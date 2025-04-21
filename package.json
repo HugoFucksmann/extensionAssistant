@@ -1,0 +1,82 @@
+{
+  "name": "extensionassistant",
+  "displayName": "Extension Assistant",
+  "description": "Asistente de IA para VS Code",
+  "version": "1.0.0",
+  "publisher": "user",
+  "engines": {
+    "vscode": "^1.96.0"
+  },
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "ai-chat-sidebar",
+          "title": "AI Chat",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "ai-chat-sidebar": [
+        {
+          "type": "webview",
+          "id": "aiChat.chatView",
+          "name": "AI Chat"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "extensionAssistant.openChat",
+        "title": "Abrir Chat de IA"
+      },
+      {
+        "command": "extensionAssistant.sendTestMessage",
+        "title": "Enviar mensaje de prueba"
+      }
+    ]
+  },
+  "scripts": {
+    "webpack": "webpack --mode development",
+    "webpack-dev": "webpack --mode development --watch",
+    "package": "webpack --mode production --devtool hidden-source-map",
+    "compile": "tsc -p ./ && npm run copy-wasm",
+    "watch": "webpack --mode development --watch",
+    "pretest": "npm run compile",
+    "copy-wasm": "mkdir -p out/wasm && cp node_modules/web-tree-sitter/tree-sitter.wasm out/wasm/ && cp node_modules/tree-sitter-typescript/tree-sitter-typescript.wasm out/wasm/"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.15.0",
+    "@babel/preset-env": "^7.15.0",
+    "@babel/preset-react": "^7.14.5",
+    "@types/node": "^20.11.0",
+    "@types/typescript": "^2.0.0",
+    "@types/vscode": "^1.96.0",
+    "babel-loader": "^8.2.2",
+    "css-loader": "^6.2.0",
+    "node-loader": "^2.1.0",
+    "style-loader": "^3.2.1",
+    "tree-sitter-cli": "^0.25.1",
+    "ts-loader": "^9.5.1",
+    "typescript": "^5.7.2",
+    "webpack": "^5.50.0",
+    "webpack-cli": "^4.8.0"
+  },
+  "dependencies": {
+    "@google/generative-ai": "^0.21.0",
+    "events": "^3.3.0",
+    "markdown-to-jsx": "^7.7.2",
+    "prismjs": "^1.29.0",
+    "react": "^17.0.2",
+    "react-dom": "^17.0.2",
+    "sqlite3": "^5.1.7",
+    "tree-sitter-javascript": "^0.23.1",
+    "tree-sitter-typescript": "^0.23.2",
+    "web-tree-sitter": "^0.25.1"
+  }
+}
