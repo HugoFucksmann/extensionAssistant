@@ -3,13 +3,6 @@ import { MemoryAgent } from '../memory/memoryAgent';
 import { ModelAgent } from '../model/modelAgent';
 
 /**
- * Interfaz para el componente que maneja la comunicación con la UI
- */
-export interface UIProvider {
-  sendMessageToWebview(message: any): void;
-}
-
-/**
  * Interfaz base para todos los agentes del sistema
  */
 export interface Agent {
@@ -31,17 +24,8 @@ export interface AgentRegistry {
  */
 export class AgentFactory {
   private agents: Partial<AgentRegistry> = {};
-  private uiProvider: UIProvider | null = null;
 
   constructor(private context: vscode.ExtensionContext) {}
-
-  /**
-   * Establece el proveedor de UI para los agentes
-   * @param uiProvider El proveedor de UI
-   */
-  public setUIProvider(uiProvider: UIProvider): void {
-    this.uiProvider = uiProvider;
-  }
 
   /**
    * Crea e inicializa todos los agentes del sistema
@@ -65,14 +49,8 @@ export class AgentFactory {
     console.log('Creando MemoryAgent...');
     const memoryAgent = new MemoryAgent(this.context);
     
-    // Inicializar con o sin notificación UI según disponibilidad
-    if (this.uiProvider) {
-      await memoryAgent.initialize(
-        (response) => this.uiProvider!.sendMessageToWebview(response)
-      );
-    } else {
-      await memoryAgent.initialize();
-    }
+    // Inicializar el agente de memoria
+    await memoryAgent.initialize();
     
     this.agents.memoryAgent = memoryAgent;
   }
@@ -119,6 +97,5 @@ export class AgentFactory {
     
     // Limpiar referencias
     this.agents = {};
-    this.uiProvider = null;
   }
 }

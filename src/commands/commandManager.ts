@@ -95,11 +95,11 @@ export class CommandManager {
    */
   private async createNewChat(): Promise<CommandResult> {
     try {
-      await this.memoryAgent.createNewChat(
-        (response) => this.uiProvider.sendMessageToWebview(response)
-      );
+      // Crear un nuevo chat sin pasar callback
+      const chatId = await this.memoryAgent.createNewChat();
       return {
-        success: true
+        success: true,
+        data: { chatId }
       };
     } catch (error: any) {
       return {

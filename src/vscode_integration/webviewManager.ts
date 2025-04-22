@@ -1,8 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { OrchestratorAgent } from '../agents/orchestratorAgent';
-import { MemoryAgent } from '../agents/memory/memoryAgent';
-import { ModelAgent } from '../agents/model/modelAgent';
+import { EventBus } from '../utils/eventBus';
+import { Events } from '../utils/events';
 
 /**
  * Clase que centraliza toda la gestión de WebView
@@ -11,33 +10,85 @@ import { ModelAgent } from '../agents/model/modelAgent';
 export class WebViewManager implements vscode.WebviewViewProvider {
   public static readonly viewType = 'aiChat.chatView';
   private _view?: vscode.WebviewView;
-
-  private _orchestratorAgent: OrchestratorAgent | null = null;
-  private _memoryAgent: MemoryAgent | null = null;
-  private _modelAgent: ModelAgent | null = null;
+  private disposables: { dispose: () => void }[] = [];
 
   constructor(
     private readonly _extensionUri: vscode.Uri
   ) {
-    // Los agentes se configurarán después de la inicialización
+    // Configurar los listeners de eventos
+    this.setupEventListeners();
   }
   
   /**
-   * Establece el agente orquestrador
-   * @param orchestratorAgent El agente orquestrador inicializado
+   * Configura los listeners de eventos para responder a eventos del sistema
    */
-  public setOrchestratorAgent(orchestratorAgent: OrchestratorAgent): void {
-    this._orchestratorAgent = orchestratorAgent;
-  }
-  
-  /**
-   * Establece los agentes especializados
-   * @param memoryAgent El agente de memoria
-   * @param modelAgent El agente de modelo
-   */
-  public setAgents(memoryAgent: MemoryAgent, modelAgent: ModelAgent): void {
-    this._memoryAgent = memoryAgent;
-    this._modelAgent = modelAgent;
+  private setupEventListeners(): void {
+    // Escuchar cuando se completa el procesamiento de un mensaje
+    const processingCompletedUnsubscribe = EventBus.subscribe(
+      Events.ORCHESTRATOR.PROCESSING_COMPLETED,
+      (data) => {
+        this.sendMessageToWebview({
+          type: 'receiveMessage',
+          message: data.assistantMessage.text,
+          isUser: false
+        });
+      }
+    );
+    
+    // Escuchar cuando hay un error en el procesamiento
+    const processingErrorUnsubscribe = EventBus.subscribe(
+      Events.ORCHESTRATOR.PROCESSING_ERROR,
+      (data) => {
+        this.sendMessageToWebview({
+          type: 'receiveMessage',
+          message: `Error al procesar la solicitud: ${data.error}`,
+          isUser: false,
+          isError: true
+        });
+      }
+    );
+    
+    // Escuchar cuando se actualiza la lista de chats
+    const chatListUpdatedUnsubscribe = EventBus.subscribe(
+      Events.MEMORY.CHAT_LIST_UPDATED,
+      (chats) => {
+        this.sendMessageToWebview({
+          type: 'historyLoaded',
+          history: chats
+        });
+      }
+    );
+    
+    // Escuchar cuando se carga un chat
+    const chatLoadedUnsubscribe = EventBus.subscribe(
+      Events.MEMORY.CHAT_LOADED,
+      (chat) => {
+        this.sendMessageToWebview({
+          type: 'chatLoaded',
+          chat
+        });
+      }
+    );
+    
+    // Escuchar cuando se crea un nuevo chat
+    const newChatCreatedUnsubscribe = EventBus.subscribe(
+      Events.MEMORY.NEW_CHAT_CREATED,
+      () => {
+        // Enviar mensaje para limpiar el chat actual en la UI
+        this.sendMessageToWebview({
+          type: 'clearChat'
+        });
+      }
+    );
+    
+    // Guardar las funciones para cancelar suscripciones
+    this.disposables.push(
+      { dispose: processingCompletedUnsubscribe },
+      { dispose: processingErrorUnsubscribe },
+      { dispose: chatListUpdatedUnsubscribe },
+      { dispose: chatLoadedUnsubscribe },
+      { dispose: newChatCreatedUnsubscribe }
+    );
   }
 
   /**
@@ -83,38 +134,40 @@ export class WebViewManager implements vscode.WebviewViewProvider {
     webviewView.webview.onDidReceiveMessage(async message => {
       console.log('Mensaje recibido del webview:', message);
       
-      try {
-        // Verificar que los agentes estén inicializados
-        if (!this._orchestratorAgent) {
-          throw new Error('OrchestratorAgent no inicializado');
-        }
-        
-        if (!this._memoryAgent || !this._modelAgent) {
-          throw new Error('Agentes especializados no inicializados');
-        }
-        
+      try {        
         switch (message.type) {
           case 'sendMessage':
-            // Procesamiento de mensajes de usuario a través del orquestador
-            await this._orchestratorAgent.processUserMessage(message.message);
+            // Mostrar el mensaje del usuario en la UI inmediatamente
+            this.sendMessageToWebview({
+              type: 'receiveMessage',
+              message: message.message,
+              isUser: true
+            });
+            
+            // Publicar evento de mensaje enviado para procesamiento
+            EventBus.publish(Events.UI.MESSAGE_SENT, {
+              message: message.message
+            });
             break;
             
           case 'newChat':
-            // Comunicación directa con el MemoryAgent
-            await this._memoryAgent.createNewChat(
-              (response: any) => this.sendMessageToWebview(response)
-            );
+            // Publicar evento de nuevo chat solicitado
+            EventBus.publish(Events.UI.NEW_CHAT_REQUESTED);
             break;
             
           case 'loadChat':
-            // Comunicación directa con el MemoryAgent
-            await this._memoryAgent.loadChat(message.chatId);
+            // Publicar evento de carga de chat solicitada
+            EventBus.publish(Events.UI.LOAD_CHAT_REQUESTED, {
+              chatId: message.chatId
+            });
             break;
             
           case 'setModel':
-            // Comunicación directa con el ModelAgent
+            // Publicar evento de cambio de modelo solicitado
             if (message.modelType === 'ollama' || message.modelType === 'gemini') {
-              await this._modelAgent.setModel(message.modelType);
+              EventBus.publish(Events.UI.MODEL_CHANGE_REQUESTED, {
+                modelType: message.modelType
+              });
             } else {
               throw new Error(`Modelo no soportado: ${message.modelType}`);
             }
@@ -182,5 +235,16 @@ export class WebViewManager implements vscode.WebviewViewProvider {
       text += possible.charAt(Math.floor(Math.random() * possible.length));
     }
     return text;
+  }
+  
+  /**
+   * Libera los recursos utilizados por el WebViewManager
+   */
+  public dispose(): void {
+    console.log('Liberando recursos del WebViewManager');
+    
+    // Cancelar todas las suscripciones a eventos
+    this.disposables.forEach(disposable => disposable.dispose());
+    this.disposables = [];
   }
 }

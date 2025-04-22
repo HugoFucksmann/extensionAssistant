@@ -36071,10 +36071,13 @@ var useMessages = function useMessages(backendService) {
     backendService.on('receiveMessage', handleReceiveMessage);
     backendService.on('chatCleared', handleChatCleared);
     backendService.on('chatLoaded', handleChatLoaded);
+    backendService.on('clearChat', handleChatCleared); // Añadir listener para clearChat
+
     return function () {
       backendService.off('receiveMessage', handleReceiveMessage);
       backendService.off('chatCleared', handleChatCleared);
       backendService.off('chatLoaded', handleChatLoaded);
+      backendService.off('clearChat', handleChatCleared); // Limpiar listener para clearChat
     };
   }, [backendService, addMessage, clearMessages]);
   return {

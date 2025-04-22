@@ -4,6 +4,7 @@ import { OrchestratorAgent } from './agents/orchestratorAgent';
 import { MemoryAgent } from './agents/memory/memoryAgent';
 import { ModelAgent } from './agents/model/modelAgent';
 import { AgentFactory } from './agents/factory';
+import { EventBus } from './utils/eventBus';
 
 export async function activate(context: vscode.ExtensionContext) {
   console.log('Extension "extensionAssistant" is now active!');
@@ -11,24 +12,19 @@ export async function activate(context: vscode.ExtensionContext) {
   // Crear la fábrica de agentes
   const agentFactory = new AgentFactory(context);
   
-  // Configurar el proveedor de UI para la fábrica
-  const webViewManager = new WebViewManager(context.extensionUri);
-  agentFactory.setUIProvider(webViewManager);
-  
   // Inicializar todos los agentes
   const agents = await agentFactory.createAndInitializeAgents();
   
-  // Crear el orquestador con los agentes ya inicializados
+  // Crear el orquestrador con los agentes ya inicializados
   const orchestratorAgent = new OrchestratorAgent(
     agents.memoryAgent,
-    agents.modelAgent,
-    webViewManager
+    agents.modelAgent
   );
   
-  // Configurar el WebViewManager con el orquestador y los agentes
-  webViewManager.setOrchestratorAgent(orchestratorAgent);
-  webViewManager.setAgents(agents.memoryAgent, agents.modelAgent);
+  // Crear e inicializar el WebViewManager
+  const webViewManager = new WebViewManager(context.extensionUri);
   
+  // Registrar el WebViewManager como proveedor de vista
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
       WebViewManager.viewType,
@@ -54,7 +50,9 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push({
     dispose: () => {
       orchestratorAgent.dispose();
+      webViewManager.dispose();
       agentFactory.dispose();
+      EventBus.dispose(); // Limpiar todos los eventos al desactivar la extensión
     }
   });
 }

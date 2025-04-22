@@ -1495,14 +1495,6 @@ class AgentFactory {
     constructor(context) {
         this.context = context;
         this.agents = {};
-        this.uiProvider = null;
-    }
-    /**
-     * Establece el proveedor de UI para los agentes
-     * @param uiProvider El proveedor de UI
-     */
-    setUIProvider(uiProvider) {
-        this.uiProvider = uiProvider;
     }
     /**
      * Crea e inicializa todos los agentes del sistema
@@ -1522,13 +1514,8 @@ class AgentFactory {
     async createMemoryAgent() {
         console.log('Creando MemoryAgent...');
         const memoryAgent = new memoryAgent_1.MemoryAgent(this.context);
-        // Inicializar con o sin notificación UI según disponibilidad
-        if (this.uiProvider) {
-            await memoryAgent.initialize((response) => this.uiProvider.sendMessageToWebview(response));
-        }
-        else {
-            await memoryAgent.initialize();
-        }
+        // Inicializar el agente de memoria
+        await memoryAgent.initialize();
         this.agents.memoryAgent = memoryAgent;
     }
     /**
@@ -1565,7 +1552,6 @@ class AgentFactory {
         });
         // Limpiar referencias
         this.agents = {};
-        this.uiProvider = null;
     }
 }
 exports.AgentFactory = AgentFactory;
@@ -1598,6 +1584,8 @@ Object.defineProperty(exports, "AgentFactory", ({ enumerable: true, get: functio
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.MemoryAgent = void 0;
 const SQLiteStorage_1 = __webpack_require__(/*! ../../db/SQLiteStorage */ "./src/db/SQLiteStorage.ts");
+const eventBus_1 = __webpack_require__(/*! ../../utils/eventBus */ "./src/utils/eventBus.ts");
+const events_1 = __webpack_require__(/*! ../../utils/events */ "./src/utils/events.ts");
 const tools_1 = __webpack_require__(/*! ./tools */ "./src/agents/memory/tools/index.ts");
 /**
  * MemoryAgent es responsable de gestionar toda la memoria de la extensión.
@@ -1610,48 +1598,30 @@ class MemoryAgent {
         this.currentChatId = null;
         this.messages = [];
         this.chatList = [];
-        // Callbacks
-        this.onChatListUpdated = null;
-        this.onChatLoadedCallback = null;
+        // Disposables para limpiar suscripciones
+        this.disposables = [];
         const storage = new SQLiteStorage_1.SQLiteStorage(context);
         // Inicializar herramientas de memoria
         this.temporaryMemory = new tools_1.TemporaryMemory();
         this.chatMemory = new tools_1.ChatMemory(storage);
         this.projectMemory = new tools_1.ProjectMemory(storage);
+        // Configurar listeners de eventos
+        this.setupEventListeners();
     }
     /**
-     * Registra un callback para cuando se actualiza la lista de chats
-     * @param callback Función a llamar cuando se actualiza la lista de chats
+     * Configura los listeners de eventos para responder a acciones del sistema
      */
-    onChatsUpdated(callback) {
-        this.onChatListUpdated = callback;
-    }
-    /**
-     * Registra un callback para cuando se carga un chat
-     * @param callback Función a llamar cuando se carga un chat
-     */
-    onChatLoaded(callback) {
-        this.onChatLoadedCallback = callback;
-    }
-    /**
-     * Configura todos los callbacks necesarios para la comunicación con otros componentes
-     * @param notifyUI Función para notificar a la UI
-     */
-    setupCallbacks(notifyUI) {
-        // Callback para cuando se actualiza la lista de chats
-        this.onChatsUpdated((chats) => {
-            notifyUI({
-                type: 'historyLoaded',
-                history: chats
-            });
+    setupEventListeners() {
+        // Escuchar cuando se solicita un nuevo chat
+        const newChatUnsubscribe = eventBus_1.EventBus.subscribe(events_1.Events.UI.NEW_CHAT_REQUESTED, async () => {
+            await this.createNewChat();
         });
-        // Callback para cuando se carga un chat
-        this.onChatLoaded((chat) => {
-            notifyUI({
-                type: 'chatLoaded',
-                chat
-            });
+        // Escuchar cuando se solicita cargar un chat
+        const loadChatUnsubscribe = eventBus_1.EventBus.subscribe(events_1.Events.UI.LOAD_CHAT_REQUESTED, async (data) => {
+            await this.loadChat(data.chatId);
         });
+        // Guardar las funciones para cancelar suscripciones
+        this.disposables.push({ dispose: newChatUnsubscribe }, { dispose: loadChatUnsubscribe });
     }
     /**
      * Almacena una memoria para un proyecto específico
@@ -1695,22 +1665,18 @@ class MemoryAgent {
     /**
      * Crea un nuevo chat y retorna su ID
      * Si hay un chat actual con mensajes, lo guarda automáticamente
-     * @param notifyUI Función opcional para notificar directamente a la UI
      * @returns El ID del nuevo chat
      */
-    async createNewChat(notifyUI) {
+    async createNewChat() {
         // Guardar el chat actual si tiene mensajes
         await this.saveCurrentChatIfNeeded();
         // Generar un ID único para el nuevo chat
         const chatId = this.chatMemory.generateChatId();
         this.currentChatId = chatId;
         this.messages = [];
-        // Notificar que se ha creado un nuevo chat (con lista de chats actualizada)
-        await this.loadChatList();
-        // Notificar directamente a la UI si se proporciona la función
-        if (notifyUI) {
-            notifyUI({ type: 'chatCleared' });
-        }
+        // Publicar evento de nuevo chat creado
+        eventBus_1.EventBus.publish(events_1.Events.MEMORY.NEW_CHAT_CREATED, { chatId });
+        console.log('Nuevo chat creado:', chatId);
         return chatId;
     }
     /**
@@ -1722,21 +1688,17 @@ class MemoryAgent {
         if (!this.currentChatId) {
             await this.createNewChat();
         }
-        const fullMessage = {
-            ...message,
-            timestamp: new Date().toISOString()
+        // Completar los campos faltantes del mensaje
+        const completeMessage = {
+            role: message.role || 'user',
+            text: message.text || '',
+            timestamp: message.timestamp || new Date().toISOString()
         };
-        this.messages.push(fullMessage);
-        // Intentar guardar el chat después de cada mensaje para evitar pérdida de datos
-        try {
-            await this.saveCurrentChatIfNeeded();
-        }
-        catch (error) {
-            console.error('Error al guardar el chat después de añadir mensaje:', error);
-        }
+        // Añadir el mensaje a la lista
+        this.messages.push(completeMessage);
     }
     /**
-     * Procesa un mensaje del usuario y la respuesta del asistente
+     * Procesa un par de mensajes (usuario y asistente) y los añade al chat actual
      * @param userText El texto del mensaje del usuario
      * @param assistantText El texto de la respuesta del asistente
      * @returns Un objeto con el mensaje del usuario y la respuesta del asistente
@@ -1749,7 +1711,7 @@ class MemoryAgent {
             timestamp: new Date().toISOString()
         };
         await this.addMessage(userMessage);
-        // Añadir respuesta del asistente
+        // Añadir mensaje del asistente
         const assistantMessage = {
             role: 'assistant',
             text: assistantText,
@@ -1760,7 +1722,7 @@ class MemoryAgent {
     }
     /**
      * Obtiene todos los mensajes del chat actual
-     * @returns Los mensajes del chat actual
+     * @returns Array con los mensajes del chat actual
      */
     getMessages() {
         return [...this.messages];
@@ -1799,11 +1761,10 @@ class MemoryAgent {
             await this.chatMemory.saveChat(this.currentChatId, chat);
             // Actualizar la lista de chats
             const updatedList = await this.chatMemory.updateChatList(chat);
-            // Actualizar la lista local y notificar
+            // Actualizar la lista local
             this.chatList = updatedList;
-            if (this.onChatListUpdated) {
-                this.onChatListUpdated(updatedList);
-            }
+            // Publicar evento de lista de chats actualizada
+            eventBus_1.EventBus.publish(events_1.Events.MEMORY.CHAT_LIST_UPDATED, updatedList);
             console.log('Chat guardado correctamente:', this.currentChatId);
         }
         catch (error) {
@@ -1818,10 +1779,8 @@ class MemoryAgent {
     async loadChatList() {
         try {
             this.chatList = await this.chatMemory.getChatList();
-            // Notificar que la lista de chats ha sido actualizada
-            if (this.onChatListUpdated) {
-                this.onChatListUpdated(this.chatList);
-            }
+            // Publicar evento de lista de chats actualizada
+            eventBus_1.EventBus.publish(events_1.Events.MEMORY.CHAT_LIST_UPDATED, this.chatList);
             return this.chatList;
         }
         catch (error) {
@@ -1842,10 +1801,8 @@ class MemoryAgent {
             if (chat) {
                 this.currentChatId = chatId;
                 this.messages = chat.messages || [];
-                // Notificar que se ha cargado un chat
-                if (this.onChatLoadedCallback) {
-                    this.onChatLoadedCallback(chat);
-                }
+                // Publicar evento de chat cargado
+                eventBus_1.EventBus.publish(events_1.Events.MEMORY.CHAT_LOADED, chat);
                 return chat;
             }
             return null;
@@ -1858,9 +1815,8 @@ class MemoryAgent {
     /**
      * Inicializa el agente de memoria
      * Carga la lista de chats al inicio y asegura que haya un chat actual
-     * @param notifyUI Función opcional para notificar a la UI
      */
-    async initialize(notifyUI) {
+    async initialize() {
         console.log('MemoryAgent inicializado');
         await this.loadChatList();
         // Asegurar que siempre haya un chat actual válido
@@ -1870,17 +1826,19 @@ class MemoryAgent {
             this.messages = [];
             console.log('Nuevo chat creado al inicializar:', this.currentChatId);
         }
-        // Configurar callbacks si se proporciona la función de notificación
-        if (notifyUI) {
-            this.setupCallbacks(notifyUI);
-        }
     }
     /**
      * Limpia los recursos cuando se desactiva la extensión
      */
     dispose() {
         console.log('MemoryAgent eliminado');
-        // Guardar cualquier estado pendiente si es necesario
+        // Guardar cualquier estado pendiente
+        this.saveCurrentChatIfNeeded().catch(err => {
+            console.error('Error al guardar el chat durante la desactivación:', err);
+        });
+        // Cancelar todas las suscripciones a eventos
+        this.disposables.forEach(disposable => disposable.dispose());
+        this.disposables = [];
     }
 }
 exports.MemoryAgent = MemoryAgent;
@@ -2174,14 +2132,26 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.ModelAgent = void 0;
 const vscode = __importStar(__webpack_require__(/*! vscode */ "vscode"));
 const baseAPI_1 = __webpack_require__(/*! ../../models/baseAPI */ "./src/models/baseAPI.ts");
+const eventBus_1 = __webpack_require__(/*! ../../utils/eventBus */ "./src/utils/eventBus.ts");
+const events_1 = __webpack_require__(/*! ../../utils/events */ "./src/utils/events.ts");
 /**
  * ModelAgent es responsable de gestionar la interacción con los modelos de lenguaje.
  * Encapsula la lógica de selección de modelo, generación de respuestas y gestión de solicitudes.
  */
 class ModelAgent {
     constructor() {
+        this.disposables = [];
         // Inicializar con el modelo predeterminado
         this.modelAPI = new baseAPI_1.BaseAPI("gemini");
+        // Configurar listeners de eventos
+        this.setupEventListeners();
+    }
+    /**
+     * Configura los listeners de eventos para responder a acciones del sistema
+     */
+    setupEventListeners() {
+        // No hay eventos específicos a los que el ModelAgent necesite suscribirse inicialmente
+        // Los eventos se manejan a través de métodos públicos que son llamados por el OrchestratorAgent
     }
     /**
      * Inicializa el agente de modelo
@@ -2201,6 +2171,8 @@ class ModelAgent {
     setModel(modelType) {
         this.modelAPI.setModel(modelType);
         console.log(`Modelo cambiado a: ${modelType}`);
+        // Publicar evento de cambio de modelo
+        eventBus_1.EventBus.publish(events_1.Events.MODEL.MODEL_CHANGED, { modelType });
     }
     /**
      * Genera una respuesta utilizando el modelo actual
@@ -2228,6 +2200,9 @@ class ModelAgent {
     dispose() {
         console.log('ModelAgent eliminado');
         this.abortRequest();
+        // Cancelar todas las suscripciones a eventos
+        this.disposables.forEach(disposable => disposable.dispose());
+        this.disposables = [];
     }
 }
 exports.ModelAgent = ModelAgent;
@@ -2278,20 +2253,30 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.OrchestratorAgent = void 0;
 const vscode = __importStar(__webpack_require__(/*! vscode */ "vscode"));
-/**
- * OrchestratorAgent es responsable de coordinar todos los agentes en la extensión.
- * Maneja los mensajes de la UI y delega tareas a los agentes especializados apropiados.
- */
+const eventBus_1 = __webpack_require__(/*! ../utils/eventBus */ "./src/utils/eventBus.ts");
+const events_1 = __webpack_require__(/*! ../utils/events */ "./src/utils/events.ts");
 /**
  * OrchestratorAgent es responsable de coordinar el flujo de procesamiento de mensajes
- * entre los diferentes agentes especializados.
+ * entre los diferentes agentes especializados utilizando un sistema de eventos.
  */
 class OrchestratorAgent {
-    constructor(memoryAgent, modelAgent, uiProvider) {
+    constructor(memoryAgent, modelAgent) {
         this.memoryAgent = memoryAgent;
         this.modelAgent = modelAgent;
-        this.uiProvider = uiProvider;
+        this.disposables = [];
         console.log('OrchestratorAgent inicializado');
+        this.setupEventListeners();
+    }
+    /**
+     * Configura los listeners de eventos para responder a acciones del sistema
+     */
+    setupEventListeners() {
+        // Suscribirse al evento de mensaje enviado desde la UI
+        const messageSentUnsubscribe = eventBus_1.EventBus.subscribe(events_1.Events.UI.MESSAGE_SENT, (data) => this.processUserMessage(data.message));
+        // Suscribirse al evento de cambio de modelo
+        const modelChangeUnsubscribe = eventBus_1.EventBus.subscribe(events_1.Events.UI.MODEL_CHANGE_REQUESTED, (data) => this.modelAgent.setModel(data.modelType));
+        // Guardar las funciones para cancelar suscripciones
+        this.disposables.push({ dispose: messageSentUnsubscribe }, { dispose: modelChangeUnsubscribe });
     }
     /**
      * Procesa un mensaje del usuario
@@ -2299,28 +2284,27 @@ class OrchestratorAgent {
      */
     async processUserMessage(message) {
         console.log(`OrchestratorAgent procesando mensaje: ${message}`);
-        // Mostrar una notificación en VS Code
+        // Notificar que se inició el procesamiento
+        eventBus_1.EventBus.publish(events_1.Events.ORCHESTRATOR.PROCESSING_STARTED, { message });
+        // Mostrar una notificación en VS Code (opcional, para depuración)
         vscode.window.showInformationMessage(`Procesando: ${message}`);
         try {
             // 1. Obtener respuesta del modelo
             const assistantResponse = await this.modelAgent.generateResponse(message);
             // 2. Guardar el par mensaje-respuesta en la memoria
-            await this.memoryAgent.processMessagePair(message, assistantResponse);
-            // 3. Enviar la respuesta a la UI
-            this.uiProvider.sendMessageToWebview({
-                type: 'receiveMessage',
-                message: assistantResponse,
-                isUser: false
+            const messagePair = await this.memoryAgent.processMessagePair(message, assistantResponse);
+            // 3. Notificar que se completó el procesamiento
+            eventBus_1.EventBus.publish(events_1.Events.ORCHESTRATOR.PROCESSING_COMPLETED, {
+                userMessage: messagePair.userMessage,
+                assistantMessage: messagePair.assistantMessage
             });
         }
         catch (error) {
             console.error('Error al procesar mensaje:', error);
-            // Notificar error a la UI
-            this.uiProvider.sendMessageToWebview({
-                type: 'receiveMessage',
-                message: `Error al procesar la solicitud: ${error.message || 'Desconocido'}`,
-                isUser: false,
-                isError: true
+            // Notificar error
+            eventBus_1.EventBus.publish(events_1.Events.ORCHESTRATOR.PROCESSING_ERROR, {
+                message,
+                error: error.message || 'Error desconocido'
             });
         }
     }
@@ -2329,7 +2313,9 @@ class OrchestratorAgent {
      */
     dispose() {
         console.log('Liberando recursos del OrchestratorAgent');
-        // No hay recursos propios que liberar
+        // Cancelar todas las suscripciones a eventos
+        this.disposables.forEach(disposable => disposable.dispose());
+        this.disposables = [];
     }
 }
 exports.OrchestratorAgent = OrchestratorAgent;
@@ -2563,20 +2549,18 @@ const vscode = __importStar(__webpack_require__(/*! vscode */ "vscode"));
 const webviewManager_1 = __webpack_require__(/*! ./vscode_integration/webviewManager */ "./src/vscode_integration/webviewManager.ts");
 const orchestratorAgent_1 = __webpack_require__(/*! ./agents/orchestratorAgent */ "./src/agents/orchestratorAgent.ts");
 const factory_1 = __webpack_require__(/*! ./agents/factory */ "./src/agents/factory/index.ts");
+const eventBus_1 = __webpack_require__(/*! ./utils/eventBus */ "./src/utils/eventBus.ts");
 async function activate(context) {
     console.log('Extension "extensionAssistant" is now active!');
     // Crear la fábrica de agentes
     const agentFactory = new factory_1.AgentFactory(context);
-    // Configurar el proveedor de UI para la fábrica
-    const webViewManager = new webviewManager_1.WebViewManager(context.extensionUri);
-    agentFactory.setUIProvider(webViewManager);
     // Inicializar todos los agentes
     const agents = await agentFactory.createAndInitializeAgents();
-    // Crear el orquestador con los agentes ya inicializados
-    const orchestratorAgent = new orchestratorAgent_1.OrchestratorAgent(agents.memoryAgent, agents.modelAgent, webViewManager);
-    // Configurar el WebViewManager con el orquestador y los agentes
-    webViewManager.setOrchestratorAgent(orchestratorAgent);
-    webViewManager.setAgents(agents.memoryAgent, agents.modelAgent);
+    // Crear el orquestrador con los agentes ya inicializados
+    const orchestratorAgent = new orchestratorAgent_1.OrchestratorAgent(agents.memoryAgent, agents.modelAgent);
+    // Crear e inicializar el WebViewManager
+    const webViewManager = new webviewManager_1.WebViewManager(context.extensionUri);
+    // Registrar el WebViewManager como proveedor de vista
     context.subscriptions.push(vscode.window.registerWebviewViewProvider(webviewManager_1.WebViewManager.viewType, webViewManager));
     // Registrar un comando para abrir la vista de chat
     context.subscriptions.push(vscode.commands.registerCommand('extensionAssistant.openChat', () => {
@@ -2590,7 +2574,9 @@ async function activate(context) {
     context.subscriptions.push({
         dispose: () => {
             orchestratorAgent.dispose();
+            webViewManager.dispose();
             agentFactory.dispose();
+            eventBus_1.EventBus.dispose(); // Limpiar todos los eventos al desactivar la extensión
         }
     });
 }
@@ -2863,6 +2849,123 @@ exports.OllamaAPI = OllamaAPI;
 
 /***/ }),
 
+/***/ "./src/utils/eventBus.ts":
+/*!*******************************!*\
+  !*** ./src/utils/eventBus.ts ***!
+  \*******************************/
+/***/ ((__unused_webpack_module, exports) => {
+
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.EventBus = void 0;
+class EventBus {
+    /**
+     * Suscribe una función callback a un evento específico
+     * @param event Nombre del evento
+     * @param callback Función a ejecutar cuando ocurra el evento
+     * @returns Función para cancelar la suscripción
+     */
+    static subscribe(event, callback) {
+        if (!this.listeners.has(event)) {
+            this.listeners.set(event, []);
+        }
+        this.listeners.get(event).push(callback);
+        // Retornar función para cancelar la suscripción
+        return () => {
+            const callbacks = this.listeners.get(event);
+            if (callbacks) {
+                const index = callbacks.indexOf(callback);
+                if (index !== -1) {
+                    callbacks.splice(index, 1);
+                }
+            }
+        };
+    }
+    /**
+     * Publica un evento con datos opcionales
+     * @param event Nombre del evento
+     * @param data Datos opcionales para pasar a los suscriptores
+     */
+    static publish(event, data) {
+        if (this.listeners.has(event)) {
+            // Crear una copia del array para evitar problemas si un suscriptor
+            // se da de baja durante la ejecución
+            const callbacks = [...this.listeners.get(event)];
+            callbacks.forEach(callback => callback(data));
+        }
+    }
+    /**
+     * Elimina todas las suscripciones a un evento específico
+     * @param event Nombre del evento
+     */
+    static clear(event) {
+        this.listeners.delete(event);
+    }
+    /**
+     * Elimina todas las suscripciones
+     */
+    static clearAll() {
+        this.listeners.clear();
+    }
+    /**
+     * Libera todos los recursos y limpia todas las suscripciones
+     * Debe llamarse cuando la extensión se desactiva
+     */
+    static dispose() {
+        console.log('Liberando recursos del EventBus');
+        this.clearAll();
+    }
+}
+exports.EventBus = EventBus;
+EventBus.listeners = new Map();
+
+
+/***/ }),
+
+/***/ "./src/utils/events.ts":
+/*!*****************************!*\
+  !*** ./src/utils/events.ts ***!
+  \*****************************/
+/***/ ((__unused_webpack_module, exports) => {
+
+
+/**
+ * Definición de eventos de la aplicación
+ * Centraliza todos los nombres de eventos para evitar errores de tipeo
+ */
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.Events = void 0;
+exports.Events = {
+    // Eventos de UI
+    UI: {
+        MESSAGE_SENT: 'ui:message:sent',
+        NEW_CHAT_REQUESTED: 'ui:chat:new',
+        LOAD_CHAT_REQUESTED: 'ui:chat:load',
+        MODEL_CHANGE_REQUESTED: 'ui:model:change'
+    },
+    // Eventos del orquestador
+    ORCHESTRATOR: {
+        PROCESSING_STARTED: 'orchestrator:processing:started',
+        PROCESSING_COMPLETED: 'orchestrator:processing:completed',
+        PROCESSING_ERROR: 'orchestrator:processing:error'
+    },
+    // Eventos de memoria
+    MEMORY: {
+        CHAT_LIST_UPDATED: 'memory:chat:list:updated',
+        CHAT_LOADED: 'memory:chat:loaded',
+        CHAT_SAVED: 'memory:chat:saved',
+        NEW_CHAT_CREATED: 'memory:chat:new:created'
+    },
+    // Eventos de modelo
+    MODEL: {
+        RESPONSE_GENERATED: 'model:response:generated',
+        MODEL_CHANGED: 'model:changed'
+    }
+};
+
+
+/***/ }),
+
 /***/ "./src/vscode_integration/webviewManager.ts":
 /*!**************************************************!*\
   !*** ./src/vscode_integration/webviewManager.ts ***!
@@ -2906,6 +3009,8 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.WebViewManager = void 0;
 const vscode = __importStar(__webpack_require__(/*! vscode */ "vscode"));
+const eventBus_1 = __webpack_require__(/*! ../utils/eventBus */ "./src/utils/eventBus.ts");
+const events_1 = __webpack_require__(/*! ../utils/events */ "./src/utils/events.ts");
 /**
  * Clase que centraliza toda la gestión de WebView
  * Maneja la creación, configuración y comunicación con el WebView
@@ -2913,26 +3018,54 @@ const vscode = __importStar(__webpack_require__(/*! vscode */ "vscode"));
 class WebViewManager {
     constructor(_extensionUri) {
         this._extensionUri = _extensionUri;
-        this._orchestratorAgent = null;
-        this._memoryAgent = null;
-        this._modelAgent = null;
-        // Los agentes se configurarán después de la inicialización
+        this.disposables = [];
+        // Configurar los listeners de eventos
+        this.setupEventListeners();
     }
     /**
-     * Establece el agente orquestrador
-     * @param orchestratorAgent El agente orquestrador inicializado
+     * Configura los listeners de eventos para responder a eventos del sistema
      */
-    setOrchestratorAgent(orchestratorAgent) {
-        this._orchestratorAgent = orchestratorAgent;
-    }
-    /**
-     * Establece los agentes especializados
-     * @param memoryAgent El agente de memoria
-     * @param modelAgent El agente de modelo
-     */
-    setAgents(memoryAgent, modelAgent) {
-        this._memoryAgent = memoryAgent;
-        this._modelAgent = modelAgent;
+    setupEventListeners() {
+        // Escuchar cuando se completa el procesamiento de un mensaje
+        const processingCompletedUnsubscribe = eventBus_1.EventBus.subscribe(events_1.Events.ORCHESTRATOR.PROCESSING_COMPLETED, (data) => {
+            this.sendMessageToWebview({
+                type: 'receiveMessage',
+                message: data.assistantMessage.text,
+                isUser: false
+            });
+        });
+        // Escuchar cuando hay un error en el procesamiento
+        const processingErrorUnsubscribe = eventBus_1.EventBus.subscribe(events_1.Events.ORCHESTRATOR.PROCESSING_ERROR, (data) => {
+            this.sendMessageToWebview({
+                type: 'receiveMessage',
+                message: `Error al procesar la solicitud: ${data.error}`,
+                isUser: false,
+                isError: true
+            });
+        });
+        // Escuchar cuando se actualiza la lista de chats
+        const chatListUpdatedUnsubscribe = eventBus_1.EventBus.subscribe(events_1.Events.MEMORY.CHAT_LIST_UPDATED, (chats) => {
+            this.sendMessageToWebview({
+                type: 'historyLoaded',
+                history: chats
+            });
+        });
+        // Escuchar cuando se carga un chat
+        const chatLoadedUnsubscribe = eventBus_1.EventBus.subscribe(events_1.Events.MEMORY.CHAT_LOADED, (chat) => {
+            this.sendMessageToWebview({
+                type: 'chatLoaded',
+                chat
+            });
+        });
+        // Escuchar cuando se crea un nuevo chat
+        const newChatCreatedUnsubscribe = eventBus_1.EventBus.subscribe(events_1.Events.MEMORY.NEW_CHAT_CREATED, () => {
+            // Enviar mensaje para limpiar el chat actual en la UI
+            this.sendMessageToWebview({
+                type: 'clearChat'
+            });
+        });
+        // Guardar las funciones para cancelar suscripciones
+        this.disposables.push({ dispose: processingCompletedUnsubscribe }, { dispose: processingErrorUnsubscribe }, { dispose: chatListUpdatedUnsubscribe }, { dispose: chatLoadedUnsubscribe }, { dispose: newChatCreatedUnsubscribe });
     }
     /**
      * Método requerido por la interfaz WebviewViewProvider
@@ -2968,30 +3101,35 @@ class WebViewManager {
         webviewView.webview.onDidReceiveMessage(async (message) => {
             console.log('Mensaje recibido del webview:', message);
             try {
-                // Verificar que los agentes estén inicializados
-                if (!this._orchestratorAgent) {
-                    throw new Error('OrchestratorAgent no inicializado');
-                }
-                if (!this._memoryAgent || !this._modelAgent) {
-                    throw new Error('Agentes especializados no inicializados');
-                }
                 switch (message.type) {
                     case 'sendMessage':
-                        // Procesamiento de mensajes de usuario a través del orquestador
-                        await this._orchestratorAgent.processUserMessage(message.message);
+                        // Mostrar el mensaje del usuario en la UI inmediatamente
+                        this.sendMessageToWebview({
+                            type: 'receiveMessage',
+                            message: message.message,
+                            isUser: true
+                        });
+                        // Publicar evento de mensaje enviado para procesamiento
+                        eventBus_1.EventBus.publish(events_1.Events.UI.MESSAGE_SENT, {
+                            message: message.message
+                        });
                         break;
                     case 'newChat':
-                        // Comunicación directa con el MemoryAgent
-                        await this._memoryAgent.createNewChat((response) => this.sendMessageToWebview(response));
+                        // Publicar evento de nuevo chat solicitado
+                        eventBus_1.EventBus.publish(events_1.Events.UI.NEW_CHAT_REQUESTED);
                         break;
                     case 'loadChat':
-                        // Comunicación directa con el MemoryAgent
-                        await this._memoryAgent.loadChat(message.chatId);
+                        // Publicar evento de carga de chat solicitada
+                        eventBus_1.EventBus.publish(events_1.Events.UI.LOAD_CHAT_REQUESTED, {
+                            chatId: message.chatId
+                        });
                         break;
                     case 'setModel':
-                        // Comunicación directa con el ModelAgent
+                        // Publicar evento de cambio de modelo solicitado
                         if (message.modelType === 'ollama' || message.modelType === 'gemini') {
-                            await this._modelAgent.setModel(message.modelType);
+                            eventBus_1.EventBus.publish(events_1.Events.UI.MODEL_CHANGE_REQUESTED, {
+                                modelType: message.modelType
+                            });
                         }
                         else {
                             throw new Error(`Modelo no soportado: ${message.modelType}`);
@@ -3054,6 +3192,15 @@ class WebViewManager {
             text += possible.charAt(Math.floor(Math.random() * possible.length));
         }
         return text;
+    }
+    /**
+     * Libera los recursos utilizados por el WebViewManager
+     */
+    dispose() {
+        console.log('Liberando recursos del WebViewManager');
+        // Cancelar todas las suscripciones a eventos
+        this.disposables.forEach(disposable => disposable.dispose());
+        this.disposables = [];
     }
 }
 exports.WebViewManager = WebViewManager;

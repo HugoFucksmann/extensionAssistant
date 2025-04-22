@@ -1,32 +1,46 @@
 import * as vscode from 'vscode';
+import { EventBus } from '../utils/eventBus';
+import { Events } from '../utils/events';
 import { MemoryAgent } from './memory/memoryAgent';
 import { ModelAgent } from './model/modelAgent';
 
 /**
- * Interfaz para el componente que maneja la comunicación con la UI
- */
-export interface UIProvider {
-  sendMessageToWebview(message: any): void;
-}
-
-/**
- * OrchestratorAgent es responsable de coordinar todos los agentes en la extensión.
- * Maneja los mensajes de la UI y delega tareas a los agentes especializados apropiados.
- */
-/**
  * OrchestratorAgent es responsable de coordinar el flujo de procesamiento de mensajes
- * entre los diferentes agentes especializados.
+ * entre los diferentes agentes especializados utilizando un sistema de eventos.
  */
 export class OrchestratorAgent {
+  private disposables: { dispose: () => void }[] = [];
+
   constructor(
     private memoryAgent: MemoryAgent,
-    private modelAgent: ModelAgent,
-    private uiProvider: UIProvider
+    private modelAgent: ModelAgent
   ) {
     console.log('OrchestratorAgent inicializado');
+    this.setupEventListeners();
   }
 
-
+  /**
+   * Configura los listeners de eventos para responder a acciones del sistema
+   */
+  private setupEventListeners(): void {
+    // Suscribirse al evento de mensaje enviado desde la UI
+    const messageSentUnsubscribe = EventBus.subscribe(
+      Events.UI.MESSAGE_SENT,
+      (data: { message: string }) => this.processUserMessage(data.message)
+    );
+    
+    // Suscribirse al evento de cambio de modelo
+    const modelChangeUnsubscribe = EventBus.subscribe(
+      Events.UI.MODEL_CHANGE_REQUESTED,
+      (data: { modelType: 'ollama' | 'gemini' }) => this.modelAgent.setModel(data.modelType)
+    );
+    
+    // Guardar las funciones para cancelar suscripciones
+    this.disposables.push(
+      { dispose: messageSentUnsubscribe },
+      { dispose: modelChangeUnsubscribe }
+    );
+  }
 
   /**
    * Procesa un mensaje del usuario
@@ -35,7 +49,10 @@ export class OrchestratorAgent {
   public async processUserMessage(message: string): Promise<void> {
     console.log(`OrchestratorAgent procesando mensaje: ${message}`);
     
-    // Mostrar una notificación en VS Code
+    // Notificar que se inició el procesamiento
+    EventBus.publish(Events.ORCHESTRATOR.PROCESSING_STARTED, { message });
+    
+    // Mostrar una notificación en VS Code (opcional, para depuración)
     vscode.window.showInformationMessage(`Procesando: ${message}`);
     
     try {
@@ -43,39 +60,32 @@ export class OrchestratorAgent {
       const assistantResponse = await this.modelAgent.generateResponse(message);
       
       // 2. Guardar el par mensaje-respuesta en la memoria
-      await this.memoryAgent.processMessagePair(message, assistantResponse);
+      const messagePair = await this.memoryAgent.processMessagePair(message, assistantResponse);
       
-      // 3. Enviar la respuesta a la UI
-      this.uiProvider.sendMessageToWebview({
-        type: 'receiveMessage',
-        message: assistantResponse,
-        isUser: false
+      // 3. Notificar que se completó el procesamiento
+      EventBus.publish(Events.ORCHESTRATOR.PROCESSING_COMPLETED, {
+        userMessage: messagePair.userMessage,
+        assistantMessage: messagePair.assistantMessage
       });
     } catch (error: any) {
       console.error('Error al procesar mensaje:', error);
       
-      // Notificar error a la UI
-      this.uiProvider.sendMessageToWebview({
-        type: 'receiveMessage',
-        message: `Error al procesar la solicitud: ${error.message || 'Desconocido'}`,
-        isUser: false,
-        isError: true
+      // Notificar error
+      EventBus.publish(Events.ORCHESTRATOR.PROCESSING_ERROR, {
+        message,
+        error: error.message || 'Error desconocido'
       });
     }
   }
-
-
-
-
-  
-
-
 
   /**
    * Libera los recursos utilizados por el agente orquestador
    */
   public dispose(): void {
     console.log('Liberando recursos del OrchestratorAgent');
-    // No hay recursos propios que liberar
+    
+    // Cancelar todas las suscripciones a eventos
+    this.disposables.forEach(disposable => disposable.dispose());
+    this.disposables = [];
   }
 }

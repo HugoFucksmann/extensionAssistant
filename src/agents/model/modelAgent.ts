@@ -1,5 +1,7 @@
 import * as vscode from 'vscode';
 import { BaseAPI } from '../../models/baseAPI';
+import { EventBus } from '../../utils/eventBus';
+import { Events } from '../../utils/events';
 
 /**
  * ModelAgent es responsable de gestionar la interacción con los modelos de lenguaje.
@@ -7,10 +9,22 @@ import { BaseAPI } from '../../models/baseAPI';
  */
 export class ModelAgent {
   private modelAPI: BaseAPI;
+  private disposables: { dispose: () => void }[] = [];
   
   constructor() {
     // Inicializar con el modelo predeterminado
     this.modelAPI = new BaseAPI("gemini");
+    
+    // Configurar listeners de eventos
+    this.setupEventListeners();
+  }
+  
+  /**
+   * Configura los listeners de eventos para responder a acciones del sistema
+   */
+  private setupEventListeners(): void {
+    // No hay eventos específicos a los que el ModelAgent necesite suscribirse inicialmente
+    // Los eventos se manejan a través de métodos públicos que son llamados por el OrchestratorAgent
   }
   
   /**
@@ -33,6 +47,9 @@ export class ModelAgent {
   public setModel(modelType: "ollama" | "gemini"): void {
     this.modelAPI.setModel(modelType);
     console.log(`Modelo cambiado a: ${modelType}`);
+    
+    // Publicar evento de cambio de modelo
+    EventBus.publish(Events.MODEL.MODEL_CHANGED, { modelType });
   }
   
   /**
@@ -62,5 +79,9 @@ export class ModelAgent {
   public dispose(): void {
     console.log('ModelAgent eliminado');
     this.abortRequest();
+    
+    // Cancelar todas las suscripciones a eventos
+    this.disposables.forEach(disposable => disposable.dispose());
+    this.disposables = [];
   }
 }
