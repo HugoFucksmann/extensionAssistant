@@ -9,7 +9,8 @@ export const ACTIONS = {
   LOAD_CHAT: 'loadChat',
   LOAD_HISTORY: 'loadHistory',
   CLEAR_CONVERSATION: 'clearConversation',
-  GET_PROJECT_FILES: 'getProjectFiles'
+  GET_PROJECT_FILES: 'getProjectFiles',
+  NEW_CHAT: 'newChat'
 };
 
 class BackendService {

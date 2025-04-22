@@ -1,5 +1,6 @@
 import React, { memo } from "react";
 import { useAppContext } from "../context/AppContext";
+import { ACTIONS } from "../services/BackendService";
 
 const styles = {
   header: {
@@ -43,15 +44,21 @@ const styles = {
 const Header = () => {
   try {
     console.log("Renderizando Header");
-    const { clearChat, handleShowHistory, model, setModel } = useAppContext();
+    const { handleShowHistory, model, setModel, backendService } = useAppContext();
 
     const handleModelChange = (event) => {
       setModel(event.target.value);
     };
 
+    const handleNewChat = () => {
+      console.log("Enviando comando newChat al backend");
+      // Enviar comando al backend para crear un nuevo chat
+      backendService.send(ACTIONS.NEW_CHAT);
+    };
+
     return (
       <header style={styles.header}>
-        <button onClick={clearChat} style={styles.button}>
+        <button onClick={handleNewChat} style={styles.button}>
           New Chat
         </button>
         <button onClick={handleShowHistory} style={styles.button}>

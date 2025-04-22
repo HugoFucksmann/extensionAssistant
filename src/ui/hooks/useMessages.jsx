@@ -20,12 +20,6 @@ export const useMessages = (backendService) => {
   });
   const [currentMessage, setCurrentMessage] = useState("");
 
-  useEffect(() => {
-    if (backendService) {
-      backendService.setState({ messages });
-    }
-  }, [messages, backendService]);
-
   const addMessage = useCallback((message) => {
     setMessages(prev => [...prev, normalizeMessage(message)]);
   }, []);
@@ -37,6 +31,52 @@ export const useMessages = (backendService) => {
       backendService.setState({ messages: [] });
     }
   }, [backendService]);
+
+  useEffect(() => {
+    if (backendService) {
+      backendService.setState({ messages });
+    }
+  }, [messages, backendService]);
+
+  // Configurar listeners para mensajes recibidos del backend
+  useEffect(() => {
+    if (!backendService) return;
+
+    const handleReceiveMessage = (data) => {
+      console.log('Mensaje recibido del backend:', data);
+      if (data.message) {
+        addMessage({
+          role: data.isUser ? 'user' : 'assistant',
+          text: data.message,
+          files: data.files || []
+        });
+      }
+    };
+
+    const handleChatCleared = () => {
+      console.log('Chat limpiado');
+      clearMessages();
+    };
+
+    const handleChatLoaded = (data) => {
+      console.log('Chat cargado:', data);
+      if (data.chat && data.chat.messages) {
+        setMessages(data.chat.messages.map(normalizeMessage));
+      }
+    };
+
+    backendService.on('receiveMessage', handleReceiveMessage);
+    backendService.on('chatCleared', handleChatCleared);
+    backendService.on('chatLoaded', handleChatLoaded);
+
+    return () => {
+      backendService.off('receiveMessage', handleReceiveMessage);
+      backendService.off('chatCleared', handleChatCleared);
+      backendService.off('chatLoaded', handleChatLoaded);
+    };
+  }, [backendService, addMessage, clearMessages]);
+
+
 
   return {
     messages,

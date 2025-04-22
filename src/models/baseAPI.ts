@@ -29,8 +29,8 @@ export class BaseAPI {
   private getModelInstance(): ModelAPI {
     if (!this.modelInstance) {
       // Importaciones dinámicas para evitar dependencias circulares
-      const { OllamaAPI } = require("./OllamaAPI");
-      const { GeminiAPI } = require("./GeminiAPI");
+      const { OllamaAPI } = require("./ollama");
+      const { GeminiAPI } = require("./gemini");
 
       if (this.currentModel === "ollama") {
         this.modelInstance = new OllamaAPI();

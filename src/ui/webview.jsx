@@ -44,14 +44,15 @@ function Chat() {
   );
 }
 
-// Inicializar vscode una sola vez
+// Inicializar vscode una sola vez con manejo de errores mejorado
 let vscode;
 try {
   console.log('Intentando adquirir vscode API');
   vscode = acquireVsCodeApi();
-  console.log('vscode API adquirida:', vscode);
+  console.log('vscode API adquirida correctamente');
 } catch (error) {
   console.error('Error al adquirir vscode API:', error);
+  // Proporcionar un mock para entornos de desarrollo/prueba
   vscode = {
     postMessage: (msg) => console.log('Mock postMessage:', msg),
     getState: () => ({}),
@@ -59,23 +60,26 @@ try {
   };
 }
 
-// Renderizar la aplicación
-const root = document.getElementById("root");
-console.log('Elemento root encontrado:', root);
-
-try {
-  console.log('Intentando renderizar React app');
-  ReactDOM.render(
-    <AppProvider vscode={vscode}>
-      <Chat />
-    </AppProvider>,
-    root
-  );
-  console.log('ReactDOM.render ejecutado correctamente');
-} catch (error) {
-  console.error('Error al renderizar React app:', error);
-  // Fallback para mostrar algo en caso de error
-  if (root) {
+// Función para renderizar la aplicación con manejo de errores mejorado
+function renderApp() {
+  const root = document.getElementById("root");
+  if (!root) {
+    console.error('Elemento root no encontrado');
+    return;
+  }
+  
+  try {
+    console.log('Renderizando React app');
+    ReactDOM.render(
+      <AppProvider vscode={vscode}>
+        <Chat />
+      </AppProvider>,
+      root
+    );
+    console.log('React app renderizada correctamente');
+  } catch (error) {
+    console.error('Error al renderizar React app:', error);
+    // Fallback para mostrar algo en caso de error
     root.innerHTML = `
       <div style="padding: 20px; color: red;">
         <h2>Error al cargar la UI</h2>
@@ -84,3 +88,6 @@ try {
     `;
   }
 }
+
+// Iniciar la aplicación
+renderApp();

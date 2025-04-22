@@ -34594,6 +34594,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export */ });
 /* harmony import */ var react__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! react */ "./node_modules/react/index.js");
 /* harmony import */ var _context_AppContext__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../context/AppContext */ "./src/ui/context/AppContext.jsx");
+/* harmony import */ var _services_BackendService__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../services/BackendService */ "./src/ui/services/BackendService.js");
+
 
 
 var styles = {
@@ -34638,17 +34640,22 @@ var Header = function Header() {
   try {
     console.log("Renderizando Header");
     var _useAppContext = (0,_context_AppContext__WEBPACK_IMPORTED_MODULE_1__.useAppContext)(),
-      clearChat = _useAppContext.clearChat,
       handleShowHistory = _useAppContext.handleShowHistory,
       model = _useAppContext.model,
-      setModel = _useAppContext.setModel;
+      setModel = _useAppContext.setModel,
+      backendService = _useAppContext.backendService;
     var handleModelChange = function handleModelChange(event) {
       setModel(event.target.value);
+    };
+    var handleNewChat = function handleNewChat() {
+      console.log("Enviando comando newChat al backend");
+      // Enviar comando al backend para crear un nuevo chat
+      backendService.send(_services_BackendService__WEBPACK_IMPORTED_MODULE_2__.ACTIONS.NEW_CHAT);
     };
     return /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0__.createElement("header", {
       style: styles.header
     }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0__.createElement("button", {
-      onClick: clearChat,
+      onClick: handleNewChat,
       style: styles.button
     }, "New Chat"), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0__.createElement("button", {
       onClick: handleShowHistory,
@@ -35404,10 +35411,6 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _hooks_useMessages__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ../hooks/useMessages */ "./src/ui/hooks/useMessages.jsx");
 /* harmony import */ var _hooks_useProjectFiles__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ../hooks/useProjectFiles */ "./src/ui/hooks/useProjectFiles.jsx");
 /* harmony import */ var _services_BackendService__WEBPACK_IMPORTED_MODULE_4__ = __webpack_require__(/*! ../services/BackendService */ "./src/ui/services/BackendService.js");
-function _toConsumableArray(r) { return _arrayWithoutHoles(r) || _iterableToArray(r) || _unsupportedIterableToArray(r) || _nonIterableSpread(); }
-function _nonIterableSpread() { throw new TypeError("Invalid attempt to spread non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
-function _iterableToArray(r) { if ("undefined" != typeof Symbol && null != r[Symbol.iterator] || null != r["@@iterator"]) return Array.from(r); }
-function _arrayWithoutHoles(r) { if (Array.isArray(r)) return _arrayLikeToArray(r); }
 function _slicedToArray(r, e) { return _arrayWithHoles(r) || _iterableToArrayLimit(r, e) || _unsupportedIterableToArray(r, e) || _nonIterableRest(); }
 function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance.\nIn order to be iterable, non-array objects must have a [Symbol.iterator]() method."); }
 function _unsupportedIterableToArray(r, a) { if (r) { if ("string" == typeof r) return _arrayLikeToArray(r, a); var t = {}.toString.call(r).slice(8, -1); return "Object" === t && r.constructor && (t = r.constructor.name), "Map" === t || "Set" === t ? Array.from(r) : "Arguments" === t || /^(?:Ui|I)nt(?:8|16|32)(?:Clamped)?Array$/.test(t) ? _arrayLikeToArray(r, a) : void 0; } }
@@ -35438,12 +35441,28 @@ var AppProvider = function AppProvider(_ref) {
     vscode = _ref.vscode;
   console.log("Inicializando AppProvider");
 
-  // Estado básico
+  // Inicializar el servicio de backend
   var _useState = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(function () {
       return (0,_services_BackendService__WEBPACK_IMPORTED_MODULE_4__.createBackendService)(vscode);
     }),
     _useState2 = _slicedToArray(_useState, 1),
     backendService = _useState2[0];
+
+  // Utilizar los hooks existentes
+  var _useLoading = (0,_hooks_useLoading__WEBPACK_IMPORTED_MODULE_1__.useLoading)(),
+    loadingState = _useLoading.loadingState,
+    setLoading = _useLoading.setLoading,
+    setInitialized = _useLoading.setInitialized;
+  var _useMessages = (0,_hooks_useMessages__WEBPACK_IMPORTED_MODULE_2__.useMessages)(backendService),
+    messages = _useMessages.messages,
+    currentMessage = _useMessages.currentMessage,
+    setCurrentMessage = _useMessages.setCurrentMessage,
+    addMessage = _useMessages.addMessage,
+    clearMessages = _useMessages.clearMessages;
+  var _useProjectFiles = (0,_hooks_useProjectFiles__WEBPACK_IMPORTED_MODULE_3__.useProjectFiles)(backendService),
+    projectFiles = _useProjectFiles.projectFiles;
+
+  // Estado adicional que no está cubierto por los hooks
   var _useState3 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(""),
     _useState4 = _slicedToArray(_useState3, 2),
     input = _useState4[0],
@@ -35464,30 +35483,8 @@ var AppProvider = function AppProvider(_ref) {
     _useState12 = _slicedToArray(_useState11, 2),
     model = _useState12[0],
     setModel = _useState12[1];
-  var _useState13 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)([]),
-    _useState14 = _slicedToArray(_useState13, 2),
-    messages = _useState14[0],
-    setMessages = _useState14[1];
-  var _useState15 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(""),
-    _useState16 = _slicedToArray(_useState15, 2),
-    currentMessage = _useState16[0],
-    setCurrentMessage = _useState16[1];
-  var _useState17 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)([]),
-    _useState18 = _slicedToArray(_useState17, 2),
-    projectFiles = _useState18[0],
-    setProjectFiles = _useState18[1];
-  var _useState19 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false),
-    _useState20 = _slicedToArray(_useState19, 2),
-    isLoading = _useState20[0],
-    setIsLoading = _useState20[1];
 
-  // Funciones básicas
-  var addMessage = (0,react__WEBPACK_IMPORTED_MODULE_0__.useCallback)(function (message) {
-    console.log("Añadiendo mensaje:", message);
-    setMessages(function (prev) {
-      return [].concat(_toConsumableArray(prev), [message]);
-    });
-  }, []);
+  // Funciones de manejo de mensajes
   var handleSendMessage = (0,react__WEBPACK_IMPORTED_MODULE_0__.useCallback)(function (message) {
     var files = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : [];
     console.log("Enviando mensaje:", message, files);
@@ -35496,19 +35493,22 @@ var AppProvider = function AppProvider(_ref) {
       text: message,
       files: files
     });
-    setIsLoading(true);
+    setLoading(true);
     backendService.send(_services_BackendService__WEBPACK_IMPORTED_MODULE_4__.ACTIONS.SEND_MESSAGE, {
       message: message,
       selectedFiles: files,
       model: model
     });
-  }, [backendService, addMessage, model]);
+  }, [backendService, addMessage, model, setLoading]);
   var clearChat = (0,react__WEBPACK_IMPORTED_MODULE_0__.useCallback)(function () {
     console.log("Limpiando chat");
-    setMessages([]);
-    setCurrentMessage("");
-    backendService.send(_services_BackendService__WEBPACK_IMPORTED_MODULE_4__.ACTIONS.CLEAR_CONVERSATION);
-  }, [backendService]);
+    clearMessages();
+  }, [clearMessages]);
+  var handleNewChat = (0,react__WEBPACK_IMPORTED_MODULE_0__.useCallback)(function () {
+    console.log("Creando nuevo chat");
+    clearMessages();
+    backendService.send(_services_BackendService__WEBPACK_IMPORTED_MODULE_4__.ACTIONS.NEW_CHAT);
+  }, [backendService, clearMessages]);
   var handleLoadChat = (0,react__WEBPACK_IMPORTED_MODULE_0__.useCallback)(function (chatId) {
     console.log("Cargando chat:", chatId);
     backendService.send(_services_BackendService__WEBPACK_IMPORTED_MODULE_4__.ACTIONS.LOAD_CHAT, {
@@ -35522,65 +35522,55 @@ var AppProvider = function AppProvider(_ref) {
     setShowHistory(true);
   }, [backendService]);
 
-  // Manejar respuestas del backend
-  (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(function () {
-    if (!backendService) return;
-    console.log("Configurando listeners de backend");
-    var handleResponse = function handleResponse(data) {
-      console.log("Respuesta recibida:", data);
-      if (!data.done) {
-        setCurrentMessage(data.message || data.text || data.content || "");
-      } else {
-        addMessage({
-          role: "assistant",
-          text: data.message || data.text || data.content,
-          files: data.files || []
-        });
-        setCurrentMessage("");
-      }
-      setIsLoading(false);
-    };
-    var handleError = function handleError(data) {
-      console.log("Error recibido:", data);
-      addMessage({
-        role: "assistant",
-        text: data.error || "Error desconocido",
-        isError: true
-      });
-      setIsLoading(false);
-    };
+  // Configurar listeners para el backend
+  // Nota: Estos listeners ahora están en los hooks individuales
+  // pero mantenemos algunos específicos para este contexto
+  var setupBackendListeners = (0,react__WEBPACK_IMPORTED_MODULE_0__.useCallback)(function () {
+    if (!backendService) return function () {};
     var handleHistoryLoaded = function handleHistoryLoaded(data) {
       console.log("Historial cargado:", data);
       setHistory(data.history || []);
     };
-    backendService.on('response', handleResponse);
-    backendService.on('error', handleError);
     backendService.on('historyLoaded', handleHistoryLoaded);
     return function () {
-      backendService.off('response', handleResponse);
-      backendService.off('error', handleError);
       backendService.off('historyLoaded', handleHistoryLoaded);
     };
-  }, [backendService, addMessage]);
+  }, [backendService]);
+
+  // Ejecutar la configuración de listeners
+  react__WEBPACK_IMPORTED_MODULE_0__.useEffect(function () {
+    var cleanup = setupBackendListeners();
+    return cleanup;
+  }, [setupBackendListeners]);
   var value = {
+    // Servicio de backend y vscode
     backendService: backendService,
     vscode: vscode,
+    // Estado de carga desde useLoading
+    isLoading: loadingState.isLoading,
+    isInitialized: loadingState.isInitialized,
+    setLoading: setLoading,
+    setInitialized: setInitialized,
+    // Estado de mensajes desde useMessages
+    messages: messages,
+    currentMessage: currentMessage,
+    setCurrentMessage: setCurrentMessage,
+    addMessage: addMessage,
+    // Estado de archivos del proyecto desde useProjectFiles
+    projectFiles: projectFiles,
+    // Estado y funciones adicionales
     input: input,
     setInput: setInput,
     selectedFiles: selectedFiles,
     setSelectedFiles: setSelectedFiles,
-    isLoading: isLoading,
-    messages: messages,
-    currentMessage: currentMessage,
-    addMessage: addMessage,
     handleSendMessage: handleSendMessage,
     clearChat: clearChat,
+    handleNewChat: handleNewChat,
     history: history,
     showHistory: showHistory,
     setShowHistory: setShowHistory,
     handleLoadChat: handleLoadChat,
     handleShowHistory: handleShowHistory,
-    projectFiles: projectFiles,
     model: model,
     setModel: setModel
   };
@@ -36033,13 +36023,6 @@ var useMessages = function useMessages(backendService) {
     _useState4 = _slicedToArray(_useState3, 2),
     currentMessage = _useState4[0],
     setCurrentMessage = _useState4[1];
-  (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(function () {
-    if (backendService) {
-      backendService.setState({
-        messages: messages
-      });
-    }
-  }, [messages, backendService]);
   var addMessage = (0,react__WEBPACK_IMPORTED_MODULE_0__.useCallback)(function (message) {
     setMessages(function (prev) {
       return [].concat(_toConsumableArray(prev), [normalizeMessage(message)]);
@@ -36054,6 +36037,46 @@ var useMessages = function useMessages(backendService) {
       });
     }
   }, [backendService]);
+  (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(function () {
+    if (backendService) {
+      backendService.setState({
+        messages: messages
+      });
+    }
+  }, [messages, backendService]);
+
+  // Configurar listeners para mensajes recibidos del backend
+  (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(function () {
+    if (!backendService) return;
+    var handleReceiveMessage = function handleReceiveMessage(data) {
+      console.log('Mensaje recibido del backend:', data);
+      if (data.message) {
+        addMessage({
+          role: data.isUser ? 'user' : 'assistant',
+          text: data.message,
+          files: data.files || []
+        });
+      }
+    };
+    var handleChatCleared = function handleChatCleared() {
+      console.log('Chat limpiado');
+      clearMessages();
+    };
+    var handleChatLoaded = function handleChatLoaded(data) {
+      console.log('Chat cargado:', data);
+      if (data.chat && data.chat.messages) {
+        setMessages(data.chat.messages.map(normalizeMessage));
+      }
+    };
+    backendService.on('receiveMessage', handleReceiveMessage);
+    backendService.on('chatCleared', handleChatCleared);
+    backendService.on('chatLoaded', handleChatLoaded);
+    return function () {
+      backendService.off('receiveMessage', handleReceiveMessage);
+      backendService.off('chatCleared', handleChatCleared);
+      backendService.off('chatLoaded', handleChatLoaded);
+    };
+  }, [backendService, addMessage, clearMessages]);
   return {
     messages: messages,
     currentMessage: currentMessage,
@@ -36179,7 +36202,8 @@ var ACTIONS = {
   LOAD_CHAT: 'loadChat',
   LOAD_HISTORY: 'loadHistory',
   CLEAR_CONVERSATION: 'clearConversation',
-  GET_PROJECT_FILES: 'getProjectFiles'
+  GET_PROJECT_FILES: 'getProjectFiles',
+  NEW_CHAT: 'newChat'
 };
 var BackendService = /*#__PURE__*/function () {
   function BackendService(vscode) {
@@ -36391,14 +36415,15 @@ function Chat() {
   }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0__.createElement(_Components_ChatMessages_ChatMessages__WEBPACK_IMPORTED_MODULE_7__["default"], null, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0__.createElement(_historical_RecentChats__WEBPACK_IMPORTED_MODULE_5__["default"], null))), /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0__.createElement(_Components_InputChat_ChatInput__WEBPACK_IMPORTED_MODULE_3__["default"], null));
 }
 
-// Inicializar vscode una sola vez
+// Inicializar vscode una sola vez con manejo de errores mejorado
 var vscode;
 try {
   console.log('Intentando adquirir vscode API');
   vscode = acquireVsCodeApi();
-  console.log('vscode API adquirida:', vscode);
+  console.log('vscode API adquirida correctamente');
 } catch (error) {
   console.error('Error al adquirir vscode API:', error);
+  // Proporcionar un mock para entornos de desarrollo/prueba
   vscode = {
     postMessage: function postMessage(msg) {
       return console.log('Mock postMessage:', msg);
@@ -36412,22 +36437,28 @@ try {
   };
 }
 
-// Renderizar la aplicación
-var root = document.getElementById("root");
-console.log('Elemento root encontrado:', root);
-try {
-  console.log('Intentando renderizar React app');
-  react_dom__WEBPACK_IMPORTED_MODULE_1__.render(/*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0__.createElement(_context_AppContext__WEBPACK_IMPORTED_MODULE_6__.AppProvider, {
-    vscode: vscode
-  }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0__.createElement(Chat, null)), root);
-  console.log('ReactDOM.render ejecutado correctamente');
-} catch (error) {
-  console.error('Error al renderizar React app:', error);
-  // Fallback para mostrar algo en caso de error
-  if (root) {
+// Función para renderizar la aplicación con manejo de errores mejorado
+function renderApp() {
+  var root = document.getElementById("root");
+  if (!root) {
+    console.error('Elemento root no encontrado');
+    return;
+  }
+  try {
+    console.log('Renderizando React app');
+    react_dom__WEBPACK_IMPORTED_MODULE_1__.render(/*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0__.createElement(_context_AppContext__WEBPACK_IMPORTED_MODULE_6__.AppProvider, {
+      vscode: vscode
+    }, /*#__PURE__*/react__WEBPACK_IMPORTED_MODULE_0__.createElement(Chat, null)), root);
+    console.log('React app renderizada correctamente');
+  } catch (error) {
+    console.error('Error al renderizar React app:', error);
+    // Fallback para mostrar algo en caso de error
     root.innerHTML = "\n      <div style=\"padding: 20px; color: red;\">\n        <h2>Error al cargar la UI</h2>\n        <pre>".concat(error.message, "</pre>\n      </div>\n    ");
   }
 }
+
+// Iniciar la aplicación
+renderApp();
 })();
 
 /******/ })()

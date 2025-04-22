@@ -1,16 +1,38 @@
 import * as vscode from 'vscode';
-import { ChatViewProvider } from './vscode_integration/uiProvider';
+import { WebViewManager } from './vscode_integration/webviewManager';
+import { OrchestratorAgent } from './agents/orchestratorAgent';
+import { MemoryAgent } from './agents/memory/memoryAgent';
+import { ModelAgent } from './agents/model/modelAgent';
+import { AgentFactory } from './agents/factory';
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
   console.log('Extension "extensionAssistant" is now active!');
 
-  // Registrar el proveedor de webview para la vista de chat
-  const chatViewProvider = new ChatViewProvider(context.extensionUri);
+  // Crear la fábrica de agentes
+  const agentFactory = new AgentFactory(context);
+  
+  // Configurar el proveedor de UI para la fábrica
+  const webViewManager = new WebViewManager(context.extensionUri);
+  agentFactory.setUIProvider(webViewManager);
+  
+  // Inicializar todos los agentes
+  const agents = await agentFactory.createAndInitializeAgents();
+  
+  // Crear el orquestador con los agentes ya inicializados
+  const orchestratorAgent = new OrchestratorAgent(
+    agents.memoryAgent,
+    agents.modelAgent,
+    webViewManager
+  );
+  
+  // Configurar el WebViewManager con el orquestador y los agentes
+  webViewManager.setOrchestratorAgent(orchestratorAgent);
+  webViewManager.setAgents(agents.memoryAgent, agents.modelAgent);
   
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
-      ChatViewProvider.viewType,
-      chatViewProvider
+      WebViewManager.viewType,
+      webViewManager
     )
   );
 
@@ -23,14 +45,18 @@ export function activate(context: vscode.ExtensionContext) {
 
   // Registrar un comando para enviar un mensaje de prueba
   context.subscriptions.push(
-    vscode.commands.registerCommand('extensionAssistant.sendTestMessage', () => {
-      chatViewProvider.sendMessageToWebview({
-        command: 'receiveMessage',
-        text: 'Este es un mensaje de prueba desde la extensión',
-        isUser: false
-      });
+    vscode.commands.registerCommand('extensionAssistant.sendTestMessage', async () => {
+      await orchestratorAgent.processUserMessage('Mensaje de prueba desde comando');
     })
   );
+  
+  // Registrar recursos para limpieza durante la desactivación
+  context.subscriptions.push({
+    dispose: () => {
+      orchestratorAgent.dispose();
+      agentFactory.dispose();
+    }
+  });
 }
 
 export function deactivate() {

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useCallback, useEffect, useState } from "react";
+import React, { createContext, useContext, useState, useCallback } from "react";
 import { useLoading } from "../hooks/useLoading";
 import { useMessages } from "../hooks/useMessages";
 import { useProjectFiles } from "../hooks/useProjectFiles";
@@ -20,24 +20,28 @@ export const useAppContext = () => {
 export const AppProvider = ({ children, vscode }) => {
   console.log("Inicializando AppProvider");
   
-  // Estado básico
+  // Inicializar el servicio de backend
   const [backendService] = useState(() => createBackendService(vscode));
+  
+  // Utilizar los hooks existentes
+  const { loadingState, setLoading, setInitialized } = useLoading();
+  const { 
+    messages, 
+    currentMessage, 
+    setCurrentMessage, 
+    addMessage, 
+    clearMessages 
+  } = useMessages(backendService);
+  const { projectFiles } = useProjectFiles(backendService);
+  
+  // Estado adicional que no está cubierto por los hooks
   const [input, setInput] = useState("");
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [history, setHistory] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
   const [model, setModel] = useState("ollama");
-  const [messages, setMessages] = useState([]);
-  const [currentMessage, setCurrentMessage] = useState("");
-  const [projectFiles, setProjectFiles] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
 
-  // Funciones básicas
-  const addMessage = useCallback((message) => {
-    console.log("Añadiendo mensaje:", message);
-    setMessages(prev => [...prev, message]);
-  }, []);
-
+  // Funciones de manejo de mensajes
   const handleSendMessage = useCallback((message, files = []) => {
     console.log("Enviando mensaje:", message, files);
     addMessage({
@@ -45,20 +49,24 @@ export const AppProvider = ({ children, vscode }) => {
       text: message,
       files
     });
-    setIsLoading(true);
+    setLoading(true);
     backendService.send(ACTIONS.SEND_MESSAGE, {
       message,
       selectedFiles: files,
       model
     });
-  }, [backendService, addMessage, model]);
+  }, [backendService, addMessage, model, setLoading]);
 
   const clearChat = useCallback(() => {
     console.log("Limpiando chat");
-    setMessages([]);
-    setCurrentMessage("");
-    backendService.send(ACTIONS.CLEAR_CONVERSATION);
-  }, [backendService]);
+    clearMessages();
+  }, [clearMessages]);
+
+  const handleNewChat = useCallback(() => {
+    console.log("Creando nuevo chat");
+    clearMessages();
+    backendService.send(ACTIONS.NEW_CHAT);
+  }, [backendService, clearMessages]);
 
   const handleLoadChat = useCallback((chatId) => {
     console.log("Cargando chat:", chatId);
@@ -72,71 +80,63 @@ export const AppProvider = ({ children, vscode }) => {
     setShowHistory(true);
   }, [backendService]);
 
-  // Manejar respuestas del backend
-  useEffect(() => {
-    if (!backendService) return;
-    console.log("Configurando listeners de backend");
-
-    const handleResponse = (data) => {
-      console.log("Respuesta recibida:", data);
-      if (!data.done) {
-        setCurrentMessage(data.message || data.text || data.content || "");
-      } else {
-        addMessage({
-          role: "assistant",
-          text: data.message || data.text || data.content,
-          files: data.files || []
-        });
-        setCurrentMessage("");
-      }
-      setIsLoading(false);
-    };
-
-    const handleError = (data) => {
-      console.log("Error recibido:", data);
-      addMessage({
-        role: "assistant",
-        text: data.error || "Error desconocido",
-        isError: true
-      });
-      setIsLoading(false);
-    };
-
+  // Configurar listeners para el backend
+  // Nota: Estos listeners ahora están en los hooks individuales
+  // pero mantenemos algunos específicos para este contexto
+  const setupBackendListeners = useCallback(() => {
+    if (!backendService) return () => {};
+    
     const handleHistoryLoaded = (data) => {
       console.log("Historial cargado:", data);
       setHistory(data.history || []);
     };
-
-    backendService.on('response', handleResponse);
-    backendService.on('error', handleError);
+    
     backendService.on('historyLoaded', handleHistoryLoaded);
-
+    
     return () => {
-      backendService.off('response', handleResponse);
-      backendService.off('error', handleError);
       backendService.off('historyLoaded', handleHistoryLoaded);
     };
-  }, [backendService, addMessage]);
+  }, [backendService]);
+  
+  // Ejecutar la configuración de listeners
+  React.useEffect(() => {
+    const cleanup = setupBackendListeners();
+    return cleanup;
+  }, [setupBackendListeners]);
 
   const value = {
+    // Servicio de backend y vscode
     backendService,
     vscode,
+    
+    // Estado de carga desde useLoading
+    isLoading: loadingState.isLoading,
+    isInitialized: loadingState.isInitialized,
+    setLoading,
+    setInitialized,
+    
+    // Estado de mensajes desde useMessages
+    messages,
+    currentMessage,
+    setCurrentMessage,
+    addMessage,
+    
+    // Estado de archivos del proyecto desde useProjectFiles
+    projectFiles,
+    
+    // Estado y funciones adicionales
     input,
     setInput,
     selectedFiles,
     setSelectedFiles,
-    isLoading,
-    messages,
-    currentMessage,
-    addMessage,
     handleSendMessage,
     clearChat,
+    handleNewChat,
     history,
     showHistory,
     setShowHistory,
     handleLoadChat,
     handleShowHistory,
-    projectFiles,
     model,
     setModel,
   };
