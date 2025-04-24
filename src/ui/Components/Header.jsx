@@ -47,7 +47,12 @@ const Header = () => {
     const { handleShowHistory, model, setModel, backendService } = useAppContext();
 
     const handleModelChange = (event) => {
-      setModel(event.target.value);
+      const newModel = event.target.value;
+      setModel(newModel);
+      
+      // Enviar comando al backend para cambiar el modelo
+      console.log(`Enviando comando setModel al backend: ${newModel}`);
+      backendService.send(ACTIONS.SET_MODEL, { modelType: newModel });
     };
 
     const handleNewChat = () => {

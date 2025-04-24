@@ -34645,7 +34645,14 @@ var Header = function Header() {
       setModel = _useAppContext.setModel,
       backendService = _useAppContext.backendService;
     var handleModelChange = function handleModelChange(event) {
-      setModel(event.target.value);
+      var newModel = event.target.value;
+      setModel(newModel);
+
+      // Enviar comando al backend para cambiar el modelo
+      console.log("Enviando comando setModel al backend: ".concat(newModel));
+      backendService.send(_services_BackendService__WEBPACK_IMPORTED_MODULE_2__.ACTIONS.SET_MODEL, {
+        modelType: newModel
+      });
     };
     var handleNewChat = function handleNewChat() {
       console.log("Enviando comando newChat al backend");
@@ -36198,7 +36205,8 @@ function _toPrimitive(t, r) { if ("object" != _typeof(t) || !t) return t; var e 
 
 var ACTIONS = {
   SEND_MESSAGE: 'sendMessage',
-  SELECT_MODEL: 'selectModel',
+  SET_MODEL: 'setModel',
+  // Acción para cambiar el modelo
   LOAD_CHAT: 'loadChat',
   LOAD_HISTORY: 'loadHistory',
   CLEAR_CONVERSATION: 'clearConversation',

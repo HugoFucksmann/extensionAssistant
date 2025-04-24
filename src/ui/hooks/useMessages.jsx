@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 
 const normalizeMessage = (message) => {
   if (!message) return null;
@@ -76,13 +76,14 @@ export const useMessages = (backendService) => {
     };
   }, [backendService, addMessage, clearMessages]);
 
-
-
-  return {
+  // Memoizar el objeto de retorno para evitar recreaciones innecesarias
+  const returnValue = useMemo(() => ({
     messages,
     currentMessage,
     setCurrentMessage,
     addMessage,
     clearMessages,
-  };
+  }), [messages, currentMessage, setCurrentMessage, addMessage, clearMessages]);
+
+  return returnValue;
 };

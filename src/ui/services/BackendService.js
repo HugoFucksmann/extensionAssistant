@@ -5,7 +5,7 @@
 
 export const ACTIONS = {
   SEND_MESSAGE: 'sendMessage',
-  SELECT_MODEL: 'selectModel',
+  SET_MODEL: 'setModel',  // Acción para cambiar el modelo
   LOAD_CHAT: 'loadChat',
   LOAD_HISTORY: 'loadHistory',
   CLEAR_CONVERSATION: 'clearConversation',
@@ -32,7 +32,11 @@ class BackendService {
 
   send(action, payload = {}) {
     if (!this.vscode) return;
-    this.vscode.postMessage({ type: action, ...payload });
+    
+    // Usar requestAnimationFrame para evitar bloquear la UI
+    requestAnimationFrame(() => {
+      this.vscode.postMessage({ type: action, ...payload });
+    });
   }
 
   on(type, callback) {

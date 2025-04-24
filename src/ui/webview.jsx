@@ -1,11 +1,14 @@
-import React from "react";
+import React, { lazy, Suspense } from "react";
 import ReactDOM from "react-dom";
 import Header from "./Components/Header";
 import ChatInput from "./Components/InputChat/ChatInput";
-import ChatHistory from "./historical/ChatHistory";
-import RecentChats from "./historical/RecentChats";
+
+// Importar componentes con carga diferida para mejorar el rendimiento inicial
+const ChatHistory = lazy(() => import("./historical/ChatHistory"));
+const RecentChats = lazy(() => import("./historical/RecentChats"));
+const ChatMessages = lazy(() => import("./Components/ChatMessages/ChatMessages"));
+
 import { AppProvider } from "./context/AppContext";
-import ChatMessages from "./Components/ChatMessages/ChatMessages";
 
 // Mensaje de depuración
 console.log('Webview script cargado');
@@ -33,11 +36,17 @@ function Chat() {
   return (
     <div style={styles.container}>
       <Header />
-      <ChatHistory />
+      <Suspense fallback={<div style={{padding: "10px", textAlign: "center"}}>Cargando historial...</div>}>
+        <ChatHistory />
+      </Suspense>
       <div style={styles.content}>
-        <ChatMessages>
-          <RecentChats />
-        </ChatMessages>
+        <Suspense fallback={<div style={{padding: "10px", textAlign: "center"}}>Cargando mensajes...</div>}>
+          <ChatMessages>
+            <Suspense fallback={<div style={{padding: "10px", textAlign: "center"}}>Cargando chats recientes...</div>}>
+              <RecentChats />
+            </Suspense>
+          </ChatMessages>
+        </Suspense>
       </div>
       <ChatInput />
     </div>

@@ -1,0 +1,33 @@
+2025-04-23 21:23:36.387 [info] [main] Log level: Info
+2025-04-23 21:23:36.387 [info] [main] Validating found git in: "C:\Program Files\Git\cmd\git.exe"
+2025-04-23 21:23:36.416 [info] [main] Using git "2.45.1.windows.1" from "C:\Program Files\Git\cmd\git.exe"
+2025-04-23 21:23:36.417 [info] [Model][doInitialScan] Initial repository scan started
+2025-04-23 21:23:36.463 [info] > git rev-parse --show-toplevel [35ms]
+2025-04-23 21:23:36.498 [info] > git rev-parse --git-dir --git-common-dir [32ms]
+2025-04-23 21:23:36.505 [info] [Model][openRepository] Opened repository: e:\PROYECTOS\extensionAssistant
+2025-04-23 21:23:36.548 [info] > git config --get commit.template [39ms]
+2025-04-23 21:23:36.549 [info] > git rev-parse --show-toplevel [38ms]
+2025-04-23 21:23:36.604 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/main refs/remotes/main [89ms]
+2025-04-23 21:23:36.607 [warning] [Git][revParse] Unable to read file: ENOENT: no such file or directory, open 'e:\PROYECTOS\extensionAssistant\.git\refs\remotes\origin\main'
+2025-04-23 21:23:36.637 [info] > git rev-parse --show-toplevel [32ms]
+2025-04-23 21:23:36.641 [info] > git rev-parse refs/remotes/origin/main [33ms]
+2025-04-23 21:23:36.672 [info] > git rev-parse --show-toplevel [32ms]
+2025-04-23 21:23:36.680 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [32ms]
+2025-04-23 21:23:36.682 [info] > git status -z -uall [37ms]
+2025-04-23 21:23:36.778 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/main refs/remotes/main [74ms]
+2025-04-23 21:23:36.778 [info] > git config --get commit.template [76ms]
+2025-04-23 21:23:36.778 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/main refs/remotes/main [81ms]
+2025-04-23 21:23:36.783 [info] > git rev-parse --show-toplevel [108ms]
+2025-04-23 21:23:36.797 [warning] [Git][revParse] Unable to read file: ENOENT: no such file or directory, open 'e:\PROYECTOS\extensionAssistant\.git\refs\remotes\origin\main'
+2025-04-23 21:23:36.815 [info] > git config --get --local branch.main.vscode-merge-base [32ms]
+2025-04-23 21:23:36.827 [info] > git rev-parse refs/remotes/origin/main [30ms]
+2025-04-23 21:23:36.849 [info] > git for-each-ref --format=%(refname)%00%(upstream:short)%00%(objectname)%00%(upstream:track)%00%(upstream:remotename)%00%(upstream:remoteref) --ignore-case refs/heads/origin/main refs/remotes/origin/main [32ms]
+2025-04-23 21:23:36.863 [info] > git for-each-ref --sort -committerdate --format %(refname)%00%(objectname)%00%(*objectname) [32ms]
+2025-04-23 21:23:36.884 [info] > git merge-base refs/heads/main refs/remotes/origin/main [32ms]
+2025-04-23 21:23:36.898 [info] > git rev-parse --show-toplevel [32ms]
+2025-04-23 21:23:36.900 [info] [Model][doInitialScan] Initial repository scan completed - repositories (1), closed repositories (0), parent repositories (0), unsafe repositories (0)
+2025-04-23 21:23:36.908 [info] > git status -z -uall [78ms]
+2025-04-23 21:23:36.920 [info] > git diff --name-status -z --diff-filter=ADMR 1fa6fa3daf0833c893b2e209b5c4305331a2d131...refs/remotes/origin/main [33ms]
+2025-04-23 21:23:36.943 [info] > git merge-base refs/heads/main refs/remotes/origin/main [30ms]
+2025-04-23 21:23:36.975 [info] > git diff --name-status -z --diff-filter=ADMR 1fa6fa3daf0833c893b2e209b5c4305331a2d131...refs/remotes/origin/main [30ms]
+2025-04-23 21:23:37.054 [info] > git check-ignore -v -z --stdin [29ms]

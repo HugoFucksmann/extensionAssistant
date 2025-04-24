@@ -10,13 +10,16 @@ import {
   ChatsUpdatedCallback,
   ChatLoadedCallback
 } from './tools';
+import { Agent, ModelResponse, MemoryResponse } from '../../interfaces';
 
 /**
  * MemoryAgent es responsable de gestionar toda la memoria de la extensión.
  * Maneja tanto la memoria persistente (proyecto y chat) como la memoria temporal
  * que solo dura durante un intercambio de mensajes.
  */
-export class MemoryAgent {
+export class MemoryAgent implements Agent<ModelResponse, MemoryResponse> {
+  public name = 'MemoryAgent';
+  
   // Herramientas de memoria
   private temporaryMemory: TemporaryMemory;
   private chatMemory: ChatMemory;
@@ -174,34 +177,72 @@ export class MemoryAgent {
   }
 
   /**
-   * Procesa un mensaje del usuario y la respuesta del asistente
-   * @param userText El texto del mensaje del usuario
-   * @param assistantText El texto de la respuesta del asistente
-   * @returns Un objeto con el mensaje del usuario y la respuesta del asistente
+   * Procesa la respuesta del modelo y almacena los mensajes
+   * @param modelResponse Respuesta del agente de modelo
+   * @returns Respuesta estructurada con los mensajes almacenados
+   */
+  public async process(modelResponse: ModelResponse): Promise<MemoryResponse> {
+    console.log(`${this.name} procesando respuesta del modelo:`, modelResponse.response);
+    
+    // Extraer el mensaje original del usuario de los metadatos
+    const userText = modelResponse.metadata.prompt;
+    const assistantText = modelResponse.response;
+    
+    // Crear mensaje del usuario
+    const userMessage: ChatMessage = {
+      text: userText,
+      role: 'user',
+      timestamp: new Date().toISOString()
+    };
+    
+    // Crear mensaje del asistente
+    const assistantMessage: ChatMessage = {
+      text: assistantText,
+      role: 'assistant',
+      timestamp: new Date().toISOString()
+    };
+    
+    // Añadir ambos mensajes al chat actual
+    await this.addMessage(userMessage);
+    await this.addMessage(assistantMessage);
+    
+    return {
+      userMessage,
+      assistantMessage,
+      chatId: this.currentChatId,
+      metadata: {
+        timestamp: new Date().toISOString(),
+        modelType: modelResponse.modelType,
+        originalModelResponse: modelResponse
+      }
+    };
+  }
+  
+  /**
+   * Método legacy para mantener compatibilidad
+   * @deprecated Use process() instead
    */
   public async processMessagePair(
     userText: string, 
     assistantText: string
   ): Promise<{userMessage: ChatMessage, assistantMessage: ChatMessage}> {
-    // Añadir mensaje del usuario
-    const userMessage: ChatMessage = {
-      role: 'user',
-      text: userText,
-      timestamp: new Date().toISOString()
+    console.log('Método legacy: processMessagePair');
+    
+    // Crear una respuesta de modelo simulada para pasar a process()
+    const modelResponse: ModelResponse = {
+      response: assistantText,
+      modelType: 'gemini', // Valor predeterminado
+      metadata: {
+        prompt: userText,
+        timestamp: new Date().toISOString()
+      }
     };
     
-    await this.addMessage(userMessage);
-    
-    // Añadir respuesta del asistente
-    const assistantMessage: ChatMessage = {
-      role: 'assistant',
-      text: assistantText,
-      timestamp: new Date().toISOString()
+    const memoryResponse = await this.process(modelResponse);
+    return {
+      userMessage: memoryResponse.userMessage,
+      assistantMessage: memoryResponse.assistantMessage
     };
-    
-    await this.addMessage(assistantMessage);
-    
-    return { userMessage, assistantMessage };
   }
 
   /**

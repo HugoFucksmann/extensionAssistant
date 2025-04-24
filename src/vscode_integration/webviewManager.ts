@@ -1,25 +1,24 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { OrchestratorAgent } from '../agents/orchestratorAgent';
-import { MemoryAgent } from '../agents/memory/memoryAgent';
-import { ModelAgent } from '../agents/model/modelAgent';
+import { UIProvider } from '../interfaces';
+import { CommandManager } from '../commands/commandManager';
 
 /**
  * Clase que centraliza toda la gestión de WebView
  * Maneja la creación, configuración y comunicación con el WebView
  */
-export class WebViewManager implements vscode.WebviewViewProvider {
+export class WebViewManager implements vscode.WebviewViewProvider, UIProvider {
   public static readonly viewType = 'aiChat.chatView';
   private _view?: vscode.WebviewView;
 
   private _orchestratorAgent: OrchestratorAgent | null = null;
-  private _memoryAgent: MemoryAgent | null = null;
-  private _modelAgent: ModelAgent | null = null;
+  private _commandManager: CommandManager | null = null;
 
   constructor(
     private readonly _extensionUri: vscode.Uri
   ) {
-    // Los agentes se configurarán después de la inicialización
+    // El orquestador y el command manager se configurarán después de la inicialización
   }
   
   /**
@@ -29,15 +28,13 @@ export class WebViewManager implements vscode.WebviewViewProvider {
   public setOrchestratorAgent(orchestratorAgent: OrchestratorAgent): void {
     this._orchestratorAgent = orchestratorAgent;
   }
-  
+
   /**
-   * Establece los agentes especializados
-   * @param memoryAgent El agente de memoria
-   * @param modelAgent El agente de modelo
+   * Establece el gestor de comandos
+   * @param commandManager El gestor de comandos inicializado
    */
-  public setAgents(memoryAgent: MemoryAgent, modelAgent: ModelAgent): void {
-    this._memoryAgent = memoryAgent;
-    this._modelAgent = modelAgent;
+  public setCommandManager(commandManager: CommandManager): void {
+    this._commandManager = commandManager;
   }
 
   /**
@@ -84,37 +81,54 @@ export class WebViewManager implements vscode.WebviewViewProvider {
       console.log('Mensaje recibido del webview:', message);
       
       try {
-        // Verificar que los agentes estén inicializados
+        // Verificar que el orquestrador y el command manager estén inicializados
         if (!this._orchestratorAgent) {
           throw new Error('OrchestratorAgent no inicializado');
         }
         
-        if (!this._memoryAgent || !this._modelAgent) {
-          throw new Error('Agentes especializados no inicializados');
+        if (!this._commandManager) {
+          throw new Error('CommandManager no inicializado');
         }
         
         switch (message.type) {
           case 'sendMessage':
-            // Procesamiento de mensajes de usuario a través del orquestador
+            // Procesamiento de mensajes de usuario a través del orquestrador
             await this._orchestratorAgent.processUserMessage(message.message);
             break;
             
           case 'newChat':
-            // Comunicación directa con el MemoryAgent
-            await this._memoryAgent.createNewChat(
-              (response: any) => this.sendMessageToWebview(response)
-            );
+            // Delegar la creación de un nuevo chat al CommandManager
+            await this._commandManager.executeCommand('createNewChat');
             break;
             
           case 'loadChat':
-            // Comunicación directa con el MemoryAgent
-            await this._memoryAgent.loadChat(message.chatId);
+            // Delegar la carga de un chat al CommandManager
+            await this._commandManager.executeCommand('loadChat', { chatId: message.chatId });
             break;
             
           case 'setModel':
-            // Comunicación directa con el ModelAgent
+            // Delegar el cambio de modelo directamente al OrchestratorAgent
+            console.log(`WebViewManager: Recibido mensaje para cambiar modelo a ${message.modelType}`);
+            
             if (message.modelType === 'ollama' || message.modelType === 'gemini') {
-              await this._modelAgent.setModel(message.modelType);
+              try {
+                console.log(`WebViewManager: Modelo actual antes del cambio: ${this._commandManager.getCurrentModel()}`);
+                
+                // El CommandManager se encarga de notificar a la UI
+                await this._commandManager.executeCommand('setModel', { modelType: message.modelType });
+                
+                // Mostrar el modelo actual para debugging
+                console.log(`WebViewManager: Modelo cambiado a ${this._commandManager.getCurrentModel()}`);
+                
+                // Enviar confirmación a la UI
+                this.sendMessageToWebview({
+                  type: 'modelChanged',
+                  modelType: this._commandManager.getCurrentModel()
+                });
+              } catch (error) {
+                console.error(`WebViewManager: Error al cambiar modelo:`, error);
+                throw error;
+              }
             } else {
               throw new Error(`Modelo no soportado: ${message.modelType}`);
             }

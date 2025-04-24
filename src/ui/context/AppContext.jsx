@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext, useState, useCallback, useMemo } from "react";
 import { useLoading } from "../hooks/useLoading";
 import { useMessages } from "../hooks/useMessages";
 import { useProjectFiles } from "../hooks/useProjectFiles";
@@ -104,7 +104,8 @@ export const AppProvider = ({ children, vscode }) => {
     return cleanup;
   }, [setupBackendListeners]);
 
-  const value = {
+  // Memoizar el objeto value para evitar recreaciones innecesarias en cada renderizado
+  const value = useMemo(() => ({
     // Servicio de backend y vscode
     backendService,
     vscode,
@@ -139,7 +140,16 @@ export const AppProvider = ({ children, vscode }) => {
     handleShowHistory,
     model,
     setModel,
-  };
+  }), [
+    backendService, vscode,
+    loadingState.isLoading, loadingState.isInitialized, setLoading, setInitialized,
+    messages, currentMessage, setCurrentMessage, addMessage,
+    projectFiles,
+    input, setInput, selectedFiles, setSelectedFiles,
+    handleSendMessage, clearChat, handleNewChat,
+    history, showHistory, setShowHistory, handleLoadChat, handleShowHistory,
+    model, setModel
+  ]);
 
   console.log("AppProvider inicializado");
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

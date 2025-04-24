@@ -1,0 +1,13 @@
+2025-04-23 21:23:27.530 [warning] Via 'product.json#extensionEnabledApiProposals' extension 'ms-python.python' wants API proposal 'terminalShellType' but that proposal DOES NOT EXIST. Likely, the proposal has been finalized (check 'vscode.d.ts') or was abandoned.
+2025-04-23 21:23:27.539 [warning] Via 'product.json#extensionEnabledApiProposals' extension 'ms-python.vscode-python-envs' wants API proposal 'terminalShellType' but that proposal DOES NOT EXIST. Likely, the proposal has been finalized (check 'vscode.d.ts') or was abandoned.
+2025-04-23 21:23:27.540 [warning] Via 'product.json#extensionEnabledApiProposals' extension 'github.copilot-chat' wants API proposal 'chatReadonlyPromptReference' but that proposal DOES NOT EXIST. Likely, the proposal has been finalized (check 'vscode.d.ts') or was abandoned.
+2025-04-23 21:23:27.663 [info] ChatSessionStore: Migrating 0 chat sessions from storage service to file system
+2025-04-23 21:23:27.783 [info] Started local extension host with pid 25296.
+2025-04-23 21:23:27.943 [error] [/c:/Users/hugof/.vscode/extensions/github.copilot-chat-0.24.1]: This extension is using the API proposals 'defaultChatParticipant' and 'chatParticipantPrivate' that are not compatible with the current version of VS Code.
+2025-04-23 21:23:28.328 [info] Settings Sync: Account status changed from uninitialized to unavailable
+2025-04-23 21:23:30.664 [info] [perf] Render performance baseline is 14ms
+2025-04-23 21:23:34.239 [info] Auto updating outdated extensions. danielsanmedium.dscodegpt, github.copilot-chat, sourcegraph.cody-ai
+2025-04-23 21:23:35.240 [info] Auto updating extension danielsanmedium.dscodegpt
+2025-04-23 21:23:35.241 [info] Auto updating extension github.copilot-chat
+2025-04-23 21:23:35.241 [info] Auto updating extension sourcegraph.cody-ai
+2025-04-23 21:23:41.355 [warning] [backup tracker] suspended, ignoring unregister event file:///e%3A/PROYECTOS/extensionAssistant/package.json 

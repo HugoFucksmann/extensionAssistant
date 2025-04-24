@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
 import { MemoryAgent } from '../agents/memory/memoryAgent';
-import { ModelAgent } from '../agents/model/modelAgent';
+import { OrchestratorAgent } from '../agents/orchestratorAgent';
+import { UIProvider } from '../interfaces';
+import { BaseAPI } from '../models/baseAPI';
 
 /**
  * Tipos de comandos soportados por la aplicación
@@ -8,8 +10,7 @@ import { ModelAgent } from '../agents/model/modelAgent';
 export type CommandType = 
   | 'createNewChat'
   | 'loadChat'
-  | 'setModel'
-  | 'processUserMessage';
+  | 'setModel';
 
 /**
  * Payload para los diferentes tipos de comandos
@@ -20,9 +21,6 @@ export interface CommandPayload {
   
   // Payload para cambiar el modelo
   modelType?: 'ollama' | 'gemini';
-  
-  // Payload para procesar un mensaje de usuario
-  message?: string;
 }
 
 /**
@@ -34,23 +32,27 @@ export interface CommandResult {
   error?: string;
 }
 
-/**
- * Interfaz para el componente que maneja la comunicación con la UI
- */
-export interface UIProvider {
-  sendMessageToWebview(message: any): void;
-}
+
 
 /**
  * CommandManager es responsable de ejecutar los comandos de la aplicación
  * Centraliza la lógica de comandos y desacopla el orquestador de los detalles de implementación
  */
 export class CommandManager {
+  private modelAPI: BaseAPI;
+  private currentModelType: 'ollama' | 'gemini' = 'gemini';
+  
   constructor(
     private memoryAgent: MemoryAgent,
-    private modelAgent: ModelAgent,
+    private orchestratorAgent: OrchestratorAgent,
     private uiProvider: UIProvider
-  ) {}
+  ) {
+    // Inicializar BaseAPI con el modelo predeterminado
+    this.modelAPI = new BaseAPI(this.currentModelType);
+    
+    // Pasar la instancia de BaseAPI al orchestratorAgent
+    this.orchestratorAgent.setModelAPI(this.modelAPI);
+  }
 
   /**
    * Ejecuta un comando
@@ -71,9 +73,6 @@ export class CommandManager {
           
         case 'setModel':
           return this.setModel(payload?.modelType);
-          
-        case 'processUserMessage':
-          return await this.processUserMessage(payload?.message);
           
         default:
           return {
@@ -140,7 +139,10 @@ export class CommandManager {
    * @param modelType Tipo de modelo a utilizar
    */
   private setModel(modelType?: 'ollama' | 'gemini'): CommandResult {
+    console.log(`CommandManager.setModel llamado con modelType: ${modelType}`);
+    
     if (!modelType) {
+      console.error('CommandManager.setModel: Se requiere modelType para cambiar el modelo');
       return {
         success: false,
         error: 'Se requiere modelType para cambiar el modelo'
@@ -148,62 +150,50 @@ export class CommandManager {
     }
     
     try {
-      this.modelAgent.setModel(modelType);
+      console.log(`CommandManager: Modelo actual antes del cambio: ${this.currentModelType}`);
+      
+      // Cambiar el modelo directamente en BaseAPI
+      this.modelAPI.setModel(modelType);
+      
+      // Actualizar el tipo de modelo actual
+      this.currentModelType = modelType;
+      
+      console.log(`CommandManager: Modelo cambiado a: ${this.currentModelType}`);
+      
+      // Notificar a la UI del cambio de modelo
+      this.uiProvider.sendMessageToWebview({
+        type: 'modelChanged',
+        modelType
+      });
+      
+      console.log(`CommandManager: Notificación enviada a la UI sobre cambio de modelo a: ${modelType}`);
+      
       return {
         success: true,
         data: { modelType }
       };
     } catch (error: any) {
+      console.error(`CommandManager: Error al cambiar modelo:`, error);
       return {
         success: false,
         error: `Error al cambiar modelo: ${error.message}`
       };
     }
   }
-
+  
   /**
-   * Procesa un mensaje del usuario
-   * @param message Mensaje del usuario
+   * Obtiene el tipo de modelo actual
+   * @returns El tipo de modelo actual
    */
-  private async processUserMessage(message?: string): Promise<CommandResult> {
-    if (!message) {
-      return {
-        success: false,
-        error: 'Se requiere un mensaje para procesar'
-      };
-    }
-    
-    try {
-      // 1. Generar respuesta usando el agente de modelo
-      const assistantResponse = await this.modelAgent.generateResponse(message);
-      
-      // 2. Almacenar el par de mensajes en la memoria
-      await this.memoryAgent.processMessagePair(message, assistantResponse);
-      
-      // 3. Notificar a la UI
-      this.uiProvider.sendMessageToWebview({
-        type: 'receiveMessage',
-        message: assistantResponse,
-        isUser: false
-      });
-      
-      return {
-        success: true,
-        data: { response: assistantResponse }
-      };
-    } catch (error: any) {
-      // Notificar error a la UI
-      this.uiProvider.sendMessageToWebview({
-        type: 'receiveMessage',
-        message: `Error al procesar la solicitud: ${error.message || 'Desconocido'}`,
-        isUser: false,
-        isError: true
-      });
-      
-      return {
-        success: false,
-        error: `Error al procesar mensaje: ${error.message}`
-      };
-    }
+  public getCurrentModel(): 'ollama' | 'gemini' {
+    return this.currentModelType;
+  }
+  
+  /**
+   * Obtiene la instancia de BaseAPI
+   * @returns La instancia de BaseAPI
+   */
+  public getModelAPI(): BaseAPI {
+    return this.modelAPI;
   }
 }

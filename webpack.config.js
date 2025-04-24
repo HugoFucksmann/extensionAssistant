@@ -6,6 +6,37 @@ const baseConfig = {
   devtool: "source-map",
   resolve: {
     extensions: [".ts", ".tsx", ".js", ".jsx"],
+    // Añadir alias para reducir la longitud de las importaciones
+    alias: {
+      '@agents': path.resolve(__dirname, 'src/agents'),
+      '@models': path.resolve(__dirname, 'src/models'),
+      '@ui': path.resolve(__dirname, 'src/ui'),
+      '@vscode': path.resolve(__dirname, 'src/vscode_integration'),
+      '@commands': path.resolve(__dirname, 'src/commands'),
+      '@db': path.resolve(__dirname, 'src/db'),
+    }
+  },
+  // Añadir caché para mejorar el rendimiento de compilación
+  cache: {
+    type: 'filesystem',
+    buildDependencies: {
+      config: [__filename],
+    },
+    // Aumentar el tiempo de caché para reducir recompilaciones innecesarias
+    maxAge: 5184000000, // 60 días en milisegundos
+  },
+  // Optimizar la compilación
+  optimization: {
+    removeAvailableModules: false,
+    removeEmptyChunks: false,
+    splitChunks: false,
+  },
+  // Añadir estadísticas para ver el progreso de la compilación
+  stats: {
+    modules: false,
+    children: false,
+    chunks: false,
+    chunkModules: false,
   },
 };
 
@@ -36,6 +67,10 @@ const extensionConfig = {
         use: [
           {
             loader: "ts-loader",
+            options: {
+              transpileOnly: true, // Acelera la compilación omitiendo la verificación de tipos
+              experimentalWatchApi: true, // Mejora el rendimiento en modo watch
+            },
           },
         ],
       },
@@ -66,6 +101,10 @@ const webviewConfig = {
         use: [
           {
             loader: "ts-loader",
+            options: {
+              transpileOnly: true, // Acelera la compilación omitiendo la verificación de tipos
+              experimentalWatchApi: true, // Mejora el rendimiento en modo watch
+            },
           },
         ],
       },
@@ -77,6 +116,7 @@ const webviewConfig = {
             loader: "babel-loader",
             options: {
               presets: ["@babel/preset-env", "@babel/preset-react"],
+              cacheDirectory: true, // Habilitar caché para babel
             },
           },
         ],

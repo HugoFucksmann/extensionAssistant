@@ -48,7 +48,7 @@
     "compile": "tsc -p ./ && npm run copy-wasm",
     "watch": "webpack --mode development --watch",
     "pretest": "npm run compile",
-    "copy-wasm": "mkdir -p out/wasm && cp node_modules/web-tree-sitter/tree-sitter.wasm out/wasm/ && cp node_modules/tree-sitter-typescript/tree-sitter-typescript.wasm out/wasm/"
+    "copy-wasm": "node scripts/copy-wasm.js"
   },
   "devDependencies": {
     "@babel/core": "^7.15.0",
@@ -74,6 +74,7 @@
     "prismjs": "^1.29.0",
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
+    "react-window": "^1.8.11",
     "sqlite3": "^5.1.7",
     "tree-sitter-javascript": "^0.23.1",
     "tree-sitter-typescript": "^0.23.2",

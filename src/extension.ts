@@ -2,32 +2,50 @@ import * as vscode from 'vscode';
 import { WebViewManager } from './vscode_integration/webviewManager';
 import { OrchestratorAgent } from './agents/orchestratorAgent';
 import { MemoryAgent } from './agents/memory/memoryAgent';
-import { ModelAgent } from './agents/model/modelAgent';
-import { AgentFactory } from './agents/factory';
+import { CommandManager } from './commands/commandManager';
 
 export async function activate(context: vscode.ExtensionContext) {
   console.log('Extension "extensionAssistant" is now active!');
 
-  // Crear la fábrica de agentes
-  const agentFactory = new AgentFactory(context);
-  
-  // Configurar el proveedor de UI para la fábrica
+  // Crear el proveedor de UI
   const webViewManager = new WebViewManager(context.extensionUri);
-  agentFactory.setUIProvider(webViewManager);
   
-  // Inicializar todos los agentes
-  const agents = await agentFactory.createAndInitializeAgents();
+  // Crear el agente de memoria
+  const memoryAgent = new MemoryAgent(context);
   
-  // Crear el orquestador con los agentes ya inicializados
+  // Inicializar el agente de memoria
+  await memoryAgent.initialize((response) => webViewManager.sendMessageToWebview(response));
+  
+  // Crear el orquestrador (sin inicializar BaseAPI)
   const orchestratorAgent = new OrchestratorAgent(
-    agents.memoryAgent,
-    agents.modelAgent,
+    memoryAgent,
     webViewManager
   );
   
-  // Configurar el WebViewManager con el orquestador y los agentes
+  // Crear el gestor de comandos (que ahora maneja BaseAPI)
+  const commandManager = new CommandManager(
+    memoryAgent,
+    orchestratorAgent,
+    webViewManager
+  );
+  
+  // Configurar el orquestrador con la instancia de BaseAPI del CommandManager
+  orchestratorAgent.setModelAPI(commandManager.getModelAPI());
+  
+  // Inicializar el orquestrador
+  await orchestratorAgent.initialize(context);
+  
+  // Configurar el WebViewManager con el orquestrador y el gestor de comandos
   webViewManager.setOrchestratorAgent(orchestratorAgent);
-  webViewManager.setAgents(agents.memoryAgent, agents.modelAgent);
+  webViewManager.setCommandManager(commandManager);
+  
+  // Cargar la configuración del modelo desde la configuración de VS Code
+  const config = vscode.workspace.getConfiguration('extensionAssistant');
+  const modelType = config.get<'ollama' | 'gemini'>('modelType') || 'gemini';
+  
+  // Establecer el modelo inicial
+  await commandManager.executeCommand('setModel', { modelType });
+  console.log(`Modelo inicial establecido a: ${commandManager.getCurrentModel()}`);
   
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
@@ -54,7 +72,7 @@ export async function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push({
     dispose: () => {
       orchestratorAgent.dispose();
-      agentFactory.dispose();
+      // El orquestrador ya se encarga de liberar los recursos de los agentes
     }
   });
 }
