@@ -1,40 +1,58 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
-import { OrchestratorAgent } from '../agents/orchestratorAgent';
-import { UIProvider } from '../interfaces';
-import { CommandManager } from '../commands/commandManager';
+import { EventBus } from '../core/eventBus';
 
 /**
  * Clase que centraliza toda la gestión de WebView
  * Maneja la creación, configuración y comunicación con el WebView
  */
-export class WebViewManager implements vscode.WebviewViewProvider, UIProvider {
+export class WebViewManager implements vscode.WebviewViewProvider {
   public static readonly viewType = 'aiChat.chatView';
   private _view?: vscode.WebviewView;
 
-  private _orchestratorAgent: OrchestratorAgent | null = null;
-  private _commandManager: CommandManager | null = null;
-
   constructor(
-    private readonly _extensionUri: vscode.Uri
+    private readonly _extensionUri: vscode.Uri,
+    private readonly eventBus: EventBus
   ) {
-    // El orquestador y el command manager se configurarán después de la inicialización
+    // Suscribirse a eventos para enviar al webview
+    this.setupEventListeners();
   }
   
   /**
-   * Establece el agente orquestrador
-   * @param orchestratorAgent El agente orquestrador inicializado
+   * Configura los listeners de eventos para comunicación con el webview
    */
-  public setOrchestratorAgent(orchestratorAgent: OrchestratorAgent): void {
-    this._orchestratorAgent = orchestratorAgent;
-  }
-
-  /**
-   * Establece el gestor de comandos
-   * @param commandManager El gestor de comandos inicializado
-   */
-  public setCommandManager(commandManager: CommandManager): void {
-    this._commandManager = commandManager;
+  private setupEventListeners(): void {
+    // Escuchar eventos que deben enviarse al webview
+    this.eventBus.on('message:receive', async (payload) => {
+      this.sendMessageToWebview(payload);
+    });
+    
+    this.eventBus.on('model:changed', async (payload) => {
+      this.sendMessageToWebview({
+        type: 'modelChanged',
+        modelType: payload.modelType
+      });
+    });
+    
+    this.eventBus.on('chat:loaded', async (payload) => {
+      this.sendMessageToWebview({
+        type: 'chatLoaded',
+        chat: payload.chat
+      });
+    });
+    
+    this.eventBus.on('history:loaded', async (payload) => {
+      this.sendMessageToWebview({
+        type: 'historyLoaded',
+        history: payload.history
+      });
+    });
+    
+    this.eventBus.on('error', async (payload) => {
+      this.sendMessageToWebview({
+        type: 'error',
+        message: payload.message || 'Error desconocido'
+      });
+    });
   }
 
   /**
@@ -81,54 +99,26 @@ export class WebViewManager implements vscode.WebviewViewProvider, UIProvider {
       console.log('Mensaje recibido del webview:', message);
       
       try {
-        // Verificar que el orquestrador y el command manager estén inicializados
-        if (!this._orchestratorAgent) {
-          throw new Error('OrchestratorAgent no inicializado');
-        }
-        
-        if (!this._commandManager) {
-          throw new Error('CommandManager no inicializado');
-        }
-        
         switch (message.type) {
           case 'sendMessage':
-            // Procesamiento de mensajes de usuario a través del orquestrador
-            await this._orchestratorAgent.processUserMessage(message.message);
+            // Emitir evento para procesar mensaje del usuario
+            await this.eventBus.emit('message:send', { message: message.message });
             break;
             
           case 'newChat':
-            // Delegar la creación de un nuevo chat al CommandManager
-            await this._commandManager.executeCommand('createNewChat');
+            // Emitir evento para crear nuevo chat
+            await this.eventBus.emit('chat:new');
             break;
             
           case 'loadChat':
-            // Delegar la carga de un chat al CommandManager
-            await this._commandManager.executeCommand('loadChat', { chatId: message.chatId });
+            // Emitir evento para cargar un chat
+            await this.eventBus.emit('chat:load', { chatId: message.chatId });
             break;
             
           case 'setModel':
-            // Delegar el cambio de modelo directamente al OrchestratorAgent
-            console.log(`WebViewManager: Recibido mensaje para cambiar modelo a ${message.modelType}`);
-            
             if (message.modelType === 'ollama' || message.modelType === 'gemini') {
-              try {
-                console.log(`WebViewManager: Modelo actual antes del cambio: ${this._commandManager.getCurrentModel()}`);
-                
-                // El CommandManager se encarga de notificar a la UI
-                await this._commandManager.executeCommand('setModel', { modelType: message.modelType });
-                
-                // Mostrar el modelo actual para debugging
-                console.log(`WebViewManager: Modelo cambiado a ${this._commandManager.getCurrentModel()}`);
-                
-                // Enviar confirmación a la UI
-                this.sendMessageToWebview({
-                  type: 'modelChanged',
-                  modelType: this._commandManager.getCurrentModel()
-                });
-              } catch (error) {
-                console.error(`WebViewManager: Error al cambiar modelo:`, error);
-                throw error;
-              }
+              // Emitir evento para cambiar modelo
+              await this.eventBus.emit('model:change', { modelType: message.modelType });
             } else {
               throw new Error(`Modelo no soportado: ${message.modelType}`);
             }
@@ -139,10 +129,7 @@ export class WebViewManager implements vscode.WebviewViewProvider, UIProvider {
         }
       } catch (error: any) {
         console.error('Error al procesar mensaje:', error);
-        this.sendMessageToWebview({
-          type: 'error',
-          message: `Error: ${error.message || 'Desconocido'}`
-        });
+        this.eventBus.emit('error', { message: error.message || 'Error desconocido' });
       }
     });
   }

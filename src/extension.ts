@@ -3,56 +3,52 @@ import { WebViewManager } from './vscode_integration/webviewManager';
 import { OrchestratorAgent } from './agents/orchestratorAgent';
 import { MemoryAgent } from './agents/memory/memoryAgent';
 import { CommandManager } from './commands/commandManager';
+import { ModelAPIProvider } from './models/modelApiProvider';
+import { EventBus } from './core/eventBus';
 
 export async function activate(context: vscode.ExtensionContext) {
   console.log('Extension "extensionAssistant" is now active!');
 
-  // Crear el proveedor de UI
-  const webViewManager = new WebViewManager(context.extensionUri);
-  
-  // Crear el agente de memoria
-  const memoryAgent = new MemoryAgent(context);
-  
-  // Inicializar el agente de memoria
-  await memoryAgent.initialize((response) => webViewManager.sendMessageToWebview(response));
-  
-  // Crear el orquestrador (sin inicializar BaseAPI)
-  const orchestratorAgent = new OrchestratorAgent(
-    memoryAgent,
-    webViewManager
-  );
-  
-  // Crear el gestor de comandos (que ahora maneja BaseAPI)
-  const commandManager = new CommandManager(
-    memoryAgent,
-    orchestratorAgent,
-    webViewManager
-  );
-  
-  // Configurar el orquestrador con la instancia de BaseAPI del CommandManager
-  orchestratorAgent.setModelAPI(commandManager.getModelAPI());
-  
-  // Inicializar el orquestrador
-  await orchestratorAgent.initialize(context);
-  
-  // Configurar el WebViewManager con el orquestrador y el gestor de comandos
-  webViewManager.setOrchestratorAgent(orchestratorAgent);
-  webViewManager.setCommandManager(commandManager);
+  // Crear el bus de eventos central
+  const eventBus = new EventBus();
   
   // Cargar la configuración del modelo desde la configuración de VS Code
   const config = vscode.workspace.getConfiguration('extensionAssistant');
   const modelType = config.get<'ollama' | 'gemini'>('modelType') || 'gemini';
   
-  // Establecer el modelo inicial
-  await commandManager.executeCommand('setModel', { modelType });
-  console.log(`Modelo inicial establecido a: ${commandManager.getCurrentModel()}`);
+  // Crear el proveedor de modelos
+  const modelProvider = new ModelAPIProvider(eventBus, modelType);
+  await modelProvider.initialize();
   
+  // Crear el WebViewManager
+  const webViewManager = new WebViewManager(context.extensionUri, eventBus);
+  
+  // Crear el agente de memoria
+  const memoryAgent = new MemoryAgent(context, eventBus);
+  
+  // Inicializar el agente de memoria
+  await memoryAgent.initialize();
+  
+  // Crear el orquestrador
+  const orchestratorAgent = new OrchestratorAgent(eventBus, modelProvider);
+  
+  // Crear el gestor de comandos
+  const commandManager = new CommandManager(eventBus);
+  
+  // Inicializar el orquestrador
+  await orchestratorAgent.initialize(context);
+  
+  // Registrar el WebViewManager como proveedor de vistas
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
       WebViewManager.viewType,
       webViewManager
     )
   );
+
+  // Registrar los comandos
+  const commandDisposables = commandManager.registerCommands(context);
+  commandDisposables.forEach(disposable => context.subscriptions.push(disposable));
 
   // Registrar un comando para abrir la vista de chat
   context.subscriptions.push(
@@ -64,15 +60,28 @@ export async function activate(context: vscode.ExtensionContext) {
   // Registrar un comando para enviar un mensaje de prueba
   context.subscriptions.push(
     vscode.commands.registerCommand('extensionAssistant.sendTestMessage', async () => {
-      await orchestratorAgent.processUserMessage('Mensaje de prueba desde comando');
+      // Usar el bus de eventos para enviar el mensaje de prueba
+      await eventBus.emit('message:send', { 
+        message: 'Mensaje de prueba desde comando' 
+      });
     })
   );
+  
+  // Establecer el modelo inicial
+  await eventBus.emit('model:change', { modelType });
+  console.log(`Modelo inicial establecido a: ${modelType}`);
   
   // Registrar recursos para limpieza durante la desactivación
   context.subscriptions.push({
     dispose: () => {
+      console.log('Liberando recursos...');
+      // Liberar recursos en orden inverso
       orchestratorAgent.dispose();
-      // El orquestrador ya se encarga de liberar los recursos de los agentes
+      if (memoryAgent.dispose) {
+        memoryAgent.dispose();
+      }
+      // El modelProvider tiene un método para abortar solicitudes
+      modelProvider.abortRequest();
     }
   });
 }

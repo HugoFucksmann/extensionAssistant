@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { EventBus } from '../../core/eventBus';
 import { SQLiteStorage } from '../../db/SQLiteStorage';
 import { 
   TemporaryMemory, 
@@ -6,18 +7,14 @@ import {
   ProjectMemory,
   ChatMessage,
   Chat,
-  ChatSummary,
-  ChatsUpdatedCallback,
-  ChatLoadedCallback
+  ChatSummary
 } from './tools';
-import { Agent, ModelResponse, MemoryResponse } from '../../interfaces';
 
 /**
  * MemoryAgent es responsable de gestionar toda la memoria de la extensión.
- * Maneja tanto la memoria persistente (proyecto y chat) como la memoria temporal
- * que solo dura durante un intercambio de mensajes.
+ * Maneja tanto la memoria persistente (proyecto y chat) como la memoria temporal.
  */
-export class MemoryAgent implements Agent<ModelResponse, MemoryResponse> {
+export class MemoryAgent {
   public name = 'MemoryAgent';
   
   // Herramientas de memoria
@@ -29,56 +26,71 @@ export class MemoryAgent implements Agent<ModelResponse, MemoryResponse> {
   private currentChatId: string | null = null;
   private messages: ChatMessage[] = [];
   private chatList: ChatSummary[] = [];
-  
-  // Callbacks
-  private onChatListUpdated: ChatsUpdatedCallback | null = null;
-  private onChatLoadedCallback: ChatLoadedCallback | null = null;
 
-  constructor(context: vscode.ExtensionContext) {
+  constructor(
+    private context: vscode.ExtensionContext,
+    private eventBus: EventBus
+  ) {
     const storage = new SQLiteStorage(context);
     
     // Inicializar herramientas de memoria
     this.temporaryMemory = new TemporaryMemory();
     this.chatMemory = new ChatMemory(storage);
     this.projectMemory = new ProjectMemory(storage);
-  }
-
-  /**
-   * Registra un callback para cuando se actualiza la lista de chats
-   * @param callback Función a llamar cuando se actualiza la lista de chats
-   */
-  public onChatsUpdated(callback: ChatsUpdatedCallback): void {
-    this.onChatListUpdated = callback;
-  }
-
-  /**
-   * Registra un callback para cuando se carga un chat
-   * @param callback Función a llamar cuando se carga un chat
-   */
-  public onChatLoaded(callback: ChatLoadedCallback): void {
-    this.onChatLoadedCallback = callback;
+    
+    // Suscribirse a eventos relevantes
+    this.setupEventListeners();
   }
   
   /**
-   * Configura todos los callbacks necesarios para la comunicación con otros componentes
-   * @param notifyUI Función para notificar a la UI
+   * Configura los listeners de eventos
    */
-  public setupCallbacks(notifyUI: (response: any) => void): void {
-    // Callback para cuando se actualiza la lista de chats
-    this.onChatsUpdated((chats) => {
-      notifyUI({
-        type: 'historyLoaded',
-        history: chats
-      });
+  private setupEventListeners(): void {
+    // Escuchar mensajes para procesarlos y almacenarlos
+    this.eventBus.on('message:receive', async (payload) => {
+      await this.processMessage(payload);
     });
     
-    // Callback para cuando se carga un chat
-    this.onChatLoaded((chat) => {
-      notifyUI({
-        type: 'chatLoaded',
-        chat
-      });
+    // Crear nuevo chat
+    this.eventBus.on('chat:new', async () => {
+      await this.createNewChat();
     });
+    
+    // Cargar chat existente
+    this.eventBus.on('chat:load', async (payload) => {
+      await this.loadChat(payload.chatId);
+    });
+  }
+
+  /**
+   * Procesa un mensaje recibido
+   * @param payload El payload del mensaje
+   */
+  private async processMessage(payload: any): Promise<void> {
+    // Asegurar que tenemos un chat actual
+    if (!this.currentChatId) {
+      await this.createNewChat();
+    }
+    
+    // Crear mensaje del usuario si existe
+    if (payload.userMessage) {
+      const userMessage: ChatMessage = {
+        text: payload.userMessage,
+        role: 'user',
+        timestamp: new Date().toISOString()
+      };
+      await this.addMessage(userMessage);
+    }
+    
+    // Crear mensaje del asistente
+    if (payload.message && !payload.isUser) {
+      const assistantMessage: ChatMessage = {
+        text: payload.message,
+        role: 'assistant',
+        timestamp: new Date().toISOString()
+      };
+      await this.addMessage(assistantMessage);
+    }
   }
 
   /**
@@ -119,7 +131,6 @@ export class MemoryAgent implements Agent<ModelResponse, MemoryResponse> {
 
   /**
    * Limpia todas las memorias temporales
-   * Debe llamarse después de completar cada intercambio de mensajes
    */
   public clearTemporaryMemory(): void {
     this.temporaryMemory.clear();
@@ -127,11 +138,9 @@ export class MemoryAgent implements Agent<ModelResponse, MemoryResponse> {
 
   /**
    * Crea un nuevo chat y retorna su ID
-   * Si hay un chat actual con mensajes, lo guarda automáticamente
-   * @param notifyUI Función opcional para notificar directamente a la UI
    * @returns El ID del nuevo chat
    */
-  public async createNewChat(notifyUI?: (response: any) => void): Promise<string> {
+  public async createNewChat(): Promise<string> {
     // Guardar el chat actual si tiene mensajes
     await this.saveCurrentChatIfNeeded();
     
@@ -140,13 +149,18 @@ export class MemoryAgent implements Agent<ModelResponse, MemoryResponse> {
     this.currentChatId = chatId;
     this.messages = [];
     
-    // Notificar que se ha creado un nuevo chat (con lista de chats actualizada)
-    await this.loadChatList();
+    // Crear un objeto de chat vacío pero válido
+    const newChat: Chat = {
+      id: chatId,
+      title: `Nuevo chat ${new Date().toLocaleTimeString()}`,
+      timestamp: new Date().toISOString(),
+      messages: [],
+      preview: ''
+    };
     
-    // Notificar directamente a la UI si se proporciona la función
-    if (notifyUI) {
-      notifyUI({ type: 'chatCleared' });
-    }
+    // Notificar que se ha creado un nuevo chat
+    await this.loadChatList();
+    await this.eventBus.emit('chat:loaded', { chat: newChat, type: 'newChat' });
     
     return chatId;
   }
@@ -168,81 +182,12 @@ export class MemoryAgent implements Agent<ModelResponse, MemoryResponse> {
     
     this.messages.push(fullMessage);
     
-    // Intentar guardar el chat después de cada mensaje para evitar pérdida de datos
+    // Intentar guardar el chat después de cada mensaje
     try {
       await this.saveCurrentChatIfNeeded();
     } catch (error) {
       console.error('Error al guardar el chat después de añadir mensaje:', error);
     }
-  }
-
-  /**
-   * Procesa la respuesta del modelo y almacena los mensajes
-   * @param modelResponse Respuesta del agente de modelo
-   * @returns Respuesta estructurada con los mensajes almacenados
-   */
-  public async process(modelResponse: ModelResponse): Promise<MemoryResponse> {
-    console.log(`${this.name} procesando respuesta del modelo:`, modelResponse.response);
-    
-    // Extraer el mensaje original del usuario de los metadatos
-    const userText = modelResponse.metadata.prompt;
-    const assistantText = modelResponse.response;
-    
-    // Crear mensaje del usuario
-    const userMessage: ChatMessage = {
-      text: userText,
-      role: 'user',
-      timestamp: new Date().toISOString()
-    };
-    
-    // Crear mensaje del asistente
-    const assistantMessage: ChatMessage = {
-      text: assistantText,
-      role: 'assistant',
-      timestamp: new Date().toISOString()
-    };
-    
-    // Añadir ambos mensajes al chat actual
-    await this.addMessage(userMessage);
-    await this.addMessage(assistantMessage);
-    
-    return {
-      userMessage,
-      assistantMessage,
-      chatId: this.currentChatId,
-      metadata: {
-        timestamp: new Date().toISOString(),
-        modelType: modelResponse.modelType,
-        originalModelResponse: modelResponse
-      }
-    };
-  }
-  
-  /**
-   * Método legacy para mantener compatibilidad
-   * @deprecated Use process() instead
-   */
-  public async processMessagePair(
-    userText: string, 
-    assistantText: string
-  ): Promise<{userMessage: ChatMessage, assistantMessage: ChatMessage}> {
-    console.log('Método legacy: processMessagePair');
-    
-    // Crear una respuesta de modelo simulada para pasar a process()
-    const modelResponse: ModelResponse = {
-      response: assistantText,
-      modelType: 'gemini', // Valor predeterminado
-      metadata: {
-        prompt: userText,
-        timestamp: new Date().toISOString()
-      }
-    };
-    
-    const memoryResponse = await this.process(modelResponse);
-    return {
-      userMessage: memoryResponse.userMessage,
-      assistantMessage: memoryResponse.assistantMessage
-    };
   }
 
   /**
@@ -259,14 +204,7 @@ export class MemoryAgent implements Agent<ModelResponse, MemoryResponse> {
    */
   private async saveCurrentChatIfNeeded(): Promise<void> {
     // Verificar que tenemos un ID de chat y al menos un mensaje
-    if (!this.currentChatId) {
-      console.log('No hay chat actual para guardar');
-      return;
-    }
-    
-    // Solo guardar si hay mensajes
-    if (this.messages.length === 0) {
-      console.log('No hay mensajes para guardar en el chat:', this.currentChatId);
+    if (!this.currentChatId || this.messages.length === 0) {
       return;
     }
     
@@ -296,14 +234,12 @@ export class MemoryAgent implements Agent<ModelResponse, MemoryResponse> {
       
       // Actualizar la lista local y notificar
       this.chatList = updatedList;
-      if (this.onChatListUpdated) {
-        this.onChatListUpdated(updatedList);
-      }
+      await this.eventBus.emit('history:loaded', { history: updatedList });
       
       console.log('Chat guardado correctamente:', this.currentChatId);
     } catch (error) {
       console.error('Error al guardar el chat:', error);
-      throw error; // Propagar el error para manejarlo en niveles superiores
+      throw error;
     }
   }
 
@@ -316,9 +252,7 @@ export class MemoryAgent implements Agent<ModelResponse, MemoryResponse> {
       this.chatList = await this.chatMemory.getChatList();
       
       // Notificar que la lista de chats ha sido actualizada
-      if (this.onChatListUpdated) {
-        this.onChatListUpdated(this.chatList);
-      }
+      await this.eventBus.emit('history:loaded', { history: this.chatList });
       
       return this.chatList;
     } catch (error) {
@@ -343,9 +277,7 @@ export class MemoryAgent implements Agent<ModelResponse, MemoryResponse> {
         this.messages = chat.messages || [];
         
         // Notificar que se ha cargado un chat
-        if (this.onChatLoadedCallback) {
-          this.onChatLoadedCallback(chat);
-        }
+        await this.eventBus.emit('chat:loaded', { chat });
         
         return chat;
       }
@@ -358,24 +290,15 @@ export class MemoryAgent implements Agent<ModelResponse, MemoryResponse> {
 
   /**
    * Inicializa el agente de memoria
-   * Carga la lista de chats al inicio y asegura que haya un chat actual
-   * @param notifyUI Función opcional para notificar a la UI
    */
-  public async initialize(notifyUI?: (response: any) => void): Promise<void> {
+  public async initialize(): Promise<void> {
     console.log('MemoryAgent inicializado');
     await this.loadChatList();
     
     // Asegurar que siempre haya un chat actual válido
     if (!this.currentChatId) {
-      // Generar un ID único para el nuevo chat
       this.currentChatId = this.chatMemory.generateChatId();
       this.messages = [];
-      console.log('Nuevo chat creado al inicializar:', this.currentChatId);
-    }
-    
-    // Configurar callbacks si se proporciona la función de notificación
-    if (notifyUI) {
-      this.setupCallbacks(notifyUI);
     }
   }
 

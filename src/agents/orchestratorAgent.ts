@@ -1,111 +1,82 @@
 import * as vscode from 'vscode';
-import { MemoryAgent } from './memory/memoryAgent';
-import { UIAgent } from './ui/uiAgent';
-import { UIProvider, ModelResponse, MemoryResponse, UIResponse } from '../interfaces';
-import { BaseAPI } from '../models/baseAPI';
+import { EventBus } from '../core/eventBus';
+
+import { ModelResponse, UIResponse } from '../interfaces';
+import { ModelAPIProvider } from '../models/modelApiProvider';
 
 /**
- * OrchestratorAgent es responsable de coordinar el flujo de procesamiento entre los diferentes agentes.
- * Recibe mensajes del usuario, los procesa a través de los agentes y devuelve respuestas.
- * Se enfoca exclusivamente en el flujo de mensajes entre el usuario y el asistente IA.
+ * OrchestratorAgent es responsable de coordinar el flujo de procesamiento.
+ * Recibe mensajes del usuario, los procesa y devuelve respuestas.
  */
 export class OrchestratorAgent {
-  private modelAPI: BaseAPI | null = null;
-  private memoryAgent: MemoryAgent;
-  private uiAgent: UIAgent;
-
   constructor(
-    memoryAgent: MemoryAgent,
-    private uiProvider: UIProvider
+    private eventBus: EventBus,
+    private modelProvider: ModelAPIProvider
   ) {
     console.log('OrchestratorAgent inicializado');
     
-    // Inicializar componentes
-    this.memoryAgent = memoryAgent;
-    this.uiAgent = new UIAgent(uiProvider);
+    // Suscribirse a eventos relevantes
+    this.setupEventListeners();
   }
 
   /**
-   * Establece la instancia de BaseAPI a utilizar
-   * @param modelAPI La instancia de BaseAPI
+   * Configura los listeners de eventos
    */
-  public setModelAPI(modelAPI: BaseAPI): void {
-    console.log('OrchestratorAgent: Estableciendo instancia de BaseAPI');
-    this.modelAPI = modelAPI;
+  private setupEventListeners(): void {
+    // Escuchar mensajes de usuario para procesar
+    this.eventBus.on('message:send', async (payload) => {
+      await this.processUserMessage(payload.message);
+    });
   }
 
   /**
-   * Inicializa todos los agentes
+   * Inicializa el agente orquestrador
    * @param context El contexto de la extensión
    */
   public async initialize(context: vscode.ExtensionContext): Promise<void> {
-    console.log('Inicializando todos los agentes...');
-    
-    // Inicializar agentes
-    await this.memoryAgent.initialize();
-    await this.uiAgent.initialize();
-    
-    console.log('Todos los agentes inicializados correctamente');
+    console.log('Inicializando OrchestratorAgent...');
+    // Cualquier inicialización específica del orquestrador
   }
   
   /**
-   * Procesa un mensaje del usuario a través de la cadena de agentes
+   * Procesa un mensaje del usuario
    * @param message El texto del mensaje del usuario
-   * @returns La respuesta final para la UI
    */
-  public async processUserMessage(message: string): Promise<UIResponse> {
-    if (!this.modelAPI) {
-      throw new Error('ModelAPI no inicializado en OrchestratorAgent');
-    }
-    
+  public async processUserMessage(message: string): Promise<void> {
     console.log(`OrchestratorAgent procesando mensaje: ${message}`);
     
     try {
       // 1. Generar respuesta con el modelo
       console.log('Paso 1: Enviando mensaje al modelo');
-      const response = await this.modelAPI.generateResponse(message);
+      const response = await this.modelProvider.generateResponse(message);
       console.log('Respuesta del modelo recibida');
       
       // Crear respuesta estructurada
       const modelResponse: ModelResponse = {
         response,
-        modelType: this.modelAPI.getCurrentModel(),
+        modelType: this.modelProvider.getCurrentModel(),
         metadata: {
           timestamp: new Date().toISOString(),
           prompt: message
         }
       };
-      console.log('Respuesta estructurada creada');
       
-      // 2. Procesar con el agente de memoria
-      console.log('Paso 2: Enviando respuesta del modelo al agente de memoria');
-      const memoryResponse: MemoryResponse = await this.memoryAgent.process(modelResponse);
-      console.log('Respuesta del agente de memoria recibida');
+      // 2. Emitir evento para procesar en la memoria
+      await this.eventBus.emit('message:receive', {
+        type: 'receiveMessage',
+        userMessage: message,
+        message: response,
+        isUser: false,
+        modelType: this.modelProvider.getCurrentModel()
+      });
       
-      // 3. Procesar con el agente de UI
-      console.log('Paso 3: Enviando respuesta de memoria al agente de UI');
-      const uiResponse: UIResponse = await this.uiAgent.process(memoryResponse);
-      console.log('Respuesta del agente de UI recibida');
-      
-      return uiResponse;
     } catch (error: any) {
       console.error('Error al procesar mensaje:', error);
       
-      // Notificar error a la UI
-      this.uiProvider.sendMessageToWebview({
-        type: 'receiveMessage',
-        message: `Error al procesar la solicitud: ${error.message || 'Desconocido'}`,
-        isUser: false,
-        isError: true
+      // Notificar error
+      await this.eventBus.emit('error', {
+        message: `Error al procesar la solicitud: ${error.message || 'Desconocido'}`
       });
-      
-      // Devolver respuesta de error
-      return {
-        message: `Error al procesar la solicitud: ${error.message || 'Desconocido'}`,
-        isUser: false,
-        isError: true,
-        metadata: { error: error.toString() }
-      };
     }
   }
 
@@ -114,9 +85,6 @@ export class OrchestratorAgent {
    */
   public dispose(): void {
     console.log('Liberando recursos del OrchestratorAgent');
-    
-    // Liberar recursos
-    this.memoryAgent.dispose();
-    this.uiAgent.dispose();
+    // Cualquier limpieza necesaria
   }
 }
