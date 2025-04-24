@@ -27,6 +27,22 @@ export class OrchestratorAgent {
     this.eventBus.on('message:send', async (payload) => {
       await this.processUserMessage(payload.message);
     });
+    
+    // Escuchar cambios de modelo
+    this.eventBus.on('model:change', async (payload) => {
+      try {
+        await this.modelProvider.setModel(payload.modelType);
+        await this.eventBus.emit('model:changed', { 
+          modelType: payload.modelType,
+          success: true
+        });
+      } catch (error) {
+        console.error('Error al cambiar modelo:', error);
+        await this.eventBus.emit('error', {
+          message: `Error al cambiar modelo: ${error instanceof Error ? error.message : 'Error desconocido'}`
+        });
+      }
+    });
   }
 
   /**
@@ -46,22 +62,15 @@ export class OrchestratorAgent {
     console.log(`OrchestratorAgent procesando mensaje: ${message}`);
     
     try {
-      // 1. Generar respuesta con el modelo
-      console.log('Paso 1: Enviando mensaje al modelo');
+      // 1. Emitir evento para indicar que se está procesando
+      await this.eventBus.emit('message:processing', { isProcessing: true });
+      
+      // 2. Generar respuesta con el modelo
+      console.log('Enviando mensaje al modelo');
       const response = await this.modelProvider.generateResponse(message);
       console.log('Respuesta del modelo recibida');
       
-      // Crear respuesta estructurada
-      const modelResponse: ModelResponse = {
-        response,
-        modelType: this.modelProvider.getCurrentModel(),
-        metadata: {
-          timestamp: new Date().toISOString(),
-          prompt: message
-        }
-      };
-      
-      // 2. Emitir evento para procesar en la memoria
+      // 3. Emitir evento con la respuesta completa
       await this.eventBus.emit('message:receive', {
         type: 'receiveMessage',
         userMessage: message,
@@ -70,13 +79,17 @@ export class OrchestratorAgent {
         modelType: this.modelProvider.getCurrentModel()
       });
       
+      // 4. Indicar que se ha completado el procesamiento
+      await this.eventBus.emit('message:processing', { isProcessing: false });
+      
     } catch (error: any) {
       console.error('Error al procesar mensaje:', error);
       
-      // Notificar error
+      // Notificar error y finalizar procesamiento
       await this.eventBus.emit('error', {
         message: `Error al procesar la solicitud: ${error.message || 'Desconocido'}`
       });
+      await this.eventBus.emit('message:processing', { isProcessing: false });
     }
   }
 

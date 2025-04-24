@@ -6,12 +6,15 @@ import * as vscode from 'vscode';
 export type EventType = 
   | 'message:send'         // Usuario envía un mensaje
   | 'message:receive'      // Respuesta del asistente recibida
+  | 'message:processing'   // Indicador de procesamiento de mensaje
   | 'model:change'         // Cambio de modelo
   | 'model:changed'        // Modelo cambiado
   | 'chat:new'             // Crear nuevo chat
   | 'chat:load'            // Cargar chat existente
   | 'chat:loaded'          // Chat cargado
+  | 'chat:list:loaded'     // Lista de chats cargada
   | 'history:loaded'       // Historia de chats cargada
+  | 'config:changed'       // Cambio en la configuración
   | 'error';               // Error en cualquier componente
 
 /**

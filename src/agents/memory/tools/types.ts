@@ -9,6 +9,7 @@ export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   text: string;
   timestamp: string;
+  modelType?: string; // Tipo de modelo usado para generar la respuesta (solo para mensajes del asistente)
 }
 
 /**

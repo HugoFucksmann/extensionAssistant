@@ -1,6 +1,6 @@
 import { EventBus } from '../core/eventBus';
 import { BaseAPI } from '../models/baseAPI';
-
+import { ProjectMemory } from '../agents/memory/tools';
 
 /**
  * Proveedor centralizado de API de modelos
@@ -9,6 +9,7 @@ import { BaseAPI } from '../models/baseAPI';
 export class ModelAPIProvider {
   private modelAPI: BaseAPI;
   private currentModelType: 'ollama' | 'gemini';
+  private projectMemory!: ProjectMemory;
 
   constructor(
     private eventBus: EventBus,
@@ -26,7 +27,25 @@ export class ModelAPIProvider {
   /**
    * Inicializa el proveedor de modelos
    */
-  public async initialize(): Promise<void> {
+  public async initialize(storage: any): Promise<void> {
+    this.projectMemory = new ProjectMemory(storage);
+    
+    try {
+      const savedModel = await this.projectMemory.getProjectMemory('global', 'preferred_model');
+      
+      if (savedModel?.content) {
+        const modelType = savedModel.content as 'ollama' | 'gemini';
+        console.log(`[ModelAPIProvider] Cargando modelo preferido: ${modelType}`);
+        this.modelAPI.setModel(modelType);
+        this.currentModelType = modelType;
+      }
+      
+      // Notificar el modelo actual (predeterminado o guardado)
+      await this.eventBus.emit('model:changed', { modelType: this.currentModelType });
+    } catch (error) {
+      console.error('[ModelAPIProvider] Error al cargar el modelo preferido:', error);
+    }
+    
     console.log(`[ModelAPIProvider] Inicializado con modelo: ${this.currentModelType}`);
   }
 
@@ -35,23 +54,19 @@ export class ModelAPIProvider {
    * @param modelType Tipo de modelo a utilizar
    */
   public async setModel(modelType: 'ollama' | 'gemini'): Promise<void> {
-    if (!modelType) {
-      throw new Error('Se requiere modelType para cambiar el modelo');
-    }
+    if (!modelType) throw new Error('Se requiere modelType para cambiar el modelo');
     
     try {
-      console.log(`[ModelAPIProvider] Cambiando modelo de ${this.currentModelType} a ${modelType}`);
+      console.log(`[ModelAPIProvider] Cambiando modelo: ${this.currentModelType} → ${modelType}`);
       
-      // Cambiar el modelo en la instancia de BaseAPI
       this.modelAPI.setModel(modelType);
-      
-      // Actualizar el tipo de modelo actual
       this.currentModelType = modelType;
       
-      // Notificar que el modelo ha cambiado
-      await this.eventBus.emit('model:changed', { modelType });
+      if (this.projectMemory) {
+        await this.projectMemory.storeProjectMemory('global', 'preferred_model', modelType);
+      }
       
-      console.log(`[ModelAPIProvider] Modelo cambiado exitosamente a ${modelType}`);
+      await this.eventBus.emit('model:changed', { modelType });
     } catch (error) {
       console.error(`[ModelAPIProvider] Error al cambiar modelo:`, error);
       throw error;

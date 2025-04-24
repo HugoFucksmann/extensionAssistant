@@ -1,5 +1,7 @@
 import * as vscode from 'vscode';
-import { EventBus } from '../core/eventBus';
+import { EventBus } from './eventBus';
+import { ChatManager } from './chatManager';
+import { MemoryManager } from './memoryManager';
 
 /**
  * CommandManager optimizado que utiliza el bus de eventos
@@ -7,7 +9,9 @@ import { EventBus } from '../core/eventBus';
  */
 export class CommandManager {
   constructor(
-    private eventBus: EventBus
+    private eventBus: EventBus,
+    private chatManager: ChatManager,
+    private memoryManager: MemoryManager
   ) {
     console.log('CommandManager inicializado');
     
@@ -34,12 +38,35 @@ export class CommandManager {
       }),
       
       vscode.commands.registerCommand('extensionAssistant.createNewChat', async () => {
-        await this.eventBus.emit('chat:new');
+        await this.chatManager.createNewChat();
+      }),
+      
+      vscode.commands.registerCommand('extensionAssistant.loadChat', async (args: any) => {
+        if (args?.chatId) {
+          await this.chatManager.loadChat(args.chatId, args.loadMessages !== false);
+        }
+      }),
+      
+      vscode.commands.registerCommand('extensionAssistant.loadChatList', async () => {
+        await this.chatManager.getChatList();
       }),
       
       vscode.commands.registerCommand('extensionAssistant.setModel', async (args: any) => {
         const modelType = args?.modelType || 'gemini';
         await this.eventBus.emit('model:change', { modelType });
+      }),
+      
+      vscode.commands.registerCommand('extensionAssistant.storeProjectMemory', async (args: any) => {
+        if (args?.projectPath && args?.key && args?.content) {
+          await this.memoryManager.storeProjectMemory(args.projectPath, args.key, args.content);
+        }
+      }),
+      
+      vscode.commands.registerCommand('extensionAssistant.getProjectMemory', async (args: any) => {
+        if (args?.projectPath && args?.key) {
+          return this.memoryManager.getProjectMemory(args.projectPath, args.key);
+        }
+        return null;
       })
     ];
   }

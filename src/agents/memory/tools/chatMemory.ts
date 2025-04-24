@@ -24,18 +24,55 @@ export class ChatMemory {
   /**
    * Carga un chat desde la base de datos
    * @param chatId ID del chat a cargar
+   * @param loadMessages Si es true, carga también los mensajes del chat
    * @returns El chat cargado o null si no existe
    */
-  public async loadChat(chatId: string): Promise<any> {
+  public async loadChat(chatId: string, loadMessages: boolean = true): Promise<any> {
     try {
       const chatData = await this.storage.getChatMemory(chatId, 'chat_data');
-      if (chatData && chatData.content) {
-        return JSON.parse(chatData.content);
+      if (!chatData?.content) return null;
+      
+      const chat = JSON.parse(chatData.content);
+      
+      // Agregar metadatos básicos independientemente del modo de carga
+      chat.messageCount = chat.messages?.length || 0;
+      chat.messagesLoaded = loadMessages;
+      
+      // Si no se requieren los mensajes, solo devolver metadatos
+      if (!loadMessages && chat.messages?.length) {
+        // Si hay mensajes, guardar información sobre el último mensaje
+        const lastMessage = chat.messages[chat.messages.length - 1];
+        chat.lastMessageTimestamp = lastMessage.timestamp;
+        chat.lastMessagePreview = lastMessage.text.substring(0, 50) + 
+          (lastMessage.text.length > 50 ? '...' : '');
+        
+        // Vaciar los mensajes para ahorrar memoria
+        chat.messages = [];
       }
-      return null;
+      
+      return chat;
     } catch (error) {
       console.error('Error al cargar el chat:', error);
       return null;
+    }
+  }
+  
+  /**
+   * Carga solo los mensajes de un chat
+   * @param chatId ID del chat cuyos mensajes se quieren cargar
+   * @returns Array de mensajes del chat
+   */
+  public async loadChatMessages(chatId: string): Promise<any[]> {
+    try {
+      const chatData = await this.storage.getChatMemory(chatId, 'chat_data');
+      if (chatData && chatData.content) {
+        const chat = JSON.parse(chatData.content);
+        return chat.messages || [];
+      }
+      return [];
+    } catch (error) {
+      console.error('Error al cargar los mensajes del chat:', error);
+      return [];
     }
   }
 
@@ -78,14 +115,25 @@ export class ChatMemory {
   }
 
   /**
-   * Obtiene la lista de todos los chats
+   * Obtiene la lista de todos los chats con metadatos optimizados
    * @returns La lista de chats
    */
   public async getChatList(): Promise<any[]> {
     try {
       const chatListData = await this.storage.getChatMemory('global', 'chat_list');
       if (chatListData && chatListData.content) {
-        return JSON.parse(chatListData.content);
+        const chatList = JSON.parse(chatListData.content);
+        
+        // Asegurar que solo devolvemos los metadatos necesarios
+        return chatList.map((chat: any) => ({
+          id: chat.id,
+          title: chat.title,
+          timestamp: chat.timestamp,
+          preview: chat.preview || '',
+          messageCount: chat.messageCount || 0,
+          lastMessageTimestamp: chat.lastMessageTimestamp || chat.timestamp,
+          lastMessagePreview: chat.lastMessagePreview || ''
+        }));
       }
       return [];
     } catch (error) {

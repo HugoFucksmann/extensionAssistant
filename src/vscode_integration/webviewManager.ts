@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { EventBus } from '../core/eventBus';
+import { EventBus, EventType } from '../core/eventBus';
 
 /**
  * Clase que centraliza toda la gestión de WebView
@@ -8,12 +8,13 @@ import { EventBus } from '../core/eventBus';
 export class WebViewManager implements vscode.WebviewViewProvider {
   public static readonly viewType = 'aiChat.chatView';
   private _view?: vscode.WebviewView;
+  private messageQueue: any[] = []; // Cola para almacenar mensajes antes de que el webview esté listo
+  private webviewReady = false;
 
   constructor(
     private readonly _extensionUri: vscode.Uri,
     private readonly eventBus: EventBus
   ) {
-    // Suscribirse a eventos para enviar al webview
     this.setupEventListeners();
   }
   
@@ -21,36 +22,56 @@ export class WebViewManager implements vscode.WebviewViewProvider {
    * Configura los listeners de eventos para comunicación con el webview
    */
   private setupEventListeners(): void {
-    // Escuchar eventos que deben enviarse al webview
-    this.eventBus.on('message:receive', async (payload) => {
-      this.sendMessageToWebview(payload);
+    // Mapa de eventos y sus manejadores
+    const eventHandlers: Partial<Record<EventType, (payload: any) => void>> = {
+      'message:receive': (payload) => {
+        this.sendMessageToWebview(payload);
+      },
+      'message:processing': (payload) => {
+        this.sendMessageToWebview({
+          type: 'processingStatus',
+          isProcessing: payload.isProcessing
+        });
+      },
+      'model:changed': (payload) => {
+        this.sendMessageToWebview({
+          type: 'modelChanged',
+          modelType: payload.modelType
+        });
+      },
+      'chat:loaded': (payload) => {
+        this.sendMessageToWebview({
+          type: 'chatLoaded',
+          chat: payload.chat,
+          messagesLoaded: payload.messagesLoaded
+        });
+      },
+      'chat:list:loaded': (payload) => {
+        this.sendMessageToWebview({
+          type: 'historyLoaded',
+          history: payload.chatList
+        });
+      },
+      'error': (payload) => {
+        this.sendMessageToWebview({
+          type: 'error',
+          message: payload.message || 'Error desconocido'
+        });
+      }
+    };
+    
+    // Registrar todos los manejadores de eventos
+    Object.entries(eventHandlers).forEach(([event, handler]) => {
+      if (handler) {
+        this.eventBus.on(event as EventType, async (payload) => handler(payload));
+      }
     });
     
-    this.eventBus.on('model:changed', async (payload) => {
-      this.sendMessageToWebview({
-        type: 'modelChanged',
-        modelType: payload.modelType
-      });
-    });
-    
-    this.eventBus.on('chat:loaded', async (payload) => {
-      this.sendMessageToWebview({
-        type: 'chatLoaded',
-        chat: payload.chat
-      });
-    });
-    
+    // Mantener el evento history:loaded por compatibilidad, pero redirigirlo a chat:list:loaded
     this.eventBus.on('history:loaded', async (payload) => {
       this.sendMessageToWebview({
         type: 'historyLoaded',
         history: payload.history
-      });
-    });
-    
-    this.eventBus.on('error', async (payload) => {
-      this.sendMessageToWebview({
-        type: 'error',
-        message: payload.message || 'Error desconocido'
       });
     });
   }
@@ -64,7 +85,6 @@ export class WebViewManager implements vscode.WebviewViewProvider {
     context: vscode.WebviewViewResolveContext,
     _token: vscode.CancellationToken,
   ): void | Thenable<void> {
-    console.log('Resolviendo webview view...');
     this._view = webviewView;
 
     // Configurar opciones del webview
@@ -75,6 +95,10 @@ export class WebViewManager implements vscode.WebviewViewProvider {
     
     // Configurar los manejadores de mensajes
     this.setupMessageHandlers(webviewView);
+    
+    // Marcar el webview como listo y procesar mensajes pendientes
+    this.webviewReady = true;
+    this.processMessageQueue();
   }
 
   /**
@@ -96,36 +120,38 @@ export class WebViewManager implements vscode.WebviewViewProvider {
    */
   private setupMessageHandlers(webviewView: vscode.WebviewView): void {
     webviewView.webview.onDidReceiveMessage(async message => {
-      console.log('Mensaje recibido del webview:', message);
-      
       try {
-        switch (message.type) {
-          case 'sendMessage':
-            // Emitir evento para procesar mensaje del usuario
-            await this.eventBus.emit('message:send', { message: message.message });
-            break;
-            
-          case 'newChat':
-            // Emitir evento para crear nuevo chat
-            await this.eventBus.emit('chat:new');
-            break;
-            
-          case 'loadChat':
-            // Emitir evento para cargar un chat
-            await this.eventBus.emit('chat:load', { chatId: message.chatId });
-            break;
-            
-          case 'setModel':
-            if (message.modelType === 'ollama' || message.modelType === 'gemini') {
-              // Emitir evento para cambiar modelo
-              await this.eventBus.emit('model:change', { modelType: message.modelType });
+        // Simplificar el manejo de mensajes usando un mapa de acciones
+        const messageHandlers: Record<string, (data: any) => Promise<void>> = {
+          'sendMessage': async (data) => {
+            await this.eventBus.emit('message:send', { message: data.message });
+          },
+          'newChat': async () => {
+            await vscode.commands.executeCommand('extensionAssistant.createNewChat');
+          },
+          'loadChat': async (data) => {
+            await vscode.commands.executeCommand('extensionAssistant.loadChat', { 
+              chatId: data.chatId,
+              loadMessages: true
+            });
+          },
+          'loadHistory': async () => {
+            await vscode.commands.executeCommand('extensionAssistant.loadChatList');
+          },
+          'setModel': async (data) => {
+            if (data.modelType === 'ollama' || data.modelType === 'gemini') {
+              await this.eventBus.emit('model:change', { modelType: data.modelType });
             } else {
-              throw new Error(`Modelo no soportado: ${message.modelType}`);
+              throw new Error(`Modelo no soportado: ${data.modelType}`);
             }
-            break;
-            
-          default:
-            console.warn('Tipo de mensaje no reconocido:', message.type);
+          }
+        };
+        
+        const handler = messageHandlers[message.type];
+        if (handler) {
+          await handler(message);
+        } else {
+          console.warn('Tipo de mensaje no reconocido:', message.type);
         }
       } catch (error: any) {
         console.error('Error al procesar mensaje:', error);
@@ -138,11 +164,20 @@ export class WebViewManager implements vscode.WebviewViewProvider {
    * Envía un mensaje al webview
    */
   public sendMessageToWebview(message: any): void {
-    if (this._view) {
-      console.log('Enviando mensaje al webview:', message);
+    if (this.webviewReady && this._view) {
       this._view.webview.postMessage(message);
     } else {
-      console.warn('No se puede enviar mensaje: webview no inicializado');
+      this.messageQueue.push(message);
+    }
+  }
+  
+  /**
+   * Procesa la cola de mensajes pendientes
+   */
+  private processMessageQueue(): void {
+    if (this.webviewReady && this._view && this.messageQueue.length) {
+      this.messageQueue.forEach(m => this._view!.webview.postMessage(m));
+      this.messageQueue = [];
     }
   }
 
@@ -150,12 +185,10 @@ export class WebViewManager implements vscode.WebviewViewProvider {
    * Genera el contenido HTML para el webview
    */
   private getHtmlContent(webview: vscode.Webview): string {
-    // Obtener la ruta al archivo webview.js generado por webpack
     const scriptUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this._extensionUri, 'out', 'webview.js')
     );
 
-    // Usar nonce para solo permitir scripts específicos
     const nonce = this.generateNonce();
 
     return `<!DOCTYPE html>
