@@ -10,6 +10,10 @@
 /build
 /dist
 
+# Archivos generados por compilación
+/out
+/temp
+
 # Misc
 .DS_Store
 .env.local
