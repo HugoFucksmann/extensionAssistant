@@ -64,7 +64,7 @@ export class ExtensionContext {
       commandDisposables.forEach(disposable => context.subscriptions.push(disposable));
       
       // Inicializar el orquestrador último ya que depende de los demás
-      this.orchestratorAgent = new OrchestratorAgent(this.eventBus, this.modelProvider);
+      this.orchestratorAgent = new OrchestratorAgent(this.eventBus, this.modelProvider, this.memoryManager);
       await this.orchestratorAgent.initialize(context);
       
       // Registrar el proveedor de WebView

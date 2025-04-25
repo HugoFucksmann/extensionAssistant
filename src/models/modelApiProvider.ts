@@ -1,6 +1,6 @@
 import { EventBus } from '../core/eventBus';
 import { BaseAPI } from '../models/baseAPI';
-import { ProjectMemory } from '../agents/memory/tools';
+import { ProjectMemory } from '../core/memory/projectMemory';
 
 /**
  * Proveedor centralizado de API de modelos

@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { SQLiteStorage } from '../db/SQLiteStorage';
-import { TemporaryMemory, ProjectMemory } from '../agents/memory/tools';
+import { TemporaryMemory } from './memory/temporaryMemory';
+import { ProjectMemory } from './memory/projectMemory';
 
 /**
  * MemoryManager es responsable de las operaciones básicas de almacenamiento

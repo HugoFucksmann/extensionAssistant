@@ -1,19 +1,39 @@
 import * as vscode from 'vscode';
 import { EventBus } from '../core/eventBus';
+import { MemoryManager } from '../core/memoryManager';
 
 import { ModelResponse, UIResponse } from '../interfaces';
 import { ModelAPIProvider } from '../models/modelApiProvider';
+
+// Importar los agentes
+import { PromptAnalysisAgent } from './promptAnalysisAgent';
+import { FileSelectionAgent } from './fileSelectionAgent';
+import { CodeExaminationAgent } from './codeExaminationAgent';
+import { ResponseGenerationAgent } from './responseGenerationAgent';
 
 /**
  * OrchestratorAgent es responsable de coordinar el flujo de procesamiento.
  * Recibe mensajes del usuario, los procesa y devuelve respuestas.
  */
 export class OrchestratorAgent {
+  // Agentes especializados
+  private promptAnalysisAgent: PromptAnalysisAgent;
+  private fileSelectionAgent: FileSelectionAgent;
+  private codeExaminationAgent: CodeExaminationAgent;
+  private responseGenerationAgent: ResponseGenerationAgent;
+
   constructor(
     private eventBus: EventBus,
-    private modelProvider: ModelAPIProvider
+    private modelProvider: ModelAPIProvider,
+    private memoryManager: MemoryManager
   ) {
     console.log('OrchestratorAgent inicializado');
+    
+    // Inicializar agentes
+    this.promptAnalysisAgent = new PromptAnalysisAgent(modelProvider);
+    this.fileSelectionAgent = new FileSelectionAgent(modelProvider);
+    this.codeExaminationAgent = new CodeExaminationAgent(modelProvider, memoryManager);
+    this.responseGenerationAgent = new ResponseGenerationAgent(modelProvider);
     
     // Suscribirse a eventos relevantes
     this.setupEventListeners();
@@ -65,10 +85,10 @@ export class OrchestratorAgent {
       // 1. Emitir evento para indicar que se está procesando
       await this.eventBus.emit('message:processing', { isProcessing: true });
       
-      // 2. Generar respuesta con el modelo
-      console.log('Enviando mensaje al modelo');
-      const response = await this.modelProvider.generateResponse(message);
-      console.log('Respuesta del modelo recibida');
+      // 2. Ejecutar flujo RAG con generación de plan
+      console.log('Iniciando flujo RAG con generación de plan');
+      const response = await this.executeRagFlow(message);
+      console.log('Respuesta generada por el flujo RAG');
       
       // 3. Emitir evento con la respuesta completa
       await this.eventBus.emit('message:receive', {
@@ -82,6 +102,10 @@ export class OrchestratorAgent {
       // 4. Indicar que se ha completado el procesamiento
       await this.eventBus.emit('message:processing', { isProcessing: false });
       
+      // 5. Limpiar la memoria temporal después de completar la interacción
+      this.memoryManager.clearTemporaryMemory();
+      console.log('Memoria temporal limpiada después de la interacción');
+      
     } catch (error: any) {
       console.error('Error al procesar mensaje:', error);
       
@@ -90,7 +114,102 @@ export class OrchestratorAgent {
         message: `Error al procesar la solicitud: ${error.message || 'Desconocido'}`
       });
       await this.eventBus.emit('message:processing', { isProcessing: false });
+      
+      // También limpiar memoria en caso de error
+      this.memoryManager.clearTemporaryMemory();
+      console.log('Memoria temporal limpiada después de error en la interacción');
     }
+  }
+
+  /**
+   * Ejecuta el flujo RAG completo con generación de plan
+   * @param message Mensaje del usuario
+   * @returns Respuesta generada
+   */
+  private async executeRagFlow(message: string): Promise<string> {
+    // 1. Analizar el prompt y generar plan inicial
+    console.log('Analizando prompt y generando plan...');
+    const analysis = await this.promptAnalysisAgent.analyze(message);
+    
+    // Guardar análisis en memoria temporal
+    this.memoryManager.storeTemporaryMemory('analysis', analysis);
+    console.log('Plan generado:', analysis.actionPlan);
+    
+    // 2. Seleccionar archivos relevantes
+    console.log('Seleccionando archivos relevantes...');
+    let relevantFiles = await this.fileSelectionAgent.selectFiles(analysis);
+    
+    // Guardar archivos relevantes en memoria temporal
+    this.memoryManager.storeTemporaryMemory('relevantFiles', relevantFiles);
+    console.log('Archivos seleccionados inicialmente:', relevantFiles.relevantFiles?.length || 0);
+    
+    // 3. Examinar código de archivos seleccionados
+    console.log('Examinando código...');
+    let codeExamination = await this.codeExaminationAgent.examineCode(analysis, relevantFiles);
+    
+    // 3.1 Verificar si se necesitan examinar archivos adicionales
+    if (codeExamination.needsAdditionalFiles && 
+        codeExamination.additionalFilesToExamine && 
+        codeExamination.additionalFilesToExamine.length > 0) {
+      
+      console.log(`Se sugieren ${codeExamination.additionalFilesToExamine.length} archivos adicionales para examinar`);
+      
+      // Convertir las sugerencias de archivos al formato esperado por el agente de examen
+      const additionalFiles = {
+        relevantFiles: codeExamination.additionalFilesToExamine.map((file: { suggestedPath: string; reason?: string }) => ({
+          path: file.suggestedPath,
+          relevance: "alta",
+          reason: file.reason || "Sugerido durante el análisis de código"
+        }))
+      };
+      
+      // Examinar los archivos adicionales
+      console.log('Examinando archivos adicionales...');
+      const additionalExamination = await this.codeExaminationAgent.examineCode(analysis, additionalFiles);
+      
+      // Guardar resultado del examen adicional en memoria temporal
+      this.memoryManager.storeTemporaryMemory('additionalCodeExamination', additionalExamination);
+      
+      // Combinar los resultados
+      console.log('Combinando resultados de examen de código...');
+      
+      // Combinar extractos de código
+      const allCodeExtracts = [
+        ...(codeExamination.consolidatedCodeExtracts || []),
+        ...(additionalExamination.consolidatedCodeExtracts || [])
+      ];
+      
+      // Combinar posibles problemas
+      const allPossibleIssues = [
+        ...(codeExamination.possibleIssues || []),
+        ...(additionalExamination.possibleIssues || [])
+      ];
+      
+      // Actualizar el objeto de examen de código
+      codeExamination = {
+        ...codeExamination,
+        consolidatedCodeExtracts: allCodeExtracts,
+        possibleIssues: allPossibleIssues,
+        // Combinar análisis de causa raíz
+        rootCauseAnalysis: `${codeExamination.rootCauseAnalysis || ''} \n\nAnálisis adicional: ${additionalExamination.rootCauseAnalysis || ''}`
+      };
+    }
+    
+    // Guardar resultado final del examen en memoria temporal
+    this.memoryManager.storeTemporaryMemory('codeExamination', codeExamination);
+    console.log('Código examinado, extractos consolidados:', codeExamination.consolidatedCodeExtracts?.length || 0);
+    console.log('Posibles problemas identificados:', codeExamination.possibleIssues?.length || 0);
+    
+    // 4. Generar respuesta final
+    console.log('Generando respuesta final...');
+    const response = await this.responseGenerationAgent.generateResponse(
+      message,
+      analysis,
+      relevantFiles,
+      codeExamination
+    );
+    
+    return response;
   }
 
   /**
