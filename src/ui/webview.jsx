@@ -1,12 +1,12 @@
-import React, { lazy, Suspense } from "react";
+import React from "react";
 import ReactDOM from "react-dom";
 import Header from "./Components/Header";
 import ChatInput from "./Components/InputChat/ChatInput";
 
-// Importar componentes con carga diferida para mejorar el rendimiento inicial
-const ChatHistory = lazy(() => import("./historical/ChatHistory"));
-const RecentChats = lazy(() => import("./historical/RecentChats"));
-const ChatMessages = lazy(() => import("./Components/ChatMessages/ChatMessages"));
+// Importar componentes de manera estática en lugar de usar lazy loading
+import ChatHistory from "./historical/ChatHistory";
+import RecentChats from "./historical/RecentChats";
+import ChatMessages from "./Components/ChatMessages/ChatMessages";
 
 import { AppProvider } from "./context/AppContext";
 
@@ -36,17 +36,11 @@ function Chat() {
   return (
     <div style={styles.container}>
       <Header />
-      <Suspense fallback={<div style={{padding: "10px", textAlign: "center"}}>Cargando historial...</div>}>
-        <ChatHistory />
-      </Suspense>
+      <ChatHistory />
       <div style={styles.content}>
-        <Suspense fallback={<div style={{padding: "10px", textAlign: "center"}}>Cargando mensajes...</div>}>
-          <ChatMessages>
-            <Suspense fallback={<div style={{padding: "10px", textAlign: "center"}}>Cargando chats recientes...</div>}>
-              <RecentChats />
-            </Suspense>
-          </ChatMessages>
-        </Suspense>
+        <ChatMessages>
+          <RecentChats />
+        </ChatMessages>
       </div>
       <ChatInput />
     </div>

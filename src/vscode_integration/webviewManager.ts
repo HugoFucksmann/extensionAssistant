@@ -190,17 +190,28 @@ export class WebViewManager implements vscode.WebviewViewProvider {
     );
 
     const nonce = this.generateNonce();
+    
+    // Log para depuración
+    console.log(`Cargando webview con scriptUri: ${scriptUri}`);
 
     return `<!DOCTYPE html>
     <html lang="en">
     <head>
       <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; img-src ${webview.cspSource} https:; script-src 'nonce-${nonce}'; connect-src https:;">
+      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; img-src ${webview.cspSource} https: data:; script-src 'nonce-${nonce}' 'unsafe-eval'; connect-src https: http: ws:;">
       <title>AI Chat</title>
     </head>
     <body>
       <div id="root"></div>
+      <script nonce="${nonce}">
+        // Script de depuración
+        console.log('Iniciando carga del webview');
+        window.onerror = function(message, source, lineno, colno, error) {
+          console.error('Error en webview:', message, 'en', source, lineno, colno, error);
+          return false;
+        };
+      </script>
       <script nonce="${nonce}" src="${scriptUri}"></script>
     </body>
     </html>`;

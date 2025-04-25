@@ -64,25 +64,67 @@ export class EventBus {
    * @param eventType Tipo de evento a emitir
    * @param payload Datos asociados al evento
    */
+  private processingEvents = new Set<string>();
+  private maxRecursionDepth = 3;
+  private recursionCounter = new Map<EventType, number>();
+
   public async emit(eventType: EventType, payload: EventPayload = {}): Promise<void> {
-    console.log(`[EventBus] Emitiendo evento: ${eventType}`, payload);
+    // Generar un ID único para este evento específico
+    const eventId = `${eventType}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Verificar si ya estamos procesando este tipo de evento para evitar bucles
+    if (this.processingEvents.has(eventType)) {
+      console.warn(`[EventBus] Posible bucle detectado para evento: ${eventType}. Ignorando emisión duplicada.`);
+      return;
+    }
+    
+    // Verificar la profundidad de recursión para este tipo de evento
+    const currentDepth = this.recursionCounter.get(eventType) || 0;
+    if (currentDepth >= this.maxRecursionDepth) {
+      console.error(`[EventBus] Máxima profundidad de recursión alcanzada para evento: ${eventType}. Deteniendo la cadena de eventos.`);
+      return;
+    }
+    
+    // Incrementar contador de recursión
+    this.recursionCounter.set(eventType, currentDepth + 1);
+    
+    // Marcar este tipo de evento como en procesamiento
+    this.processingEvents.add(eventType);
+    
+    console.log(`[EventBus] Emitiendo evento: ${eventType} (ID: ${eventId})`, payload);
     
     const handlers = this.eventHandlers.get(eventType) || [];
     
     try {
       // Ejecutar todos los manejadores para este evento
       for (const handler of handlers) {
-        await Promise.resolve(handler(payload));
+        try {
+          await Promise.resolve(handler(payload));
+        } catch (handlerError) {
+          console.error(`[EventBus] Error en manejador individual para ${eventType}:`, handlerError);
+          // No propagar el error para que otros manejadores puedan ejecutarse
+        }
       }
     } catch (error) {
       console.error(`[EventBus] Error al procesar evento ${eventType}:`, error);
-      // Re-emitir como evento de error si no es ya un evento de error
-      if (eventType !== 'error') {
-        this.emit('error', { 
+      // Re-emitir como evento de error si no es ya un evento de error, con protección contra bucles
+      if (eventType !== 'error' && !this.processingEvents.has('error')) {
+        await this.emit('error', { 
           source: eventType,
           originalPayload: payload,
           error
         });
+      }
+    } finally {
+      // Limpiar: marcar el evento como ya no en procesamiento
+      this.processingEvents.delete(eventType);
+      
+      // Decrementar contador de recursión
+      const newDepth = (this.recursionCounter.get(eventType) || 1) - 1;
+      if (newDepth <= 0) {
+        this.recursionCounter.delete(eventType);
+      } else {
+        this.recursionCounter.set(eventType, newDepth);
       }
     }
   }

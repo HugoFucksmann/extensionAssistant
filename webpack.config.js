@@ -92,6 +92,15 @@ const webviewConfig = {
   output: {
     path: path.resolve(__dirname, "out"),
     filename: "webview.js",
+    // Configurar publicPath para que los chunks se carguen correctamente
+    publicPath: "",
+    // Evitar chunks separados para solucionar el problema de carga en VS Code
+    chunkFilename: "[name].js"
+  },
+  // Desactivar la división de código para evitar problemas de carga en VS Code
+  optimization: {
+    splitChunks: false,
+    runtimeChunk: false
   },
   module: {
     rules: [
