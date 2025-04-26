@@ -12,22 +12,69 @@ export class BaseAPI {
   protected abortController: AbortController | null = null;
   private modelInstance: ModelAPI | null = null;
   private currentModel: ModelType;
+  private projectMemory: any; // Tipo any por ahora, se tipará correctamente en initialize
 
-  constructor(modelType: ModelType) {
-    this.currentModel = modelType;
+  constructor(
+    private eventBus: any, // Tipo any por ahora, se tipará correctamente
+    initialModelType: ModelType = "gemini"
+  ) {
+    this.currentModel = initialModelType;
+    
+    // Suscribirse a eventos de cambio de modelo
+    this.eventBus.on('model:change', async (payload: { modelType: ModelType }) => {
+      await this.setModel(payload.modelType);
+    });
+  }
+
+  /**
+   * Inicializa la API con el almacenamiento para persistencia
+   */
+  public async initialize(storage: any): Promise<void> {
+    const { ProjectMemory } = require('../core/memory/projectMemory');
+    this.projectMemory = new ProjectMemory(storage);
+    
+    try {
+      const savedModel = await this.projectMemory.getProjectMemory('global', 'preferred_model');
+      
+      if (savedModel?.content) {
+        const modelType = savedModel.content as ModelType;
+        console.log(`[BaseAPI] Cargando modelo preferido: ${modelType}`);
+        this.setModel(modelType);
+      }
+      
+      // Notificar el modelo actual (predeterminado o guardado)
+      await this.eventBus.emit('model:changed', { modelType: this.currentModel });
+    } catch (error) {
+      console.error('[BaseAPI] Error al cargar el modelo preferido:', error);
+    }
+    
+    console.log(`[BaseAPI] Inicializado con modelo: ${this.currentModel}`);
   }
 
   // Método para cambiar el modelo en tiempo de ejecución
-  setModel(modelType: ModelType): void {
-    console.log(`BaseAPI.setModel llamado con modelType: ${modelType}, modelo actual: ${this.currentModel}`);
+  async setModel(modelType: ModelType): Promise<void> {
+    if (!modelType) throw new Error('Se requiere modelType para cambiar el modelo');
     
-    if (this.currentModel !== modelType) {
-      console.log(`BaseAPI: Cambiando modelo de ${this.currentModel} a ${modelType}`);
-      this.currentModel = modelType;
-      this.modelInstance = null; // Forzar recreación de la instancia
-      console.log(`BaseAPI: Modelo cambiado a ${this.currentModel}, instancia reseteada: ${this.modelInstance === null}`);
-    } else {
-      console.log(`BaseAPI: El modelo ya está configurado como ${modelType}, no se hace nada`);
+    try {
+      console.log(`[BaseAPI] Cambiando modelo: ${this.currentModel} → ${modelType}`);
+      
+      if (this.currentModel !== modelType) {
+        console.log(`BaseAPI: Cambiando modelo de ${this.currentModel} a ${modelType}`);
+        this.currentModel = modelType;
+        this.modelInstance = null; // Forzar recreación de la instancia
+        console.log(`BaseAPI: Modelo cambiado a ${this.currentModel}, instancia reseteada: ${this.modelInstance === null}`);
+      } else {
+        console.log(`BaseAPI: El modelo ya está configurado como ${modelType}, no se hace nada`);
+      }
+      
+      if (this.projectMemory) {
+        await this.projectMemory.storeProjectMemory('global', 'preferred_model', modelType);
+      }
+      
+      await this.eventBus.emit('model:changed', { modelType });
+    } catch (error) {
+      console.error(`[BaseAPI] Error al cambiar modelo:`, error);
+      throw error;
     }
   }
   
@@ -88,8 +135,8 @@ export class BaseAPI {
       // Log de la respuesta recibida
       console.log(`[BaseAPI][${this.currentModel}] RESPONSE::: `, response);
       
-      // Procesamiento común para ambos modelos
-      return this.normalizeResponse(response);
+      // Devolver la respuesta sin normalización
+      return response;
     } catch (error) {
       console.error(`[BaseAPI] Error generando respuesta con ${this.currentModel}:`, error);
       throw error;
@@ -100,21 +147,5 @@ export class BaseAPI {
     if (this.modelInstance) {
       this.modelInstance.abortRequest();
     }
-  }
-
-  // Método para normalizar respuestas de diferentes modelos
-  private normalizeResponse(response: string): string {
-    if (!response) return "";
-    
-    // Normalización específica por modelo
-    if (this.currentModel === "ollama") {
-      // Procesamiento específico para Ollama si es necesario
-      return response.trim();
-    } else if (this.currentModel === "gemini") {
-      // Procesamiento específico para Gemini si es necesario
-      return response.trim();
-    }
-    
-    return response.trim();
   }
 }

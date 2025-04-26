@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { EventBus } from './eventBus';
 import { ChatManager } from './chatManager';
 import { MemoryManager } from './memoryManager';
+import { AppCommands, VS_CODE_PREFIX } from './constants';
 
 /**
  * CommandManager optimizado que utiliza el bus de eventos
@@ -26,43 +27,43 @@ export class CommandManager {
    */
   public registerCommands(context: vscode.ExtensionContext): vscode.Disposable[] {
     return [
-      vscode.commands.registerCommand('extensionAssistant.openChat', () => {
+      vscode.commands.registerCommand(`${VS_CODE_PREFIX}${AppCommands.CHAT_OPEN.split(':').join('.')}`, () => {
         vscode.commands.executeCommand('workbench.view.extension.ai-chat-sidebar');
       }),
       
-      vscode.commands.registerCommand('extensionAssistant.sendTestMessage', async () => {
+      vscode.commands.registerCommand(`${VS_CODE_PREFIX}${AppCommands.MESSAGE_TEST.split(':').join('.')}`, async () => {
         // Emitir evento para procesar mensaje de prueba
-        await this.eventBus.emit('message:send', { 
+        await this.eventBus.emit(AppCommands.MESSAGE_SEND, { 
           message: 'Mensaje de prueba desde comando' 
         });
       }),
       
-      vscode.commands.registerCommand('extensionAssistant.createNewChat', async () => {
+      vscode.commands.registerCommand(`${VS_CODE_PREFIX}${AppCommands.CHAT_NEW.split(':').join('.')}`, async () => {
         await this.chatManager.createNewChat();
       }),
       
-      vscode.commands.registerCommand('extensionAssistant.loadChat', async (args: any) => {
+      vscode.commands.registerCommand(`${VS_CODE_PREFIX}${AppCommands.CHAT_LOAD.split(':').join('.')}`, async (args: any) => {
         if (args?.chatId) {
           await this.chatManager.loadChat(args.chatId, args.loadMessages !== false);
         }
       }),
       
-      vscode.commands.registerCommand('extensionAssistant.loadChatList', async () => {
+      vscode.commands.registerCommand(`${VS_CODE_PREFIX}${AppCommands.CHAT_LIST_LOAD.split(':').join('.')}`, async () => {
         await this.chatManager.getChatList();
       }),
       
-      vscode.commands.registerCommand('extensionAssistant.setModel', async (args: any) => {
+      vscode.commands.registerCommand(`${VS_CODE_PREFIX}${AppCommands.MODEL_CHANGE.split(':').join('.')}`, async (args: any) => {
         const modelType = args?.modelType || 'gemini';
-        await this.eventBus.emit('model:change', { modelType });
+        await this.eventBus.emit(AppCommands.MODEL_CHANGE, { modelType });
       }),
       
-      vscode.commands.registerCommand('extensionAssistant.storeProjectMemory', async (args: any) => {
+      vscode.commands.registerCommand(`${VS_CODE_PREFIX}${AppCommands.MEMORY_STORE.split(':').join('.')}`, async (args: any) => {
         if (args?.projectPath && args?.key && args?.content) {
           await this.memoryManager.storeProjectMemory(args.projectPath, args.key, args.content);
         }
       }),
       
-      vscode.commands.registerCommand('extensionAssistant.getProjectMemory', async (args: any) => {
+      vscode.commands.registerCommand(`${VS_CODE_PREFIX}${AppCommands.MEMORY_GET.split(':').join('.')}`, async (args: any) => {
         if (args?.projectPath && args?.key) {
           return this.memoryManager.getProjectMemory(args.projectPath, args.key);
         }

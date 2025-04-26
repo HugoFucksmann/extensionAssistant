@@ -1,87 +1,65 @@
-import { ModelAPIProvider } from '../models/modelApiProvider';
+import { BaseAPI } from '../models/baseAPI';
 import { PROMPTS } from './prompts';
 
 /**
- * Agente encargado de analizar el prompt del usuario y generar un plan inicial
+ * Agente encargado de analizar el prompt del usuario
+ * Extrae información clave y genera un plan de acción
  */
 export class PromptAnalysisAgent {
-  constructor(private modelProvider: ModelAPIProvider) {}
+  constructor(private modelAPI: BaseAPI) {}
 
   /**
-   * Analiza el prompt del usuario y genera un plan inicial
+   * Analiza el prompt del usuario y extrae información clave
    * @param userQuery Consulta del usuario
-   * @returns Análisis y plan inicial
+   * @returns Análisis del prompt con objetivo, palabras clave y plan
    */
   public async analyze(userQuery: string): Promise<any> {
     try {
+      console.log('Analizando prompt:', userQuery);
+      
       // Construir el prompt para el análisis
       const prompt = PROMPTS.PROMPT_ANALYSIS.replace('{userQuery}', userQuery);
       
-      // Generar respuesta con el modelo
-      const response = await this.modelProvider.generateResponse(prompt);
+      // Obtener respuesta del modelo
+      const response = await this.modelAPI.generateResponse(prompt);
       
       // Parsear la respuesta JSON
-      return this.parseJsonResponse(response);
-    } catch (error) {
-      console.error('Error al analizar prompt:', error);
-      // Devolver un análisis básico en caso de error
-      return {
-        objective: "Responder a la consulta del usuario",
-        keywords: this.extractBasicKeywords(userQuery),
-        problemType: "desconocido",
-        actionPlan: {
-          steps: [
-            {
-              id: 1,
-              description: "Buscar archivos relevantes",
-              actionType: "buscar_archivos"
-            },
-            {
-              id: 2,
-              description: "Generar respuesta",
-              actionType: "generar_respuesta"
-            }
-          ]
+      try {
+        const parsedResponse = JSON.parse(response);
+        console.log('Análisis completado:', parsedResponse);
+        return parsedResponse;
+      } catch (parseError) {
+        console.error('Error al parsear respuesta JSON del análisis:', parseError);
+        console.log('Respuesta cruda:', response);
+        
+        // Intentar extraer JSON si está rodeado de texto
+        const jsonMatch = response.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          try {
+            const extractedJson = jsonMatch[0];
+            console.log('Intentando parsear JSON extraído:', extractedJson);
+            return JSON.parse(extractedJson);
+          } catch (extractError) {
+            console.error('Error al parsear JSON extraído:', extractError);
+          }
         }
-      };
-    }
-  }
-
-  /**
-   * Extrae palabras clave básicas del texto
-   * @param text Texto a analizar
-   * @returns Lista de palabras clave
-   */
-  private extractBasicKeywords(text: string): string[] {
-    // Eliminar palabras comunes y extraer posibles nombres de funciones, archivos, etc.
-    const words = text.split(/\s+/);
-    const commonWords = ['el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas', 'y', 'o', 'a', 'de', 'en', 'con', 'por', 'para'];
-    
-    return words
-      .filter(word => word.length > 3 && !commonWords.includes(word.toLowerCase()))
-      .filter(word => /[A-Za-z0-9_\-.]+/.test(word));
-  }
-
-  /**
-   * Parsea la respuesta JSON del modelo
-   * @param response Respuesta del modelo
-   * @returns Objeto JSON parseado
-   */
-  private parseJsonResponse(response: string): any {
-    try {
-      // Intentar extraer JSON de la respuesta
-      const jsonMatch = response.match(/```json\n([\s\S]*?)\n```/) || 
-                        response.match(/{[\s\S]*}/);
-      
-      if (jsonMatch) {
-        const jsonStr = jsonMatch[0].replace(/```json\n|```/g, '');
-        return JSON.parse(jsonStr);
+        
+        // Devolver un análisis básico en caso de error
+        return {
+          objective: userQuery,
+          keywords: userQuery.split(' ').filter(word => word.length > 3),
+          problemType: "consulta",
+          actionPlan: {
+            steps: [
+              { id: 1, description: "Buscar archivos relevantes", actionType: "buscar_archivos" },
+              { id: 2, description: "Examinar código", actionType: "examinar_codigo" },
+              { id: 3, description: "Generar respuesta", actionType: "generar_respuesta" }
+            ]
+          }
+        };
       }
-      
-      // Si no se puede extraer JSON, intentar parsear toda la respuesta
-      return JSON.parse(response);
     } catch (error) {
-      console.error('Error al parsear respuesta JSON:', error);
+      console.error('Error en análisis de prompt:', error);
       throw error;
     }
   }

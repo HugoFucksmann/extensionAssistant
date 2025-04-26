@@ -1,11 +1,11 @@
-import { ModelAPIProvider } from '../models/modelApiProvider';
+import { BaseAPI } from '../models/baseAPI';
 import { PROMPTS } from './prompts';
 
 /**
  * Agente encargado de generar la respuesta final para el usuario
  */
 export class ResponseGenerationAgent {
-  constructor(private modelProvider: ModelAPIProvider) {}
+  constructor(private modelAPI: BaseAPI) {}
 
   /**
    * Genera una respuesta final basada en toda la información recopilada
@@ -50,8 +50,8 @@ export class ResponseGenerationAgent {
       console.log('Generando respuesta final con extractos de código:', codeExtracts.length);
       console.log('Posibles problemas identificados:', possibleIssues.length);
       
-      // Generar respuesta con el modelo
-      return await this.modelProvider.generateResponse(prompt);
+      // Generar respuesta con el modelo directamente a través de BaseAPI
+      return await this.modelAPI.generateResponse(prompt);
     } catch (error) {
       console.error('Error al generar respuesta final:', error);
       // Devolver una respuesta genérica en caso de error

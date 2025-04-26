@@ -1,124 +1,99 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { ModelAPIProvider } from '../models/modelApiProvider';
+import { BaseAPI } from '../models/baseAPI';
 import { PROMPTS } from './prompts';
 
 /**
- * Agente encargado de seleccionar archivos relevantes para el problema
+ * Agente encargado de seleccionar archivos relevantes para la consulta
  */
 export class FileSelectionAgent {
-  constructor(private modelProvider: ModelAPIProvider) {}
+  constructor(private modelAPI: BaseAPI) {}
 
   /**
-   * Selecciona archivos relevantes basados en el análisis previo
-   * @param analysis Análisis previo del prompt
-   * @returns Lista de archivos relevantes
+   * Selecciona archivos relevantes basados en el análisis del prompt
+   * @param analysis Análisis del prompt
+   * @returns Lista de archivos relevantes con su nivel de relevancia
    */
   public async selectFiles(analysis: any): Promise<any> {
     try {
-      // Obtener lista de archivos disponibles en el workspace
+      // Obtener lista de archivos del workspace
       const availableFiles = await this.getWorkspaceFiles();
       
-      // Filtrar archivos por palabras clave del análisis
-      const filteredFiles = this.preFilterFiles(availableFiles, analysis.keywords);
+      if (!availableFiles || availableFiles.length === 0) {
+        console.log('No se encontraron archivos en el workspace');
+        return { relevantFiles: [] };
+      }
       
-      // Si hay muchos archivos, limitar a los más probables para no sobrecargar el modelo
-      const topFiles = filteredFiles.slice(0, 10);
+      console.log(`Encontrados ${availableFiles.length} archivos en el workspace`);
       
       // Construir el prompt para la selección de archivos
       const prompt = PROMPTS.FILE_SELECTION
         .replace('{analysis}', JSON.stringify(analysis))
-        .replace('{availableFiles}', JSON.stringify(topFiles));
+        .replace('{availableFiles}', JSON.stringify(availableFiles));
       
-      // Generar respuesta con el modelo
-      const response = await this.modelProvider.generateResponse(prompt);
+      // Obtener respuesta del modelo
+      const response = await this.modelAPI.generateResponse(prompt);
       
       // Parsear la respuesta JSON
-      return this.parseJsonResponse(response);
+      try {
+        const parsedResponse = JSON.parse(response);
+        console.log('Archivos seleccionados:', parsedResponse.relevantFiles?.length || 0);
+        return parsedResponse;
+      } catch (parseError) {
+        console.error('Error al parsear respuesta JSON de selección de archivos:', parseError);
+        console.log('Respuesta cruda:', response);
+        
+        // Intentar extraer JSON si está rodeado de texto
+        const jsonMatch = response.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          try {
+            const extractedJson = jsonMatch[0];
+            console.log('Intentando parsear JSON extraído:', extractedJson);
+            return JSON.parse(extractedJson);
+          } catch (extractError) {
+            console.error('Error al parsear JSON extraído:', extractError);
+          }
+        }
+        
+        // Devolver una lista vacía en caso de error
+        return { relevantFiles: [] };
+      }
     } catch (error) {
-      console.error('Error al seleccionar archivos:', error);
-      // Devolver una selección básica en caso de error
-      return {
-        relevantFiles: this.preFilterFiles(await this.getWorkspaceFiles(), analysis.keywords)
-          .slice(0, 3)
-          .map(file => ({
-            path: file,
-            relevance: "media",
-            reason: "Contiene palabras clave de la consulta"
-          }))
-      };
+      console.error('Error en selección de archivos:', error);
+      return { relevantFiles: [] };
     }
   }
 
   /**
-   * Obtiene la lista de archivos en el workspace actual
+   * Obtiene la lista de archivos en el workspace
    * @returns Lista de rutas de archivos
    */
   private async getWorkspaceFiles(): Promise<string[]> {
-    if (!vscode.workspace.workspaceFolders) {
-      return [];
-    }
-    
-    const workspaceRoot = vscode.workspace.workspaceFolders[0].uri.fsPath;
-    const files: string[] = [];
-    
-    // Usar la API de VS Code para buscar archivos
-    const uris = await vscode.workspace.findFiles(
-      '**/*.{js,ts,jsx,tsx,html,css}',
-      '**/node_modules/**'
-    );
-    
-    // Convertir URIs a rutas relativas
-    for (const uri of uris) {
-      const relativePath = path.relative(workspaceRoot, uri.fsPath);
-      files.push(relativePath);
-    }
-    
-    return files;
-  }
-
-  /**
-   * Filtra archivos basados en palabras clave
-   * @param files Lista de archivos
-   * @param keywords Palabras clave
-   * @returns Lista filtrada de archivos
-   */
-  private preFilterFiles(files: string[], keywords: string[]): string[] {
-    if (!keywords || keywords.length === 0) {
-      return files;
-    }
-    
-    // Filtrar archivos que contengan alguna de las palabras clave
-    return files.filter(file => {
-      const fileName = path.basename(file).toLowerCase();
-      return keywords.some(keyword => 
-        fileName.includes(keyword.toLowerCase()) ||
-        file.toLowerCase().includes(keyword.toLowerCase())
-      );
-    });
-  }
-
-  /**
-   * Parsea la respuesta JSON del modelo
-   * @param response Respuesta del modelo
-   * @returns Objeto JSON parseado
-   */
-  private parseJsonResponse(response: string): any {
     try {
-      // Intentar extraer JSON de la respuesta
-      const jsonMatch = response.match(/```json\n([\s\S]*?)\n```/) || 
-                        response.match(/{[\s\S]*}/);
+      const workspaceFolders = vscode.workspace.workspaceFolders;
       
-      if (jsonMatch) {
-        const jsonStr = jsonMatch[0].replace(/```json\n|```/g, '');
-        return JSON.parse(jsonStr);
+      if (!workspaceFolders || workspaceFolders.length === 0) {
+        console.log('No hay carpetas de workspace abiertas');
+        return [];
       }
       
-      // Si no se puede extraer JSON, intentar parsear toda la respuesta
-      return JSON.parse(response);
+      const rootPath = workspaceFolders[0].uri.fsPath;
+      console.log(`Buscando archivos en: ${rootPath}`);
+      
+      // Buscar archivos en el workspace
+      const files = await vscode.workspace.findFiles(
+        '**/*.{js,ts,jsx,tsx,html,css,json,md}',
+        '**/node_modules/**'
+      );
+      
+      // Convertir a rutas relativas
+      return files.map(file => {
+        const relativePath = path.relative(rootPath, file.fsPath);
+        return relativePath.replace(/\\/g, '/'); // Normalizar separadores
+      });
     } catch (error) {
-      console.error('Error al parsear respuesta JSON:', error);
-      throw error;
+      console.error('Error al obtener archivos del workspace:', error);
+      return [];
     }
   }
 }

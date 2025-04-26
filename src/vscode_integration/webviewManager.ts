@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { EventBus, EventType } from '../core/eventBus';
+import { AppCommands, VS_CODE_PREFIX } from '../core/constants';
 
 /**
  * Clase que centraliza toda la gestión de WebView
@@ -24,37 +25,37 @@ export class WebViewManager implements vscode.WebviewViewProvider {
   private setupEventListeners(): void {
     // Mapa de eventos y sus manejadores
     const eventHandlers: Partial<Record<EventType, (payload: any) => void>> = {
-      'message:receive': (payload) => {
+      [AppCommands.MESSAGE_RECEIVE]: (payload) => {
         this.sendMessageToWebview(payload);
       },
-      'message:processing': (payload) => {
+      [AppCommands.MESSAGE_PROCESSING]: (payload) => {
         this.sendMessageToWebview({
-          type: 'processingStatus',
+          type: 'processingStatus', // Usar el nombre antiguo para compatibilidad con el frontend
           isProcessing: payload.isProcessing
         });
       },
-      'model:changed': (payload) => {
+      [AppCommands.MODEL_CHANGED]: (payload) => {
         this.sendMessageToWebview({
-          type: 'modelChanged',
+          type: 'modelChanged', // Usar el nombre antiguo para compatibilidad con el frontend
           modelType: payload.modelType
         });
       },
-      'chat:loaded': (payload) => {
+      [AppCommands.CHAT_LOADED]: (payload) => {
         this.sendMessageToWebview({
-          type: 'chatLoaded',
+          type: 'chatLoaded', // Usar el nombre antiguo para compatibilidad con el frontend
           chat: payload.chat,
           messagesLoaded: payload.messagesLoaded
         });
       },
-      'chat:list:loaded': (payload) => {
+      [AppCommands.CHAT_LIST_LOADED]: (payload) => {
         this.sendMessageToWebview({
-          type: 'historyLoaded',
+          type: 'historyLoaded', // Usar el nombre antiguo para compatibilidad con el frontend
           history: payload.chatList
         });
       },
-      'error': (payload) => {
+      [AppCommands.ERROR]: (payload) => {
         this.sendMessageToWebview({
-          type: 'error',
+          type: 'error', // Usar el nombre antiguo para compatibilidad con el frontend
           message: payload.message || 'Error desconocido'
         });
       }
@@ -70,7 +71,7 @@ export class WebViewManager implements vscode.WebviewViewProvider {
     // Mantener el evento history:loaded por compatibilidad, pero redirigirlo a chat:list:loaded
     this.eventBus.on('history:loaded', async (payload) => {
       this.sendMessageToWebview({
-        type: 'historyLoaded',
+        type: 'historyLoaded', // Mantener el nombre antiguo para compatibilidad con el frontend
         history: payload.history
       });
     });
@@ -123,24 +124,49 @@ export class WebViewManager implements vscode.WebviewViewProvider {
       try {
         // Simplificar el manejo de mensajes usando un mapa de acciones
         const messageHandlers: Record<string, (data: any) => Promise<void>> = {
+          // Nuevos nombres basados en constantes
+          [AppCommands.MESSAGE_SEND]: async (data) => {
+            await this.eventBus.emit(AppCommands.MESSAGE_SEND, { message: data.message });
+          },
+          [AppCommands.CHAT_NEW]: async () => {
+            await vscode.commands.executeCommand(`${VS_CODE_PREFIX}${AppCommands.CHAT_NEW.split(':').join('.')}`);
+          },
+          [AppCommands.CHAT_LOAD]: async (data) => {
+            await vscode.commands.executeCommand(`${VS_CODE_PREFIX}${AppCommands.CHAT_LOAD.split(':').join('.')}`, { 
+              chatId: data.chatId,
+              loadMessages: true
+            });
+          },
+          [AppCommands.CHAT_LIST_LOAD]: async () => {
+            await vscode.commands.executeCommand(`${VS_CODE_PREFIX}${AppCommands.CHAT_LIST_LOAD.split(':').join('.')}`);
+          },
+          [AppCommands.MODEL_CHANGE]: async (data) => {
+            if (data.modelType === 'ollama' || data.modelType === 'gemini') {
+              await this.eventBus.emit(AppCommands.MODEL_CHANGE, { modelType: data.modelType });
+            } else {
+              throw new Error(`Modelo no soportado: ${data.modelType}`);
+            }
+          },
+          
+          // Nombres antiguos para compatibilidad
           'sendMessage': async (data) => {
-            await this.eventBus.emit('message:send', { message: data.message });
+            await this.eventBus.emit(AppCommands.MESSAGE_SEND, { message: data.message });
           },
           'newChat': async () => {
-            await vscode.commands.executeCommand('extensionAssistant.createNewChat');
+            await vscode.commands.executeCommand(`${VS_CODE_PREFIX}${AppCommands.CHAT_NEW.split(':').join('.')}`);
           },
           'loadChat': async (data) => {
-            await vscode.commands.executeCommand('extensionAssistant.loadChat', { 
+            await vscode.commands.executeCommand(`${VS_CODE_PREFIX}${AppCommands.CHAT_LOAD.split(':').join('.')}`, { 
               chatId: data.chatId,
               loadMessages: true
             });
           },
           'loadHistory': async () => {
-            await vscode.commands.executeCommand('extensionAssistant.loadChatList');
+            await vscode.commands.executeCommand(`${VS_CODE_PREFIX}${AppCommands.CHAT_LIST_LOAD.split(':').join('.')}`);
           },
           'setModel': async (data) => {
             if (data.modelType === 'ollama' || data.modelType === 'gemini') {
-              await this.eventBus.emit('model:change', { modelType: data.modelType });
+              await this.eventBus.emit(AppCommands.MODEL_CHANGE, { modelType: data.modelType });
             } else {
               throw new Error(`Modelo no soportado: ${data.modelType}`);
             }

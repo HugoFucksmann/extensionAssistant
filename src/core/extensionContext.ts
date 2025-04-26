@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { EventBus } from './eventBus';
 import { ConfigManager } from './configManager';
 import { WebViewManager } from '../vscode_integration/webviewManager';
-import { ModelAPIProvider } from '../models/modelApiProvider';
+import { BaseAPI } from '../models/baseAPI';
 import { OrchestratorAgent } from '../agents/orchestratorAgent';
 import { CommandManager } from './commandManager';
 import { MemoryManager } from './memoryManager';
@@ -16,7 +16,7 @@ export class ExtensionContext {
   private eventBus: EventBus;
   private configManager: ConfigManager;
   private webViewManager: WebViewManager | null = null;
-  private modelProvider: ModelAPIProvider | null = null;
+  private modelAPI: BaseAPI | null = null;
   private orchestratorAgent: OrchestratorAgent | null = null;
   private memoryManager: MemoryManager | null = null;
   private chatManager: ChatManager | null = null;
@@ -30,11 +30,11 @@ export class ExtensionContext {
   /**
    * Inicializa todos los componentes de la extensión
    * @param context El contexto de la extensión de VS Code
-   * @param modelProvider Opcional: proveedor de modelos ya inicializado
+   * @param modelAPI Opcional: API de modelo ya inicializada
    */
   public async initializeComponents(
     context: vscode.ExtensionContext,
-    modelProvider?: ModelAPIProvider
+    modelAPI?: BaseAPI
   ): Promise<void> {
     try {
       // Obtener configuración desde el ConfigManager
@@ -48,10 +48,10 @@ export class ExtensionContext {
       this.chatManager = new ChatManager(this.memoryManager, this.eventBus);
       await this.chatManager.initialize();
       
-      // Inicializar el proveedor de modelos o usar el proporcionado
+      // Inicializar el API de modelos o usar el proporcionado
+      this.modelAPI = modelAPI || new BaseAPI(this.eventBus, initialModelType);
       const storage = this.memoryManager.getStorage();
-      this.modelProvider = modelProvider || new ModelAPIProvider(this.eventBus, initialModelType);
-      await this.modelProvider.initialize(storage);
+      await this.modelAPI.initialize(storage);
       
       // Inicializar el WebViewManager
       this.webViewManager = new WebViewManager(context.extensionUri, this.eventBus);
@@ -64,7 +64,7 @@ export class ExtensionContext {
       commandDisposables.forEach(disposable => context.subscriptions.push(disposable));
       
       // Inicializar el orquestrador último ya que depende de los demás
-      this.orchestratorAgent = new OrchestratorAgent(this.eventBus, this.modelProvider, this.memoryManager);
+      this.orchestratorAgent = new OrchestratorAgent(this.eventBus, this.modelAPI, this.memoryManager);
       await this.orchestratorAgent.initialize(context);
       
       // Registrar el proveedor de WebView
@@ -75,12 +75,7 @@ export class ExtensionContext {
         )
       );
       
-      // Escuchar cambios de configuración
-      this.eventBus.on('config:changed', async (payload) => {
-        if (this.modelProvider && payload.modelType) {
-          await this.modelProvider.setModel(payload.modelType);
-        }
-      });
+      // No necesitamos escuchar cambios de configuración aquí ya que BaseAPI ya maneja esos eventos
       
       // Registrar la limpieza de recursos
       context.subscriptions.push({
@@ -97,8 +92,8 @@ export class ExtensionContext {
     return this.eventBus;
   }
   
-  public getModelProvider(): ModelAPIProvider | null {
-    return this.modelProvider;
+  public getModelAPI(): BaseAPI | null {
+    return this.modelAPI;
   }
   
   public getWebViewManager(): WebViewManager | null {
@@ -157,10 +152,10 @@ export class ExtensionContext {
     this.commandManager = null;
     this.webViewManager = null;
     
-    // Liberar el proveedor de modelos
-    if (this.modelProvider) {
-      this.modelProvider.abortRequest();
-      this.modelProvider = null;
+    // Liberar el API de modelos
+    if (this.modelAPI) {
+      this.modelAPI.abortRequest();
+      this.modelAPI = null;
     }
   }
 }

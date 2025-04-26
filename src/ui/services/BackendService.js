@@ -3,14 +3,17 @@
  * Servicio centralizado para la comunicación con el backend (extensión de VS Code)
  */
 
+import { AppCommands } from '../../core/constants';
+
+// Exportamos AppCommands directamente para usar en el frontend
 export const ACTIONS = {
-  SEND_MESSAGE: 'sendMessage',
-  SET_MODEL: 'setModel',  // Acción para cambiar el modelo
-  LOAD_CHAT: 'loadChat',
-  LOAD_HISTORY: 'loadHistory',
-  CLEAR_CONVERSATION: 'clearConversation',
-  GET_PROJECT_FILES: 'getProjectFiles',
-  NEW_CHAT: 'newChat'
+  SEND_MESSAGE: AppCommands.MESSAGE_SEND,
+  SET_MODEL: AppCommands.MODEL_CHANGE,
+  LOAD_CHAT: AppCommands.CHAT_LOAD,
+  LOAD_HISTORY: AppCommands.CHAT_LIST_LOAD,
+  CLEAR_CONVERSATION: AppCommands.CHAT_NEW, // Reutilizamos el comando de nuevo chat
+  GET_PROJECT_FILES: AppCommands.PROJECT_FILES_GET,
+  NEW_CHAT: AppCommands.CHAT_NEW
 };
 
 class BackendService {

@@ -3,7 +3,7 @@ import { EventBus } from '../core/eventBus';
 import { MemoryManager } from '../core/memoryManager';
 
 import { ModelResponse, UIResponse } from '../interfaces';
-import { ModelAPIProvider } from '../models/modelApiProvider';
+import { BaseAPI } from '../models/baseAPI';
 
 // Importar los agentes
 import { PromptAnalysisAgent } from './promptAnalysisAgent';
@@ -24,16 +24,16 @@ export class OrchestratorAgent {
 
   constructor(
     private eventBus: EventBus,
-    private modelProvider: ModelAPIProvider,
+    private modelAPI: BaseAPI,
     private memoryManager: MemoryManager
   ) {
     console.log('OrchestratorAgent inicializado');
     
     // Inicializar agentes
-    this.promptAnalysisAgent = new PromptAnalysisAgent(modelProvider);
-    this.fileSelectionAgent = new FileSelectionAgent(modelProvider);
-    this.codeExaminationAgent = new CodeExaminationAgent(modelProvider, memoryManager);
-    this.responseGenerationAgent = new ResponseGenerationAgent(modelProvider);
+    this.promptAnalysisAgent = new PromptAnalysisAgent(modelAPI);
+    this.fileSelectionAgent = new FileSelectionAgent(modelAPI);
+    this.codeExaminationAgent = new CodeExaminationAgent(modelAPI, memoryManager);
+    this.responseGenerationAgent = new ResponseGenerationAgent(modelAPI);
     
     // Suscribirse a eventos relevantes
     this.setupEventListeners();
@@ -48,21 +48,7 @@ export class OrchestratorAgent {
       await this.processUserMessage(payload.message);
     });
     
-    // Escuchar cambios de modelo
-    this.eventBus.on('model:change', async (payload) => {
-      try {
-        await this.modelProvider.setModel(payload.modelType);
-        await this.eventBus.emit('model:changed', { 
-          modelType: payload.modelType,
-          success: true
-        });
-      } catch (error) {
-        console.error('Error al cambiar modelo:', error);
-        await this.eventBus.emit('error', {
-          message: `Error al cambiar modelo: ${error instanceof Error ? error.message : 'Error desconocido'}`
-        });
-      }
-    });
+    // No necesitamos escuchar cambios de modelo aquí ya que BaseAPI ya maneja esos eventos
   }
 
   /**
@@ -96,7 +82,7 @@ export class OrchestratorAgent {
         userMessage: message,
         message: response,
         isUser: false,
-        modelType: this.modelProvider.getCurrentModel()
+        modelType: this.modelAPI.getCurrentModel()
       });
       
       // 4. Indicar que se ha completado el procesamiento
@@ -106,21 +92,19 @@ export class OrchestratorAgent {
       this.memoryManager.clearTemporaryMemory();
       console.log('Memoria temporal limpiada después de la interacción');
       
-    } catch (error: any) {
-      console.error('Error al procesar mensaje:', error);
+    } catch (error) {
+      console.error('Error procesando mensaje:', error);
       
-      // Notificar error y finalizar procesamiento
+      // Emitir evento de error
       await this.eventBus.emit('error', {
-        message: `Error al procesar la solicitud: ${error.message || 'Desconocido'}`
+        message: `Error procesando mensaje: ${error instanceof Error ? error.message : 'Error desconocido'}`
       });
-      await this.eventBus.emit('message:processing', { isProcessing: false });
       
-      // También limpiar memoria en caso de error
-      this.memoryManager.clearTemporaryMemory();
-      console.log('Memoria temporal limpiada después de error en la interacción');
+      // Indicar que se ha completado el procesamiento (con error)
+      await this.eventBus.emit('message:processing', { isProcessing: false });
     }
   }
-
+  
   /**
    * Ejecuta el flujo RAG completo con generación de plan
    * @param message Mensaje del usuario
