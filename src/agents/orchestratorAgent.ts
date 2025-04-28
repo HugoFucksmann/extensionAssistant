@@ -9,7 +9,7 @@ import { BaseAPI } from '../models/baseAPI';
 import { PromptAnalysisAgent } from './promptAnalysisAgent';
 import { FileSelectionAgent } from './fileSelectionAgent';
 import { CodeExaminationAgent } from './codeExaminationAgent';
-import { ResponseGenerationAgent } from './responseGenerationAgent';
+// ResponseGenerationAgent no longer needed as BaseAPI now has the functionality
 
 /**
  * OrchestratorAgent es responsable de coordinar el flujo de procesamiento.
@@ -20,7 +20,6 @@ export class OrchestratorAgent {
   private promptAnalysisAgent: PromptAnalysisAgent;
   private fileSelectionAgent: FileSelectionAgent;
   private codeExaminationAgent: CodeExaminationAgent;
-  private responseGenerationAgent: ResponseGenerationAgent;
 
   constructor(
     private eventBus: EventBus,
@@ -33,7 +32,6 @@ export class OrchestratorAgent {
     this.promptAnalysisAgent = new PromptAnalysisAgent(modelAPI);
     this.fileSelectionAgent = new FileSelectionAgent(modelAPI);
     this.codeExaminationAgent = new CodeExaminationAgent(modelAPI, memoryManager);
-    this.responseGenerationAgent = new ResponseGenerationAgent(modelAPI);
     
     // Suscribirse a eventos relevantes
     this.setupEventListeners();
@@ -185,13 +183,13 @@ export class OrchestratorAgent {
     console.log('Posibles problemas identificados:', codeExamination.possibleIssues?.length || 0);
     
     // 4. Generar respuesta final
-    console.log('Generando respuesta final...');
-    const response = await this.responseGenerationAgent.generateResponse(
-      message,
+    console.log('Generando respuesta final usando BaseAPI directamente...');
+    const response = await this.modelAPI.generateAdvancedResponse({
+      userQuery: message,
       analysis,
       relevantFiles,
       codeExamination
-    );
+    });
     
     return response;
   }

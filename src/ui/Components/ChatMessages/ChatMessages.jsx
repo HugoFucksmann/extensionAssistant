@@ -1,5 +1,5 @@
 import React, { useRef, useEffect, memo, useState, useLayoutEffect } from "react";
-import { FixedSizeList as List } from 'react-window';
+import { VariableSizeList as List } from 'react-window';
 import { styles } from "./styles";
 import { UserMessage } from "./Message/UserMessage";
 import { AIMessage } from "./Message/AIMessage";
@@ -83,7 +83,7 @@ const ChatMessages = ({ children }) => {
 
     // Calcular la altura estimada de cada mensaje
     // Esto es una estimación, idealmente se ajustaría según el contenido real
-    const getItemHeight = (index) => {
+    const getItemSize = (index) => {
       const message = messages[index];
       // Estimar altura basada en longitud del texto (muy simple)
       const baseHeight = 80; // Altura mínima
@@ -99,7 +99,7 @@ const ChatMessages = ({ children }) => {
             height={containerHeight}
             width={containerWidth}
             itemCount={messages.length}
-            itemSize={getItemHeight} // Altura promedio estimada por mensaje
+            itemSize={getItemSize}
             itemData={messages}
           >
             {Row}

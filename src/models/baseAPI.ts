@@ -3,16 +3,23 @@ type ModelType = "ollama" | "gemini";
 // Interfaz para implementaciones específicas de modelos
 export interface ModelAPI {
   generateResponse(prompt: string): Promise<string>;
- 
   abortRequest(): void;
 }
 
+// Interfaz para los parámetros de generación de respuesta avanzada
+export interface ResponseGenerationParams {
+  userQuery: string;
+  analysis: any;
+  relevantFiles: any;
+  codeExamination: any;
+}
 
 export class BaseAPI {
   protected abortController: AbortController | null = null;
   private modelInstance: ModelAPI | null = null;
   private currentModel: ModelType;
   private projectMemory: any; // Tipo any por ahora, se tipará correctamente en initialize
+  private prompts: any; // Almacenará los templates de prompts
 
   constructor(
     private eventBus: any, // Tipo any por ahora, se tipará correctamente
@@ -20,10 +27,27 @@ export class BaseAPI {
   ) {
     this.currentModel = initialModelType;
     
+    // Cargar los templates de prompts
+    this.loadPrompts();
+    
     // Suscribirse a eventos de cambio de modelo
     this.eventBus.on('model:change', async (payload: { modelType: ModelType }) => {
       await this.setModel(payload.modelType);
     });
+  }
+  
+  /**
+   * Carga los templates de prompts
+   */
+  private loadPrompts(): void {
+    try {
+      // Importar los prompts dinámicamente para evitar dependencias circulares
+      const { PROMPTS } = require('../agents/prompts');
+      this.prompts = PROMPTS;
+    } catch (error) {
+      console.error('[BaseAPI] Error al cargar los prompts:', error);
+      this.prompts = {};
+    }
   }
 
   /**
@@ -120,7 +144,7 @@ export class BaseAPI {
     return this.modelInstance;
   }
 
-  // Implementación de los métodos que delegan a la instancia específica
+  // Método básico para generar respuestas con el modelo
   async generateResponse(prompt: string): Promise<string> {
     try {
       // Log del prompt enviado al modelo
@@ -140,6 +164,60 @@ export class BaseAPI {
     } catch (error) {
       console.error(`[BaseAPI] Error generando respuesta con ${this.currentModel}:`, error);
       throw error;
+    }
+  }
+  
+  /**
+   * Método avanzado para generar respuestas basadas en análisis completo
+   * @param params Parámetros para la generación de respuesta
+   * @returns Respuesta generada
+   */
+  async generateAdvancedResponse(params: ResponseGenerationParams): Promise<string> {
+    try {
+      const { userQuery, analysis, relevantFiles, codeExamination } = params;
+      
+      // Extraer el problema principal del análisis
+      const problem = analysis.objective || 'Resolver el problema del usuario';
+      
+      // Preparar los extractos de código consolidados
+      const consolidatedCodeExtracts = codeExamination.consolidatedCodeExtracts || [];
+      
+      // Preparar los posibles problemas identificados
+      const consolidatedPossibleIssues = codeExamination.possibleIssues || [];
+      
+      // Incluir análisis de causa raíz si está disponible
+      const rootCauseAnalysis = codeExamination.rootCauseAnalysis || '';
+      
+      // Extraer solo las rutas de los archivos relevantes para simplificar
+      // relevantFiles es un objeto con una propiedad relevantFiles que es un array
+      const relevantFilesArray = relevantFiles.relevantFiles || [];
+      const relevantFilePaths = relevantFilesArray.map((file: any) => file.path);
+      
+      // Verificar que tenemos el template de prompt necesario
+      if (!this.prompts || !this.prompts.RESPONSE_GENERATION) {
+        throw new Error('Template de prompt para generación de respuesta no disponible');
+      }
+      
+      // Construir el prompt para la generación de respuesta
+      let prompt = this.prompts.RESPONSE_GENERATION
+        .replace('{userQuery}', userQuery)
+        .replace('{analysis.objective}', problem)
+        .replace('{relevantFilePaths}', JSON.stringify(relevantFilePaths))
+        .replace('{consolidatedCodeExtracts}', JSON.stringify(consolidatedCodeExtracts))
+        .replace('{consolidatedPossibleIssues}', JSON.stringify(consolidatedPossibleIssues))
+        .replace('{rootCauseAnalysis}', rootCauseAnalysis);
+      
+      console.log('Generando respuesta avanzada con extractos de código:', consolidatedCodeExtracts.length);
+      console.log('Posibles problemas identificados:', consolidatedPossibleIssues.length);
+      
+      // Generar respuesta con el modelo
+      return await this.generateResponse(prompt);
+    } catch (error) {
+      console.error('Error al generar respuesta avanzada:', error);
+      // Devolver una respuesta genérica en caso de error
+      return `Lo siento, no pude generar una respuesta completa para tu consulta "${params.userQuery}". 
+      
+Parece que hubo un problema al analizar la información. Puedes intentar reformular tu pregunta o proporcionar más detalles sobre el problema que estás enfrentando.`;
     }
   }
 

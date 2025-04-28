@@ -1,6 +1,7 @@
 // GeminiAPI.ts
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { ModelAPI } from "./baseAPI";
+import { processModelResponse } from "./modelUtils";
 
 interface HuggingFaceEmbeddingResponse extends Array<number> {}
 
@@ -24,19 +25,19 @@ export class GeminiAPI implements ModelAPI {
 
   async generateResponse(prompt: string): Promise<string> {
     this.abortRequest();
-
     this.abortController = new AbortController();
-
+  
     try {
       const result = await this.model.generateContent(prompt, {
         signal: this.abortController.signal,
       });
-
+  
       if (!result.response) {
         throw new Error("Empty response from Gemini.");
       }
-
-      return result.response.candidates[0].content.parts[0].text;
+  
+      const responseText = result.response.candidates[0].content.parts[0].text;
+      return processModelResponse(responseText);
     } catch (error) {
       console.error("Error in Gemini API:", error);
       throw error;
