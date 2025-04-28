@@ -1,1 +1,0 @@
-// Maneja acciones directas sin planificación

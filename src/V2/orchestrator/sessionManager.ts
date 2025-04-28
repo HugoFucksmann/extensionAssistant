@@ -1,1 +1,0 @@
-// Gestiona sesiones de usuario
