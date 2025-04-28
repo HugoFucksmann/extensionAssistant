@@ -1,6 +1,8 @@
 // OllamaAPI.ts
-import { ModelAPI } from "./baseAPI";
-import { processModelResponse } from "./modelUtils";
+
+import { ModelAPI } from "../baseAPI";
+import { processModelResponse } from "../utils/modelUtils";
+
 
 interface OllamaEmbeddingResponse {
   embedding: number[];

@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
-import { EventBus, EventType } from '../core/eventBus';
-import { AppCommands, VS_CODE_PREFIX } from '../core/constants';
+
+import { AppCommands, VS_CODE_PREFIX } from '../config/constants';
+import { EventBus, EventType } from './eventBus';
 
 /**
  * Clase que centraliza toda la gestión de WebView

@@ -1,7 +1,8 @@
-import { EventBus } from './eventBus';
-import { MemoryManager } from './memoryManager';
-import { Chat, ChatMessage, ChatSummary } from './memory/types';
-import { ChatMemory } from './memory/chatMemory';
+
+import { EventBus } from '../../core/events/eventBus';
+import { Chat, ChatMemory, ChatMessage, ChatSummary } from '../../core/storage/memory';
+import { MemoryManager } from '../../core/storage/memory/memoryManager';
+
 
 /**
  * ChatManager es responsable de gestionar todas las operaciones

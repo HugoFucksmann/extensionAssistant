@@ -1,0 +1,1 @@
+// # Contexto compartido para herramientas

@@ -1,0 +1,1 @@
+// # Interfaz común para todas las herramientas

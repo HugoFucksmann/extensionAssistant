@@ -1,0 +1,1 @@
+// # NUEVO: Gestiona retroalimentación de herramientas

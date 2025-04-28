@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
 import { EventBus } from './eventBus';
-import { ChatManager } from './chatManager';
-import { MemoryManager } from './memoryManager';
-import { AppCommands, VS_CODE_PREFIX } from './constants';
+import { ChatManager } from '../../ui/conectors/chatManager';
+import { MemoryManager } from '../storage/memory/memoryManager';
+import { AppCommands, VS_CODE_PREFIX } from '../config/constants';
 
 /**
  * CommandManager optimizado que utiliza el bus de eventos

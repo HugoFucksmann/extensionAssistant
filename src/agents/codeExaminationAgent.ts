@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { BaseAPI } from '../models/baseAPI';
-import { MemoryManager } from '../core/memoryManager';
+import { MemoryManager } from '../core/storage/memory/memoryManager';
 import { PROMPTS } from './prompts';
 
 /**

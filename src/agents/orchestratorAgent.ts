@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
-import { EventBus } from '../core/eventBus';
-import { MemoryManager } from '../core/memoryManager';
+
+import { MemoryManager } from '../core/storage/memory/memoryManager';
 
 import { ModelResponse, UIResponse } from '../interfaces';
 import { BaseAPI } from '../models/baseAPI';
@@ -9,6 +9,7 @@ import { BaseAPI } from '../models/baseAPI';
 import { PromptAnalysisAgent } from './promptAnalysisAgent';
 import { FileSelectionAgent } from './fileSelectionAgent';
 import { CodeExaminationAgent } from './codeExaminationAgent';
+import { EventBus } from '../core/events/eventBus';
 // ResponseGenerationAgent no longer needed as BaseAPI now has the functionality
 
 /**

@@ -1,7 +1,8 @@
 // GeminiAPI.ts
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { ModelAPI } from "./baseAPI";
-import { processModelResponse } from "./modelUtils";
+import { ModelAPI } from "../baseAPI";
+import { processModelResponse } from "../utils/modelUtils";
+
 
 interface HuggingFaceEmbeddingResponse extends Array<number> {}
 

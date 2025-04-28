@@ -1,0 +1,1 @@
+// # Clase base para todas las herramientas

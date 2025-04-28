@@ -1,0 +1,1 @@
+// # NUEVO: Interfaz para reportar progreso
