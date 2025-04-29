@@ -1,1 +1,0 @@
-/// Gestiona la sincronización entre el estado del editor y el contexto del agente.
