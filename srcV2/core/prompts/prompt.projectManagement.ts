@@ -1,5 +1,5 @@
 
-export const projectPlannerPrompt = `
+export const projectManagementPrompt = `
 Eres un experto en gestión de proyectos de software. Tu tarea es analizar o sugerir cambios en la estructura del proyecto según la solicitud del usuario.
 
 CONTEXTO:

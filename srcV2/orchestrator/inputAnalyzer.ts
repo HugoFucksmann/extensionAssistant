@@ -6,14 +6,12 @@
  * planificación completa o si se puede manejar como una acción directa.
  */
 
-import { SessionContext } from '../core/context/sessionContext';
-import { ProjectContext } from '../core/context/projectContext';
-import { CodeContext } from '../core/context/codeContext';
 import { ConfigManager } from '../core/config/configManager';
+import { OrchestrationContext } from '../core/context/orchestrationContext';
 import { Logger } from '../utils/logger';
 import { EventBus } from '../core/event/eventBus';
 import { BaseAPI } from '../models/baseAPI';
-
+import { PromptType } from '../core/prompts/promptManager';
 /**
  * Interfaz que define el análisis de una entrada
  */
@@ -33,27 +31,21 @@ export interface InputAnalysis {
  * Clase para analizar entradas del usuario
  */
 export class InputAnalyzer {
-  private sessionContext: SessionContext;
-  private projectContext: ProjectContext;
-  private codeContext: CodeContext;
   private configManager: ConfigManager;
+  private orchestrationContext: OrchestrationContext;
   private logger: Logger;
   private eventBus: EventBus;
   private modelApi: BaseAPI;
 
   constructor(
-    sessionContext: SessionContext,
-    projectContext: ProjectContext,
-    codeContext: CodeContext,
     configManager: ConfigManager,
+    orchestrationContext: OrchestrationContext,
     logger: Logger,
     eventBus: EventBus,
     modelApi: BaseAPI
   ) {
-    this.sessionContext = sessionContext;
-    this.projectContext = projectContext;
-    this.codeContext = codeContext;
     this.configManager = configManager;
+    this.orchestrationContext = orchestrationContext;
     this.logger = logger;
     this.eventBus = eventBus;
     this.modelApi = modelApi;
@@ -67,26 +59,28 @@ export class InputAnalyzer {
   public async analyzeInput(input: string): Promise<InputAnalysis> {
     try {
       this.logger.info('InputAnalyzer: Analyzing input', { input });
+      console.log(`[InputAnalyzer] Iniciando análisis de entrada: "${input.substring(0, 100)}${input.length > 100 ? '...' : ''}"`);
       
-      // Obtener el contexto relevante
-      const sessionData = this.sessionContext.getSessionData();
-      const projectData = this.projectContext.getContextData();
-      const codeData = this.codeContext.getContextData();
+      // Obtener el contexto de orquestación
+      const contextData = this.orchestrationContext.get();
+      console.log(`[InputAnalyzer] Contexto de orquestación obtenido: sessionId=${contextData.sessionId}`);
       
       // Preparar el prompt para el modelo
-      const prompt = this.preparePrompt(input, sessionData, projectData, codeData);
+      const prompt = this.preparePrompt(input, contextData);
+      console.log(`[InputAnalyzer] Prompt preparado (longitud: ${prompt.length} caracteres)`);
       
       // Obtener el análisis del modelo
-      const modelResponse = await this.modelApi.getCompletion(prompt, {
-        temperature: 0.1,
-        max_tokens: 1000,
-        prompt_name: 'input_analyzer'
-      });
+      console.log(`[InputAnalyzer] Enviando prompt al modelo...`);
+      const modelResponse = await this.modelApi.generateResponse(prompt);
+      console.log(`[InputAnalyzer] Respuesta recibida del modelo (longitud: ${modelResponse.length} caracteres)`);
       
       // Parsear la respuesta del modelo
+      console.log(`[InputAnalyzer] Parseando respuesta del modelo...`);
       const analysis = this.parseModelResponse(modelResponse);
+      console.log(`[InputAnalyzer] Análisis completado: needsFullPlanning=${analysis.needsFullPlanning}, category=${analysis.category}, confidence=${analysis.confidence}`);
       
       // Emitir evento de análisis completado
+      console.log(`[InputAnalyzer] Emitiendo evento 'input:analyzed'`);
       this.eventBus.emit('input:analyzed', analysis);
       
       return analysis;
@@ -101,28 +95,33 @@ export class InputAnalyzer {
   /**
    * Prepara el prompt para el modelo
    * @param input La entrada del usuario
-   * @param sessionData Datos de la sesión
-   * @param projectData Datos del proyecto
-   * @param codeData Datos del código
+   * @param contextData Contexto de orquestación
    * @returns El prompt preparado
    */
-  private preparePrompt(
-    input: string,
-    sessionData: any,
-    projectData: any,
-    codeData: any
-  ): string {
-    // Obtener el prompt desde el sistema de prompts
-    const promptTemplate = this.configManager.getPromptTemplate('inputAnalyzer');
-    
-    // Reemplazar variables en el prompt
-    const filledPrompt = promptTemplate
-      .replace('{{input}}', input)
-      .replace('{{sessionContext}}', JSON.stringify(sessionData))
-      .replace('{{projectContext}}', JSON.stringify(projectData))
-      .replace('{{codeContext}}', JSON.stringify(codeData));
+  private preparePrompt(input: string, contextData: any): string {
+    try {
+      // Obtener el template desde configManager
+      const promptTemplate = this.configManager.getPromptTemplate('inputAnalyzer' as PromptType);
       
-    return filledPrompt;
+      // Preparar variables para el template
+      const variables = {
+        userPrompt: input,
+        referencedFiles: JSON.stringify(contextData.referencedFiles || []),
+        functionNames: JSON.stringify(contextData.functionNames || []),
+        projectContext: JSON.stringify(contextData.projectData || {})
+      };
+      
+      // Llenar el template con las variables
+      const filledPrompt = Object.entries(variables).reduce(
+        (prompt, [key, value]) => prompt.replace(new RegExp(`{{${key}}}`, 'g'), value),
+        promptTemplate
+      );
+      
+      return filledPrompt;
+    } catch (error) {
+      this.logger.warn('Error al preparar el prompt, usando template por defecto', { error });
+      return `Analiza la siguiente entrada: ${input}`;
+    }
   }
 
   /**
@@ -141,9 +140,18 @@ export class InputAnalyzer {
       }
       
       return parsedResponse as InputAnalysis;
-    } catch (error) {
-      this.logger.error('InputAnalyzer: Error parsing model response', { error, modelResponse });
-      throw new Error(`Failed to parse model response: ${error.message}`);
+    } catch (error: unknown) {
+      this.logger.error('InputAnalyzer: Error parsing model response', { 
+        error, 
+        modelResponse 
+      });
+      
+      // Manejar el error con tipado correcto
+      if (error instanceof Error) {
+        throw new Error(`Failed to parse model response: ${error.message}`);
+      } else {
+        throw new Error(`Failed to parse model response: Unknown error`);
+      }
     }
   }
 

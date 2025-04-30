@@ -188,13 +188,20 @@ export class ChatService {
    */
   async processUserMessage(message: string): Promise<string> {
     try {
+      console.log(`[ChatService] Procesando mensaje del usuario: "${message.substring(0, 100)}${message.length > 100 ? '...' : ''}"`);
+      
       // Asegurar que hay un chat activo
       if (!this.currentChatId) {
+        console.log(`[ChatService] No hay chat activo, creando uno nuevo...`);
         await this.createNewChat();
+        console.log(`[ChatService] Nuevo chat creado con ID: ${this.currentChatId}`);
+      } else {
+        console.log(`[ChatService] Usando chat activo con ID: ${this.currentChatId}`);
       }
       
       // Generar ID único para el mensaje
       const messageId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      console.log(`[ChatService] ID generado para el mensaje: ${messageId}`);
       
       // Añadir mensaje del usuario
       const userMessage: ChatMessage = {
@@ -204,17 +211,24 @@ export class ChatService {
         timestamp: new Date().toISOString()
       };
       this.messages.push(userMessage);
+      console.log(`[ChatService] Mensaje del usuario añadido. Total mensajes: ${this.messages.length}`);
       
       // Actualizar estado de UI
+      console.log(`[ChatService] Actualizando estado de UI con mensajes...`);
       this.uiStateContext.setState('messages', [...this.messages]);
       this.uiStateContext.setState('isProcessing', true);
       
       try {
         // Generar respuesta
+        console.log(`[ChatService] Solicitando respuesta al modelo ${this.baseAPI.getCurrentModel()}...`);
+        const startTime = Date.now();
         const response = await this.baseAPI.generateResponse(message);
+        const endTime = Date.now();
+        console.log(`[ChatService] Respuesta recibida en ${endTime - startTime}ms (longitud: ${response.length} caracteres)`);
         
         // Generar ID único para la respuesta
         const responseId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        console.log(`[ChatService] ID generado para la respuesta: ${responseId}`);
         
         // Añadir respuesta del asistente
         const assistantMessage: ChatMessage = {
@@ -225,12 +239,15 @@ export class ChatService {
           modelType: this.baseAPI.getCurrentModel()
         };
         this.messages.push(assistantMessage);
+        console.log(`[ChatService] Respuesta del asistente añadida. Total mensajes: ${this.messages.length}`);
         
         // Actualizar estado de UI
+        console.log(`[ChatService] Actualizando estado de UI con respuesta...`);
         this.uiStateContext.setState('messages', [...this.messages]);
         
         // Guardar el chat actualizado
         if (this.currentChatId) {
+          console.log(`[ChatService] Guardando chat actualizado con ID: ${this.currentChatId}`);
           const chatToSave: Chat = {
             id: this.currentChatId,
             title: this.generateChatTitle(message),
@@ -239,8 +256,10 @@ export class ChatService {
           };
           
           await this.chatMemory.saveChat(this.currentChatId, chatToSave);
+          console.log(`[ChatService] Chat guardado correctamente`);
           
           // Actualizar la lista de chats
+          console.log(`[ChatService] Actualizando lista de chats...`);
           await this.chatMemory.updateChatList({
             id: this.currentChatId,
             title: chatToSave.title,
@@ -250,6 +269,7 @@ export class ChatService {
           
           // Actualizar la lista de chats en la UI
           await this.getChatList();
+          console.log(`[ChatService] Lista de chats actualizada en la UI`);
         }
         
         return response;

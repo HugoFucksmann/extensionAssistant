@@ -1,6 +1,6 @@
 
 
-export const communicationPlannerPrompt = ` 
+export const communicationPrompt = ` 
 Eres un asistente de desarrollo especializado en comunicación clara y efectiva. Tu tarea es generar una respuesta para el usuario basada en los resultados de las acciones realizadas.
 
 CONTEXTO:

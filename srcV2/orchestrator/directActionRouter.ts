@@ -10,7 +10,8 @@ import { Logger } from '../utils/logger';
 import { ErrorHandler } from '../utils/errorHandler';
 import { EventBus } from '../core/event/eventBus';
 import { ToolRegistry } from '../tools/core/toolRegistry';
-import { SessionContext } from '../core/context/sessionContext';
+import { OrchestrationContext } from '../core/context/orchestrationContext';
+
 
 /**
  * Interfaz que define el resultado de una acción directa
@@ -34,20 +35,20 @@ export class DirectActionRouter {
   private errorHandler: ErrorHandler;
   private eventBus: EventBus;
   private toolRegistry: ToolRegistry;
-  private sessionContext: SessionContext;
+  private orchestrationContext: OrchestrationContext;
 
   constructor(
     logger: Logger,
     errorHandler: ErrorHandler,
     eventBus: EventBus,
     toolRegistry: ToolRegistry,
-    sessionContext: SessionContext
+    orchestrationContext: OrchestrationContext
   ) {
     this.logger = logger;
     this.errorHandler = errorHandler;
     this.eventBus = eventBus;
     this.toolRegistry = toolRegistry;
-    this.sessionContext = sessionContext;
+    this.orchestrationContext = orchestrationContext;
   }
 
   /**
@@ -94,7 +95,7 @@ export class DirectActionRouter {
       this.eventBus.emit('action:completed', actionResult);
       
       // Actualizar el contexto de la sesión
-      this.updateSessionContext(toolName, params, result);
+      this.updateorchestrationContext(toolName, params, result);
       
       return actionResult;
     } catch (error) {
@@ -155,8 +156,8 @@ export class DirectActionRouter {
    * @param params Los parámetros usados
    * @param result El resultado obtenido
    */
-  private updateSessionContext(toolName: string, params: object, result: any): void {
-    this.sessionContext.updateContext({
+  private updateorchestrationContext(toolName: string, params: object, result: any): void {
+    this.orchestrationContext.set({
       lastAction: {
         tool: toolName,
         params: params,

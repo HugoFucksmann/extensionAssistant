@@ -1,3 +1,7 @@
+import { ConfigManager } from "../core/config/configManager";
+import { UIStateContext } from "../core/context/uiStateContext";
+import { GeminiAPI } from "./providers/gemini";
+import { OllamaAPI } from "./providers/ollama";
 
 
 export type ModelType = "ollama" | "gemini";
@@ -8,54 +12,47 @@ export interface ModelAPI {
   abortRequest(): void;
 }
 
-
+/**
+ * Clase base para la API de modelos de IA.
+ * Maneja la lógica de cambio de modelos y la comunicación con el modelo activo.
+ */
 export class BaseAPI {
   private modelInstance: ModelAPI | null = null;
   private currentModel: ModelType;
-  private projectMemory: ProjectMemory | null = null;
-  private eventBus: any; // Considera tipar si es posible
+  private configManager: ConfigManager;
+  private uiStateContext: UIStateContext;
+  private unsubscribeModelType: () => void;
 
+  /**
+   * Constructor de la clase BaseAPI.
+   * @param configManager Instancia de ConfigManager para la gestión de configuración.
+   * @param uiStateContext Instancia de UIStateContext para la gestión de cambios de estado.
+   * @param initialModelType Tipo de modelo inicial. Por defecto, "gemini".
+   */
   constructor(
-    eventBus: any,
+    configManager: ConfigManager,
+    uiStateContext: UIStateContext,
     initialModelType: ModelType = "gemini"
   ) {
-    this.eventBus = eventBus;
+    this.configManager = configManager;
+    this.uiStateContext = uiStateContext;
     this.currentModel = initialModelType;
 
-    this.eventBus.on('model:change', async (payload: { modelType: ModelType }) => {
-      if (payload?.modelType) {
-        await this.setModel(payload.modelType);
-      } else {
-        console.warn('[BaseAPI] Evento model:change recibido sin modelType válido.');
+    // Escuchar cambios de modelo a través de UIStateContext
+    this.unsubscribeModelType = this.uiStateContext.subscribe('modelType', (newModel: ModelType) => {
+      if (newModel && newModel !== this.currentModel) {
+        this.setModel(newModel);
       }
     });
     console.log(`[BaseAPI] Instanciado con modelo inicial: ${this.currentModel}`);
   }
 
   /**
-   * Inicializa la API con el almacenamiento y carga el modelo preferido.
+   * Inicializa la API con el modelo preferido.
    */
-  public async initialize(storage: any): Promise<void> {
-    this.projectMemory = new ProjectMemory(storage);
-    try {
-      const savedModel = await this.projectMemory.getProjectMemory('global', 'preferred_model');
-      const validModels: ModelType[] = ["ollama", "gemini"];
-
-      if (savedModel?.content && validModels.includes(savedModel.content as ModelType)) {
-        const modelType = savedModel.content as ModelType;
-        console.log(`[BaseAPI] Cargando modelo preferido: ${modelType}`);
-        await this.setModel(modelType); // Usa setModel para lógica centralizada
-      } else {
-         console.log(`[BaseAPI] Usando modelo por defecto: ${this.currentModel}`);
-         // Asegura notificación del estado inicial si no se carga uno guardado
-         await this.eventBus.emit('model:changed', { modelType: this.currentModel });
-      }
-    } catch (error) {
-      console.error('[BaseAPI] Error al inicializar o cargar modelo preferido:', error);
-       // Notifica el modelo actual incluso en caso de error
-       await this.eventBus.emit('model:changed', { modelType: this.currentModel });
-    }
-    console.log(`[BaseAPI] Inicializado. Modelo actual: ${this.currentModel}`);
+  public async initialize(): Promise<void> {
+    this.currentModel = this.configManager.getModelType();
+    this.modelInstance = this.createModelInstance(this.currentModel);
   }
 
   /**
@@ -78,12 +75,8 @@ export class BaseAPI {
     this.modelInstance = null; // Forza la recreación de la instancia
 
     try {
-      if (this.projectMemory) {
-        await this.projectMemory.storeProjectMemory('global', 'preferred_model', modelType);
-      }
       // Notifica después de que el cambio interno se haya completado
-      await this.eventBus.emit('model:changed', { modelType: this.currentModel });
-      console.log(`[BaseAPI] Evento model:changed emitido para ${this.currentModel}.`);
+      console.log(`[BaseAPI] Modelo cambiado a ${this.currentModel}.`);
     } catch (error) {
       console.error(`[BaseAPI] Error durante el cambio de modelo a ${modelType}:`, error);
       throw error; // Re-lanza para informar al llamador
@@ -98,32 +91,24 @@ export class BaseAPI {
   }
 
   /**
-   * Obtiene o crea la instancia del cliente API para el modelo actual.
+   * Crea una instancia del modelo según el tipo especificado.
+   * @param modelType Tipo de modelo a instanciar.
+   * @returns Instancia del modelo.
    */
-  private getModelInstance(): ModelAPI {
-    if (!this.modelInstance) {
-      console.log(`[BaseAPI] Creando nueva instancia para ${this.currentModel}`);
-
-      if (this.currentModel === "ollama") {
-        this.modelInstance = new OllamaAPI();
-      } else if (this.currentModel === "gemini") {
-        // ¡ADVERTENCIA! Claves hardcodeadas son inseguras. Usar variables de entorno.
-        const apiKey = process.env.GEMINI_API_KEY || "TU_API_KEY_GEMINI_POR_DEFECTO_O_ERROR";
-        if (!process.env.GEMINI_API_KEY) {
-            console.warn("[BaseAPI] Clave API de Gemini no encontrada en process.env.GEMINI_API_KEY. Usando valor por defecto/hardcodeado.");
-        }
-        this.modelInstance = new GeminiAPI(apiKey);
-      } else {
-        // Esta rama no debería ser alcanzable si setModel valida correctamente
-        throw new Error(`Modelo no soportado encontrado internamente: ${this.currentModel}`);
+  private createModelInstance(modelType: ModelType): ModelAPI {
+    if (modelType === "ollama") {
+      return new OllamaAPI();
+    } else if (modelType === "gemini") {
+      // ¡ADVERTENCIA! Claves hardcodeadas son inseguras. Usar variables de entorno.
+      const apiKey = process.env.GEMINI_API_KEY || "AIzaSyBXGZbSj099c4bUOpLxbXKJgysGKKF3sR0";
+      if (!process.env.GEMINI_API_KEY) {
+          console.warn("[BaseAPI] Clave API de Gemini no encontrada en process.env.GEMINI_API_KEY. Usando valor por defecto/hardcodeado.");
       }
+      return new GeminiAPI(apiKey);
+    } else {
+      // Esta rama no debería ser alcanzable si setModel valida correctamente
+      throw new Error(`Modelo no soportado encontrado internamente: ${modelType}`);
     }
-
-    // Asegura que la instancia nunca sea null después de la lógica de creación
-    if (!this.modelInstance) {
-       throw new Error(`Fallo crítico: No se pudo obtener instancia para ${this.currentModel}`);
-    }
-    return this.modelInstance;
   }
 
   /**
@@ -137,11 +122,17 @@ export class BaseAPI {
     }
 
     try {
-      // Log conciso
+      // Log detallado del prompt
       console.log(`[BaseAPI] Generando respuesta con ${this.currentModel} (Prompt len: ${prompt.length})`);
-      const modelInstance = this.getModelInstance();
+      console.log(`[BaseAPI] PROMPT ENVIADO:\n${prompt.substring(0, 500)}${prompt.length > 500 ? '...' : ''}`);
+      
+      const modelInstance = this.createModelInstance(this.currentModel);
       const response = await modelInstance.generateResponse(prompt);
+      
+      // Log detallado de la respuesta
       console.log(`[BaseAPI] Respuesta recibida de ${this.currentModel} (Resp len: ${response.length})`);
+      console.log(`[BaseAPI] RESPUESTA RECIBIDA:\n${response.substring(0, 500)}${response.length > 500 ? '...' : ''}`);
+      
       return response;
     } catch (error: any) {
       console.error(`[BaseAPI] Error generando respuesta con ${this.currentModel}:`, error.message);

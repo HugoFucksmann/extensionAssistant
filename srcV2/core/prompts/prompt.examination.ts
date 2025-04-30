@@ -1,5 +1,5 @@
 
-export const examinationPlanner = `
+export const examinationPrompt = `
 Eres un experto en análisis de código. Tu tarea es examinar el código proporcionado y proporcionar información relevante según la solicitud del usuario.
 
 CONTEXTO:

@@ -1,189 +1,123 @@
-/**
- * Evaluador de Resultados
- * 
- * Responsabilidad: Evaluar los resultados de las acciones ejecutadas.
- * Este componente verifica si los resultados obtenidos cumplen con los
- * objetivos establecidos y determina si se necesitan acciones adicionales.
- */
-
-import { SessionContext } from '../core/context/sessionContext';
-import { ProjectContext } from '../core/context/projectContext';
-import { CodeContext } from '../core/context/codeContext';
+import { OrchestrationContext } from '../core/context/orchestrationContext';
 import { ConfigManager } from '../core/config/configManager';
 import { Logger } from '../utils/logger';
-import { EventBus } from '../core/event/eventBus';
 import { BaseAPI } from '../models/baseAPI';
 import { ExecutionPlan } from './planningEngine';
+import { ToolRegistry } from '../tools/core/toolRegistry';
 
 /**
- * Interfaz que define la evaluación de un resultado
+ * Interfaz simplificada de evaluación de resultados
  */
 export interface ResultEvaluation {
   success: boolean;
-  completionLevel: "partial" | "complete" | "exceeds";
-  qualityAssessment: "poor" | "adequate" | "good" | "excellent";
-  missingElements: string[];
-  additionalStepsNeeded: {
-    description: string;
+  confidence: number; // 0-1
+  missingRequirements?: string[];
+  suggestions?: {
+    action: string;
+    tool?: string;
     reason: string;
-    toolSuggestion: string;
   }[];
-  requiresUserInput: boolean;
 }
 
-/**
- * Clase para evaluar resultados
- */
 export class ResultEvaluator {
-  private sessionContext: SessionContext;
-  private projectContext: ProjectContext;
-  private codeContext: CodeContext;
+  private orchestrationContext: OrchestrationContext;
   private configManager: ConfigManager;
   private logger: Logger;
-  private eventBus: EventBus;
-  private modelApi: BaseAPI;
+  private modelAPI: BaseAPI;
+  private toolRegistry: ToolRegistry;
 
   constructor(
-    sessionContext: SessionContext,
-    projectContext: ProjectContext,
-    codeContext: CodeContext,
+    orchestrationContext: OrchestrationContext,
     configManager: ConfigManager,
     logger: Logger,
-    eventBus: EventBus,
-    modelApi: BaseAPI
+    modelAPI: BaseAPI,
+    toolRegistry: ToolRegistry
   ) {
-    this.sessionContext = sessionContext;
-    this.projectContext = projectContext;
-    this.codeContext = codeContext;
+    this.orchestrationContext = orchestrationContext;
     this.configManager = configManager;
     this.logger = logger;
-    this.eventBus = eventBus;
-    this.modelApi = modelApi;
+    this.modelAPI = modelAPI;
+    this.toolRegistry = toolRegistry;
   }
 
   /**
-   * Evalúa el resultado de una ejecución
-   * @param result El resultado a evaluar
-   * @param plan El plan de ejecución
-   * @param originalInput La entrada original del usuario
-   * @returns Una evaluación del resultado
+   * Evalúa si los resultados cumplen con los objetivos del plan
    */
   public async evaluateResult(
-    result: any,
-    plan: ExecutionPlan,
+    workflowResult: any,
+    executionPlan: ExecutionPlan,
     originalInput: string
   ): Promise<ResultEvaluation> {
     try {
-      this.logger.info('ResultEvaluator: Evaluating result', { originalInput });
+      // Obtener contexto consolidado
+      const context = this.orchestrationContext.get();
       
-      // Obtener el contexto relevante
-      const sessionData = this.sessionContext.getSessionData();
-      const projectData = this.projectContext.getContextData();
-      const codeData = this.codeContext.getContextData();
-      
-      // Preparar el prompt para el modelo
-      const prompt = this.preparePrompt(
-        result,
-        plan,
+      // Preparar prompt para el modelo
+      const prompt = this.prepareEvaluationPrompt(
+        workflowResult,
+        executionPlan,
         originalInput,
-        sessionData,
-        projectData,
-        codeData
+        context
       );
+
+      // Obtener evaluación del modelo
+      const evaluation = await this.modelAPI.generateResponse(prompt);
       
-      // Obtener la evaluación del modelo
-      const modelResponse = await this.modelApi.getCompletion(prompt, {
-        temperature: 0.1,
-        max_tokens: 1000,
-        prompt_name: 'result_evaluator'
-      });
+      // Parsear y validar la respuesta
+      return this.validateEvaluation(evaluation);
+    } catch (error) {
+      this.logger.error('[ResultEvaluator] Error evaluating result:', {error});
+      return {
+        success: false,
+        confidence: 0,
+        missingRequirements: ['Error during evaluation'],
+        suggestions: [{
+          action: 'Retry evaluation',
+          reason: 'The evaluation process failed'
+        }]
+      };
+    }
+  }
+
+  private prepareEvaluationPrompt(
+    result: any,
+    plan: ExecutionPlan,
+    input: string,
+    context: any
+  ): string {
+    return `
+      Evalúa si los resultados cumplen con los objetivos del plan.
+      Contexto:
+      - Input original: ${input}
+      - Objetivos del plan: ${JSON.stringify(plan.goals)}
+      - Resultados obtenidos: ${JSON.stringify(result)}
+      - Contexto de sesión: ${JSON.stringify(context.session || {})}
       
-      // Parsear la respuesta del modelo
-      const evaluation = this.parseModelResponse(modelResponse);
+      Devuelve un JSON con:
+      - success: boolean
+      - confidence: number (0-1)
+      - missingRequirements?: string[]
+      - suggestions?: {action: string, tool?: string, reason: string}[]
+    `;
+  }
+
+  private validateEvaluation(response: string): ResultEvaluation {
+    try {
+      const evaluation = JSON.parse(response) as ResultEvaluation;
       
-      // Emitir evento de evaluación completada
-      this.eventBus.emit('result:evaluated', evaluation);
+      // Validación básica
+      if (typeof evaluation.success !== 'boolean') {
+        throw new Error('Invalid evaluation format');
+      }
       
       return evaluation;
     } catch (error) {
-      this.logger.error('ResultEvaluator: Error evaluating result', { error });
-      return this.getDefaultEvaluation(result, plan, originalInput);
+      this.logger.warn('[ResultEvaluator] Invalid evaluation response:', {response});
+      return {
+        success: false,
+        confidence: 0,
+        missingRequirements: ['Invalid evaluation format']
+      };
     }
   }
-
-  /**
-   * Prepara el prompt para el modelo
-   * @param result El resultado a evaluar
-   * @param plan El plan de ejecución
-   * @param originalInput La entrada original del usuario
-   * @param sessionData Los datos de la sesión
-   * @param projectData Los datos del proyecto
-   * @param codeData Los datos del código
-   * @returns El prompt preparado
-   */
-  private preparePrompt(
-    result: any,
-    plan: ExecutionPlan,
-    originalInput: string,
-    sessionData: any,
-    projectData: any,
-    codeData: any
-  ): string {
-    // Obtener el prompt desde el sistema de prompts
-    const promptTemplate = this.configManager.getPromptTemplate('resultEvaluator');
-    
-    // Reemplazar variables en el prompt
-    const filledPrompt = promptTemplate
-      .replace('{{originalInput}}', originalInput)
-      .replace('{{plan}}', JSON.stringify(plan))
-      .replace('{{result}}', JSON.stringify(result))
-      .replace('{{sessionContext}}', JSON.stringify(sessionData))
-      .replace('{{projectContext}}', JSON.stringify(projectData))
-      .replace('{{codeContext}}', JSON.stringify(codeData));
-      
-    return filledPrompt;
-  }
-
-  /**
-   * Parsea la respuesta del modelo a un objeto ResultEvaluation
-   * @param modelResponse La respuesta del modelo
-   * @returns Un objeto ResultEvaluation
-   */
-  private parseModelResponse(modelResponse: string): ResultEvaluation {
-    try {
-      // Intentar parsear la respuesta como JSON
-      const parsedResponse = JSON.parse(modelResponse);
-      
-      // Validar que la respuesta tenga la estructura esperada
-      if (!this.validateEvaluationStructure(parsedResponse)) {
-        throw new Error('Invalid response structure from model');
-      }
-      
-      return parsedResponse as ResultEvaluation;
-    } catch (error) {
-      this.logger.error('ResultEvaluator: Error parsing model response', { error, modelResponse });
-      throw new Error(`Failed to parse model response: ${error.message}`);
-    }
-  }
-
-  /**
-   * Valida que un objeto tenga la estructura esperada para ResultEvaluation
-   * @param obj El objeto a validar
-   * @returns true si el objeto tiene la estructura esperada, false en caso contrario
-   */
-  private validateEvaluationStructure(obj: any): boolean {
-    const requiredFields = [
-      'success',
-      'completionLevel',
-      'qualityAssessment',
-      'missingElements',
-      'additionalStepsNeeded',
-      'requiresUserInput'
-    ];
-    
-    // Verificar que todos los campos requeridos existan
-    const hasAllFields = requiredFields.every(field => field in obj);
-    
-    // Verificar que los campos enum tengan valores válidos
-    const validCompletionLevels = ['partial', 'complete', 'exceeds'];
-    const validQualityAssessments = ['poor', 'adequate', 'good', 'excellent'];
+}

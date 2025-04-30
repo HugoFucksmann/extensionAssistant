@@ -1,4 +1,5 @@
-import { SQLiteStorage } from '../storage/db/SQLiteStorage';
+import { SQLiteStorage } from "../db/SQLiteStorage";
+
 
 /**
  * Herramienta para gestionar la memoria de proyectos

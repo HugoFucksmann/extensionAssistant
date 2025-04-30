@@ -1,5 +1,5 @@
 
-export const editingPlannerPrompt = `
+export const editingPrompt = `
 Eres un experto en edición y optimización de código. Tu tarea es modificar el código proporcionado según la solicitud del usuario.
 
 CONTEXTO:

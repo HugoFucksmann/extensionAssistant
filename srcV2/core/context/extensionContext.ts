@@ -35,8 +35,8 @@ export class ExtensionContext {
       
       // Inicializar API de modelo
       const initialModelType = this.configManager.getModelType();
-      this.baseAPI = new BaseAPI(null, initialModelType); // null para eventBus, no lo usamos
-      await this.baseAPI.initialize(this.storage);
+      this.baseAPI = new BaseAPI(this.configManager, this.uiStateContext, initialModelType); 
+      await this.baseAPI.initialize();
       
       // Inicializar servicio de chat
       this.chatService = new ChatService(this.storage, this.uiStateContext, this.baseAPI);

@@ -6,9 +6,7 @@
  * tareas complejas que requieren múltiples herramientas.
  */
 
-import { SessionContext } from '../core/context/sessionContext';
-import { ProjectContext } from '../core/context/projectContext';
-import { CodeContext } from '../core/context/codeContext';
+import { OrchestrationContext } from '../core/context/orchestrationContext';
 import { ConfigManager } from '../core/config/configManager';
 import { Logger } from '../utils/logger';
 import { EventBus } from '../core/event/eventBus';
@@ -16,60 +14,43 @@ import { BaseAPI } from '../models/baseAPI';
 import { ToolRegistry } from '../tools/core/toolRegistry';
 import { InputAnalysis } from './inputAnalyzer';
 import { ToolSelector } from './toolSelector';
+import { FeedbackManager } from './feedbackManager';
 
 /**
  * Interfaz que define un plan de ejecución
  */
 export interface ExecutionPlan {
   taskUnderstanding: string;
-  plan: {
-    stepNumber: number;
-    description: string;
-    toolName: string;
-    toolParams: object;
-    expectedOutput: string;
-    isRequired: boolean;
-    fallbackStep: number | null;
-  }[];
+  goals: string[];
+  plan: PlanStep[];
   estimatedComplexity: "simple" | "moderate" | "complex";
   potentialChallenges: string[];
+}
+
+export interface PlanStep {
+  stepNumber: number;
+  description: string;
+  toolName: string;
+  toolParams: Record<string, any>;
+  expectedOutput: string;
+  isRequired: boolean;
+  fallbackStep: number | null;
 }
 
 /**
  * Clase para generar planes de ejecución
  */
 export class PlanningEngine {
-  private sessionContext: SessionContext;
-  private projectContext: ProjectContext;
-  private codeContext: CodeContext;
-  private configManager: ConfigManager;
-  private logger: Logger;
-  private eventBus: EventBus;
-  private modelApi: BaseAPI;
-  private toolRegistry: ToolRegistry;
-  private toolSelector: ToolSelector;
-
   constructor(
-    sessionContext: SessionContext,
-    projectContext: ProjectContext,
-    codeContext: CodeContext,
-    configManager: ConfigManager,
-    logger: Logger,
-    eventBus: EventBus,
-    modelApi: BaseAPI,
-    toolRegistry: ToolRegistry,
-    toolSelector: ToolSelector
-  ) {
-    this.sessionContext = sessionContext;
-    this.projectContext = projectContext;
-    this.codeContext = codeContext;
-    this.configManager = configManager;
-    this.logger = logger;
-    this.eventBus = eventBus;
-    this.modelApi = modelApi;
-    this.toolRegistry = toolRegistry;
-    this.toolSelector = toolSelector;
-  }
+    private orchestrationContext: OrchestrationContext,
+    private configManager: ConfigManager,
+    private logger: Logger,
+    private eventBus: EventBus,
+    private modelApi: BaseAPI,
+    private toolRegistry: ToolRegistry,
+    private toolSelector: ToolSelector,
+    private feedbackManager: FeedbackManager
+  ) {}
 
   /**
    * Crea un plan de ejecución para una tarea
@@ -79,35 +60,39 @@ export class PlanningEngine {
    */
   public async createPlan(userInput: string, inputAnalysis: InputAnalysis): Promise<ExecutionPlan> {
     try {
-      this.logger.info('PlanningEngine: Creating execution plan', { 
+      this.logger.info('PlanningEngine: Creando plan de ejecución', { 
         userInput,
         category: inputAnalysis.category
       });
       
-      // Obtener el contexto relevante
-      const sessionData = this.sessionContext.getSessionData();
-      const projectData = this.projectContext.getContextData();
-      const codeData = this.codeContext.getContextData();
+      this.feedbackManager.notify({
+        type: 'progress',
+        message: 'Analizando la solicitud y preparando plan de ejecución...',
+        step: 'plan-creation',
+        userNotification: {
+          show: true,
+          message: 'Analizando la solicitud y preparando plan de ejecución...',
+          type: 'info'
+        }
+      });
       
-      // Obtener las herramientas disponibles
-      const availableTools = this.toolRegistry.availableTools;
+      // Obtener el contexto relevante
+      const sessionData = this.orchestrationContext.get();
+      
+      // Obtener herramientas disponibles
+      const availableTools = this.toolRegistry.getAvailableTools();
       
       // Preparar el prompt para el modelo
       const prompt = this.preparePrompt(
-        userInput,
-        inputAnalysis,
-        sessionData,
-        projectData,
-        codeData,
-        availableTools
+        userInput, 
+        inputAnalysis, 
+        sessionData, 
+        availableTools,
+       
       );
       
       // Obtener el plan del modelo
-      const modelResponse = await this.modelApi.getCompletion(prompt, {
-        temperature: 0.2,
-        max_tokens: 2000,
-        prompt_name: 'planning_engine'
-      });
+      const modelResponse = await this.modelApi.generateResponse(prompt);
       
       // Parsear la respuesta del modelo
       const executionPlan = this.parseModelResponse(modelResponse);
@@ -115,77 +100,145 @@ export class PlanningEngine {
       // Validar y enriquecer el plan
       const enrichedPlan = await this.enrichPlan(executionPlan, inputAnalysis);
       
+      // Notificar sobre la creación del plan
+      this.feedbackManager.notify({
+        type: 'info',
+        message: `Plan creado con ${enrichedPlan.plan.length} pasos. Complejidad: ${enrichedPlan.estimatedComplexity}`,
+        detail: {
+          planSteps: enrichedPlan.plan.length,
+          complexity: enrichedPlan.estimatedComplexity
+        },
+        userNotification: {
+          show: true,
+          message: `Plan creado con ${enrichedPlan.plan.length} pasos. Complejidad: ${enrichedPlan.estimatedComplexity}`,
+          type: 'info'
+        }
+      });
+      
       // Emitir evento de plan creado
       this.eventBus.emit('plan:created', enrichedPlan);
+      this.eventBus.emit('step:completed:plan-creation', {});
       
       return enrichedPlan;
     } catch (error) {
-      this.logger.error('PlanningEngine: Error creating execution plan', { error });
+      this.logger.error('PlanningEngine: Error al crear plan de ejecución', { error });
+      
+      this.feedbackManager.notify({
+        type: 'error',
+        message: 'Error al crear el plan de ejecución. Utilizando plan alternativo.',
+        detail: { error },
+        userNotification: {
+          show: true,
+          message: 'Error al crear el plan de ejecución. Utilizando plan alternativo.',
+          type: 'error'
+        }
+      });
+      
       return this.getFallbackPlan(userInput, inputAnalysis);
     }
   }
 
   /**
    * Prepara el prompt para el modelo
-   * @param userInput La entrada del usuario
-   * @param inputAnalysis El análisis de la entrada
-   * @param sessionData Los datos de la sesión
-   * @param projectData Los datos del proyecto
-   * @param codeData Los datos del código
-   * @param availableTools Las herramientas disponibles
-   * @returns El prompt preparado
    */
   private preparePrompt(
     userInput: string,
     inputAnalysis: InputAnalysis,
     sessionData: any,
-    projectData: any,
-    codeData: any,
     availableTools: any[]
   ): string {
-    // Obtener el prompt desde el sistema de prompts
-    const promptTemplate = this.configManager.getPromptTemplate('planningEngine');
+
+   
+    
+    // Si no hay un template específico, usamos uno por defecto
+    const basePrompt = `
+      Tu tarea es crear un plan detallado para resolver la siguiente solicitud de usuario.
+      
+      # Solicitud del usuario
+      {{userInput}}
+      
+      # Análisis de la solicitud
+      {{inputAnalysis}}
+      
+      # Contexto de la sesión
+      {{sessionContext}}
+      
+      # Contexto del proyecto
+      {{projectContext}}
+      
+      # Contexto del código
+      {{codeContext}}
+      
+      # Herramientas disponibles
+      {{availableTools}}
+      
+      Devuelve un plan de ejecución en formato JSON con la siguiente estructura:
+      {
+        "taskUnderstanding": "Descripción clara de la tarea a realizar",
+        "goals": ["Lista", "de", "objetivos", "concretos"],
+        "plan": [
+          {
+            "stepNumber": 1,
+            "description": "Descripción del paso",
+            "toolName": "Nombre de la herramienta a usar",
+            "toolParams": { "param1": "valor1", "param2": "valor2" },
+            "expectedOutput": "Descripción de lo que se espera obtener",
+            "isRequired": true,
+            "fallbackStep": null
+          }
+        ],
+        "estimatedComplexity": "simple | moderate | complex",
+        "potentialChallenges": ["Lista", "de", "posibles", "desafíos"]
+      }
+    `;
+    
+    // Preparar las herramientas disponibles en formato legible
+    const toolsFormatted = availableTools.map(tool => ({
+      name: tool.name,
+      description: tool.description,
+      parameters: tool.getParameterSchema() || 'No parameter schema available',
+      capabilities: tool.capabilities || []
+    }));
     
     // Reemplazar variables en el prompt
-    const filledPrompt = promptTemplate
+    return basePrompt
       .replace('{{userInput}}', userInput)
-      .replace('{{inputAnalysis}}', JSON.stringify(inputAnalysis))
-      .replace('{{sessionContext}}', JSON.stringify(sessionData))
-      .replace('{{projectContext}}', JSON.stringify(projectData))
-      .replace('{{codeContext}}', JSON.stringify(codeData))
-      .replace('{{availableTools}}', JSON.stringify(availableTools));
-      
-    return filledPrompt;
+      .replace('{{inputAnalysis}}', JSON.stringify(inputAnalysis, null, 2))
+      .replace('{{sessionContext}}', JSON.stringify(sessionData, null, 2))
+      .replace('{{availableTools}}', JSON.stringify(toolsFormatted, null, 2));
   }
 
   /**
    * Parsea la respuesta del modelo a un objeto ExecutionPlan
-   * @param modelResponse La respuesta del modelo
-   * @returns Un objeto ExecutionPlan
    */
   private parseModelResponse(modelResponse: string): ExecutionPlan {
     try {
+      // Extraer JSON de la respuesta (podría estar envuelto en texto)
+      const jsonMatch = modelResponse.match(/```json\n([\s\S]*?)\n```/) || 
+                       modelResponse.match(/{[\s\S]*}/);
+      
+      const jsonString = jsonMatch ? jsonMatch[0].replace(/```json\n|```/g, '') : modelResponse;
+      
       // Intentar parsear la respuesta como JSON
-      const parsedResponse = JSON.parse(modelResponse);
+      const parsedResponse = JSON.parse(jsonString);
       
       // Validar que la respuesta tenga la estructura esperada
       if (!this.validatePlanStructure(parsedResponse)) {
-        throw new Error('Invalid response structure from model');
+        throw new Error('Estructura de respuesta inválida del modelo');
       }
       
       return parsedResponse as ExecutionPlan;
     } catch (error) {
-      this.logger.error('PlanningEngine: Error parsing model response', { error, modelResponse });
-      throw new Error(`Failed to parse model response: ${error.message}`);
+      this.logger.error('PlanningEngine: Error al parsear respuesta del modelo', { error, modelResponse });
+      throw new Error(`Error al parsear respuesta del modelo: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
   /**
    * Valida que un objeto tenga la estructura esperada para ExecutionPlan
-   * @param obj El objeto a validar
-   * @returns true si el objeto tiene la estructura esperada, false en caso contrario
    */
   private validatePlanStructure(obj: any): boolean {
+    // Verificar campos obligatorios
     const requiredFields = [
       'taskUnderstanding',
       'plan',
@@ -203,14 +256,19 @@ export class PlanningEngine {
     const validComplexities = ['simple', 'moderate', 'complex'];
     const hasValidComplexity = validComplexities.includes(obj.estimatedComplexity);
     
-    return hasAllFields && hasPlanSteps && hasValidComplexity;
+    // Verificar que haya una lista de goals (añadido)
+    const hasGoals = Array.isArray(obj.goals) && obj.goals.length > 0;
+    
+    // Si falta algún campo, añadirlo con un valor por defecto
+    if (!obj.goals) {
+      obj.goals = ["Completar la solicitud del usuario"];
+    }
+    
+    return hasAllFields && hasPlanSteps && hasValidComplexity && hasGoals;
   }
 
   /**
    * Enriquece el plan con información adicional y valida las herramientas
-   * @param plan El plan a enriquecer
-   * @param inputAnalysis El análisis de la entrada
-   * @returns El plan enriquecido
    */
   private async enrichPlan(plan: ExecutionPlan, inputAnalysis: InputAnalysis): Promise<ExecutionPlan> {
     // Clonar el plan para no modificar el original
@@ -220,62 +278,83 @@ export class PlanningEngine {
     for (let i = 0; i < enrichedPlan.plan.length; i++) {
       const step = enrichedPlan.plan[i];
       
+      // Mostrar progreso
+      this.feedbackManager.notify({
+        type: 'progress',
+        message: `Validando paso ${i + 1}: ${step.description}`,
+        step: 'plan-enrichment',
+        progress: Math.round((i / enrichedPlan.plan.length) * 100),
+        userNotification: {
+          show: true,
+          message: `Validando paso ${i + 1}: ${step.description}`,
+          type: 'info'
+        }
+      });
+      
       // Verificar si la herramienta existe
       const tool = this.toolRegistry.getByName(step.toolName);
       if (!tool) {
-        // Si la herramienta no existe, seleccionar una alternativa
-        const toolSelection = await this.toolSelector.selectTool(
+        this.logger.warn(`PlanningEngine: Herramienta '${step.toolName}' no encontrada. Seleccionando alternativa.`);
+        
+        // Seleccionar una herramienta alternativa utilizando el selector
+        const alternativeTool = await this.toolSelector.selectTool(
           plan.taskUnderstanding,
           step.description,
           inputAnalysis
         );
         
         // Actualizar el paso con la herramienta seleccionada
-        step.toolName = toolSelection.selectedTool;
-        step.toolParams = toolSelection.parameters;
-        step.expectedOutput = toolSelection.expectedOutcome;
+        step.toolName = alternativeTool.tool;
+        // Preservar los parámetros existentes si son válidos
+        // En caso contrario, el toolSelector debería proporcionar parámetros adecuados
+        
+        this.logger.info(`PlanningEngine: Se seleccionó la herramienta alternativa '${step.toolName}'`);
       }
       
-      // Validar los parámetros de la herramienta
-      if (tool && !tool.validateParams(step.toolParams)) {
-        // Si los parámetros no son válidos, intentar corregirlos
-        try {
-          // Obtener el esquema de parámetros de la herramienta
-          const paramSchema = tool.getParameterSchema();
+      // Obtener la herramienta actualizada (la original o la alternativa)
+      const updatedTool = this.toolRegistry.getByName(step.toolName);
+      
+      // Validar y corregir los parámetros de la herramienta
+      if (updatedTool) {
+        const paramSchema = updatedTool.getParameterSchema();
+        
+        if (paramSchema && !updatedTool.validateParams(step.toolParams)) {
+          this.logger.warn(`PlanningEngine: Parámetros inválidos para '${step.toolName}'. Corrigiendo.`);
           
-          // Corregir o completar los parámetros basados en el esquema
+          // Corregir los parámetros basados en el esquema
           step.toolParams = this.correctToolParams(step.toolParams, paramSchema);
-        } catch (error) {
-          this.logger.warn('PlanningEngine: Error correcting tool parameters', { 
-            step: step.stepNumber,
-            tool: step.toolName,
-            error
-          });
         }
       }
     }
+    
+    // Notificar finalización del enriquecimiento del plan
+    this.eventBus.emit('step:completed:plan-enrichment', {});
     
     return enrichedPlan;
   }
 
   /**
    * Corrige o completa los parámetros de una herramienta basados en su esquema
-   * @param params Los parámetros actuales
-   * @param schema El esquema de parámetros
-   * @returns Los parámetros corregidos
    */
-  private correctToolParams(params: object, schema: any): object {
-    // Implementación simple para corregir parámetros
-    // En una implementación real, esto sería más complejo y basado en el esquema
-    
+  private correctToolParams(params: Record<string, any>, schema: any): Record<string, any> {
+    // Crear una copia del objeto de parámetros para no modificar el original
     const correctedParams = { ...params };
     
-    // Ejemplo simple: asegurar que los parámetros requeridos existan con valores por defecto
-    if (schema && schema.required && Array.isArray(schema.required)) {
-      schema.required.forEach(param => {
-        if (!(param in correctedParams)) {
+    // Si el esquema tiene un objeto de propiedades
+    if (schema && schema.properties) {
+      // Procesar cada propiedad en el esquema
+      Object.entries(schema.properties).forEach(([paramName, paramSchema]: [string, any]) => {
+        // Si el parámetro es requerido pero no está presente
+        const isRequired = schema.required && schema.required.includes(paramName);
+        
+        if (isRequired && (correctedParams[paramName] === undefined || correctedParams[paramName] === null)) {
           // Asignar un valor por defecto si el parámetro no existe
-          correctedParams[param] = this.getDefaultValue(schema.properties[param]);
+          correctedParams[paramName] = this.getDefaultValue(paramSchema);
+        }
+        
+        // Validar y corregir el tipo de dato según el esquema
+        if (correctedParams[paramName] !== undefined) {
+          correctedParams[paramName] = this.coerceValueToType(correctedParams[paramName], paramSchema);
         }
       });
     }
@@ -285,76 +364,192 @@ export class PlanningEngine {
 
   /**
    * Obtiene un valor por defecto para un tipo de parámetro
-   * @param propertySchema El esquema de la propiedad
-   * @returns Un valor por defecto
    */
   private getDefaultValue(propertySchema: any): any {
     if (!propertySchema || !propertySchema.type) {
       return null;
     }
     
+    // Usar el valor por defecto definido en el esquema si existe
+    if ('default' in propertySchema) {
+      return propertySchema.default;
+    }
+    
+    // Generar un valor por defecto según el tipo
     switch (propertySchema.type) {
       case 'string':
-        return propertySchema.default || '';
+        return '';
       case 'number':
-        return propertySchema.default || 0;
+      case 'integer':
+        return 0;
       case 'boolean':
-        return propertySchema.default || false;
+        return false;
       case 'array':
-        return propertySchema.default || [];
+        return [];
       case 'object':
-        return propertySchema.default || {};
+        return {};
       default:
         return null;
     }
   }
 
   /**
-   * Obtiene un plan por defecto en caso de error
-   * @param userInput La entrada del usuario
-   * @param inputAnalysis El análisis de la entrada
-   * @returns Un plan por defecto
+   * Fuerza la conversión de un valor al tipo especificado en el esquema
    */
-  private getFallbackPlan(userInput: string, inputAnalysis: InputAnalysis): ExecutionPlan {
-    // Crear un plan básico basado en la categoría
-    let toolName: string;
-    let toolParams: object = {};
-    
-    switch (inputAnalysis.category) {
-      case 'codeExamination':
-        toolName = 'codeExaminer';
-        break;
-      case 'codeEditing':
-        toolName = 'codeEditor';
-        break;
-      case 'projectManagement':
-        toolName = 'projectAnalyzer';
-        break;
-      case 'projectSearch':
-        toolName = 'fileSelector';
-        break;
-      case 'communication':
-      default:
-        toolName = 'communicationModule';
-        toolParams = { message: userInput };
-        break;
+  private coerceValueToType(value: any, schema: any): any {
+    if (!schema || !schema.type) {
+      return value;
     }
     
-    return {
-      taskUnderstanding: `Procesar la solicitud: ${userInput}`,
-      plan: [
-        {
-          stepNumber: 1,
-          description: `Ejecutar ${toolName} para procesar la solicitud`,
-          toolName: toolName,
-          toolParams: toolParams,
-          expectedOutput: 'Respuesta básica a la solicitud del usuario',
-          isRequired: true,
-          fallbackStep: null
-        }
-      ],
-      estimatedComplexity: 'simple',
-      potentialChallenges: ['Plan de respaldo generado debido a un error en la planificación']
-    };
+    try {
+      switch (schema.type) {
+        case 'string':
+          return String(value);
+        
+        case 'number':
+        case 'integer':
+          // Intentar convertir a número
+          if (typeof value === 'string') {
+            const num = Number(value);
+            return isNaN(num) ? 0 : num;
+          }
+          return typeof value === 'number' ? value : 0;
+        
+        case 'boolean':
+          // Convertir a booleano
+          if (typeof value === 'string') {
+            return value.toLowerCase() === 'true';
+          }
+          return Boolean(value);
+        
+        case 'array':
+          // Asegurar que sea un array
+          return Array.isArray(value) ? value : [value];
+        
+        case 'object':
+          // Asegurar que sea un objeto
+          return typeof value === 'object' && value !== null ? value : {};
+        
+        default:
+          return value;
+      }
+    } catch (error) {
+      this.logger.warn('Error al convertir valor al tipo esperado', { value, schema, error });
+      return this.getDefaultValue(schema);
+    }
   }
-}
+
+ /**
+   * Obtiene un plan por defecto en caso de error
+   */
+ private getFallbackPlan(userInput: string, inputAnalysis: InputAnalysis): ExecutionPlan {
+  // Crear un plan básico basado en la categoría del análisis
+  let toolName: string;
+  let toolParams: Record<string, any> = {};
+  
+  // Determinar la herramienta adecuada según la categoría
+  switch (inputAnalysis.category) {
+    case 'codeExamination':
+      toolName = 'codeExaminer';
+      toolParams = {
+        query: userInput,
+        executionMode: 'analyze'
+      };
+      break;
+    
+    case 'codeEditing':
+      toolName = 'codeEditor';
+      toolParams = {
+        query: userInput,
+        action: 'suggest'
+      };
+      break;
+    
+    case 'projectManagement':
+      toolName = 'projectAnalyzer';
+      toolParams = {
+        query: userInput,
+        scope: 'currentProject'
+      };
+      break;
+      
+    case 'projectSearch':
+      toolName = 'fileSearcher';
+      toolParams = {
+        query: userInput,
+        includeContent: true
+      };
+      break;
+      
+    case 'communication':
+    default:
+      toolName = 'communicationHandler';
+      toolParams = {
+        query: userInput,
+        mode: 'respond'
+      };
+      break;
+  }
+  
+  // Verificar si la herramienta seleccionada existe en el registro
+  const selectedTool = this.toolRegistry.getByName(toolName);
+  if (!selectedTool) {
+    // Si la herramienta no existe, usar la primera herramienta disponible
+    const availableTools = this.toolRegistry.getAvailableTools();
+    if (availableTools.length > 0) {
+      toolName = availableTools[0].name;
+      // Mantener los parámetros simples
+      toolParams = {
+        query: userInput
+      };
+    } else {
+      // Caso extremo: no hay herramientas disponibles
+      this.logger.error('PlanningEngine: No hay herramientas disponibles para el plan alternativo');
+      toolName = 'noopTool'; // Una herramienta que no hace nada
+      toolParams = {};
+    }
+  }
+  
+  // Crear un plan de ejecución simplificado
+  const fallbackPlan: ExecutionPlan = {
+    taskUnderstanding: `Ejecutar un plan alternativo para: ${userInput}`,
+    goals: ["Responder a la solicitud del usuario con un enfoque simplificado"],
+    plan: [
+      {
+        stepNumber: 1,
+        description: `Procesar la solicitud del usuario: "${userInput}"`,
+        toolName: toolName,
+        toolParams: toolParams,
+        expectedOutput: "Respuesta o acción basada en la solicitud del usuario",
+        isRequired: true,
+        fallbackStep: null
+      }
+    ],
+    estimatedComplexity: "simple",
+    potentialChallenges: [
+      "Este es un plan alternativo debido a un error en la planificación original",
+      "Puede no cubrir todos los aspectos de la solicitud original"
+    ]
+  };
+  
+  // Notificar sobre el plan alternativo
+  this.feedbackManager.notify({
+    type: 'warning',
+    message: 'Se está utilizando un plan alternativo simplificado debido a un error en la planificación.',
+    detail: {
+      originalInput: userInput,
+      category: inputAnalysis.category,
+      fallbackTool: toolName
+    },
+    userNotification: {
+      show: true,
+      message: 'Usando un enfoque simplificado para procesar su solicitud.',
+      type: 'warning'
+    }
+  });
+  
+  // Emitir evento de plan alternativo creado
+  this.eventBus.emit('plan:fallback-created', fallbackPlan);
+  
+  return fallbackPlan;
+}}

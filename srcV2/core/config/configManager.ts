@@ -1,15 +1,17 @@
 import * as vscode from 'vscode';
 import { UIStateContext } from '../context/uiStateContext';
-
+import { PromptManager, PromptType } from '../prompts/promptManager';
 /**
  * Clase que centraliza la gestión de configuración de la extensión
  */
 export class ConfigManager {
   private config: vscode.WorkspaceConfiguration;
-  
+  private promptManager: PromptManager;
+
   constructor(private readonly uiStateContext: UIStateContext) {
     this.config = vscode.workspace.getConfiguration('extensionAssistant');
-    
+     this.promptManager = new PromptManager();
+
     // Escuchar cambios en la configuración
     vscode.workspace.onDidChangeConfiguration(e => {
       if (e.affectsConfiguration('extensionAssistant')) {
@@ -17,6 +19,10 @@ export class ConfigManager {
         this.notifyConfigChanges();
       }
     });
+  }
+
+  public getPromptTemplate(type: PromptType): string {
+    return this.promptManager.getPrompt(type);
   }
   
   /**
@@ -49,5 +55,7 @@ export class ConfigManager {
     await this.config.update('modelType', modelType, true);
     this.uiStateContext.setState('modelType', modelType);
   }
+
+  
 
 }

@@ -1,177 +1,301 @@
-// src/services/feedbackManager.ts
-
 /**
- * Gestor de Retroalimentación
- * * Responsabilidad: Centralizar el manejo de errores, advertencias, mensajes informativos
- * y la retroalimentación general del sistema hacia el usuario o hacia otros componentes.
- * Decide cómo manejar un problema (registrar, notificar, intentar recuperación).
+ * Gestor de Feedback para el Asistente IA
+ * 
+ * Responsabilidad: Proporcionar retroalimentación visual y notificaciones
+ * al usuario sobre el progreso de las operaciones y los resultados.
  */
 
 import { Logger } from '../utils/logger';
-import { ErrorHandler, ErrorInfo } from '../utils/errorHandler'; // Asume que ErrorHandler devuelve ErrorInfo
+import { ErrorHandler } from '../utils/errorHandler';
 import { EventBus } from '../core/event/eventBus';
-// Podría interactuar con una UI o sistema de notificaciones
-// import { NotificationService } from '../ui/notificationService'; 
+import * as vscode from 'vscode'; // Importar VS Code API
 
-/**
- * Interfaz que define el resultado del manejo de retroalimentación/error
- */
-export interface FeedbackResult {
-  errorHandled: boolean; // Indica si el manager pudo procesar el feedback/error
-  severity: 'info' | 'warning' | 'error' | 'critical';
-  message: string; // Mensaje procesado o generado
-  source: string; // Componente o módulo que originó el feedback
-  recoveryAction?: { // Acción sugerida para recuperarse del error (si aplica)
-    type: string; // Tipo de acción (ej. 'retry', 'suggestAlternative', 'requestUserInput')
-    params: any; // Parámetros para la acción
-  };
-  userNotification?: { // Cómo notificar al usuario (si aplica)
-    show: boolean;
-    message: string;
-    type: 'info' | 'warning' | 'error';
-  };
+export interface FeedbackPayload {
+  type: 'info' | 'warning' | 'error' | 'progress' | 'file-selection' | 'completion' | string;
+  message?: string;
+  files?: string[];
+  step?: string;
+  progress?: number; // Progreso como porcentaje (0-100)
+  duration?: number; // Duración en ms para notificaciones temporales
+  source?: string;
+  actions?: Array<{
+    title: string;
+    callback: string; // Identificador para el callback
+  }>;
+  detail?: any; // Detalles adicionales para debugging o registro
+  userNotification: {
+    show: boolean,
+    message: string,
+    type: string
+  }
 }
 
-/**
- * Clase para gestionar la retroalimentación y los errores
- */
 export class FeedbackManager {
-  private logger: Logger;
-  private errorHandler: ErrorHandler; // Para análisis detallado del error
-  private eventBus: EventBus;
-  // private notificationService: NotificationService; // Si hay un servicio de UI
+  private progressBars: Map<string, vscode.Progress<{ message?: string; increment?: number }>> = new Map();
+  private notificationTimeouts: Map<string, NodeJS.Timeout> = new Map();
+  private activeNotifications: Map<string, vscode.Disposable> = new Map();
 
   constructor(
-    logger: Logger,
-    errorHandler: ErrorHandler,
-    eventBus: EventBus
-    // notificationService: NotificationService
+    private logger: Logger,
+    private errorHandler: ErrorHandler,
+    private eventBus: EventBus,
+    private context: vscode.ExtensionContext
   ) {
-    this.logger = logger;
-    this.errorHandler = errorHandler;
-    this.eventBus = eventBus;
-    // this.notificationService = notificationService;
-
-    // Escuchar eventos de error globales si ErrorHandler los emite
-    this.eventBus.on('error:occurred', this.handleErrorEvent.bind(this));
+    // Registrar oyentes de eventos para limpiar recursos cuando sea necesario
+    this.eventBus.on('orchestration:completed', () => this.clearAllProgressBars());
+    this.eventBus.on('orchestration:cancelled', () => this.clearAllProgressBars());
+    
+    // Registrar comandos para las acciones de notificación
+    context.subscriptions.push(
+      vscode.commands.registerCommand('extension.ai-assistant.dismissNotification', (id: string) => {
+        this.dismissNotification(id);
+      })
+    );
   }
 
   /**
-   * Procesa un evento de error o un feedback recibido.
-   * @param error El objeto de error o información de feedback.
-   * @param source El nombre del componente que origina el feedback.
-   * @param severity (Opcional) Severidad predefinida, si no se puede inferir del error.
-   * @returns Un objeto FeedbackResult describiendo cómo se manejó.
+   * Muestra una notificación al usuario y emite un evento para integraciones adicionales
    */
-  public processFeedback(error: any, source: string, severity?: 'info' | 'warning' | 'error' | 'critical'): FeedbackResult {
-    this.logger.debug('FeedbackManager: Processing feedback', { source, error });
-
-    let errorInfo: ErrorInfo;
-    let processedSeverity: 'info' | 'warning' | 'error' | 'critical';
-
-    if (error instanceof Error || (typeof error === 'object' && error?.message)) {
-        // Es probablemente un error estándar
-        errorInfo = this.errorHandler.handleError(error); // Usa ErrorHandler para estandarizar
-        processedSeverity = severity || this.determineSeverity(errorInfo); // Determina severidad si no se dio
+  public notify(feedback: FeedbackPayload): void {
+    // 1. Registrar en el logger según el tipo
+    if (feedback.type === 'error') {
+      this.logger.error(feedback.message || 'Error', feedback);
+    } else if (feedback.type === 'warning') {
+      this.logger.warn(feedback.message || 'Warning', feedback);
     } else {
-        // Es probablemente un mensaje informativo o advertencia sin ser Error
-        errorInfo = { 
-            message: String(error), 
-            stack: undefined, 
-            type: 'FeedbackMessage', 
-            isRecoverable: true // Asumir recuperable para mensajes simples
-        };
-        processedSeverity = severity || 'info'; // Por defecto info si no es un error
+      this.logger.info(feedback.message || 'Feedback', feedback);
     }
 
-    const feedbackResult: FeedbackResult = {
-      errorHandled: true, // Se procesó aquí
-      severity: processedSeverity,
-      message: errorInfo.message,
-      source: source,
-      // Lógica para determinar acciones de recuperación y notificaciones
-      recoveryAction: this.determineRecoveryAction(errorInfo, processedSeverity, source),
-      userNotification: this.determineUserNotification(errorInfo, processedSeverity, source),
-    };
+    // 2. Presentar UI según el tipo
+    this.presentFeedbackUI(feedback);
+    
+    // 3. Emitir evento para que otros componentes puedan reaccionar
+    this.eventBus.emit('feedback:update', feedback);
+  }
 
-    // Loguear según severidad
-    switch (processedSeverity) {
-        case 'info': this.logger.info(`Feedback [${source}]`, { message: errorInfo.message }); break;
-        case 'warning': this.logger.warn(`Feedback [${source}]`, { message: errorInfo.message }); break;
-        case 'error': this.logger.error(`Feedback [${source}]`, { message: errorInfo.message, stack: errorInfo.stack }); break;
-        case 'critical': this.logger.fatal(`Feedback [${source}]`, { message: errorInfo.message, stack: errorInfo.stack }); break;
+  /**
+   * Presenta la interfaz de usuario apropiada según el tipo de feedback
+   */
+  private presentFeedbackUI(feedback: FeedbackPayload): void {
+    const message = feedback.message || '';
+    
+    switch (feedback.type) {
+      case 'progress':
+        this.showProgress(feedback);
+        break;
+      
+      case 'error':
+        vscode.window.showErrorMessage(message, ...(feedback.actions?.map(a => a.title) || [])).then(selection => {
+          if (selection && feedback.actions) {
+            const action = feedback.actions.find(a => a.title === selection);
+            if (action) {
+              vscode.commands.executeCommand(action.callback);
+            }
+          }
+        });
+        break;
+      
+      case 'warning':
+        vscode.window.showWarningMessage(message, ...(feedback.actions?.map(a => a.title) || [])).then(selection => {
+          if (selection && feedback.actions) {
+            const action = feedback.actions.find(a => a.title === selection);
+            if (action) {
+              vscode.commands.executeCommand(action.callback);
+            }
+          }
+        });
+        break;
+      
+      case 'info':
+        vscode.window.showInformationMessage(message, ...(feedback.actions?.map(a => a.title) || [])).then(selection => {
+          if (selection && feedback.actions) {
+            const action = feedback.actions.find(a => a.title === selection);
+            if (action) {
+              vscode.commands.executeCommand(action.callback);
+            }
+          }
+        });
+        break;
+      
+      case 'file-selection':
+        this.showFileSelectionFeedback(feedback);
+        break;
+      
+      case 'completion':
+        this.showCompletionFeedback(feedback);
+        break;
+        
+      default:
+        // Para tipos personalizados, mostrar notificación de información
+        vscode.window.showInformationMessage(message);
+    }
+  }
+
+  /**
+   * Muestra una barra de progreso para operaciones largas
+   */
+  private showProgress(feedback: FeedbackPayload): void {
+    const stepId = feedback.step || 'default';
+    
+    // Si ya hay una barra de progreso para este paso, actualizarla
+    if (this.progressBars.has(stepId)) {
+      return;
     }
     
-    // Emitir evento para que otros sistemas reaccionen si es necesario
-    this.eventBus.emit('feedback:processed', feedbackResult);
-
-    // Mostrar notificación si aplica
-    if (feedbackResult.userNotification?.show) {
-        this.showNotification(feedbackResult.userNotification);
-    }
-
-    return feedbackResult;
-  }
-
-  /** Handler para eventos de error globales */
-  private handleErrorEvent(payload: { error: any, source: string }): void {
-    this.processFeedback(payload.error, payload.source || 'Unknown');
-  }
-
-  /** Determina la severidad basada en la información del error */
-  private determineSeverity(errorInfo: ErrorInfo): 'info' | 'warning' | 'error' | 'critical' {
-      // Lógica simple, puede ser más compleja
-      if (errorInfo.type?.toLowerCase().includes('validation')) return 'warning';
-      if (errorInfo.type?.toLowerCase().includes('notfound')) return 'warning';
-      if (!errorInfo.isRecoverable) return 'critical';
-      // Añadir más reglas...
-      return 'error'; // Por defecto si es un error
-  }
-
-  /** Determina si hay una acción de recuperación sugerida */
-  private determineRecoveryAction(errorInfo: ErrorInfo, severity: string, source: string): FeedbackResult['recoveryAction'] | undefined {
-      // Lógica basada en tipo de error, severidad, fuente
-      if (severity === 'error' && errorInfo.isRecoverable) {
-          // Ejemplo: si falla una llamada a API, sugerir reintento
-          if (errorInfo.type === 'ApiError') { 
-              return { type: 'retry', params: { delay: 1000 } };
-          }
-          // Ejemplo: si falló la planificación, sugerir pedir más info al usuario
-           if (source === 'PlanningEngine') {
-               return { type: 'requestUserInput', params: { question: "Could you provide more details or clarify the request?" } };
-           }
-      }
-       // Añadir más reglas...
-      return undefined;
-  }
-
-  /** Determina si y cómo notificar al usuario */
-  private determineUserNotification(errorInfo: ErrorInfo, severity: string, source: string): FeedbackResult['userNotification'] | undefined {
-      // No notificar por info, a menos que sea explícito
-      if (severity === 'info') return { show: false, message: '', type: 'info' };
-
-      // Notificar siempre por errores críticos
-      if (severity === 'critical') {
-          return { show: true, message: `Critical Error [${source}]: ${errorInfo.message}`, type: 'error' };
+    // Crear una nueva barra de progreso
+    vscode.window.withProgress({
+      location: vscode.ProgressLocation.Notification,
+      title: `AI Assistant: ${feedback.step || 'Procesando...'}`,
+      cancellable: true
+    }, (progress, token) => {
+      // Guardar referencia a la barra de progreso
+      this.progressBars.set(stepId, progress);
+      
+      // Mostrar mensaje inicial
+      progress.report({ message: feedback.message });
+      
+      // Si hay un progreso específico, mostrarlo
+      if (typeof feedback.progress === 'number') {
+        progress.report({ increment: feedback.progress });
       }
       
-      // Notificar por errores y warnings (quizás configurable)
-      if (severity === 'error' || severity === 'warning') {
-           return { 
-               show: true, 
-               message: `${severity.toUpperCase()} [${source}]: ${errorInfo.message}`, 
-               type: severity === 'error' ? 'error' : 'warning' 
-           };
-      }
-
-      return undefined;
+      // Permitir cancelación
+      token.onCancellationRequested(() => {
+        this.eventBus.emit('operation:cancelled', { step: stepId });
+        this.progressBars.delete(stepId);
+      });
+      
+      // Devolver una promesa que se resuelve cuando la operación está completa
+      return new Promise<void>(resolve => {
+        const cleanup = () => {
+          this.progressBars.delete(stepId);
+          resolve();
+        };
+        
+        // Escuchar el evento de finalización para este paso
+        const handler = () => cleanup();
+        this.eventBus.on(`step:completed:${stepId}`, handler);
+        
+        // Timeout de seguridad (30 segundos)
+        setTimeout(cleanup, 30000);
+      });
+    });
   }
 
-  /** Muestra la notificación al usuario (interactúa con UI) */
-  private showNotification(notification: NonNullable<FeedbackResult['userNotification']>): void {
-       this.logger.debug('FeedbackManager: Showing notification', { notification });
-       // Aquí iría la llamada al servicio de UI/Notificaciones
-       // this.notificationService.show(notification.message, notification.type);
-       console.log(`[UI NOTIFICATION] Type: ${notification.type}, Message: ${notification.message}`); // Placeholder
+  /**
+   * Muestra feedback para selección de archivos
+   */
+  private showFileSelectionFeedback(feedback: FeedbackPayload): void {
+    if (!feedback.files || feedback.files.length === 0) {
+      return;
+    }
+    
+    const filesStr = feedback.files.length > 3 
+      ? `${feedback.files.slice(0, 3).join(', ')} y ${feedback.files.length - 3} más`
+      : feedback.files.join(', ');
+      
+    const message = feedback.message || `Archivos seleccionados: ${filesStr}`;
+    
+    const notification = vscode.window.showInformationMessage(
+      message, 
+      { modal: false }, 
+      'Ver archivos'
+    ).then(selection => {
+      if (selection === 'Ver archivos') {
+        // Mostrar los archivos en el explorador o abrirlos
+        feedback.files!.forEach(file => {
+          vscode.workspace.openTextDocument(file).then(doc => {
+            vscode.window.showTextDocument(doc, { preview: false });
+          });
+        });
+      }
+    });
+    
+    // Guardar para limpieza posterior si es necesario
+    const id = `file-selection-${Date.now()}`;
+    this.activeNotifications.set(id, { dispose: () => {} });
+    
+    // Auto-limpiar después de un tiempo
+    if (feedback.duration) {
+      const timeout = setTimeout(() => this.dismissNotification(id), feedback.duration);
+      this.notificationTimeouts.set(id, timeout);
+    }
+  }
+
+  /**
+   * Muestra feedback de finalización
+   */
+  private showCompletionFeedback(feedback: FeedbackPayload): void {
+    // Limpiar todas las barras de progreso
+    this.clearAllProgressBars();
+    
+    // Mostrar mensaje de finalización
+    vscode.window.showInformationMessage(
+      feedback.message || 'Operación completada', 
+      ...(feedback.actions?.map(a => a.title) || [])
+    ).then(selection => {
+      if (selection && feedback.actions) {
+        const action = feedback.actions.find(a => a.title === selection);
+        if (action) {
+          vscode.commands.executeCommand(action.callback);
+        }
+      }
+    });
+  }
+
+  /**
+   * Actualiza el progreso de un paso específico
+   */
+  public updateProgress(stepId: string, increment: number, message?: string): void {
+    const progress = this.progressBars.get(stepId);
+    if (progress) {
+      progress.report({ increment, message });
+    }
+  }
+
+  /**
+   * Elimina una notificación específica
+   */
+  private dismissNotification(id: string): void {
+    // Limpiar timeout si existe
+    if (this.notificationTimeouts.has(id)) {
+      clearTimeout(this.notificationTimeouts.get(id)!);
+      this.notificationTimeouts.delete(id);
+    }
+    
+    // Eliminar notificación
+    if (this.activeNotifications.has(id)) {
+      this.activeNotifications.get(id)!.dispose();
+      this.activeNotifications.delete(id);
+    }
+  }
+
+  /**
+   * Limpia todas las barras de progreso
+   */
+  private clearAllProgressBars(): void {
+    // Emitir eventos de finalización para todas las barras de progreso
+    this.progressBars.forEach((_, stepId) => {
+      this.eventBus.emit(`step:completed:${stepId}`, {});
+    });
+    
+    // Limpiar la colección
+    this.progressBars.clear();
+  }
+
+  /**
+   * Limpia todos los recursos al desactivar la extensión
+   */
+  public dispose(): void {
+    // Limpiar timeouts
+    this.notificationTimeouts.forEach(timeout => clearTimeout(timeout));
+    this.notificationTimeouts.clear();
+    
+    // Limpiar notificaciones activas
+    this.activeNotifications.forEach(notification => notification.dispose());
+    this.activeNotifications.clear();
+    
+    // Limpiar barras de progreso
+    this.clearAllProgressBars();
   }
 }
