@@ -190,54 +190,51 @@ export class ExtensionContext {
   private async initializeOrchestrationComponents(): Promise<void> {
     console.log('========== INICIO INICIALIZACIÓN DE COMPONENTES DE ORQUESTACIÓN ==========');
     try {
-      // Inicializar componentes base de orquestación
-      console.log('[DEBUG] Inicializando componentes base...');
+     
       this.logger = new ConsoleLogger();
-      console.log('[DEBUG] ConsoleLogger inicializado');
+    
       
       this.eventBus = new EventBus();
-      console.log('[DEBUG] EventBus inicializado');
+     
       
       this.errorHandler = new ErrorHandler(); // No requiere parámetros
-      console.log('[DEBUG] ErrorHandler inicializado');
+    
       
       this.orchestrationContext = new OrchestrationContext(); // No acepta parámetros
-      console.log('[DEBUG] OrchestrationContext inicializado');
+     
       
       this.toolRegistry = new ToolRegistry(this.logger);
-      console.log('[DEBUG] ToolRegistry inicializado');
+    
       
       // Inicializar módulos especializados
-      console.log('[DEBUG] Inicializando módulos especializados...');
+    
       
       this.editingModule = new EditingModule(
         this.toolRegistry,
         this.logger,
         this.baseAPI!
       );
-      console.log('[DEBUG] EditingModule inicializado');
+     
       
       this.examinationModule = new ExaminationModule(
         this.toolRegistry,
         this.logger,
         this.baseAPI!
       );
-      console.log('[DEBUG] ExaminationModule inicializado');
+   
       
-      // Inicializar componentes de orquestación
-      console.log('[DEBUG] Inicializando componentes de orquestación...');
+     
       
-      console.log('[DEBUG] Creando InputAnalyzer...');
+     
       const inputAnalyzer = new InputAnalyzer(
-        this.configManager,
         this.orchestrationContext,
         this.logger,
         this.eventBus,
         this.baseAPI!
       );
-      console.log('[DEBUG] InputAnalyzer inicializado');
+   
       
-      console.log('[DEBUG] Creando DirectActionRouter...');
+
       const directActionRouter = new DirectActionRouter(
         this.logger,
         this.errorHandler,
@@ -245,18 +242,14 @@ export class ExtensionContext {
         this.toolRegistry,
         this.orchestrationContext
       );
-      console.log('[DEBUG] DirectActionRouter inicializado');
       
-      console.log('[DEBUG] Creando FeedbackManager...');
       const feedbackManager = new FeedbackManager(
         this.logger,
         this.errorHandler,
         this.eventBus,
         this.vsCodeContext! // Usar el contexto de VS Code guardado
       );
-      console.log('[DEBUG] FeedbackManager inicializado');
-      
-      console.log('[DEBUG] Creando ToolSelector...');
+     
       const toolSelector = new ToolSelector(
         this.orchestrationContext,
         this.toolRegistry,
@@ -264,23 +257,18 @@ export class ExtensionContext {
         this.errorHandler,
         this.baseAPI! // Aseguramos que baseAPI está inicializado
       );
-      console.log('[DEBUG] ToolSelector inicializado');
-      
-      // Inicializar planificador y gestor de flujo de trabajo
-      console.log('[DEBUG] Creando PlanningEngine...');
+    
       const planningEngine = new PlanningEngine(
         this.orchestrationContext,
-        this.configManager,
         this.logger,
         this.eventBus,
         this.baseAPI!,
         this.toolRegistry,
         toolSelector,
-        feedbackManager
+        feedbackManager,
+        {} // modulePlanners
       );
-      console.log('[DEBUG] PlanningEngine inicializado');
-      
-      console.log('[DEBUG] Creando WorkflowManager...');
+     
       const workflowManager = new WorkflowManager(
         this.logger,
         this.errorHandler,
@@ -289,9 +277,7 @@ export class ExtensionContext {
         feedbackManager,
         this.baseAPI!
       );
-      console.log('[DEBUG] WorkflowManager inicializado');
-      
-      // Inicializar el servicio de orquestación
+     
       console.log('[DEBUG] Creando OrchestratorService...');
       this.orchestratorService = new OrchestratorService(
         this.eventBus,
@@ -306,10 +292,8 @@ export class ExtensionContext {
         workflowManager,
         feedbackManager
       );
-      console.log('[DEBUG] OrchestratorService inicializado');
-      
-      console.log('[INFO] Flujo de orquestación inicializado correctamente');
-      console.log('========== FIN INICIALIZACIÓN DE COMPONENTES DE ORQUESTACIÓN (EXITOSO) ==========');
+     
+ 
     } catch (error: any) {
       console.error('[ERROR] Error al inicializar flujo de orquestación:', error);
       console.error('[DEBUG] Stack trace:', error.stack);
@@ -441,12 +425,12 @@ export class ExtensionContext {
       console.log(`[INFO] Procesando mensaje: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}"`);
       
       // 1. Añadir el mensaje del usuario al chat
-      console.log('[DEBUG] Agregando mensaje del usuario al chat...');
+
       await this.chatService.addUserMessage(message);
       console.log('[DEBUG] Mensaje del usuario agregado exitosamente');
       
       // 2. Indicar que estamos procesando
-      console.log('[DEBUG] Actualizando estado de procesamiento...');
+
       this.uiStateContext.setState('isProcessing', true);
       console.log('[DEBUG] Estado de procesamiento actualizado');
       
@@ -456,13 +440,10 @@ export class ExtensionContext {
         // 3. Procesar el mensaje según el flujo activo
         if (this.useOrchestration && this.orchestratorService) {
           // Flujo de orquestación
-          console.log('[INFO] Usando flujo de orquestación');
-          console.log('[DEBUG] Valor de useOrchestration:', this.useOrchestration);
-          console.log('[DEBUG] Estado de orchestratorService:', this.orchestratorService ? 'Inicializado' : 'No inicializado');
+      
           
           try {
-            console.log('[DEBUG] Llamando a orchestratorService.orchestrateRequest()...');
-            console.log('[DEBUG] Tipo de orchestratorService:', typeof this.orchestratorService);
+         
             console.log('[DEBUG] Métodos disponibles:', Object.getOwnPropertyNames(Object.getPrototypeOf(this.orchestratorService)));
             
             const result = await this.orchestratorService.orchestrateRequest(message);
@@ -554,7 +535,7 @@ export class ExtensionContext {
               console.log(response);
               console.log('================================');
               
-              console.log('[DEBUG] Respuesta procesada:', response.substring(0, 100) + (response.length > 100 ? '...' : ''));
+              
             } else {
               console.error('[ERROR] La orquestación falló');
               console.error('[DEBUG] Detalles del error:', result?.error);

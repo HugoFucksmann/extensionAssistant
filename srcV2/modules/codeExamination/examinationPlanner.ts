@@ -1,7 +1,7 @@
 import { ConfigManager } from '../../core/config/configManager';
 import { Logger } from '../../utils/logger';
 import { BaseAPI } from '../../models/baseAPI';
-import { PromptType } from '../../core/prompts/promptManager';
+import { runPrompt } from '../../core/promptSystem/promptSystem';
 
 export interface ExaminationPlan {
   objective: string;
@@ -28,41 +28,24 @@ export class ExaminationPlanner {
     try {
       this.logger.info('ExaminationPlanner: Creando plan de examen', { input });
       console.log(`[ExaminationPlanner] Creando plan para: ${input}`);
-      
-      // Obtener el prompt template
-      const promptTemplate = this.configManager.getPromptTemplate('examination' as PromptType);
-      
-      // Preparar variables para el template
-      const variables = {
+
+      const context = {
         userPrompt: input,
-        codeContext: JSON.stringify(codeContext),
-        availableTools: JSON.stringify(this.getAvailableExaminationTools())
+        codeContext,
+        availableTools: this.getAvailableExaminationTools()
       };
-      
-      // Llenar el template con las variables
-      const filledPrompt = Object.entries(variables).reduce(
-        (prompt, [key, value]) => prompt.replace(new RegExp(`{{${key}}}`, 'g'), value),
-        promptTemplate
+
+      const plan = await runPrompt<ExaminationPlan>(
+        'examination',
+        context,
+        this.modelApi
       );
-      
-      console.log(`[ExaminationPlanner] Enviando prompt al modelo (longitud: ${filledPrompt.length})`);
-      
-      // Obtener respuesta del modelo
-      const modelResponse = await this.modelApi.generateResponse(filledPrompt);
-      
-      console.log(`[ExaminationPlanner] Respuesta recibida (longitud: ${modelResponse.length})`);
-      
-      // Parsear la respuesta
-      const plan = this.parseModelResponse(modelResponse);
-      
-      console.log(`[ExaminationPlanner] Plan creado con ${plan.steps.length} pasos`);
-      
+
+      this.logger.info(`[ExaminationPlanner] Plan creado con ${plan.steps.length} pasos`);
       return plan;
     } catch (error) {
       this.logger.error('ExaminationPlanner: Error creando plan', { error });
       console.error(`[ExaminationPlanner] Error: ${error instanceof Error ? error.message : 'Error desconocido'}`);
-      
-      // Devolver un plan por defecto en caso de error
       return {
         objective: 'Plan por defecto debido a un error',
         steps: [],
@@ -71,22 +54,6 @@ export class ExaminationPlanner {
     }
   }
   
-  private parseModelResponse(response: string): ExaminationPlan {
-    try {
-      // Intentar parsear la respuesta como JSON
-      const parsedResponse = JSON.parse(response);
-      
-      // Validar la estructura del plan
-      if (!parsedResponse.objective || !Array.isArray(parsedResponse.steps)) {
-        throw new Error('Estructura de plan inválida');
-      }
-      
-      return parsedResponse;
-    } catch (error) {
-      this.logger.error('ExaminationPlanner: Error parseando respuesta', { error, response });
-      throw new Error(`Error parseando respuesta del modelo: ${error instanceof Error ? error.message : 'Error desconocido'}`);
-    }
-  }
   
   private getAvailableExaminationTools(): any[] {
     // Aquí deberías devolver la lista de herramientas disponibles para examen de código
