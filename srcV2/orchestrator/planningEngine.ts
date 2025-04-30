@@ -16,6 +16,13 @@ import { InputAnalysis } from './inputAnalyzer';
 import { ToolSelector } from './toolSelector';
 import { FeedbackManager } from './feedbackManager';
 
+// Importar planificadores de módulos
+import { EditingPlanner } from '../modules/codeEditing/editingPlanner';
+import { ExaminationPlanner } from '../modules/codeExamination/examinationPlanner';
+import { ProjectPlanner } from '../modules/projectManagement/projectPlanner';
+import { ProjectSearchPlanner } from '../modules/projectSearch/projectSearchPlanner';
+import { CommunicationPlanner } from '../modules/communication/communicationPlanner';
+
 /**
  * Interfaz que define un plan de ejecución
  */
@@ -41,6 +48,13 @@ export interface PlanStep {
  * Clase para generar planes de ejecución
  */
 export class PlanningEngine {
+  // Planificadores de módulos
+  private editingPlanner: EditingPlanner;
+  private examinationPlanner: ExaminationPlanner;
+  private projectPlanner: ProjectPlanner;
+  private projectSearchPlanner: ProjectSearchPlanner;
+  private communicationPlanner: CommunicationPlanner;
+
   constructor(
     private orchestrationContext: OrchestrationContext,
     private configManager: ConfigManager,
@@ -50,7 +64,16 @@ export class PlanningEngine {
     private toolRegistry: ToolRegistry,
     private toolSelector: ToolSelector,
     private feedbackManager: FeedbackManager
-  ) {}
+  ) {
+    // Inicializar planificadores de módulos
+    this.editingPlanner = new EditingPlanner(configManager, logger, modelApi);
+    this.examinationPlanner = new ExaminationPlanner(configManager, logger, modelApi);
+    this.projectPlanner = new ProjectPlanner(configManager, logger, modelApi);
+    this.projectSearchPlanner = new ProjectSearchPlanner(configManager, logger, modelApi);
+    this.communicationPlanner = new CommunicationPlanner(configManager, logger, modelApi);
+    
+    this.logger.info('PlanningEngine inicializado con planificadores de módulos');
+  }
 
   /**
    * Crea un plan de ejecución para una tarea
@@ -79,26 +102,94 @@ export class PlanningEngine {
       // Obtener el contexto relevante
       const sessionData = this.orchestrationContext.get();
       
-      // Obtener herramientas disponibles
-      const availableTools = this.toolRegistry.getAvailableTools();
+      // Variable para almacenar el plan específico del módulo
+      let modulePlan: any = null;
+      let needsGenericPlan = false;
       
-      // Preparar el prompt para el modelo
-      const prompt = this.preparePrompt(
-        userInput, 
-        inputAnalysis, 
-        sessionData, 
-        availableTools,
-       
-      );
+      // Seleccionar el planificador adecuado según la categoría
+      console.log(`[PlanningEngine] Creando plan para categoría: ${inputAnalysis.category}`);
       
-      // Obtener el plan del modelo
-      const modelResponse = await this.modelApi.generateResponse(prompt);
+      switch (inputAnalysis.category) {
+        case 'codeEditing':
+          console.log(`[PlanningEngine] Usando EditingPlanner`);
+          modulePlan = await this.editingPlanner.createEditingPlan(userInput, {
+            referencedFiles: inputAnalysis.relevantContext,
+            projectData: sessionData.projectData || {}
+          });
+          break;
+          
+        case 'codeExamination':
+          console.log(`[PlanningEngine] Usando ExaminationPlanner`);
+          modulePlan = await this.examinationPlanner.createExaminationPlan(userInput, {
+            referencedFiles: inputAnalysis.relevantContext,
+            projectData: sessionData.projectData || {}
+          });
+          break;
+          
+        case 'projectManagement':
+          console.log(`[PlanningEngine] Usando ProjectPlanner`);
+          modulePlan = await this.projectPlanner.createProjectPlan(userInput, {
+            projectData: sessionData.projectData || {}
+          });
+          break;
+          
+        case 'projectSearch':
+          console.log(`[PlanningEngine] Usando ProjectSearchPlanner`);
+          modulePlan = await this.projectSearchPlanner.createSearchPlan(userInput, {
+            projectData: sessionData.projectData || {}
+          });
+          break;
+          
+        case 'communication':
+          console.log(`[PlanningEngine] Usando CommunicationPlanner`);
+          // Para comunicación, usaremos un enfoque diferente ya que no genera un plan de ejecución
+          // sino que directamente genera una respuesta
+          needsGenericPlan = true;
+          break;
+          
+        default:
+          console.log(`[PlanningEngine] Categoría no soportada: ${inputAnalysis.category}, usando planificador genérico`);
+          needsGenericPlan = true;
+      }
       
-      // Parsear la respuesta del modelo
-      const executionPlan = this.parseModelResponse(modelResponse);
+      let executionPlan: ExecutionPlan;
+      
+      // Si no se pudo crear un plan específico de módulo, usar el planificador genérico
+      if (needsGenericPlan || !modulePlan) {
+        console.log(`[PlanningEngine] Usando planificador genérico`);
+        
+        // Obtener herramientas disponibles
+        const availableTools = this.toolRegistry.getAvailableTools();
+        
+        // Preparar el prompt para el modelo
+        const prompt = this.preparePrompt(
+          userInput, 
+          inputAnalysis, 
+          sessionData, 
+          availableTools
+        );
+        
+        // Obtener el plan del modelo
+        const modelResponse = await this.modelApi.generateResponse(prompt);
+        
+        // Parsear la respuesta del modelo
+        executionPlan = this.parseModelResponse(modelResponse);
+      } else {
+        // Convertir el plan específico del módulo a un ExecutionPlan
+        console.log(`[PlanningEngine] Convirtiendo plan específico a ExecutionPlan`);
+        
+        executionPlan = this.convertModulePlanToExecutionPlan(modulePlan, inputAnalysis);
+      }
       
       // Validar y enriquecer el plan
       const enrichedPlan = await this.enrichPlan(executionPlan, inputAnalysis);
+      
+      // Añadir metadatos al plan
+      (enrichedPlan as any).metadata = {
+        category: inputAnalysis.category,
+        objective: enrichedPlan.taskUnderstanding,
+        estimatedComplexity: enrichedPlan.estimatedComplexity
+      };
       
       // Notificar sobre la creación del plan
       this.feedbackManager.notify({
@@ -365,6 +456,50 @@ export class PlanningEngine {
   /**
    * Obtiene un valor por defecto para un tipo de parámetro
    */
+  /**
+   * Convierte un plan específico de un módulo a un ExecutionPlan genérico
+   * @param modulePlan Plan específico del módulo
+   * @param inputAnalysis Análisis de la entrada
+   * @returns Plan de ejecución genérico
+   */
+  private convertModulePlanToExecutionPlan(modulePlan: any, inputAnalysis: InputAnalysis): ExecutionPlan {
+    try {
+      this.logger.info('PlanningEngine: Convirtiendo plan específico a ExecutionPlan', { modulePlan });
+      
+      // Crear los pasos del plan de ejecución
+      const planSteps: PlanStep[] = modulePlan.steps.map((step: any, index: number) => {
+        return {
+          stepNumber: index + 1,
+          description: step.description,
+          toolName: step.toolName,
+          toolParams: step.params,
+          expectedOutput: step.resultKey ? `Resultado guardado en ${step.resultKey}` : 'Ejecución exitosa',
+          isRequired: true,
+          fallbackStep: null
+        };
+      });
+      
+      // Crear el plan de ejecución
+      const executionPlan: ExecutionPlan = {
+        taskUnderstanding: modulePlan.objective,
+        goals: [modulePlan.objective],
+        plan: planSteps,
+        estimatedComplexity: modulePlan.estimatedComplexity,
+        potentialChallenges: []
+      };
+      
+      return executionPlan;
+    } catch (error) {
+      this.logger.error('PlanningEngine: Error convirtiendo plan específico', { error });
+      console.error(`[PlanningEngine] Error convirtiendo plan: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+      
+      // En caso de error, devolver un plan por defecto
+      // Usar un valor por defecto para la entrada del usuario
+      const userInput = 'Error al convertir plan específico';
+      return this.getFallbackPlan(userInput, inputAnalysis);
+    }
+  }
+
   private getDefaultValue(propertySchema: any): any {
     if (!propertySchema || !propertySchema.type) {
       return null;

@@ -7,26 +7,139 @@ import { ToolRegistry } from '../tools/core/toolRegistry';
 import { OrchestrationContext } from '../core/context/orchestrationContext';
 import { FeedbackManager } from './feedbackManager';
 
+// Importar módulos
+import { EditingModule } from '../modules/codeEditing/editingModule';
+import { ExaminationModule } from '../modules/codeExamination/examinationModule';
+import { ProjectModule } from '../modules/projectManagement/projectModule';
+import { ProjectSearchModule } from '../modules/projectSearch/projectSearchModule';
+import { CommunicationModule } from '../modules/communication/communicationModule';
+import { BaseAPI } from '../models/baseAPI';
+
 export class WorkflowManager {
+  // Módulos especializados
+  private editingModule: EditingModule;
+  private examinationModule: ExaminationModule;
+  private projectModule: ProjectModule;
+  private projectSearchModule: ProjectSearchModule;
+  private communicationModule: CommunicationModule;
+
   constructor(
     private logger: Logger,
     private errorHandler: ErrorHandler,
     private toolSelector: ToolSelector,
     private toolRegistry: ToolRegistry,
     // private resultEvaluator: ResultEvaluator, // Temporalmente comentado para pruebas
-    private feedbackManager: FeedbackManager
+    private feedbackManager: FeedbackManager,
+    private modelApi: BaseAPI
   ) {
-    this.logger.info('WorkflowManager inicializado sin ResultEvaluator (modo prueba)');
+    // Inicializar módulos
+    this.editingModule = new EditingModule(toolRegistry, logger, modelApi);
+    this.examinationModule = new ExaminationModule(toolRegistry, logger, modelApi);
+    this.projectModule = new ProjectModule(toolRegistry, logger, modelApi);
+    this.projectSearchModule = new ProjectSearchModule(toolRegistry, logger, modelApi);
+    this.communicationModule = new CommunicationModule(logger, modelApi);
+    
+    this.logger.info('WorkflowManager inicializado con módulos especializados');
   }
 
   public async startWorkflow(plan: ExecutionPlan, context: OrchestrationContext): Promise<any> {
     console.log(`[WorkflowManager] Iniciando ejecución de workflow con ${plan.plan.length} pasos`);
+    
     // Verificar si existe la propiedad metadata antes de intentar acceder a ella
     if (plan.hasOwnProperty('metadata')) {
       console.log(`[WorkflowManager] Plan de ejecución: ${JSON.stringify((plan as any).metadata)}`);
+      
+      // Si el plan tiene una categoría, usar el módulo correspondiente
+      const category = (plan as any).metadata.category;
+      if (category) {
+        console.log(`[WorkflowManager] Usando módulo especializado para categoría: ${category}`);
+        
+        try {
+          let moduleResult;
+          
+          switch (category) {
+            case 'codeEditing':
+              console.log(`[WorkflowManager] Delegando ejecución a EditingModule`);
+              moduleResult = await this.editingModule.executeEditingPlan(plan, context);
+              break;
+              
+            case 'codeExamination':
+              console.log(`[WorkflowManager] Delegando ejecución a ExaminationModule`);
+              moduleResult = await this.examinationModule.executeExaminationPlan(plan, context);
+              break;
+              
+            case 'projectManagement':
+              console.log(`[WorkflowManager] Delegando ejecución a ProjectModule`);
+              moduleResult = await this.projectModule.executeProjectPlan(plan, context);
+              break;
+              
+            case 'projectSearch':
+              console.log(`[WorkflowManager] Delegando ejecución a ProjectSearchModule`);
+              moduleResult = await this.projectSearchModule.executeSearchPlan(plan, context);
+              break;
+              
+            case 'communication':
+              // Para comunicación, no ejecutamos un plan sino que generamos una respuesta directamente
+              console.log(`[WorkflowManager] Delegando ejecución a CommunicationModule`);
+              // Aquí deberíamos obtener la solicitud original y los resultados de acciones previas
+              const originalRequest = context.get().originalRequest || '';
+              const actionResults = context.get().executedSteps || [];
+              moduleResult = await this.communicationModule.generateResponse(originalRequest, actionResults, context);
+              break;
+              
+            default:
+              console.log(`[WorkflowManager] No hay módulo específico para categoría: ${category}, ejecutando plan genérico`);
+              // Continuar con la ejecución genérica
+              return await this.executeGenericPlan(plan, context);
+          }
+          
+          // Guardar el resultado en el contexto
+          context.set({ moduleResult });
+          
+          // Notificar sobre la finalización del workflow
+          this.feedbackManager.notify({
+            type: 'info',
+            message: 'Workflow finalizado con éxito',
+            userNotification: {
+              show: true,
+              message: 'Tarea completada con éxito',
+              type: 'info'
+            }
+          });
+          
+          return { ...context.get(), moduleResult };
+        } catch (error) {
+          console.error(`[WorkflowManager] Error en módulo especializado: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+          this.feedbackManager.notify({
+            type: 'error',
+            message: `Error en la ejecución del módulo: ${error instanceof Error ? error.message : 'Error desconocido'}`,
+            userNotification: {
+              show: true,
+              message: 'Error al procesar la solicitud',
+              type: 'error'
+            }
+          });
+          
+          // En caso de error, intentar con la ejecución genérica
+          return await this.executeGenericPlan(plan, context);
+        }
+      }
     } else {
-      console.log(`[WorkflowManager] Plan de ejecución sin metadatos`);
+      console.log(`[WorkflowManager] Plan de ejecución sin metadatos, ejecutando plan genérico`);
     }
+    
+    // Si llegamos aquí, ejecutar el plan genérico
+    return await this.executeGenericPlan(plan, context);
+  }
+
+  /**
+   * Ejecuta un plan genérico paso a paso
+   * @param plan Plan de ejecución
+   * @param context Contexto de orquestación
+   * @returns Contexto actualizado
+   */
+  private async executeGenericPlan(plan: ExecutionPlan, context: OrchestrationContext): Promise<any> {
+    console.log(`[WorkflowManager] Ejecutando plan genérico con ${plan.plan.length} pasos`);
     
     for (let i = 0; i < plan.plan.length; i++) {
       const step = plan.plan[i];
@@ -113,6 +226,7 @@ export class WorkflowManager {
         break;
       }
     }
+    
     this.feedbackManager.notify({
       type: 'info',
       message: 'Workflow finalizado',
@@ -122,6 +236,7 @@ export class WorkflowManager {
         type: 'info'
       }
     });
+    
     return context;
   }
 }

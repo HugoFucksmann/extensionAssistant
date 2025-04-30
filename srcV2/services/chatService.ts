@@ -184,11 +184,13 @@ export class ChatService {
   }
   
   /**
-   * Procesa un mensaje del usuario
+   * Añade un mensaje del usuario al chat actual
+   * @param message Texto del mensaje del usuario
+   * @returns ID del mensaje añadido
    */
-  async processUserMessage(message: string): Promise<string> {
+  async addUserMessage(message: string): Promise<string> {
     try {
-      console.log(`[ChatService] Procesando mensaje del usuario: "${message.substring(0, 100)}${message.length > 100 ? '...' : ''}"`);
+      console.log(`[ChatService] Añadiendo mensaje del usuario: "${message.substring(0, 100)}${message.length > 100 ? '...' : ''}"`);
       
       // Asegurar que hay un chat activo
       if (!this.currentChatId) {
@@ -218,67 +220,100 @@ export class ChatService {
       this.uiStateContext.setState('messages', [...this.messages]);
       this.uiStateContext.setState('isProcessing', true);
       
-      try {
-        // Generar respuesta
-        console.log(`[ChatService] Solicitando respuesta al modelo ${this.baseAPI.getCurrentModel()}...`);
-        const startTime = Date.now();
-        const response = await this.baseAPI.generateResponse(message);
-        const endTime = Date.now();
-        console.log(`[ChatService] Respuesta recibida en ${endTime - startTime}ms (longitud: ${response.length} caracteres)`);
-        
-        // Generar ID único para la respuesta
-        const responseId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-        console.log(`[ChatService] ID generado para la respuesta: ${responseId}`);
-        
-        // Añadir respuesta del asistente
-        const assistantMessage: ChatMessage = {
-          id: responseId,
-          text: response,
-          role: 'assistant',
-          timestamp: new Date().toISOString(),
-          modelType: this.baseAPI.getCurrentModel()
-        };
-        this.messages.push(assistantMessage);
-        console.log(`[ChatService] Respuesta del asistente añadida. Total mensajes: ${this.messages.length}`);
-        
-        // Actualizar estado de UI
-        console.log(`[ChatService] Actualizando estado de UI con respuesta...`);
-        this.uiStateContext.setState('messages', [...this.messages]);
-        
-        // Guardar el chat actualizado
-        if (this.currentChatId) {
-          console.log(`[ChatService] Guardando chat actualizado con ID: ${this.currentChatId}`);
-          const chatToSave: Chat = {
-            id: this.currentChatId,
-            title: this.generateChatTitle(message),
-            messages: this.messages,
-            timestamp: new Date().toISOString()
-          };
-          
-          await this.chatMemory.saveChat(this.currentChatId, chatToSave);
-          console.log(`[ChatService] Chat guardado correctamente`);
-          
-          // Actualizar la lista de chats
-          console.log(`[ChatService] Actualizando lista de chats...`);
-          await this.chatMemory.updateChatList({
-            id: this.currentChatId,
-            title: chatToSave.title,
-            timestamp: chatToSave.timestamp,
-            preview: message.substring(0, 50) + (message.length > 50 ? '...' : '')
-          });
-          
-          // Actualizar la lista de chats en la UI
-          await this.getChatList();
-          console.log(`[ChatService] Lista de chats actualizada en la UI`);
-        }
-        
-        return response;
-      } finally {
-        this.uiStateContext.setState('isProcessing', false);
-      }
+      return messageId;
     } catch (error: any) {
-      console.error('Error al procesar el mensaje:', error);
-      this.uiStateContext.setState('error', error.message || 'Error al procesar el mensaje');
+      console.error('Error al añadir mensaje del usuario:', error);
+      this.uiStateContext.setState('error', error.message || 'Error al añadir mensaje del usuario');
+      throw error;
+    }
+  }
+  
+  /**
+   * Añade una respuesta del asistente al chat actual
+   * @param response Texto de la respuesta del asistente
+   * @param modelType Tipo de modelo utilizado (opcional)
+   * @returns ID del mensaje añadido
+   */
+  async addAssistantResponse(response: string, modelType?: string): Promise<string> {
+    try {
+      console.log(`[ChatService] Añadiendo respuesta del asistente (longitud: ${response.length} caracteres)`);
+      
+      // Asegurar que hay un chat activo
+      if (!this.currentChatId) {
+        throw new Error('No hay un chat activo para añadir la respuesta');
+      }
+      
+      // Generar ID único para la respuesta
+      const responseId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      console.log(`[ChatService] ID generado para la respuesta: ${responseId}`);
+      
+      // Añadir respuesta del asistente
+      const assistantMessage: ChatMessage = {
+        id: responseId,
+        text: response,
+        role: 'assistant',
+        timestamp: new Date().toISOString(),
+        modelType: modelType || this.baseAPI.getCurrentModel()
+      };
+      this.messages.push(assistantMessage);
+      console.log(`[ChatService] Respuesta del asistente añadida. Total mensajes: ${this.messages.length}`);
+      
+      // Actualizar estado de UI
+      console.log(`[ChatService] Actualizando estado de UI con respuesta...`);
+      this.uiStateContext.setState('messages', [...this.messages]);
+      this.uiStateContext.setState('isProcessing', false);
+      
+      // Guardar el chat actualizado
+      if (this.currentChatId && this.messages.length > 0) {
+        // Buscar el último mensaje del usuario para generar el título
+        const lastUserMessage = [...this.messages].reverse().find(m => m.role === 'user');
+        const titleText = lastUserMessage ? lastUserMessage.text : 'Chat sin mensajes';
+        
+        console.log(`[ChatService] Guardando chat actualizado con ID: ${this.currentChatId}`);
+        const chatToSave: Chat = {
+          id: this.currentChatId,
+          title: this.generateChatTitle(titleText),
+          messages: this.messages,
+          timestamp: new Date().toISOString()
+        };
+        
+        await this.chatMemory.saveChat(this.currentChatId, chatToSave);
+        console.log(`[ChatService] Chat guardado correctamente`);
+        
+        // Actualizar la lista de chats
+        console.log(`[ChatService] Actualizando lista de chats...`);
+        await this.chatMemory.updateChatList({
+          id: this.currentChatId,
+          title: chatToSave.title,
+          timestamp: chatToSave.timestamp,
+          preview: titleText.substring(0, 50) + (titleText.length > 50 ? '...' : '')
+        });
+        
+        // Actualizar la lista de chats en la UI
+        await this.getChatList();
+        console.log(`[ChatService] Lista de chats actualizada en la UI`);
+      }
+      
+      return responseId;
+    } catch (error: any) {
+      console.error('Error al añadir respuesta del asistente:', error);
+      this.uiStateContext.setState('error', error.message || 'Error al añadir respuesta del asistente');
+      throw error;
+    }
+  }
+  
+  /**
+   * @deprecated Use addUserMessage y addAssistantResponse en su lugar
+   * Método mantenido por compatibilidad
+   */
+  async processUserMessage(message: string): Promise<string> {
+    console.warn('[ChatService] processUserMessage está deprecado. Use el flujo de orquestación en su lugar.');
+    try {
+      await this.addUserMessage(message);
+      // Este método ya no procesa la respuesta del modelo, devuelve un mensaje de advertencia
+      return "Este método está deprecado. La respuesta debe ser generada por el flujo de orquestación.";
+    } catch (error: any) {
+      console.error('Error en método deprecado processUserMessage:', error);
       throw error;
     }
   }

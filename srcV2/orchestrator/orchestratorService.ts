@@ -87,6 +87,7 @@ export class OrchestratorService {
       console.log(`[OrchestratorService] Actualizando contexto de orquestación...`);
       this.orchestrationContext.set({
         lastInput: input,
+        originalRequest: input, // Almacenar la solicitud original para los módulos especializados
         timestamp: Date.now()
       });
 

@@ -12,6 +12,10 @@ export async function activate(context: vscode.ExtensionContext) {
     extensionContext = new ExtensionContext();
     await extensionContext.initializeComponents(context);
     
+    // Establecer la instancia singleton para que pueda ser accedida desde otros componentes
+    ExtensionContext.setInstance(extensionContext);
+    console.log('Instancia de ExtensionContext establecida como singleton');
+    
     console.log('Extensión AI Assistant activada correctamente');
   } catch (error) {
     console.error('Error al activar la extensión:', error);
