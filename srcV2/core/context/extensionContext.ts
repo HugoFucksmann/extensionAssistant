@@ -470,9 +470,91 @@ export class ExtensionContext {
             
             if (result && result.success) {
               console.log('[INFO] Orquestación completada exitosamente');
-              console.log('[DEBUG] Resultado final:', result.finalResult);
-              response = result.finalResult?.toString() || 'Operación completada exitosamente';
-              console.log('[DEBUG] Respuesta generada:', response.substring(0, 100) + '...');
+              console.log('[DEBUG] Resultado final completo:', JSON.stringify(result.finalResult, null, 2));
+              
+              // Procesar el resultado final para asegurar que sea una cadena de texto
+              if (typeof result.finalResult === 'string') {
+                response = result.finalResult;
+              } else if (result.finalResult?.moduleResult?.message) {
+                // Caso específico para el resultado del módulo de comunicación
+                let message = result.finalResult.moduleResult.message;
+                
+                // Si el mensaje contiene JSON en formato string, extraerlo
+                if (message.includes('```json')) {
+                  try {
+                    const jsonMatch = message.match(/```json\n([\s\S]*?)\n```/);
+                    if (jsonMatch && jsonMatch[1]) {
+                      const jsonObj = JSON.parse(jsonMatch[1]);
+                      if (jsonObj.message) {
+                        response = jsonObj.message;
+                      } else {
+                        response = message;
+                      }
+                    } else {
+                      response = message;
+                    }
+                  } catch (e: unknown) {
+                    console.error('[ERROR] Error al parsear JSON en la respuesta:', e);
+                    response = message;
+                  }
+                } else {
+                  response = message;
+                }
+              } else if (result.finalResult?.response) {
+                response = result.finalResult.response;
+              } else if (result.finalResult?.text) {
+                response = result.finalResult.text;
+              } else if (result.finalResult) {
+                // Si el resultado final es un objeto, intentar extraer información útil
+                if (typeof result.finalResult === 'object') {
+                  // Caso específico cuando el objeto tiene moduleResult directamente en la raíz
+                  if (result.finalResult.moduleResult && result.finalResult.moduleResult.message) {
+                    let message = result.finalResult.moduleResult.message;
+                    
+                    // Si el mensaje contiene JSON en formato string, extraerlo
+                    if (message.includes('```json')) {
+                      try {
+                        const jsonMatch = message.match(/```json\n([\s\S]*?)\n```/);
+                        if (jsonMatch && jsonMatch[1]) {
+                          const jsonObj = JSON.parse(jsonMatch[1]);
+                          if (jsonObj.message) {
+                            response = jsonObj.message;
+                          } else {
+                            response = message;
+                          }
+                        } else {
+                          response = message;
+                        }
+                      } catch (e: unknown) {
+                        console.error('[ERROR] Error al parsear JSON en la respuesta:', e);
+                        response = message;
+                      }
+                    } else {
+                      response = message;
+                    }
+                  } else {
+                    // Intentar convertir el objeto a JSON
+                    try {
+                      response = JSON.stringify(result.finalResult, null, 2);
+                    } catch (e: unknown) {
+                      response = `Error al procesar la respuesta: ${e instanceof Error ? e.message : String(e)}`;
+                    }
+                  }
+                } else {
+                  response = `${result.finalResult}`;
+                }
+              } else {
+                response = 'Operación completada exitosamente';
+              }
+              
+              // Logs para ver el prompt y la respuesta
+              console.log('=== PROMPT ENVIADO AL MODELO ===');
+              console.log(message);
+              console.log('=== RESPUESTA CRUDA DEL MODELO ===');
+              console.log(response);
+              console.log('================================');
+              
+              console.log('[DEBUG] Respuesta procesada:', response.substring(0, 100) + (response.length > 100 ? '...' : ''));
             } else {
               console.error('[ERROR] La orquestación falló');
               console.error('[DEBUG] Detalles del error:', result?.error);
