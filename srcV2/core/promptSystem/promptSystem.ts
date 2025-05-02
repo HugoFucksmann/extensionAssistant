@@ -39,6 +39,13 @@ function fillPromptTemplate(template: string, variables: PromptVariables): strin
   return filledTemplate;
 }
 
+/**
+ * Ejecuta un prompt con el modelo de IA
+ * @param type Tipo de prompt a ejecutar
+ * @param context Contexto con variables para el prompt
+ * @param modelApi API del modelo a utilizar
+ * @returns Respuesta parseada según el tipo de prompt
+ */
 export async function runPrompt<T = any>(
   type: PromptType,
   context: Record<string, any>,
@@ -49,6 +56,27 @@ export async function runPrompt<T = any>(
   const variables = buildPromptVariables(type, context);
   const filledPrompt = fillPromptTemplate(template, variables);
   console.log(`[PromptSystem] Enviando prompt al modelo: ${filledPrompt}`);
-  const rawResponse = await modelApi.generateResponse(filledPrompt);
+  const rawResponse = await modelApi.generateResponseInternal(filledPrompt);
   return parseModelResponse<T>(type, rawResponse);
+}
+
+/**
+ * Punto de entrada único para todas las interacciones con el modelo
+ * Esta función debe ser la única forma de interactuar con el modelo desde cualquier parte de la aplicación
+ * @param type Tipo de prompt a ejecutar
+ * @param context Contexto con variables para el prompt
+ * @param modelApi API del modelo a utilizar
+ * @returns Respuesta parseada según el tipo de prompt
+ */
+export async function executeModelInteraction<T = any>(
+  type: PromptType,
+  context: Record<string, any>,
+  modelApi: BaseAPI
+): Promise<T> {
+  try {
+    return await runPrompt<T>(type, context, modelApi);
+  } catch (error) {
+    console.error(`[PromptSystem] Error al ejecutar prompt ${type}:`, error);
+    throw error;
+  }
 }

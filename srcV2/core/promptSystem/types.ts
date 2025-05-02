@@ -30,6 +30,12 @@ export function buildPromptVariables(type: PromptType, context: Record<string, a
         functionNames: context.functionNames ?? '',
         projectContext: context.projectContext ?? '',
       };
+    case 'communication':
+      return {
+        userMessage: context.userMessage ?? '',
+        conversationHistory: context.conversationHistory ?? '',
+        projectContext: context.projectContext ?? '',
+      };
     // ...otros casos igual que tu lógica actual
     default:
       throw new Error(`No variable builder definido para el prompt: ${type}`);

@@ -10,6 +10,9 @@ import { PlanningEngine, ExecutionPlan } from './planningEngine';
 import { ToolSelector } from './toolSelector';
 import { WorkflowManager } from './workflowManager';
 import { FeedbackManager } from './feedbackManager';
+import { BaseAPI } from '../models/baseAPI';
+import { ToolRegistry } from '../tools/core/toolRegistry';
+import * as vscode from 'vscode';
 
 export interface OrchestrationResult {
   success: boolean;
@@ -27,6 +30,15 @@ export interface OrchestrationResult {
   };
 }
 
+export interface OrchestratorCreateOptions {
+  eventBus: EventBus;
+  logger: Logger;
+  errorHandler: ErrorHandler;
+  baseAPI: BaseAPI;
+  configManager: ConfigManager;
+  context: vscode.ExtensionContext;
+}
+
 export class OrchestratorService {
   private eventBus: EventBus;
   private orchestrationContext: OrchestrationContext;
@@ -40,6 +52,84 @@ export class OrchestratorService {
   private toolSelector: ToolSelector;
   private workflowManager: WorkflowManager;
   private feedbackManager: FeedbackManager;
+  private disposed: boolean = false;
+
+  /**
+   * Método estático para crear una instancia de OrchestratorService
+   * Compatible con el patrón usado en extensionHandler.ts
+   */
+  public static async create(options: OrchestratorCreateOptions): Promise<OrchestratorService> {
+    const { eventBus, logger, errorHandler, baseAPI, configManager, context } = options;
+    
+    // Crear o obtener instancias de componentes necesarios
+    const orchestrationContext = new OrchestrationContext();
+    const toolRegistry = new ToolRegistry(logger);
+    
+    // Inicializar componentes del orquestador
+    const inputAnalyzer = new InputAnalyzer(
+      orchestrationContext,
+      logger,
+      eventBus,
+      baseAPI
+    );
+
+    const directActionRouter = new DirectActionRouter(
+      logger,
+      errorHandler,
+      eventBus,
+      toolRegistry,
+      orchestrationContext
+    );
+
+    const feedbackManager = new FeedbackManager(
+      logger,
+      errorHandler,
+      eventBus,
+      context
+    );
+
+    const toolSelector = new ToolSelector(
+      orchestrationContext,
+      toolRegistry,
+      logger,
+      baseAPI
+    );
+
+    const workflowManager = new WorkflowManager(
+      logger,
+      errorHandler,
+      toolSelector,
+      toolRegistry,
+      feedbackManager,
+      baseAPI
+    );
+
+    const planningEngine = new PlanningEngine(
+      orchestrationContext,
+      logger,
+      eventBus,
+      baseAPI,
+      toolRegistry,
+      toolSelector,
+      feedbackManager,
+      {} // Aquí irían los modulePlanners si los tienes
+    );
+
+    // Crear y retornar la instancia de OrchestratorService
+    return new OrchestratorService(
+      eventBus,
+      orchestrationContext,
+      configManager,
+      logger,
+      errorHandler,
+      inputAnalyzer,
+      directActionRouter,
+      planningEngine,
+      toolSelector,
+      workflowManager,
+      feedbackManager
+    );
+  }
 
   constructor(
     eventBus: EventBus,
@@ -77,6 +167,10 @@ export class OrchestratorService {
    * @returns Promesa que resuelve al resultado de la orquestación
    */
   public async orchestrateRequest(input: string): Promise<OrchestrationResult> {
+    if (this.disposed) {
+      throw new Error('OrchestratorService has been disposed');
+    }
+
     try {
       console.log(`[OrchestratorService] Iniciando orquestación para entrada: "${input.substring(0, 100)}${input.length > 100 ? '...' : ''}"`);
       this.logger.info('OrchestratorService: Handling input', { input });
@@ -251,5 +345,26 @@ export class OrchestratorService {
 
   private generateExecutionId(): string {
     return `exec-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+  }
+
+  /**
+   * Libera los recursos utilizados por el orquestador
+   * Este método es necesario para compatibilidad con ExtensionHandler.dispose()
+   */
+  public dispose(): void {
+    if (this.disposed) {
+      return;
+    }
+
+    console.log('[OrchestratorService] Disposing resources...');
+    this.logger.info('OrchestratorService: Disposing resources');
+    
+    // Limpiar listeners de eventos
+    // (aquí podrías desregistrar listeners si los hubieras registrado)
+    
+    // Marcar como dispuesto
+    this.disposed = true;
+    
+    console.log('[OrchestratorService] Resources disposed');
   }
 }

@@ -3,7 +3,9 @@ import { UIStateContext } from "../core/context/uiStateContext";
 import { GeminiAPI } from "./providers/gemini";
 import { OllamaAPI } from "./providers/ollama";
 
-
+/**
+ * Tipo de modelo de IA soportado.
+ */
 export type ModelType = "ollama" | "gemini";
 
 // Interfaz para implementaciones específicas de modelos
@@ -114,8 +116,10 @@ export class BaseAPI {
   /**
    * Genera una respuesta utilizando el modelo de IA configurado.
    * Recibe un prompt ya construido y devuelve la respuesta del modelo.
+   * @deprecated Use el sistema de prompts en su lugar (executeModelInteraction)
+   * Este método solo debe ser usado internamente por el sistema de prompts.
    */
-  async generateResponse(prompt: string): Promise<string> {
+  async generateResponseInternal(prompt: string): Promise<string> {
     if (!prompt || typeof prompt !== 'string' || prompt.trim() === '') {
         console.error("[BaseAPI] Intento de generar respuesta con prompt inválido.");
         throw new Error("El prompt no puede estar vacío.");
@@ -138,6 +142,31 @@ export class BaseAPI {
       console.error(`[BaseAPI] Error generando respuesta con ${this.currentModel}:`, error.message);
       // Re-lanzar un error más genérico o específico de BaseAPI si se prefiere
       throw new Error(`Error al generar respuesta con ${this.currentModel}: ${error.message}`);
+    }
+  }
+
+  /**
+   * Método público para generar respuestas. Este método ya no debe ser usado directamente.
+   * En su lugar, use el sistema de prompts a través de executeModelInteraction.
+   * @deprecated Use el sistema de prompts en su lugar
+   */
+  async generateResponse(prompt: string): Promise<string> {
+    console.warn('[BaseAPI] El método generateResponse está deprecado. Use el sistema de prompts en su lugar.');
+    
+    // Importar dinámicamente para evitar dependencias circulares
+    const { executeModelInteraction } = await import('../core/promptSystem/promptSystem');
+    
+    try {
+      // Redirigir al sistema de prompts usando el tipo 'communication'
+      return await executeModelInteraction<string>(
+        'communication',
+        { userMessage: prompt },
+        this
+      );
+    } catch (error) {
+      console.error('[BaseAPI] Error al usar el sistema de prompts:', error);
+      // Fallback al método interno en caso de error
+      return this.generateResponseInternal(prompt);
     }
   }
 

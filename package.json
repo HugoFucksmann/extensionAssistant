@@ -30,6 +30,27 @@
         }
       ]
     },
+    "configuration": {
+      "title": "Extension Assistant",
+      "properties": {
+        "extensionAssistant.modelType": {
+          "type": "string",
+          "enum": ["ollama", "gemini"],
+          "default": "gemini",
+          "description": "Tipo de modelo a utilizar (ollama o gemini)"
+        },
+        "extensionAssistant.persistChat": {
+          "type": "boolean",
+          "default": true,
+          "description": "Habilitar persistencia de chats"
+        },
+        "extensionAssistant.useOrchestration": {
+          "type": "boolean",
+          "default": false,
+          "description": "Habilitar orquestación para procesamiento avanzado"
+        }
+      }
+    },
     "commands": [
       {
         "command": "extensionAssistant.openChat",

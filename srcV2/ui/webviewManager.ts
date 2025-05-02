@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { UIStateContext } from '../core/context/uiStateContext';
 import { ChatService } from '../services/chatService';
 import { WebviewProvider } from './webview/webviewProvider';
+import { ExtensionHandler } from '../core/config/extensionHandler';
 
 /**
  * Clase que centraliza toda la gestión de WebView

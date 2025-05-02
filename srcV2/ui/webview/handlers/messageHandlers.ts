@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { AppCommands, VS_CODE_PREFIX } from '../../../core/config/constants';
 import { UIStateContext } from '../../../core/context/uiStateContext';
 import { ChatService } from '../../../services/chatService';
-import { ExtensionContext } from '../../../core/context/extensionContext';
+import { ExtensionHandler } from '../../../core/config/extensionHandler';
 
 /**
  * Configura los manejadores de mensajes desde el webview
@@ -13,7 +13,7 @@ export function setupMessageHandlers(
   chatService: ChatService
 ): void {
   // Obtener la instancia de ExtensionContext
-  const extensionContext = ExtensionContext.getInstance();
+  const extensionContext = ExtensionHandler.getInstance();
   
   webviewView.webview.onDidReceiveMessage(async (message) => {
     try {
@@ -24,17 +24,14 @@ export function setupMessageHandlers(
         // Comandos nuevos
         [AppCommands.MESSAGE_SEND]: async (data) => {
           console.log('[MessageHandler] Recibido mensaje para procesar:', data.message.substring(0, 50) + '...');
-          uiStateContext.setState('isProcessing', true);
           try {
-            // Usar el flujo de orquestación en lugar del método deprecado
-            console.log('[MessageHandler] Llamando al flujo de orquestación...');
+            // Usar el nuevo MessageProcessor a través de ExtensionContext
+            console.log('[MessageHandler] Delegando al processMessage de ExtensionContext...');
             await extensionContext.processMessage(data.message);
-            console.log('[MessageHandler] Mensaje procesado por el flujo de orquestación');
+            console.log('[MessageHandler] Mensaje procesado correctamente');
           } catch (error) {
             console.error('[MessageHandler] Error al procesar mensaje:', error);
             throw error;
-          } finally {
-            uiStateContext.setState('isProcessing', false);
           }
         },
         [AppCommands.CHAT_NEW]: async () => {
@@ -59,17 +56,14 @@ export function setupMessageHandlers(
         // Nombres antiguos para compatibilidad
         'sendMessage': async (data) => {
           console.log('[MessageHandler] Recibido mensaje (formato antiguo) para procesar:', data.message.substring(0, 50) + '...');
-          uiStateContext.setState('isProcessing', true);
           try {
-            // Usar el flujo de orquestación en lugar del método deprecado
-            console.log('[MessageHandler] Llamando al flujo de orquestación (desde handler antiguo)...');
+            // Usar el nuevo MessageProcessor a través de ExtensionContext
+            console.log('[MessageHandler] Delegando al processMessage de ExtensionContext (desde handler antiguo)...');
             await extensionContext.processMessage(data.message);
-            console.log('[MessageHandler] Mensaje procesado por el flujo de orquestación (desde handler antiguo)');
+            console.log('[MessageHandler] Mensaje procesado correctamente (desde handler antiguo)');
           } catch (error) {
             console.error('[MessageHandler] Error al procesar mensaje (formato antiguo):', error);
             throw error;
-          } finally {
-            uiStateContext.setState('isProcessing', false);
           }
         },
         'newChat': async () => {

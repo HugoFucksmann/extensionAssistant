@@ -1,13 +1,15 @@
 import * as vscode from 'vscode';
 import { UIStateContext } from '../context/uiStateContext';
 import { PromptType } from '../promptSystem/types';
+
 /**
  * Clase que centraliza la gestión de configuración de la extensión
  */
 export class ConfigManager {
+  private static instance: ConfigManager;
   private config: vscode.WorkspaceConfiguration;
 
-  constructor(private readonly uiStateContext: UIStateContext) {
+  private constructor(private readonly uiStateContext: UIStateContext, private readonly vsCodeContext: vscode.ExtensionContext) {
     this.config = vscode.workspace.getConfiguration('extensionAssistant');
 
     // Escuchar cambios en la configuración
@@ -17,6 +19,13 @@ export class ConfigManager {
         this.notifyConfigChanges();
       }
     });
+  }
+
+  public static getInstance(uiStateContext: UIStateContext, vsCodeContext: vscode.ExtensionContext): ConfigManager {
+    if (!ConfigManager.instance) {
+      ConfigManager.instance = new ConfigManager(uiStateContext, vsCodeContext);
+    }
+    return ConfigManager.instance;
   }
 
   /**
@@ -59,6 +68,20 @@ export class ConfigManager {
     this.uiStateContext.setState('modelType', modelType);
   }
 
-  
+  /**
+   * Obtiene un valor genérico de configuración
+   * @param key La clave de configuración
+   * @param defaultValue Valor por defecto si no existe
+   */
+  public get<T>(key: string, defaultValue?: T): T | undefined {
+    return this.config.get<T>(key) ?? defaultValue;
+  }
+
+  /**
+   * Obtiene la configuración de orquestación
+   */
+  public getUseOrchestration(): boolean {
+    return this.get<boolean>('useOrchestration', false) ?? false;
+  }
 
 }
