@@ -1,15 +1,16 @@
 import * as vscode from 'vscode';
-import { ConfigManager } from './configManager';
 import { CommandRegistry } from '../commands/commandRegistry';
 import { BaseAPI } from '../../models/baseAPI';
 import { ChatService } from '../../services/chatService';
 import { SQLiteStorage } from '../storage/db/SQLiteStorage';
 import { WebViewManager } from '../../ui/webviewManager';
-import { EventBus } from '../event/eventBus';
 import { logger } from '../../utils/logger';
 import { ErrorHandler } from '../../utils/errorHandler';
 import { OrchestratorService } from '../../orchestrator/orchestratorService';
-import { UIStateContext } from '../context/uiStateContext';
+import { EventBus } from '../event/eventBus';
+import { ConfigurationManager } from './ConfigurationManager';
+import { MessageProcessor } from '../../services/messageProcessor';
+import { ACTIONS } from './constants';
 
 /**
  * Central class that manages the extension components and their lifecycle
@@ -17,6 +18,7 @@ import { UIStateContext } from '../context/uiStateContext';
 export class ExtensionHandler {
   // Singleton implementation
   private static instance: ExtensionHandler | null = null;
+  private messageProcessor: MessageProcessor | null = null;
 
   public static getInstance(): ExtensionHandler {
     if (!ExtensionHandler.instance) {
@@ -25,20 +27,22 @@ export class ExtensionHandler {
     return ExtensionHandler.instance;
   }
 
-  public static initialize(context: vscode.ExtensionContext): ExtensionHandler {
+  public static async initialize(context: vscode.ExtensionContext): Promise<ExtensionHandler> {
     if (ExtensionHandler.instance) {
-      console.warn("ExtensionHandler.initialize called multiple times.");
+      logger.warn("ExtensionHandler.initialize called multiple times.");
+      return ExtensionHandler.instance;
     }
-    ExtensionHandler.instance = new ExtensionHandler(context);
-    return ExtensionHandler.instance;
+    
+    const handler = new ExtensionHandler(context);
+    await handler.initializeComponents();
+    ExtensionHandler.instance = handler;
+    return handler;
   }
 
   // Core components
-  private readonly vsCodeContext: vscode.ExtensionContext;
-  private readonly uiStateContext: UIStateContext;
-  private readonly configManager: ConfigManager;
+  private readonly context: vscode.ExtensionContext;
+  private readonly configManager: ConfigurationManager;
   private readonly errorHandler: ErrorHandler;
-  private readonly logger: typeof logger;
   private readonly eventBus: EventBus;
 
   // Service components
@@ -47,95 +51,119 @@ export class ExtensionHandler {
   private chatService: ChatService | null = null;
   private commandRegistry: CommandRegistry | null = null;
   private webViewManager: WebViewManager | null = null;
-  private orchestratorService: OrchestratorService | null = null;
+  private orchestratorService: OrchestratorService | undefined;
 
   private constructor(context: vscode.ExtensionContext) {
-    this.vsCodeContext = context;
-    this.uiStateContext = new UIStateContext();
-    this.configManager = ConfigManager.getInstance(this.uiStateContext, context);
-    this.errorHandler = new ErrorHandler();
-    this.logger = logger;
+    this.context = context;
+    this.configManager = ConfigurationManager.getInstance(context);
     this.eventBus = EventBus.getInstance();
+    
+    // Inicializar ErrorHandler con ConfigManager
+    // El ChatService se asignará más tarde en initializeComponents
+    this.errorHandler = new ErrorHandler(this.configManager);
   }
 
   /**
-   * Initializes all extension components in the correct order
+   * Inicializa todos los componentes de la extensión en un orden correcto
    */
-  public async initialize(): Promise<void> {
+ private async initializeComponents(): Promise<void> {
     try {
-      // Initialize storage
-      this.storage = new SQLiteStorage(this.vsCodeContext);
+      logger.info('Inicializando componentes de la extensión...');
       
-      // Initialize API
-      this.baseAPI = new BaseAPI(this.configManager, this.uiStateContext);
+      // 1. Inicializar almacenamiento
+      this.storage = new SQLiteStorage(this.context);
+      
+      // 2. Inicializar API con el gestor de configuración unificado
+      this.baseAPI = new BaseAPI(this.configManager);
       await this.baseAPI.initialize();
       
-      // Initialize chat service
-      this.chatService = new ChatService(this.storage, this.uiStateContext, this.baseAPI);
+      // 3. Inicializar servicio de chat
+      this.chatService = new ChatService(
+        this.storage, 
+        this.configManager,
+        this.baseAPI
+      );
       await this.chatService.initialize();
       
-      // Initialize command registry
+      // 3.1 Actualizar errorHandler con el servicio de chat
+      // Ahora que el chatService está inicializado, lo asignamos al errorHandler
+      if (this.chatService) {
+        // Actualizar el errorHandler con el chatService ahora disponible
+        this.errorHandler.chatService = this.chatService;
+      }
+      
+      // 4. Inicializar y registrar comandos
       this.commandRegistry = new CommandRegistry();
       this.registerCommands();
       
-      // Initialize orchestrator
-      this.orchestratorService = await this.initializeOrchestrator();
+    // 5. Inicializar orquestador SIEMPRE
+this.orchestratorService = await this.initializeOrchestrator();
+console.log(`[ExtensionHandler] Orquestador inicializado: ${!!this.orchestratorService}`);
+if (!this.orchestratorService) {
+  throw new Error('No se pudo inicializar el OrchestratorService. La extensión no puede continuar.');
+}
       
-      // Initialize WebView
+      // 6. Inicializar WebView
       this.webViewManager = new WebViewManager(
-        this.vsCodeContext.extensionUri, 
-        this.uiStateContext, 
-        this.chatService
+        this.context.extensionUri,
+        this.configManager,
+        this.chatService,
+        this.orchestratorService
       );
-      const webviewDisposable = this.webViewManager.register(this.vsCodeContext);
-      this.vsCodeContext.subscriptions.push(webviewDisposable);
+      const webviewDisposable = this.webViewManager.register(this.context);
+      this.context.subscriptions.push(webviewDisposable);
       
-      // Set initial UI state
-      this.uiStateContext.setState('modelType', this.configManager.getModelType());
-      this.uiStateContext.setState('persistChat', this.configManager.getPersistenceEnabled());
+      // 7. Inicializar procesador de mensajes
+      this.messageProcessor = new MessageProcessor(
+        this.configManager,
+        this.baseAPI,
+        this.chatService,
+        this.errorHandler,
+      );
       
-      this.logger.info('Extension initialized successfully');
+      logger.info('Extensión inicializada correctamente');
     } catch (error) {
-      this.logger.error('Failed to initialize extension:', {error});
+      logger.error('Error al inicializar la extensión:', {error});
       throw error;
     }
   }
 
   /**
-   * Initialize the orchestrator and its components
+   * Inicializa el orquestador y sus componentes
    */
-  private async initializeOrchestrator(): Promise<OrchestratorService> {
+  private async initializeOrchestrator(): Promise<OrchestratorService | undefined> {
+   
     try {
+      // Pasar todas las propiedades requeridas por OrchestratorCreateOptions
       return await OrchestratorService.create({
         eventBus: this.eventBus,
-        logger: this.logger,
+        logger: logger,
         errorHandler: this.errorHandler,
         baseAPI: this.baseAPI!,
-        configManager: this.configManager,
-        context: this.vsCodeContext
+        configurationManager: this.configManager, 
+        context: this.context
       });
     } catch (error) {
-      this.logger.error('Failed to initialize orchestrator:', {error});
+      logger.error('Error al inicializar el orquestador:', {error});
       throw error;
     }
   }
 
   /**
-   * Register command handlers
+   * Registra los manejadores de comandos
    */
   private registerCommands(): void {
     if (!this.commandRegistry) return;
     
-    // Register chat commands
-    this.commandRegistry.register('chat:new', async () => {
+    // Registrar comandos de chat
+    this.commandRegistry.register(ACTIONS.NEW_CHAT, async () => {
       if (this.chatService) {
         await this.chatService.createNewChat();
       }
     });
     
-    this.commandRegistry.register('model:change', async (args: { modelType: 'ollama' | 'gemini' }) => {
-      if (this.configManager && this.baseAPI) {
-        await this.configManager.setModelType(args.modelType);
+    this.commandRegistry.register(ACTIONS.SET_MODEL, async (args: { modelType: 'ollama' | 'gemini' }) => {
+      if (this.baseAPI) {
         await this.baseAPI.setModel(args.modelType);
       }
     });
@@ -144,84 +172,45 @@ export class ExtensionHandler {
       vscode.commands.executeCommand('aiChat.chatView.focus');
     });
     
-    // Register commands with VS Code
-    const commandDisposables = this.commandRegistry.registerWithVSCode(this.vsCodeContext);
+    // Registrar comandos con VS Code
+    const commandDisposables = this.commandRegistry.registerWithVSCode(this.context);
     commandDisposables.forEach(disposable => 
-      this.vsCodeContext.subscriptions.push(disposable)
+      this.context.subscriptions.push(disposable)
     );
   }
 
   /**
-   * Process a user message through the orchestrator
+   * Procesa un mensaje de usuario a través del orquestador o directamente
    */
   public async processMessage(message: string): Promise<string> {
-    if (!this.orchestratorService || !this.chatService) {
-      throw new Error('Services not initialized. Extension not ready to process messages.');
+    if (!this.messageProcessor) {
+      throw new Error('Procesador de mensajes no inicializado');
     }
     
-    this.uiStateContext.setState('isProcessing', true);
-    
-    try {
-      // Add user message to chat
-      await this.chatService.addUserMessage(message);
-      
-      // Process with orchestration
-      const result = await this.orchestratorService.orchestrateRequest(message);
-      
-      if (!result.success) {
-        throw new Error(result?.error?.message || 'Orchestration error');
-      }
-      
-      // Extract response
-      let response: string;
-      if (typeof result.finalResult === 'string') {
-        response = result.finalResult;
-      } else if (result.finalResult && typeof result.finalResult.response === 'string') {
-        response = result.finalResult.response;
-      } else {
-        response = 'Operation completed successfully';
-      }
-      
-      // Add response to chat
-      await this.chatService.addAssistantResponse(response);
-      return response;
-    } catch (error: any) {
-      this.logger.error('Error processing message:', error);
-      
-      // Add error response
-      const errorResponse = `Sorry, an error occurred: ${error.message || 'Unknown error'}`;
-      await this.chatService.addAssistantResponse(errorResponse);
-      
-      this.uiStateContext.setState('error', error.message || 'Error processing message');
-      throw error;
-    } finally {
-      this.uiStateContext.setState('isProcessing', false);
-    }
+    return await this.messageProcessor.process(message);
   }
 
-  // Getters for core components and services
-  public getVSCodeContext(): vscode.ExtensionContext { return this.vsCodeContext; }
-  public getUIStateContext(): UIStateContext { return this.uiStateContext; }
-  public getConfigManager(): ConfigManager { return this.configManager; }
+  // Getters para componentes y servicios principales
+  public getContext(): vscode.ExtensionContext { return this.context; }
+  public getConfigManager(): ConfigurationManager { return this.configManager; }
   public getErrorHandler(): ErrorHandler { return this.errorHandler; }
-  public getLogger(): typeof logger { return this.logger; }
   public getEventBus(): EventBus { return this.eventBus; }
   
-  // Getters for service components (may be null if not initialized)
+  // Getters para componentes de servicio (pueden ser null si no están inicializados)
   public getStorage(): SQLiteStorage | null { return this.storage; }
   public getBaseAPI(): BaseAPI | null { return this.baseAPI; }
   public getChatService(): ChatService | null { return this.chatService; }
   public getCommandRegistry(): CommandRegistry | null { return this.commandRegistry; }
   public getWebViewManager(): WebViewManager | null { return this.webViewManager; }
-  public getOrchestratorService(): OrchestratorService | null { return this.orchestratorService; }
+  public getOrchestratorService(): OrchestratorService | undefined { return this.orchestratorService; }
 
   /**
-   * Dispose of all resources
+   * Libera todos los recursos
    */
   public dispose(): void {
-    this.logger.info('Disposing extension resources...');
+    logger.info('Liberando recursos de la extensión...');
     
-    // Dispose services in reverse dependency order
+    // Disponer servicios en orden inverso de dependencia
     if (this.webViewManager) {
       this.webViewManager.dispose();
       this.webViewManager = null;
@@ -229,7 +218,7 @@ export class ExtensionHandler {
     
     if (this.orchestratorService) {
       this.orchestratorService.dispose?.();
-      this.orchestratorService = null;
+      this.orchestratorService = undefined;
     }
     
     if (this.chatService) {
@@ -238,7 +227,7 @@ export class ExtensionHandler {
     }
     
     if (this.baseAPI) {
-      this.baseAPI.abortRequest();
+      this.baseAPI.dispose();
       this.baseAPI = null;
     }
     
@@ -247,9 +236,9 @@ export class ExtensionHandler {
       this.storage = null;
     }
     
-    // Clear singleton instance
+    // Limpiar instancia singleton
     ExtensionHandler.instance = null;
     
-    this.logger.info('Extension disposed');
+    logger.info('Extensión liberada');
   }
 }

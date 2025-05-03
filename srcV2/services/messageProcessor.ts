@@ -1,21 +1,29 @@
-import { BaseAPI } from '../models/baseAPI';
+
 import { ChatService } from './chatService';
-import { UIStateContext } from '../core/context/uiStateContext';
 import { OrchestratorService } from '../orchestrator/orchestratorService';
-import { ConfigManager } from '../core/config/configManager';
+import { ConfigurationManager } from '../core/config/ConfigurationManager';
+import { ErrorHandler } from '../utils/errorHandler';
+import { EventBus } from '../core/event/eventBus';
+import { ACTIONS, MESSAGE_TYPES } from '../core/config/constants';
+import { BaseAPI } from '../models/baseAPI';
+
 
 /**
  * Clase especializada para procesar mensajes del usuario
  * Separa la lógica de procesamiento de mensajes del ExtensionContext
  */
 export class MessageProcessor {
+  private eventBus: EventBus;
+  
   constructor(
-    private uiStateContext: UIStateContext,
+    private configManager: ConfigurationManager,
     private baseAPI: BaseAPI,
     private chatService: ChatService,
-    private configManager: ConfigManager,
+    private errorHandler: ErrorHandler,
     private orchestratorService?: OrchestratorService
-  ) {}
+  ) {
+    this.eventBus = EventBus.getInstance();
+  }
 
   /**
    * Procesa un mensaje del usuario y genera una respuesta
@@ -27,7 +35,8 @@ export class MessageProcessor {
     console.log(`[MessageProcessor] Procesando mensaje: "${message.substring(0, 50)}${message.length > 50 ? '...' : ''}"`);
     
     // Actualizar estado de UI para indicar procesamiento
-    this.uiStateContext.setState('isProcessing', true);
+    this.configManager.setProcessingState(true);
+    this.eventBus.emit(ACTIONS.MESSAGE_PROCESSING, { processing: true });
     
     try {
       // Añadir mensaje del usuario al chat
@@ -45,23 +54,20 @@ export class MessageProcessor {
       // Añadir respuesta al chat
       await this.chatService.addAssistantResponse(response);
       
+      // Emitir evento de respuesta recibida
+      this.eventBus.emit(ACTIONS.MESSAGE_RECEIVE, { 
+        content: response, 
+        success: true 
+      });
+      
       console.log('========== FIN PROCESAMIENTO DE MENSAJE (EXITOSO) ==========');
       return response;
     } catch (error: any) {
-      console.error('[ERROR] Error general al procesar mensaje:', error);
-      
-      // Añadir mensaje de error como respuesta del asistente
-      const errorResponse = `Lo siento, ocurrió un error: ${error.message || 'Error desconocido'}`;
-      await this.chatService.addAssistantResponse(errorResponse);
-      
-      // Actualizar estado de UI con el error
-      this.uiStateContext.setState('error', error.message || 'Error al procesar mensaje');
-      
-      console.log('========== FIN PROCESAMIENTO DE MENSAJE (CON ERROR) ==========');
-      throw error;
+      return await this.errorHandler.handleAndRespondToError(error, 'MessageProcessor');
     } finally {
       // Asegurar que siempre se actualice el estado de procesamiento
-      this.uiStateContext.setState('isProcessing', false);
+      this.configManager.setProcessingState(false);
+      this.eventBus.emit(ACTIONS.MESSAGE_PROCESSING, { processing: false });
     }
   }
   
@@ -69,7 +75,9 @@ export class MessageProcessor {
    * Determina si se debe usar la orquestación para procesar el mensaje
    */
   private shouldUseOrchestration(): boolean {
-    return this.configManager.getUseOrchestration() && !!this.orchestratorService;
+    return this.configManager.getUseOrchestration() && 
+           !!this.orchestratorService &&
+           (this.orchestratorService as any).isReady?.() !== false;
   }
   
   /**
@@ -96,8 +104,6 @@ export class MessageProcessor {
         
         return response;
       } else {
-        console.error('[ERROR] La orquestación falló');
-        console.error('[DEBUG] Detalles del error:', result?.error);
         throw new Error(result?.error?.message || 'Error en la orquestación');
       }
     } catch (orchError: any) {

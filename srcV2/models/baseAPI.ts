@@ -1,12 +1,7 @@
-import { ConfigManager } from "../core/config/configManager";
-import { UIStateContext } from "../core/context/uiStateContext";
+// BaseAPI.ts (Refactorizado)
+import { ConfigurationManager, ModelType } from "../core/config/ConfigurationManager";
 import { GeminiAPI } from "./providers/gemini";
 import { OllamaAPI } from "./providers/ollama";
-
-/**
- * Tipo de modelo de IA soportado.
- */
-export type ModelType = "ollama" | "gemini";
 
 // Interfaz para implementaciones específicas de modelos
 export interface ModelAPI {
@@ -20,41 +15,29 @@ export interface ModelAPI {
  */
 export class BaseAPI {
   private modelInstance: ModelAPI | null = null;
-  private currentModel: ModelType;
-  private configManager: ConfigManager;
-  private uiStateContext: UIStateContext;
-  private unsubscribeModelType: () => void;
+  private configurationManager: ConfigurationManager;
+  private modelSubscription: () => void;
 
   /**
    * Constructor de la clase BaseAPI.
-   * @param configManager Instancia de ConfigManager para la gestión de configuración.
-   * @param uiStateContext Instancia de UIStateContext para la gestión de cambios de estado.
-   * @param initialModelType Tipo de modelo inicial. Por defecto, "gemini".
+   * @param ConfigurationManager Instancia de ConfigurationManager para gestión de configuración.
    */
-  constructor(
-    configManager: ConfigManager,
-    uiStateContext: UIStateContext,
-    initialModelType: ModelType = "gemini"
-  ) {
-    this.configManager = configManager;
-    this.uiStateContext = uiStateContext;
-    this.currentModel = initialModelType;
-
-    // Escuchar cambios de modelo a través de UIStateContext
-    this.unsubscribeModelType = this.uiStateContext.subscribe('modelType', (newModel: ModelType) => {
-      if (newModel && newModel !== this.currentModel) {
-        this.setModel(newModel);
-      }
+  constructor(ConfigurationManager: ConfigurationManager) {
+    this.configurationManager = ConfigurationManager;
+    
+    // Suscribirse a cambios de modelo
+    this.modelSubscription = this.configurationManager.onChange('modelType', () => {
+      this.modelInstance = null; // Forzar recreación del modelo en el próximo uso
     });
-    console.log(`[BaseAPI] Instanciado con modelo inicial: ${this.currentModel}`);
+    
+    console.log(`[BaseAPI] Inicializado con modelo: ${this.configurationManager.getModelType()}`);
   }
 
   /**
    * Inicializa la API con el modelo preferido.
    */
   public async initialize(): Promise<void> {
-    this.currentModel = this.configManager.getModelType();
-    this.modelInstance = this.createModelInstance(this.currentModel);
+    this.modelInstance = null; // Forzar creación a demanda
   }
 
   /**
@@ -63,25 +46,29 @@ export class BaseAPI {
   async setModel(modelType: ModelType): Promise<void> {
     const validModels: ModelType[] = ["ollama", "gemini"];
     if (!modelType || !validModels.includes(modelType)) {
-       console.error(`[BaseAPI] Intento de cambiar a modelo inválido: ${modelType}`);
-       throw new Error(`Modelo no soportado o inválido: ${modelType}`);
+      console.error(`[BaseAPI] Intento de cambiar a modelo inválido: ${modelType}`);
+      throw new Error(`Modelo no soportado o inválido: ${modelType}`);
     }
 
-    if (this.currentModel === modelType && this.modelInstance) {
+    const currentModel = this.configurationManager.getModelType();
+    if (currentModel === modelType) {
       console.log(`[BaseAPI] Modelo ya configurado como ${modelType}.`);
       return; // No hay cambio necesario
     }
 
-    console.log(`[BaseAPI] Cambiando modelo: ${this.currentModel} -> ${modelType}`);
-    this.currentModel = modelType;
-    this.modelInstance = null; // Forza la recreación de la instancia
-
+    console.log(`[BaseAPI] Cambiando modelo: ${currentModel} -> ${modelType}`);
+    
     try {
-      // Notifica después de que el cambio interno se haya completado
-      console.log(`[BaseAPI] Modelo cambiado a ${this.currentModel}.`);
+      // Actualizar la configuración
+      await this.configurationManager.setModelType(modelType);
+      
+      // Reiniciar instancia del modelo
+      this.modelInstance = null;
+      
+      console.log(`[BaseAPI] Modelo cambiado a ${modelType}.`);
     } catch (error) {
       console.error(`[BaseAPI] Error durante el cambio de modelo a ${modelType}:`, error);
-      throw error; // Re-lanza para informar al llamador
+      throw error;
     }
   }
 
@@ -89,75 +76,71 @@ export class BaseAPI {
    * Obtiene el tipo de modelo actualmente activo.
    */
   getCurrentModel(): ModelType {
-    return this.currentModel;
+    return this.configurationManager.getModelType();
   }
 
   /**
-   * Crea una instancia del modelo según el tipo especificado.
-   * @param modelType Tipo de modelo a instanciar.
-   * @returns Instancia del modelo.
+   * Obtiene o crea una instancia del modelo según la configuración actual.
    */
-  private createModelInstance(modelType: ModelType): ModelAPI {
-    if (modelType === "ollama") {
-      return new OllamaAPI();
-    } else if (modelType === "gemini") {
-      // ¡ADVERTENCIA! Claves hardcodeadas son inseguras. Usar variables de entorno.
-      const apiKey = process.env.GEMINI_API_KEY || "AIzaSyBXGZbSj099c4bUOpLxbXKJgysGKKF3sR0";
-      if (!process.env.GEMINI_API_KEY) {
-          console.warn("[BaseAPI] Clave API de Gemini no encontrada en process.env.GEMINI_API_KEY. Usando valor por defecto/hardcodeado.");
+  private getModelInstance(): ModelAPI {
+    if (!this.modelInstance) {
+      const modelType = this.configurationManager.getModelType();
+      
+      if (modelType === "ollama") {
+        this.modelInstance = new OllamaAPI();
+      } else if (modelType === "gemini") {
+        // Obtener la clave API de manera segura
+        const apiKey = process.env.GEMINI_API_KEY || "AIzaSyBXGZbSj099c4bUOpLxbXKJgysGKKF3sR0";
+        if (!process.env.GEMINI_API_KEY) {
+          console.warn("[BaseAPI] Clave API de Gemini no encontrada. Usando valor por defecto.");
+        }
+        this.modelInstance = new GeminiAPI(apiKey);
+      } else {
+        throw new Error(`Modelo no soportado: ${modelType}`);
       }
-      return new GeminiAPI(apiKey);
-    } else {
-      // Esta rama no debería ser alcanzable si setModel valida correctamente
-      throw new Error(`Modelo no soportado encontrado internamente: ${modelType}`);
     }
+    
+    return this.modelInstance;
   }
 
   /**
    * Genera una respuesta utilizando el modelo de IA configurado.
-   * Recibe un prompt ya construido y devuelve la respuesta del modelo.
-   * @deprecated Use el sistema de prompts en su lugar (executeModelInteraction)
-   * Este método solo debe ser usado internamente por el sistema de prompts.
+   * @deprecated Use el sistema de prompts en su lugar
    */
   async generateResponseInternal(prompt: string): Promise<string> {
     if (!prompt || typeof prompt !== 'string' || prompt.trim() === '') {
-        console.error("[BaseAPI] Intento de generar respuesta con prompt inválido.");
-        throw new Error("El prompt no puede estar vacío.");
+      console.error("[BaseAPI] Intento de generar respuesta con prompt inválido.");
+      throw new Error("El prompt no puede estar vacío.");
     }
 
     try {
-      // Log detallado del prompt
-      console.log(`[BaseAPI] Generando respuesta con ${this.currentModel} (Prompt len: ${prompt.length})`);
-      console.log(`[BaseAPI] PROMPT ENVIADO:\n${prompt.substring(0, 500)}${prompt.length > 500 ? '...' : ''}`);
+      const modelType = this.configurationManager.getModelType();
+      console.log(`[BaseAPI] Generando respuesta con ${modelType} (Prompt len: ${prompt.length})`);
+      console.log(`[BaseAPI] PROMPT:\n${prompt.substring(0, 500)}${prompt.length > 500 ? '...' : ''}`);
       
-      const modelInstance = this.createModelInstance(this.currentModel);
-      const response = await modelInstance.generateResponse(prompt);
+      const response = await this.getModelInstance().generateResponse(prompt);
       
-      // Log detallado de la respuesta
-      console.log(`[BaseAPI] Respuesta recibida de ${this.currentModel} (Resp len: ${response.length})`);
-      console.log(`[BaseAPI] RESPUESTA RECIBIDA:\n${response.substring(0, 500)}${response.length > 500 ? '...' : ''}`);
+      console.log(`[BaseAPI] Respuesta recibida (len: ${response.length})`);
+      console.log(`[BaseAPI] RESPUESTA:\n${response.substring(0, 500)}${response.length > 500 ? '...' : ''}`);
       
       return response;
     } catch (error: any) {
-      console.error(`[BaseAPI] Error generando respuesta con ${this.currentModel}:`, error.message);
-      // Re-lanzar un error más genérico o específico de BaseAPI si se prefiere
-      throw new Error(`Error al generar respuesta con ${this.currentModel}: ${error.message}`);
+      console.error(`[BaseAPI] Error generando respuesta:`, error.message);
+      throw new Error(`Error al generar respuesta: ${error.message}`);
     }
   }
 
   /**
-   * Método público para generar respuestas. Este método ya no debe ser usado directamente.
-   * En su lugar, use el sistema de prompts a través de executeModelInteraction.
+   * Método público para generar respuestas.
    * @deprecated Use el sistema de prompts en su lugar
    */
   async generateResponse(prompt: string): Promise<string> {
-    console.warn('[BaseAPI] El método generateResponse está deprecado. Use el sistema de prompts en su lugar.');
-    
-    // Importar dinámicamente para evitar dependencias circulares
-    const { executeModelInteraction } = await import('../core/promptSystem/promptSystem');
+    console.warn('[BaseAPI] El método generateResponse está deprecado. Use el sistema de prompts.');
     
     try {
-      // Redirigir al sistema de prompts usando el tipo 'communication'
+      // Importar dinámicamente para evitar dependencias circulares
+      const { executeModelInteraction } = await import('../core/promptSystem/promptSystem');
+      
       return await executeModelInteraction<string>(
         'communication',
         { userMessage: prompt },
@@ -171,14 +154,30 @@ export class BaseAPI {
   }
 
   /**
+   * Método para enviar un mensaje (interfaz pública)
+   */
+  async sendMessage(message: string): Promise<string> {
+    return this.generateResponse(message);
+  }
+
+  /**
    * Aborta cualquier solicitud de generación en curso.
    */
   abortRequest(): void {
     if (this.modelInstance) {
-      console.log(`[BaseAPI] Solicitando abortar petición para ${this.currentModel}`);
+      console.log(`[BaseAPI] Abortando petición para ${this.configurationManager.getModelType()}`);
       this.modelInstance.abortRequest();
     } else {
-       console.log(`[BaseAPI] No hay instancia de modelo activa para abortar.`);
+      console.log(`[BaseAPI] No hay instancia de modelo activa para abortar.`);
     }
+  }
+
+  /**
+   * Libera recursos
+   */
+  dispose(): void {
+    this.abortRequest();
+    this.modelSubscription();
+    this.modelInstance = null;
   }
 }

@@ -1,7 +1,8 @@
-import { ConfigManager } from '../../core/config/configManager';
+
 import { Logger } from '../../utils/logger';
 import { BaseAPI } from '../../models/baseAPI';
 import { runPrompt } from '../../core/promptSystem/promptSystem';
+import { ConfigurationManager } from '../../core/config/ConfigurationManager';
 
 export interface ExaminationPlan {
   objective: string;
@@ -16,7 +17,7 @@ export interface ExaminationPlan {
 
 export class ExaminationPlanner {
   constructor(
-    private configManager: ConfigManager,
+    private configurationManager: ConfigurationManager,
     private logger: Logger,
     private modelApi: BaseAPI
   ) {

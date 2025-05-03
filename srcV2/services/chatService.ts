@@ -1,4 +1,4 @@
-import { UIStateContext } from '../core/context/uiStateContext';
+import { ConfigurationManager } from '../core/config/ConfigurationManager';
 import { BaseAPI } from '../models/baseAPI';
 import { SQLiteStorage } from '../core/storage/db/SQLiteStorage';
 import { ChatMemory } from '../core/storage/memory/chatMemory';
@@ -35,7 +35,7 @@ export class ChatService {
   
   constructor(
     private storage: SQLiteStorage,
-    private uiStateContext: UIStateContext,
+    private configManager: ConfigurationManager,
     private baseAPI: BaseAPI
   ) {
     this.chatMemory = new ChatMemory(storage);
@@ -56,7 +56,7 @@ export class ChatService {
       }
     } catch (error) {
       console.error('Error al inicializar el servicio de chat:', error);
-      this.uiStateContext.setState('error', 'Error al inicializar el chat');
+      this.configManager.setError('Error al inicializar el chat');
     }
   }
   
@@ -85,17 +85,9 @@ export class ChatService {
       // Actualizar la lista de chats
       await this.chatMemory.updateChatList(newChat);
       
-      // Actualizar estado de UI
-      this.uiStateContext.setState('currentChatId', chatId);
-      this.uiStateContext.setState('messages', []);
-      
-      // Actualizar la lista de chats en la UI
-      await this.getChatList();
-      
       return chatId;
     } catch (error) {
       console.error('Error al crear un nuevo chat:', error);
-      this.uiStateContext.setState('error', 'Error al crear un nuevo chat');
       throw error;
     }
   }
@@ -111,30 +103,20 @@ export class ChatService {
       
       if (!chat) {
         console.warn(`Chat ${chatId} no encontrado`);
-        this.uiStateContext.setState('error', `Chat no encontrado`);
         return null;
       }
       
       this.currentChatId = chatId;
       
-      // Actualizar estado de UI
-      this.uiStateContext.setState('currentChatId', chatId);
-      
       if (loadMessages) {
         this.messages = chat.messages || [];
-        this.uiStateContext.setState('messages', this.messages);
       } else {
         // Si no cargamos los mensajes, solo actualizamos el ID del chat
         // Los mensajes se cargarán bajo demanda cuando se necesiten
         this.messages = [];
-        this.uiStateContext.setState('messages', []);
         
         // Indicar que hay mensajes por cargar
         if (chat.messageCount > 0) {
-          this.uiStateContext.setState('messagesStatus', {
-            loaded: false,
-            count: chat.messageCount
-          });
         }
       }
       
@@ -144,7 +126,6 @@ export class ChatService {
       return chat;
     } catch (error) {
       console.error('Error al cargar el chat:', error);
-      this.uiStateContext.setState('error', 'Error al cargar el chat');
       return null;
     }
   }
@@ -168,17 +149,9 @@ export class ChatService {
       // Cargar los mensajes
       this.messages = await this.chatMemory.loadChatMessages(chatId);
       
-      // Actualizar estado de UI
-      this.uiStateContext.setState('messages', this.messages);
-      this.uiStateContext.setState('messagesStatus', {
-        loaded: true,
-        count: this.messages.length
-      });
-      
       return this.messages;
     } catch (error) {
       console.error('Error al cargar los mensajes del chat:', error);
-      this.uiStateContext.setState('error', 'Error al cargar los mensajes');
       return [];
     }
   }
@@ -215,15 +188,9 @@ export class ChatService {
       this.messages.push(userMessage);
       console.log(`[ChatService] Mensaje del usuario añadido. Total mensajes: ${this.messages.length}`);
       
-      // Actualizar estado de UI
-      console.log(`[ChatService] Actualizando estado de UI con mensajes...`);
-      this.uiStateContext.setState('messages', [...this.messages]);
-      this.uiStateContext.setState('isProcessing', true);
-      
       return messageId;
     } catch (error: any) {
       console.error('Error al añadir mensaje del usuario:', error);
-      this.uiStateContext.setState('error', error.message || 'Error al añadir mensaje del usuario');
       throw error;
     }
   }
@@ -257,11 +224,6 @@ export class ChatService {
       };
       this.messages.push(assistantMessage);
       console.log(`[ChatService] Respuesta del asistente añadida. Total mensajes: ${this.messages.length}`);
-      
-      // Actualizar estado de UI
-      console.log(`[ChatService] Actualizando estado de UI con respuesta...`);
-      this.uiStateContext.setState('messages', [...this.messages]);
-      this.uiStateContext.setState('isProcessing', false);
       
       // Guardar el chat actualizado
       if (this.currentChatId && this.messages.length > 0) {
@@ -297,23 +259,6 @@ export class ChatService {
       return responseId;
     } catch (error: any) {
       console.error('Error al añadir respuesta del asistente:', error);
-      this.uiStateContext.setState('error', error.message || 'Error al añadir respuesta del asistente');
-      throw error;
-    }
-  }
-  
-  /**
-   * @deprecated Use addUserMessage y addAssistantResponse en su lugar
-   * Método mantenido por compatibilidad
-   */
-  async processUserMessage(message: string): Promise<string> {
-    console.warn('[ChatService] processUserMessage está deprecado. Use el flujo de orquestación en su lugar.');
-    try {
-      await this.addUserMessage(message);
-      // Este método ya no procesa la respuesta del modelo, devuelve un mensaje de advertencia
-      return "Este método está deprecado. La respuesta debe ser generada por el flujo de orquestación.";
-    } catch (error: any) {
-      console.error('Error en método deprecado processUserMessage:', error);
       throw error;
     }
   }
@@ -325,13 +270,9 @@ export class ChatService {
     try {
       const chatList = await this.chatMemory.getChatList();
       
-      // Actualizar estado de UI
-      this.uiStateContext.setState('chatList', chatList);
-      
       return chatList;
     } catch (error) {
       console.error('Error al obtener la lista de chats:', error);
-      this.uiStateContext.setState('error', 'Error al obtener la lista de chats');
       return [];
     }
   }

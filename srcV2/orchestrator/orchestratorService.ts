@@ -1,6 +1,6 @@
 import { EventBus } from '../core/event/eventBus';
 import { OrchestrationContext } from '../core/context/orchestrationContext';
-import { ConfigManager } from '../core/config/configManager';
+import { ConfigurationManager } from '../core/config/ConfigurationManager';
 import { Logger } from '../utils/logger';
 import { ErrorHandler } from '../utils/errorHandler';
 import { DirectActionRouter } from './directActionRouter';
@@ -35,14 +35,14 @@ export interface OrchestratorCreateOptions {
   logger: Logger;
   errorHandler: ErrorHandler;
   baseAPI: BaseAPI;
-  configManager: ConfigManager;
+  configurationManager: ConfigurationManager;
   context: vscode.ExtensionContext;
 }
 
 export class OrchestratorService {
   private eventBus: EventBus;
   private orchestrationContext: OrchestrationContext;
-  private configManager: ConfigManager;
+  private configurationManager: ConfigurationManager;
   private logger: Logger;
   private errorHandler: ErrorHandler;
   private inputAnalyzer: InputAnalyzer;
@@ -59,7 +59,7 @@ export class OrchestratorService {
    * Compatible con el patrón usado en extensionHandler.ts
    */
   public static async create(options: OrchestratorCreateOptions): Promise<OrchestratorService> {
-    const { eventBus, logger, errorHandler, baseAPI, configManager, context } = options;
+    const { eventBus, logger, errorHandler, baseAPI, configurationManager, context } = options;
     
     // Crear o obtener instancias de componentes necesarios
     const orchestrationContext = new OrchestrationContext();
@@ -119,7 +119,7 @@ export class OrchestratorService {
     return new OrchestratorService(
       eventBus,
       orchestrationContext,
-      configManager,
+      configurationManager,
       logger,
       errorHandler,
       inputAnalyzer,
@@ -134,7 +134,7 @@ export class OrchestratorService {
   constructor(
     eventBus: EventBus,
     orchestrationContext: OrchestrationContext,
-    configManager: ConfigManager,
+    configurationManager: ConfigurationManager,
     logger: Logger,
     errorHandler: ErrorHandler,
     inputAnalyzer: InputAnalyzer,
@@ -147,7 +147,7 @@ export class OrchestratorService {
   ) {
     this.eventBus = eventBus;
     this.orchestrationContext = orchestrationContext;
-    this.configManager = configManager;
+    this.configurationManager = configurationManager;
     this.logger = logger;
     this.errorHandler = errorHandler;
     this.inputAnalyzer = inputAnalyzer;

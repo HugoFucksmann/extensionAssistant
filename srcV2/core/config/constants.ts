@@ -1,32 +1,25 @@
-export const AppCommands = {
-    // Comandos de chat
-    CHAT_NEW: 'chat:new',
-    CHAT_LOAD: 'chat:load',
-    CHAT_LOADED: 'chat:loaded',
-    CHAT_LIST_LOAD: 'chat:list:load',
-    CHAT_LIST_LOADED: 'chat:list:loaded',
-    CHAT_OPEN: 'chat:open',
-    
-    // Comandos de mensaje
-    MESSAGE_SEND: 'message:send',
-    MESSAGE_RECEIVE: 'message:receive',
-    MESSAGE_PROCESSING: 'message:processing',
-    MESSAGE_TEST: 'message:test',
-    
-    // Comandos de modelo
-    MODEL_CHANGE: 'model:change',
-    MODEL_CHANGED: 'model:changed',
-    
-    // Comandos de memoria
-    MEMORY_STORE: 'memory:store',
-    MEMORY_GET: 'memory:get',
-    
-    // Comandos de proyecto
-    PROJECT_FILES_GET: 'project:files:get',
-    
-    // Otros
-    ERROR: 'error',
-    CONFIG_CHANGED: 'config:changed'
+export const ACTIONS = {
+  SEND_MESSAGE: 'message:send',
+  SET_MODEL: 'model:change',
+  LOAD_CHAT: 'chat:load',
+  LOAD_HISTORY: 'chat:list:load',
+  NEW_CHAT: 'chat:new',
+  MESSAGE_PROCESSING: 'message:processing',
+  MESSAGE_RECEIVE: 'message:receive'
+};
+
+export const MESSAGE_TYPES = {
+  ERROR: 'error',
+  PROCESSING: 'processing',
+  MODEL_CHANGED: 'model:changed',
+  CHAT_LOADED: 'chat:loaded',
+  HISTORY_LOADED: 'chat:list:loaded',
+  CHAT_CREATED: 'chat:created',
+  MODEL_INFO: 'model:info',
+  ORCHESTRATION_RESULT: 'orchestration-result',
+  PROGRESS_UPDATE: 'progress-update',
+  ORCHESTRATION_MODE: 'orchestration-mode',
+  MESSAGE: 'message' // Para mensajes regulares de chat
 };
 
 // Prefijo para comandos de VS Code

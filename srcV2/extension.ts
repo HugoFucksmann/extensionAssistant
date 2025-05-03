@@ -1,45 +1,40 @@
+// extension.ts
 import * as vscode from 'vscode';
-import { ExtensionHandler } from './core/config/extensionHandler';
 import { logger } from './utils/logger';
-import { ErrorHandler } from './utils/errorHandler';
-
-// Global error handler instance for error reporting
-export const errorHandler = new ErrorHandler();
+import { ExtensionHandler } from './core/config/extensionHandler';
 
 export async function activate(context: vscode.ExtensionContext) {
+  logger.info('Activando extensión...');
+  
   try {
-    logger.info('Activating AI Assistant extension...');
+    // Inicializar el manejador de la extensión
+    const extensionHandler = await ExtensionHandler.initialize(context);
     
-    // Initialize the extension handler (main component container)
-    const extensionHandler = ExtensionHandler.initialize(context);
-    await extensionHandler.initialize();
-    
-    // Register cleanup on deactivation
-    context.subscriptions.push({
-      dispose: () => deactivateExtension()
+    // Registrar comando para mostrar la vista principal
+    const disposable = vscode.commands.registerCommand('extensionAssistant.start', () => {
+      vscode.window.showInformationMessage('¡Asistente de extensión iniciado!');
+      vscode.commands.executeCommand('aiChat.chatView.focus');
     });
     
-    logger.info('AI Assistant extension activated successfully');
+    context.subscriptions.push(disposable);
+    
+    logger.info('Extensión activada correctamente');
   } catch (error) {
-    logger.error('Failed to activate extension:', {error});
-    deactivateExtension();
-    vscode.window.showErrorMessage(
-      `Extension activation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-    );
-  }
-}
-
-function deactivateExtension() {
-  try {
-    const extensionHandler = ExtensionHandler.getInstance();
-    extensionHandler.dispose();
-    logger.info('AI Assistant extension deactivated');
-  } catch (error) {
-    // May fail if getInstance is called before initialization or after disposal
-    logger.info('AI Assistant extension deactivated (no handler to dispose)');
+    logger.error('Error al activar la extensión:', {error});
+    vscode.window.showErrorMessage(`Error al iniciar el asistente: ${error}`);
   }
 }
 
 export function deactivate() {
-  deactivateExtension();
+  logger.info('Desactivando extensión...');
+  
+  try {
+    // Obtener y liberar recursos del manejador de la extensión
+    const extensionHandler = ExtensionHandler.getInstance();
+    extensionHandler.dispose();
+    
+    logger.info('Extensión desactivada correctamente');
+  } catch (error) {
+    logger.error('Error al desactivar la extensión:', {error});
+  }
 }
