@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import { ConfigurationManager } from '../../core/config/ConfigurationManager';
-import { ChatService } from '../../services/chatService';
 import { getHtmlContent } from './templates/htmlTemplate';
 import { OrchestratorService } from '../../orchestrator/orchestratorService';
 import { ACTIONS, MESSAGE_TYPES } from '../../core/config/constants';
@@ -18,8 +17,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
 
 	constructor(
 		private readonly extensionUri: vscode.Uri,
-		private readonly chatService: ChatService,
-		private readonly orchestratorService: OrchestratorService // Obligatorio
+		private readonly orchestratorService: OrchestratorService
 	) {
 		this.configManager = ConfigurationManager.getInstance();
 		
@@ -127,46 +125,60 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
 	 * Simplificado para usar exclusivamente el flujo de orquestación
 	 */
 	private async handleSendMessage(message: string): Promise<void> {
-		if (!message?.trim()) return;
-		
-		// Notificar al frontend que estamos procesando
-		this.sendMessageToWebview({
-			type: MESSAGE_TYPES.PROCESSING,
-			status: 'start'
-		});
-		
 		try {
-			// Usar el orquestador de manera directa
-			const result = await this.orchestratorService.orchestrateRequest(message);
-			
-			// Extraer la respuesta del resultado de orquestación
-			const response = this.extractResponseFromOrchestrationResult(result);
-			
-			// Añadir el mensaje del usuario a la UI
+			// Mostrar el mensaje del usuario en la UI inmediatamente
 			this.sendMessageToWebview({
-				type: MESSAGE_TYPES.MESSAGE,
-				role: 'user',
-				content: message
+				type: MESSAGE_TYPES.USER_MESSAGE,
+				message: {
+					id: `user_${Date.now()}`,
+					text: message,
+					role: 'user',
+					timestamp: new Date().toISOString()
+				}
 			});
 			
-			// Enviar respuesta a la UI
-			this.sendMessageToWebview({
-				type: MESSAGE_TYPES.MESSAGE,
-				role: 'assistant',
-				content: response
-			});
-		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : 'Error al procesar el mensaje';
-			console.error(`[WebviewProvider] Error en orquestación:`, error);
-			this.sendMessageToWebview({
-				type: MESSAGE_TYPES.ERROR,
-				error: errorMessage
-			});
-		} finally {
-			// Notificar al frontend que terminamos de procesar
+			// Indicar que estamos procesando
 			this.sendMessageToWebview({
 				type: MESSAGE_TYPES.PROCESSING,
-				status: 'stop'
+				processing: true
+			});
+			
+			console.log(`[WebviewProvider] Usando orquestador para procesar mensaje`);
+			const result = await this.orchestratorService.orchestrateRequest(message);
+			
+			if (result.success) {
+				// Extraer la respuesta del resultado de la orquestación
+				const response = this.extractResponseFromOrchestrationResult(result);
+				
+				// Mostrar la respuesta en la UI
+				this.sendMessageToWebview({
+					type: MESSAGE_TYPES.ASSISTANT_MESSAGE,
+					message: {
+						id: `assistant_${Date.now()}`,
+						text: response,
+						role: 'assistant',
+						timestamp: new Date().toISOString(),
+						modelType: this.configManager.getModelType()
+					}
+				});
+			} else {
+				// Mostrar error
+				this.sendMessageToWebview({
+					type: MESSAGE_TYPES.ERROR,
+					error: result.error?.message || 'Error desconocido en la orquestación'
+				});
+			}
+		} catch (error) {
+			console.error(`[WebviewProvider] Error al procesar mensaje:`, error);
+			this.sendMessageToWebview({
+				type: MESSAGE_TYPES.ERROR,
+				error: error instanceof Error ? error.message : 'Error desconocido'
+			});
+		} finally {
+			// Indicar que terminamos de procesar
+			this.sendMessageToWebview({
+				type: MESSAGE_TYPES.PROCESSING,
+				processing: false
 			});
 		}
 	}
@@ -251,11 +263,18 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
 	 */
 	private async handleLoadChat(chatId: string, loadMessages: boolean): Promise<void> {
 		try {
-			const chat = await this.chatService.loadChat(chatId, loadMessages);
+			// Implementación temporal: notificar que esta funcionalidad está en desarrollo
 			this.sendMessageToWebview({
-				type: MESSAGE_TYPES.CHAT_LOADED,
-				chat
+				type: MESSAGE_TYPES.ERROR,
+				error: 'La carga de chats anteriores está en desarrollo en el nuevo flujo de orquestación'
 			});
+			
+			// TODO: Implementar la carga de chats a través del orquestador
+			// const result = await this.orchestratorService.loadChat(chatId, loadMessages);
+			// this.sendMessageToWebview({
+			//   type: MESSAGE_TYPES.CHAT_LOADED,
+			//   chat: result
+			// });
 		} catch (error) {
 			this.sendMessageToWebview({
 				type: MESSAGE_TYPES.ERROR,
@@ -269,11 +288,18 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
 	 */
 	private async handleLoadHistory(): Promise<void> {
 		try {
-			const history = await this.chatService.getChatList();
+			// Implementación temporal: notificar que esta funcionalidad está en desarrollo
 			this.sendMessageToWebview({
-				type: MESSAGE_TYPES.HISTORY_LOADED,
-				history
+				type: MESSAGE_TYPES.ERROR,
+				error: 'El historial de chats está en desarrollo en el nuevo flujo de orquestación'
 			});
+			
+			// TODO: Implementar la carga del historial a través del orquestador
+			// const history = await this.orchestratorService.getChatList();
+			// this.sendMessageToWebview({
+			//   type: MESSAGE_TYPES.HISTORY_LOADED,
+			//   history
+			// });
 		} catch (error) {
 			console.error('[WebviewProvider] Error al cargar historial:', error);
 			this.sendMessageToWebview({
@@ -288,11 +314,23 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
 	 */
 	private async handleNewChat(): Promise<void> {
 		try {
-			const newChat = await this.chatService.createNewChat();
+			// Simplemente limpiar la UI para un nuevo chat
 			this.sendMessageToWebview({
 				type: MESSAGE_TYPES.CHAT_CREATED,
-				chat: newChat
+				chat: {
+					id: `chat_${Date.now()}`,
+					title: 'Nuevo chat',
+					timestamp: new Date().toISOString(),
+					messages: []
+				}
 			});
+			
+			// TODO: Implementar la creación de chats a través del orquestador si es necesario
+			// const newChat = await this.orchestratorService.createNewChat();
+			// this.sendMessageToWebview({
+			//   type: MESSAGE_TYPES.CHAT_CREATED,
+			//   chat: newChat
+			// });
 		} catch (error) {
 			this.sendMessageToWebview({
 				type: MESSAGE_TYPES.ERROR,
@@ -318,11 +356,15 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
 	private async loadChatHistory(): Promise<void> {
 		if (this.configManager.getPersistenceEnabled()) {
 			try {
-				const chatList = await this.chatService.getChatList();
-				this.sendMessageToWebview({
-					type: MESSAGE_TYPES.HISTORY_LOADED,
-					history: chatList
-				});
+				// Implementación temporal: no cargar historial automáticamente
+				console.log('[WebviewProvider] Carga de historial deshabilitada en el nuevo flujo de orquestación');
+				
+				// TODO: Implementar la carga del historial a través del orquestador
+				// const chatList = await this.orchestratorService.getChatList();
+				// this.sendMessageToWebview({
+				//   type: MESSAGE_TYPES.HISTORY_LOADED,
+				//   history: chatList
+				// });
 			} catch (error) {
 				console.error('[WebviewProvider] Error al cargar historial:', error);
 			}

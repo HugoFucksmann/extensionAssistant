@@ -12,7 +12,6 @@ import { projectManagementPrompt } from './prompts/prompt.projectManagement';
 import { projectSearchPrompt } from './prompts/prompt.projectSearch';
 import { resultEvaluatorPrompt } from './prompts/prompt.resultEvaluator';
 import { toolSelectorPrompt } from './prompts/prompt.toolSelector';
-import { parseModelResponse } from '../../utils/parseModelResponse';
 
 
 const PROMPT_MAP: Record<PromptType, string> = {
@@ -52,12 +51,15 @@ export async function runPrompt<T = any>(
   modelApi: BaseAPI
 ): Promise<T> {
   const template = PROMPT_MAP[type];
-  if (!template) throw new Error(`Prompt no encontrado para el tipo: ${type}`);
   const variables = buildPromptVariables(type, context);
   const filledPrompt = fillPromptTemplate(template, variables);
-  console.log(`[PromptSystem] Enviando prompt al modelo: ${filledPrompt}`);
+  
   const rawResponse = await modelApi.generateResponseInternal(filledPrompt);
-  return parseModelResponse<T>(type, rawResponse);
+  
+  // Aquí se aplicaría tu nueva función
+  const jsonResponse = rawResponse
+  
+  return jsonResponse as T;
 }
 
 /**

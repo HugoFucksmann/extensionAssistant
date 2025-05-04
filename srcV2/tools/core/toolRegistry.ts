@@ -7,7 +7,7 @@
  * de las herramientas disponibles con sus metadatos.
  */
 
-import { Logger } from '../../utils/logger'; // Asumiendo ubicación de Logger
+import { LoggerService } from '../../utils/logger'; // Asumiendo ubicación de Logger
 import { Tool } from './toolInterface';
 
 /**
@@ -26,9 +26,9 @@ export interface ToolListing {
  */
 export class ToolRegistry {
   private tools: Map<string, Tool> = new Map();
-  private logger: Logger;
+  private logger: LoggerService;
 
-  constructor(logger: Logger) {
+  constructor(logger: LoggerService) {
     this.logger = logger;
   }
 

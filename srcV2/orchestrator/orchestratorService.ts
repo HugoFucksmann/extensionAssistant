@@ -1,7 +1,7 @@
 import { EventBus } from '../core/event/eventBus';
 import { OrchestrationContext } from '../core/context/orchestrationContext';
 import { ConfigurationManager } from '../core/config/ConfigurationManager';
-import { Logger } from '../utils/logger';
+import { LoggerService } from '../utils/logger';
 import { ErrorHandler } from '../utils/errorHandler';
 import { DirectActionRouter } from './directActionRouter';
 import { InputAnalyzer, InputAnalysis } from './inputAnalyzer';
@@ -32,7 +32,7 @@ export interface OrchestrationResult {
 
 export interface OrchestratorCreateOptions {
   eventBus: EventBus;
-  logger: Logger;
+  logger: LoggerService;
   errorHandler: ErrorHandler;
   baseAPI: BaseAPI;
   configurationManager: ConfigurationManager;
@@ -43,7 +43,7 @@ export class OrchestratorService {
   private eventBus: EventBus;
   private orchestrationContext: OrchestrationContext;
   private configurationManager: ConfigurationManager;
-  private logger: Logger;
+  private logger: LoggerService;
   private errorHandler: ErrorHandler;
   private inputAnalyzer: InputAnalyzer;
   private directActionRouter: DirectActionRouter;
@@ -135,7 +135,7 @@ export class OrchestratorService {
     eventBus: EventBus,
     orchestrationContext: OrchestrationContext,
     configurationManager: ConfigurationManager,
-    logger: Logger,
+    logger: LoggerService,
     errorHandler: ErrorHandler,
     inputAnalyzer: InputAnalyzer,
     directActionRouter: DirectActionRouter,

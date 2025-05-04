@@ -7,7 +7,7 @@ export async function activate(context: vscode.ExtensionContext) {
   logger.info('Activando extensión...');
   
   try {
-    // Inicializar el manejador de la extensión
+    // Inicializar el manejador de la extensión y sus componentes
     const extensionHandler = await ExtensionHandler.initialize(context);
     
     // Registrar comando para mostrar la vista principal

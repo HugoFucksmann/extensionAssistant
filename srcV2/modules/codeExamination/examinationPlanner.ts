@@ -1,5 +1,4 @@
-
-import { Logger } from '../../utils/logger';
+import { LoggerService } from '../../utils/logger';
 import { BaseAPI } from '../../models/baseAPI';
 import { runPrompt } from '../../core/promptSystem/promptSystem';
 import { ConfigurationManager } from '../../core/config/ConfigurationManager';
@@ -18,7 +17,7 @@ export interface ExaminationPlan {
 export class ExaminationPlanner {
   constructor(
     private configurationManager: ConfigurationManager,
-    private logger: Logger,
+    private logger: LoggerService,
     private modelApi: BaseAPI
   ) {
     this.logger.info('ExaminationPlanner inicializado');

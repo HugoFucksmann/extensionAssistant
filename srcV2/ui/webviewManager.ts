@@ -2,27 +2,26 @@ import * as vscode from 'vscode';
 import { ConfigurationManager } from '../core/config/ConfigurationManager';
 import { OrchestratorService } from '../orchestrator/orchestratorService';
 import { WebviewProvider } from './webview/webviewProvider';
-import { ChatService } from '../services/chatService';
 import { EventBus } from '../core/event/eventBus';
+import { MESSAGE_TYPES } from '../core/config/constants';
 
 /**
  * Clase que centraliza toda la gestión de WebView
  * Maneja la creación, configuración y comunicación con el WebView
+ * Implementa WebviewViewProvider para integración directa con VS Code
  */
-export class WebViewManager {
+export class WebViewManager implements vscode.WebviewViewProvider {
   public static readonly viewType = 'aiChat.chatView';
   private webviewProvider: WebviewProvider;
   private disposables: vscode.Disposable[] = [];
 
   constructor(
     private readonly extensionUri: vscode.Uri,
-    private readonly chatService: ChatService,
     private readonly orchestratorService: OrchestratorService
   ) {
     // Crear el proveedor de webview con los servicios necesarios
     this.webviewProvider = new WebviewProvider(
       extensionUri,
-      chatService,
       orchestratorService
     );
     
@@ -31,24 +30,16 @@ export class WebViewManager {
   }
 
   /**
-   * Registra el proveedor de webview en VS Code
+   * Implementación de WebviewViewProvider.resolveWebviewView
+   * Se llama cuando VS Code necesita crear o restaurar la vista del webview
    */
-  public register(context: vscode.ExtensionContext): vscode.Disposable {
-    // Registrar el proveedor de webview
-    const providerRegistration = vscode.window.registerWebviewViewProvider(
-      WebViewManager.viewType,
-      this.webviewProvider
-    );
-    
-    // Añadir a la lista de disposables
-    this.disposables.push(providerRegistration);
-    
-    // Devolver un disposable compuesto para limpiar todos los recursos
-    return {
-      dispose: () => {
-        providerRegistration.dispose();
-      }
-    };
+  public resolveWebviewView(
+    webviewView: vscode.WebviewView,
+    context: vscode.WebviewViewResolveContext,
+    _token: vscode.CancellationToken
+  ): void | Thenable<void> {
+    // Delegar al proveedor de webview
+    return this.webviewProvider.resolveWebviewView(webviewView, context, _token);
   }
 
   /**
@@ -108,7 +99,4 @@ export class WebViewManager {
   }
 }
 
-enum MESSAGE_TYPES {
-  ORCHESTRATION_RESULT,
-  PROGRESS_UPDATE
-}
+// Usar los tipos de mensajes definidos en constants.ts

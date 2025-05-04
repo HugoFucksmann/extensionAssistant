@@ -1,4 +1,4 @@
-import { Logger } from '../../utils/logger';
+import { LoggerService } from '../../utils/logger';
 import { BaseAPI } from '../../models/baseAPI';
 import { runPrompt } from '../../core/promptSystem/promptSystem';
 
@@ -12,7 +12,7 @@ export interface CommunicationPlan {
 
 export class CommunicationPlanner {
   constructor(
-    private logger: Logger,
+    private logger: LoggerService,
     private modelApi: BaseAPI
   ) {
     this.logger.info('CommunicationPlanner initialized');

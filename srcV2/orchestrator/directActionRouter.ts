@@ -6,7 +6,7 @@
  * sin necesidad de crear un plan detallado o un flujo de trabajo complejo.
  */
 
-import { Logger } from '../utils/logger';
+import { LoggerService } from '../utils/logger';
 import { ErrorHandler } from '../utils/errorHandler';
 import { EventBus } from '../core/event/eventBus';
 import { ToolRegistry } from '../tools/core/toolRegistry';
@@ -31,14 +31,14 @@ export interface DirectActionResult {
  * Clase para ejecutar acciones directas
  */
 export class DirectActionRouter {
-  private logger: Logger;
+  private logger: LoggerService;
   private errorHandler: ErrorHandler;
   private eventBus: EventBus;
   private toolRegistry: ToolRegistry;
   private orchestrationContext: OrchestrationContext;
 
   constructor(
-    logger: Logger,
+    logger: LoggerService,
     errorHandler: ErrorHandler,
     eventBus: EventBus,
     toolRegistry: ToolRegistry,

@@ -1,5 +1,5 @@
 import { ToolRegistry } from '../../tools/core/toolRegistry';
-import { Logger } from '../../utils/logger';
+import { LoggerService } from '../../utils/logger';
 import { BaseAPI } from '../../models/baseAPI';
 import { OrchestrationContext } from '../../core/context/orchestrationContext';
 
@@ -12,7 +12,7 @@ export interface EditingModuleResult {
 export class EditingModule {
   constructor(
     private toolRegistry: ToolRegistry,
-    private logger: Logger,
+    private logger: LoggerService,
     private modelApi: BaseAPI
   ) {
     this.logger.info('EditingModule inicializado');

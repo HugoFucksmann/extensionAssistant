@@ -1,6 +1,6 @@
 import { OrchestrationContext } from '../core/context/orchestrationContext';
 import { ToolRegistry } from '../tools/core/toolRegistry';
-import { Logger } from '../utils/logger';
+import { LoggerService } from '../utils/logger';
 import { BaseAPI } from '../models/baseAPI';
 import { runPrompt } from '../core/promptSystem/promptSystem';
 import { InputAnalysis } from './inputAnalyzer';
@@ -15,7 +15,7 @@ export class ToolSelector {
   constructor(
     private orchestrationContext: OrchestrationContext,
     private toolRegistry: ToolRegistry,
-    private logger: Logger,
+    private logger: LoggerService,
     private modelApi: BaseAPI
   ) {}
 

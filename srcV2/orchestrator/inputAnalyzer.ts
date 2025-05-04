@@ -1,5 +1,5 @@
 import { OrchestrationContext } from '../core/context/orchestrationContext';
-import { Logger } from '../utils/logger';
+import { LoggerService } from '../utils/logger';
 import { EventBus } from '../core/event/eventBus';
 import { BaseAPI } from '../models/baseAPI';
 import { runPrompt } from '../core/promptSystem/promptSystem';
@@ -19,7 +19,7 @@ export interface InputAnalysis {
 export class InputAnalyzer {
   constructor(
     private orchestrationContext: OrchestrationContext,
-    private logger: Logger,
+    private logger: LoggerService,
     private eventBus: EventBus,
     private modelApi: BaseAPI
   ) {}

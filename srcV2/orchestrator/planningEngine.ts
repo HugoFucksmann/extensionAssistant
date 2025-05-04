@@ -1,5 +1,5 @@
 import { OrchestrationContext } from '../core/context/orchestrationContext';
-import { Logger } from '../utils/logger';
+import { LoggerService } from '../utils/logger';
 import { EventBus } from '../core/event/eventBus';
 import { BaseAPI } from '../models/baseAPI';
 import { ToolRegistry } from '../tools/core/toolRegistry';
@@ -37,7 +37,7 @@ export class PlanningEngine {
 
   constructor(
     private orchestrationContext: OrchestrationContext,
-    private logger: Logger,
+    private logger: LoggerService,
     private eventBus: EventBus,
     private modelApi: BaseAPI,
     private toolRegistry: ToolRegistry,

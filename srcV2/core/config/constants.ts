@@ -19,7 +19,9 @@ export const MESSAGE_TYPES = {
   ORCHESTRATION_RESULT: 'orchestration-result',
   PROGRESS_UPDATE: 'progress-update',
   ORCHESTRATION_MODE: 'orchestration-mode',
-  MESSAGE: 'message' // Para mensajes regulares de chat
+  MESSAGE: 'message', // Para mensajes regulares de chat
+  USER_MESSAGE: 'message:user', // Para mensajes del usuario
+  ASSISTANT_MESSAGE: 'message:assistant' // Para mensajes del asistente
 };
 
 // Prefijo para comandos de VS Code

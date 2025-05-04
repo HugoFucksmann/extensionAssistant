@@ -7,7 +7,7 @@
  * las herramientas concretas deben implementar.
  */
 
-import { Logger } from '../../utils/logger'; // Asumiendo ubicación de Logger
+import { LoggerService } from '../../utils/logger'; // Asumiendo ubicación de Logger
 import { Tool, ToolContext, ProgressReporter } from './toolInterface';
 
 /**
@@ -15,7 +15,7 @@ import { Tool, ToolContext, ProgressReporter } from './toolInterface';
  * Se recomienda que todas las herramientas hereden de esta clase.
  */
 export abstract class ToolBase implements Tool {
-  protected logger: Logger;
+  protected logger: LoggerService;
 
   /**
    * Propiedades abstractas que deben ser definidas por las clases hijas.
@@ -24,7 +24,7 @@ export abstract class ToolBase implements Tool {
   abstract readonly description: string;
   abstract readonly category: string;
 
-  constructor(logger: Logger) {
+  constructor(logger: LoggerService) {
     this.logger = logger;
   }
 

@@ -1,5 +1,4 @@
 import { ConfigurationManager } from '../core/config/ConfigurationManager';
-import { ChatService } from '../services/chatService';
 import { EventBus } from '../core/event/eventBus';
 import { ACTIONS, MESSAGE_TYPES } from '../core/config/constants';
 
@@ -12,14 +11,11 @@ export interface ErrorInfo {
 
 export class ErrorHandler {
   private eventBus: EventBus;
-  public chatService?: ChatService;
   
   constructor(
-    private configManager: ConfigurationManager,
-    chatService?: ChatService
+    private configManager: ConfigurationManager
   ) {
     this.eventBus = EventBus.getInstance();
-    this.chatService = chatService;
   }
   
   public handleError(error: any, source?: string): ErrorInfo {
@@ -68,16 +64,6 @@ export class ErrorHandler {
     
     // Generar mensaje de error para el usuario
     const errorResponse = `Lo siento, ocurrió un error: ${errorInfo.message}`;
-    
-    // Si hay un servicio de chat disponible, añadir respuesta de error
-    if (this.chatService) {
-      try {
-        await this.chatService.addAssistantResponse(errorResponse);
-      } catch (chatError) {
-        // Si falla añadir al chat, solo log (evita bucle infinito)
-        console.error('[ErrorHandler] Error al añadir respuesta de error al chat:', chatError);
-      }
-    }
     
     // Emitir evento de mensaje recibido con error
     this.eventBus.emit(ACTIONS.MESSAGE_RECEIVE, { 

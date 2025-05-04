@@ -1,5 +1,5 @@
 import { OrchestrationContext } from '../core/context/orchestrationContext';
-import { Logger } from '../utils/logger';
+import { LoggerService } from '../utils/logger';
 import { BaseAPI } from '../models/baseAPI';
 import { ExecutionPlan } from './planningEngine';
 import { runPrompt } from '../core/promptSystem/promptSystem';
@@ -18,7 +18,7 @@ export interface ResultEvaluation {
 export class ResultEvaluator {
   constructor(
     private orchestrationContext: OrchestrationContext,
-    private logger: Logger,
+    private logger: LoggerService,
     private modelAPI: BaseAPI
   ) {}
 

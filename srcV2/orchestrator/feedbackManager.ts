@@ -5,7 +5,7 @@
  * al usuario sobre el progreso de las operaciones y los resultados.
  */
 
-import { Logger } from '../utils/logger';
+import { LoggerService } from '../utils/logger';
 import { ErrorHandler } from '../utils/errorHandler';
 import { EventBus } from '../core/event/eventBus';
 import * as vscode from 'vscode'; // Importar VS Code API
@@ -36,7 +36,7 @@ export class FeedbackManager {
   private activeNotifications: Map<string, vscode.Disposable> = new Map();
 
   constructor(
-    private logger: Logger,
+    private logger: LoggerService,
     private errorHandler: ErrorHandler,
     private eventBus: EventBus,
     private context: vscode.ExtensionContext

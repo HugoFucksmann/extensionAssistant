@@ -1,4 +1,4 @@
-import { Logger } from '../utils/logger';
+import { LoggerService } from '../utils/logger';
 import { ErrorHandler } from '../utils/errorHandler';
 import { ExecutionPlan } from './planningEngine';
 import { ToolSelector } from './toolSelector';
@@ -24,7 +24,7 @@ export class WorkflowManager {
   private communicationModule: CommunicationModule;
 
   constructor(
-    private logger: Logger,
+    private logger: LoggerService,
     private errorHandler: ErrorHandler,
     private toolSelector: ToolSelector,
     private toolRegistry: ToolRegistry,
