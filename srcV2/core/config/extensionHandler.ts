@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { CommandRegistry } from '../commands/commandRegistry';
 import { WebViewManager } from '../../ui/webviewManager';
-import { logger } from '../../utils/logger';
+import { log } from '../../utils/logger';
 import { OrchestratorService } from '../../orchestrator/orchestratorService';
 import { ConfigurationManager } from './ConfigurationManager';
 import { ACTIONS } from './constants';
@@ -58,7 +58,7 @@ export class ExtensionHandler {
    */
   public async initializeComponents(): Promise<void> {
     try {
-      logger.info('Inicializando componentes de la extensión...');
+      log('Inicializando componentes de la extensión...','info');
       
       // 1. Inicializar servicios de datos a través del contenedor
       await this.dependencyContainer.initializeDataServices();
@@ -83,9 +83,9 @@ export class ExtensionHandler {
       );
       this.context.subscriptions.push(webviewDisposable);
       
-      logger.info('Extensión inicializada correctamente');
+      log('Extensión inicializada correctamente','info');
     } catch (error) {
-      logger.error('Error al inicializar la extensión:', {error});
+      log('Error al inicializar la extensión:', 'error');
       throw error;
     }
   }
@@ -99,13 +99,13 @@ export class ExtensionHandler {
       // Pasar todas las propiedades requeridas por OrchestratorCreateOptions
       return await OrchestratorService.create({
         eventBus: this.dependencyContainer.getEventBus(),
-        logger: logger,
+       
         errorHandler: this.dependencyContainer.getErrorHandler(),
         configurationManager: this.dependencyContainer.getConfigManager(), 
         context: this.context
       });
     } catch (error) {
-      logger.error('Error al inicializar el orquestador:', {error});
+      log('Error al inicializar el orquestador:', 'error');
       throw error;
     }
   }
@@ -185,7 +185,7 @@ public async processMessage(message: string): Promise<string> {
    * Libera todos los recursos
    */
   public dispose(): void {
-    logger.info('Liberando recursos de la extensión...');
+    log('Liberando recursos de la extensión...','info');
     
     // Disponer servicios en orden inverso de dependencia
     if (this.webViewManager) {
@@ -199,6 +199,6 @@ public async processMessage(message: string): Promise<string> {
     // Limpiar instancia singleton
     ExtensionHandler.instance = null;
     
-    logger.info('Extensión liberada');
+    log('Extensión liberada','info');
   }
 }

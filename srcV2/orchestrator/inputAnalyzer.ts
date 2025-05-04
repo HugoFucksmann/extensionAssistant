@@ -1,7 +1,7 @@
 
 import { OrchestrationContext } from '../core/context/orchestrationContext';
 import { executeModelInteraction } from '../core/promptSystem/promptSystem';
-import { LoggerService } from '../utils/logger';
+import { log } from '../utils/logger';
 
 export interface InputAnalysis {
   needsFullPlanning: boolean;
@@ -18,12 +18,12 @@ export interface InputAnalysis {
 export class InputAnalyzer {
   constructor(
     private orchestrationContext: OrchestrationContext,
-    private logger: LoggerService,
+
   ) {}
 
   public async analyzeInput(input: string): Promise<InputAnalysis> {
     try {
-      this.logger.info('InputAnalyzer: Analyzing input', { input });
+      log('InputAnalyzer: Analyzing input { input }'  ,'info');
       
       return await executeModelInteraction<InputAnalysis>(
         'inputAnalyzer', 
@@ -33,7 +33,7 @@ export class InputAnalyzer {
         }
       );
     } catch (error) {
-      this.logger.error('InputAnalyzer: Error analyzing input', { error });
+      log('InputAnalyzer: Error analyzing input { error }','error' );
       return this.getDefaultAnalysis(input);
     }
   }

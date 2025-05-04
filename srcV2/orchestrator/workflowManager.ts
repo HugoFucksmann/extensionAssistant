@@ -1,4 +1,4 @@
-import { LoggerService } from '../utils/logger';
+import { log } from '../utils/logger';
 import { ErrorHandler } from '../utils/errorHandler';
 import { ExecutionPlan } from './planningEngine';
 import { ToolSelector } from './toolSelector';
@@ -9,14 +9,14 @@ import { ModuleManager } from '../modules/moduleManager';
 
 export class WorkflowManager {
   constructor(
-    private logger: LoggerService,
+    
     private errorHandler: ErrorHandler,
     private toolSelector: ToolSelector,
     private toolRegistry: ToolRegistry,
     private feedbackManager: FeedbackManager,
     private moduleManager: ModuleManager
   ) {
-    this.logger.info('WorkflowManager initialized with module manager');
+   
   }
 
   public async startWorkflow(plan: ExecutionPlan, context: OrchestrationContext): Promise<any> {
@@ -39,7 +39,7 @@ export class WorkflowManager {
         });
         
         // Y caemos a la ejecución genérica
-        this.logger.info(`Falling back to generic execution for plan ${plan.id}`);
+        log(`Falling back to generic execution for plan ${plan.id}` , 'info');
         return this.executeGenericPlan(plan, context);
       }
     }
@@ -53,7 +53,7 @@ export class WorkflowManager {
     plan: ExecutionPlan, 
     context: OrchestrationContext
   ): Promise<any> {
-    this.logger.info(`Executing specialized plan for category: ${category}`);
+    log(`Executing specialized plan for category: ${category}` , 'info');
     this.feedbackManager.notify({
       type: 'progress',
       message: `Starting specialized execution for ${category}`,
@@ -68,13 +68,13 @@ export class WorkflowManager {
       // Intentamos ejecutar el plan a través del ModuleManager
       return await this.moduleManager.executePlan(plan, context);
     } catch (error) {
-      this.logger.error(`Error in specialized execution: ${error instanceof Error ? error.message : String(error)}`);
+      log(`Error in specialized execution: ${error instanceof Error ? error.message : String(error)}` , 'error');
       throw error;
     }
   }
 
   private async executeGenericPlan(plan: ExecutionPlan, context: OrchestrationContext): Promise<any> {
-    this.logger.info(`Executing generic plan with ${plan.plan.length} steps`);
+    log(`Executing generic plan with ${plan.plan.length} steps` , 'info');
     const results: any[] = [];
     
     for (let i = 0; i < plan.plan.length; i++) {
@@ -105,11 +105,7 @@ export class WorkflowManager {
         const result = await tool.execute(step.toolParams);
         const duration = Date.now() - startTime;
         
-        this.logger.info(`Step ${i + 1} executed in ${duration}ms`, {
-          step: step.description,
-          tool: step.toolName,
-          duration
-        });
+        log(`Step ${i + 1} executed in ${duration}ms ${step.description} ${step.toolName}`, 'info');
         
         // Guardar resultado
         results.push(result);
@@ -146,7 +142,7 @@ export class WorkflowManager {
         
         // Verificar si hay un paso de fallback
         if (step.fallbackStep !== null && typeof step.fallbackStep === 'number') {
-          this.logger.info(`Using fallback step ${step.fallbackStep}`);
+          log(`Using fallback step ${step.fallbackStep}` , 'info');
           
           // Notificar el uso del fallback
           this.feedbackManager.notify({
@@ -166,11 +162,11 @@ export class WorkflowManager {
         
         // Si es un paso requerido y no hay fallback, falla todo el workflow
         if (step.isRequired) {
-          this.logger.error(`Required step failed without fallback`);
+          log(`Required step failed without fallback`, 'error');
           throw error;
         } else {
           // Si el paso no es requerido, continuamos con el siguiente
-          this.logger.warn(`Non-required step failed, continuing workflow`);
+          log(`Non-required step failed, continuing workflow` , 'warn');
           continue;
         }
       }

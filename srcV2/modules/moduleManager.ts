@@ -1,7 +1,7 @@
 // src/modules/moduleManager.ts
 
 import { EventBus } from '../core/event/eventBus';
-import { LoggerService } from '../utils/logger';
+import { log } from '../utils/logger';
 import { ToolRegistry } from '../tools/core/toolRegistry';
 import { ErrorHandler } from '../utils/errorHandler';
 import { OrchestrationContext } from '../core/context/orchestrationContext';
@@ -37,13 +37,13 @@ export class ModuleManager {
   private intentToModuleMap: Map<string, Module[]> = new Map();
   
   constructor(
-    private logger: LoggerService,
+ 
     private toolRegistry: ToolRegistry,
     private eventBus: EventBus,
     private errorHandler: ErrorHandler
   ) {
     this.initializeDefaultModules();
-    this.logger.info('ModuleManager initialized');
+  
   }
 
   private initializeDefaultModules() {
@@ -58,7 +58,7 @@ export class ModuleManager {
    */
   public registerModule(module: Module): void {
     if (this.modules.has(module.name)) {
-      this.logger.warn(`Module ${module.name} is already registered`);
+      log(`Module ${module.name} is already registered`,'warn');
       return;
     }
 
@@ -73,7 +73,7 @@ export class ModuleManager {
       this.intentToModuleMap.get(intent)!.push(module);
     }
 
-    this.logger.info(`Module ${module.name} registered for category ${module.category}`);
+    log(`Module ${module.name} registered for category ${module.category}`,'info');
     this.eventBus.emit('module:registered', { moduleName: module.name });
   }
 
@@ -132,15 +132,15 @@ export class ModuleManager {
     const module = this.findBestModuleForAnalysis(analysis);
     
     if (!module) {
-      this.logger.info('No specialized module found for input analysis', { analysis });
+      log('No specialized module found for input analysis { analysis }','warn' );
       return null;
     }
 
     try {
-      this.logger.info(`Creating plan with module ${module.name}`, { analysis });
+      log(`Creating plan with module ${module.name} { analysis }`, 'info');
       return await module.createPlan(input, context);
     } catch (error) {
-      this.logger.error(`Error creating plan with module ${module.name}`, { error });
+      log(`Error creating plan with module ${module.name }: ${ error }`, 'error');
       this.errorHandler.handleError({
         error,
         context: 'ModuleManager.createPlan',
@@ -168,15 +168,15 @@ export class ModuleManager {
     const module = this.getModuleByCategory(category);
     
     if (!module) {
-      this.logger.info('No specialized module found for plan execution', { category });
+      log('No specialized module found for plan execution { category }', 'warn');
       throw new Error(`No module found for category ${category}`);
     }
 
     try {
-      this.logger.info(`Executing plan with module ${module.name}`, { planId: plan.id });
+     
       return await module.executePlan(plan, context);
     } catch (error) {
-      this.logger.error(`Error executing plan with module ${module.name}`, { error });
+      log(`Error executing plan with module ${module.name} ${ error }`, 'error');
       this.errorHandler.handleError({
         error,
         context: 'ModuleManager.executePlan',

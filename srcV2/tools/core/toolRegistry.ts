@@ -7,7 +7,7 @@
  * de las herramientas disponibles con sus metadatos.
  */
 
-import { LoggerService } from '../../utils/logger'; // Asumiendo ubicación de Logger
+import { log } from '../../utils/logger'; // Asumiendo ubicación de log
 import { Tool } from './toolInterface';
 
 /**
@@ -26,10 +26,10 @@ export interface ToolListing {
  */
 export class ToolRegistry {
   private tools: Map<string, Tool> = new Map();
-  private logger: LoggerService;
 
-  constructor(logger: LoggerService) {
-    this.logger = logger;
+
+  constructor() {
+    
   }
 
   /**
@@ -40,11 +40,11 @@ export class ToolRegistry {
   public registerTool(tool: Tool): void {
     if (this.tools.has(tool.name)) {
       const errorMsg = `Tool registration conflict: A tool with the name '${tool.name}' already exists.`;
-      this.logger.error('ToolRegistry: ' + errorMsg);
+      log('ToolRegistry: ' + errorMsg, 'error');
       throw new Error(errorMsg);
     }
     this.tools.set(tool.name, tool);
-    this.logger.info(`ToolRegistry: Registered tool '${tool.name}' in category '${tool.category}'.`);
+    log(`ToolRegistry: Registered tool '${tool.name}' in category '${tool.category}'.`, 'info');
   }
 
   /**
@@ -57,7 +57,7 @@ export class ToolRegistry {
         this.registerTool(tool);
       } catch (error) {
         // Log y continúa registrando las demás si una falla
-        this.logger.error(`ToolRegistry: Failed to register tool '${tool?.name || 'unknown'}'.`, { error });
+        log(`ToolRegistry: Failed to register tool '${tool?.name || 'unknown'}'.`, 'error');
       }
     });
   }
@@ -70,7 +70,7 @@ export class ToolRegistry {
   public getByName(name: string): Tool | null {
     const tool = this.tools.get(name);
     if (!tool) {
-       this.logger.warn(`ToolRegistry: Tool '${name}' not found.`);
+       log(`ToolRegistry: Tool '${name}' not found.`, 'warn');
        return null;
     }
     return tool;

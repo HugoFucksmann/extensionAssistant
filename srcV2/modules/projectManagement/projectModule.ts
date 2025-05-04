@@ -1,4 +1,4 @@
-import { ToolRegistry } from '../../tools/core/toolRegistry';
+/* import { ToolRegistry } from '../../tools/core/toolRegistry';
 import { LoggerService } from '../../utils/logger';
 import { OrchestrationContext } from '../../core/context/orchestrationContext';
 
@@ -60,3 +60,4 @@ export class ProjectModule {
     }
   }
 }
+ */

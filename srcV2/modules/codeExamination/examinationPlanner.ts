@@ -1,4 +1,4 @@
-import { LoggerService } from '../../utils/logger';
+/* import { LoggerService } from '../../utils/logger';
 
 import { executeModelInteraction } from '../../core/promptSystem/promptSystem';
 import { ConfigurationManager } from '../../core/config/ConfigurationManager';
@@ -91,3 +91,4 @@ export class ExaminationPlanner {
     ];
   }
 }
+ */

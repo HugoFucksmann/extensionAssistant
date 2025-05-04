@@ -1,5 +1,5 @@
 import { OrchestrationContext } from '../core/context/orchestrationContext';
-import { LoggerService } from '../utils/logger';
+import { log } from '../utils/logger';
 import { ExecutionPlan } from './planningEngine';
 import { executeModelInteraction } from '../core/promptSystem/promptSystem';
 
@@ -17,7 +17,7 @@ export interface ResultEvaluation {
 export class ResultEvaluator {
   constructor(
     private orchestrationContext: OrchestrationContext,
-    private logger: LoggerService,
+   
   ) {}
 
   public async evaluateResult(
@@ -38,7 +38,7 @@ export class ResultEvaluator {
         context,
       );
     } catch (error) {
-      this.logger.error('[ResultEvaluator] Error evaluating result:', {error});
+      log('[ResultEvaluator] Error evaluating result:' + error , 'error');
       return {
         success: false,
         confidence: 0,

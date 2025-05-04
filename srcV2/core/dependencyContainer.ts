@@ -4,7 +4,6 @@ import { ConfigurationManager } from './config/ConfigurationManager';
 import { ErrorHandler } from '../utils/errorHandler';
 import { OrchestratorService } from '../orchestrator/orchestratorService';
 import { EventBus } from './event/eventBus';
-import { logger, LoggerService } from '../utils/logger';
 import { initializePromptSystem } from './promptSystem/promptSystem';
 
 /**
@@ -21,7 +20,6 @@ export class DependencyContainer {
   private configManager: ConfigurationManager | null = null;
   private errorHandler: ErrorHandler | null = null;
   private eventBus: EventBus | null = null;
-  private logger: LoggerService | null = null;
   
   // Servicios de datos
   private storage: SQLiteStorage | null = null;
@@ -55,7 +53,6 @@ export class DependencyContainer {
     
     // Inicializar servicios principales
     this.eventBus = EventBus.getInstance();
-    this.logger = logger;
     this.configManager = ConfigurationManager.getInstance(context);
     this.errorHandler = new ErrorHandler(this.configManager);
   }
@@ -86,7 +83,6 @@ export class DependencyContainer {
     // Inicializar orquestador
     this.orchestratorService = await OrchestratorService.create({
       eventBus: this.getEventBus(),
-      logger: this.getLogger(),
       errorHandler: this.getErrorHandler(),
       configurationManager: this.getConfigManager(),
       context: this.getContext()
@@ -120,13 +116,6 @@ export class DependencyContainer {
       throw new Error('EventBus no inicializado');
     }
     return this.eventBus;
-  }
-  
-  public getLogger(): LoggerService {
-    if (!this.logger) {
-      throw new Error('Logger no inicializado');
-    }
-    return this.logger;
   }
   
   // Getters para servicios de datos

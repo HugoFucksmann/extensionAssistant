@@ -7,7 +7,7 @@
  * las herramientas concretas deben implementar.
  */
 
-import { LoggerService } from '../../utils/logger'; // Asumiendo ubicación de Logger
+import { log } from '../../utils/logger'; // Asumiendo ubicación de Logger
 import { Tool, ToolContext, ProgressReporter } from './toolInterface';
 
 /**
@@ -15,7 +15,7 @@ import { Tool, ToolContext, ProgressReporter } from './toolInterface';
  * Se recomienda que todas las herramientas hereden de esta clase.
  */
 export abstract class ToolBase implements Tool {
-  protected logger: LoggerService;
+  
 
   /**
    * Propiedades abstractas que deben ser definidas por las clases hijas.
@@ -24,8 +24,8 @@ export abstract class ToolBase implements Tool {
   abstract readonly description: string;
   abstract readonly category: string;
 
-  constructor(logger: LoggerService) {
-    this.logger = logger;
+  constructor() {
+    
   }
 
   /**
@@ -50,7 +50,7 @@ export abstract class ToolBase implements Tool {
    * Método de ayuda común para registrar el inicio de la ejecución.
    */
   protected logStart(params: any): void {
-    this.logger.info(`[${this.name}] Starting execution`, { params });
+    log(`[${this.name}] Starting execution` +  params, 'info');
   }
 
  /**
@@ -61,14 +61,14 @@ export abstract class ToolBase implements Tool {
     const resultSummary = typeof result === 'object' && result !== null 
       ? { keys: Object.keys(result), type: 'object' } 
       : result;
-    this.logger.info(`[${this.name}] Execution finished successfully`, { resultSummary });
+    log(`[${this.name}] Execution finished successfully` + resultSummary, 'info');
   }
 
   /**
    * Método de ayuda común para registrar un error durante la ejecución.
    */
   protected logError(error: any, params: any): void {
-     this.logger.error(`[${this.name}] Execution failed`, { error: error?.message || error, params });
+     log(`[${this.name}] Execution failed ${error} ${params}  ` , 'error');
   }
 
   // Otros métodos de utilidad comunes podrían añadirse aquí

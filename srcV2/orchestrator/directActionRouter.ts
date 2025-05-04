@@ -6,7 +6,7 @@
  * sin necesidad de crear un plan detallado o un flujo de trabajo complejo.
  */
 
-import { LoggerService } from '../utils/logger';
+import { log } from '../utils/logger';
 import { ErrorHandler } from '../utils/errorHandler';
 import { EventBus } from '../core/event/eventBus';
 import { ToolRegistry } from '../tools/core/toolRegistry';
@@ -31,20 +31,20 @@ export interface DirectActionResult {
  * Clase para ejecutar acciones directas
  */
 export class DirectActionRouter {
-  private logger: LoggerService;
+ 
   private errorHandler: ErrorHandler;
   private eventBus: EventBus;
   private toolRegistry: ToolRegistry;
   private orchestrationContext: OrchestrationContext;
 
   constructor(
-    logger: LoggerService,
+  
     errorHandler: ErrorHandler,
     eventBus: EventBus,
     toolRegistry: ToolRegistry,
     orchestrationContext: OrchestrationContext
   ) {
-    this.logger = logger;
+   
     this.errorHandler = errorHandler;
     this.eventBus = eventBus;
     this.toolRegistry = toolRegistry;
@@ -59,7 +59,7 @@ export class DirectActionRouter {
    */
   public async executeAction(toolName: string, params: object): Promise<DirectActionResult> {
     try {
-      this.logger.info('DirectActionRouter: Executing action', { toolName, params });
+      log('DirectActionRouter: Executing action { toolName, params }', 'info');
       
       // Verificar si la herramienta existe
       const tool = this.toolRegistry.getByName(toolName);
@@ -111,7 +111,7 @@ export class DirectActionRouter {
    */
   private handleError(toolName: string, error: any): DirectActionResult {
     const errorInfo = this.errorHandler.handleError(error);
-    this.logger.error('DirectActionRouter: Error executing action', { toolName, error: errorInfo });
+    log('DirectActionRouter: Error executing action { toolName, error: errorInfo }', 'error');
     
     // Emitir evento de error
     this.eventBus.emit('action:failed', { toolName, error: errorInfo });

@@ -1,5 +1,5 @@
 import { OrchestrationContext } from '../core/context/orchestrationContext';
-import { LoggerService } from '../utils/logger';
+import { log } from '../utils/logger';
 import { EventBus } from '../core/event/eventBus';
 import { ToolRegistry } from '../tools/core/toolRegistry';
 import { InputAnalysis } from './inputAnalyzer';
@@ -37,14 +37,14 @@ export interface PlanStep {
 export class PlanningEngine {
   constructor(
     private orchestrationContext: OrchestrationContext,
-    private logger: LoggerService,
+  
     private eventBus: EventBus,
     private toolRegistry: ToolRegistry,
     private toolSelector: ToolSelector,
     private feedbackManager: FeedbackManager,
     private moduleManager: ModuleManager
   ) {
-    this.logger.info('PlanningEngine initialized with module manager');
+    log('PlanningEngine initialized with module manager' , 'info');
   }
 
   public async createPlan(userInput: string, inputAnalysis: InputAnalysis): Promise<ExecutionPlan> {
@@ -78,7 +78,7 @@ export class PlanningEngine {
       
       return enrichedPlan;
     } catch (error) {
-      this.logger.error('Error creating execution plan', { error });
+      log('Error creating execution plan' + error , 'error');
       return this.createFallbackPlan(userInput, inputAnalysis);
     }
   }
@@ -149,7 +149,7 @@ export class PlanningEngine {
         );
         
         // Actualizar el nombre de la herramienta
-        this.logger.info(`Replacing tool ${step.toolName} with ${alternative.toolName}`);
+        log(`Replacing tool ${step.toolName} with ${alternative.toolName}` , 'info');
         step.toolName = alternative.toolName;
         
         // Puede que también sea necesario adaptar los parámetros

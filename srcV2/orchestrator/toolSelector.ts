@@ -1,7 +1,7 @@
 import { OrchestrationContext } from "../core/context/orchestrationContext";
 import { executeModelInteraction } from "../core/promptSystem/promptSystem";
 import { ToolRegistry } from "../tools/core/toolRegistry";
-import { LoggerService } from "../utils/logger";
+import { log } from "../utils/logger";
 
 
 export interface ToolSelection {
@@ -14,12 +14,12 @@ export class ToolSelector {
   constructor(
     private context: OrchestrationContext,
     private toolRegistry: ToolRegistry,
-    private logger: LoggerService
+
   ) {}
 
   public async selectTool(taskDescription: string): Promise<ToolSelection> {
     try {
-      this.logger.info('Seleccionando herramienta para tarea', { taskDescription });
+      log('Seleccionando herramienta para tarea { taskDescription }', 'info');
       
       return await executeModelInteraction<ToolSelection>(
         'toolSelector',
@@ -30,7 +30,7 @@ export class ToolSelector {
         }
       );
     } catch (error) {
-      this.logger.error('Error seleccionando herramienta', { error });
+      log('Error seleccionando herramienta ' + error , 'error');
       return this.getDefaultToolSelection();
     }
   }

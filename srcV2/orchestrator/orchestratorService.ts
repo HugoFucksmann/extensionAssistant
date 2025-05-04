@@ -1,7 +1,7 @@
 import { EventBus } from '../core/event/eventBus';
 import { OrchestrationContext } from '../core/context/orchestrationContext';
 import { ConfigurationManager } from '../core/config/ConfigurationManager';
-import { LoggerService } from '../utils/logger';
+import { log } from '../utils/logger';
 import { ErrorHandler } from '../utils/errorHandler';
 import { DirectActionRouter } from './directActionRouter';
 import { InputAnalyzer, InputAnalysis } from './inputAnalyzer';
@@ -32,7 +32,7 @@ export interface OrchestrationResult {
 
 export interface OrchestratorCreateOptions {
   eventBus: EventBus;
-  logger: LoggerService;
+
   errorHandler: ErrorHandler;
   configurationManager: ConfigurationManager;
   context: vscode.ExtensionContext;
@@ -42,7 +42,7 @@ export class OrchestratorService {
   private eventBus: EventBus;
   private orchestrationContext: OrchestrationContext;
   private configurationManager: ConfigurationManager;
-  private logger: LoggerService;
+
   private errorHandler: ErrorHandler;
   private inputAnalyzer: InputAnalyzer;
   private directActionRouter: DirectActionRouter;
@@ -58,20 +58,20 @@ export class OrchestratorService {
    * Compatible con el patrón usado en extensionHandler.ts
    */
   public static async create(options: OrchestratorCreateOptions): Promise<OrchestratorService> {
-    const { eventBus, logger, errorHandler, configurationManager, context } = options;
+    const { eventBus,  errorHandler, configurationManager, context } = options;
     
     // Crear o obtener instancias de componentes necesarios
     const orchestrationContext = new OrchestrationContext();
-    const toolRegistry = new ToolRegistry(logger);
+    const toolRegistry = new ToolRegistry();
     
     // Inicializar componentes del orquestador
     const inputAnalyzer = new InputAnalyzer(
       orchestrationContext,
-      logger,
+
     );
 
     const directActionRouter = new DirectActionRouter(
-      logger,
+    
       errorHandler,
       eventBus,
       toolRegistry,
@@ -79,14 +79,13 @@ export class OrchestratorService {
     );
 
     const feedbackManager = new FeedbackManager(
-      logger,
       errorHandler,
       eventBus,
       context
     );
 
     const moduleManager = new ModuleManager(
-      logger,
+
       toolRegistry,
       eventBus,
       errorHandler
@@ -95,12 +94,12 @@ export class OrchestratorService {
     const toolSelector = new ToolSelector(
       orchestrationContext,
       toolRegistry,
-      logger,
+ 
      
     );
 
     const workflowManager = new WorkflowManager(
-      logger,
+
       errorHandler,
       toolSelector,
       toolRegistry,
@@ -110,7 +109,7 @@ export class OrchestratorService {
 
     const planningEngine = new PlanningEngine(
       orchestrationContext,
-      logger,
+  
       eventBus,
       toolRegistry,
       toolSelector,
@@ -123,7 +122,7 @@ export class OrchestratorService {
       eventBus,
       orchestrationContext,
       configurationManager,
-      logger,
+   
       errorHandler,
       inputAnalyzer,
       directActionRouter,
@@ -138,7 +137,7 @@ export class OrchestratorService {
     eventBus: EventBus,
     orchestrationContext: OrchestrationContext,
     configurationManager: ConfigurationManager,
-    logger: LoggerService,
+  
     errorHandler: ErrorHandler,
     inputAnalyzer: InputAnalyzer,
     directActionRouter: DirectActionRouter,
@@ -151,7 +150,7 @@ export class OrchestratorService {
     this.eventBus = eventBus;
     this.orchestrationContext = orchestrationContext;
     this.configurationManager = configurationManager;
-    this.logger = logger;
+  
     this.errorHandler = errorHandler;
     this.inputAnalyzer = inputAnalyzer;
     this.directActionRouter = directActionRouter;
@@ -161,7 +160,7 @@ export class OrchestratorService {
     this.workflowManager = workflowManager;
     this.feedbackManager = feedbackManager;
     
-    this.logger.info('OrchestratorService inicializado sin ResultEvaluator (modo prueba)');
+    log('OrchestratorService inicializado sin ResultEvaluator (modo prueba)', 'info');
   }
 
 /**
@@ -177,7 +176,7 @@ public async orchestrateRequest(input: string): Promise<OrchestrationResult> {
 
   try {
     console.log(`[OrchestratorService] Iniciando orquestación para entrada: "${input.substring(0, 100)}${input.length > 100 ? '...' : ''}"`);
-    this.logger.info('OrchestratorService: Handling input', { input });
+    log('OrchestratorService: Handling input ${ input }', 'info');
 
     const executionId = this.generateExecutionId();
     console.log(`[OrchestratorService] ID de ejecución generado: ${executionId}`);
@@ -302,7 +301,7 @@ public async orchestrateRequest(input: string): Promise<OrchestrationResult> {
     console.log(`[OrchestratorService] Error procesado: ${errorInfo.message}`);
     console.log(`[OrchestratorService] Componente origen: ${errorInfo.source || 'OrchestratorService'}`);
     
-    this.logger.error('OrchestratorService: Error during orchestration', { error: errorInfo });
+    log('OrchestratorService: Error during orchestration { error: errorInfo }','error' );
 
     console.log(`[OrchestratorService] Notificando error a través de FeedbackManager...`);
     this.feedbackManager.notify({
@@ -345,7 +344,7 @@ public async orchestrateRequest(input: string): Promise<OrchestrationResult> {
     }
 
     console.log('[OrchestratorService] Disposing resources...');
-    this.logger.info('OrchestratorService: Disposing resources');
+    log('OrchestratorService: Disposing resources','info');
     
     // Limpiar listeners de eventos
     // (aquí podrías desregistrar listeners si los hubieras registrado)

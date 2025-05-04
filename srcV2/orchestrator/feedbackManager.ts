@@ -5,7 +5,7 @@
  * al usuario sobre el progreso de las operaciones y los resultados.
  */
 
-import { LoggerService } from '../utils/logger';
+import { log } from '../utils/logger';
 import { ErrorHandler } from '../utils/errorHandler';
 import { EventBus } from '../core/event/eventBus';
 import * as vscode from 'vscode'; // Importar VS Code API
@@ -36,7 +36,7 @@ export class FeedbackManager {
   private activeNotifications: Map<string, vscode.Disposable> = new Map();
 
   constructor(
-    private logger: LoggerService,
+ 
     private errorHandler: ErrorHandler,
     private eventBus: EventBus,
     private context: vscode.ExtensionContext
@@ -58,13 +58,7 @@ export class FeedbackManager {
    */
   public notify(feedback: FeedbackPayload): void {
     // 1. Registrar en el logger según el tipo
-    if (feedback.type === 'error') {
-      this.logger.error(feedback.message || 'Error', feedback);
-    } else if (feedback.type === 'warning') {
-      this.logger.warn(feedback.message || 'Warning', feedback);
-    } else {
-      this.logger.info(feedback.message || 'Feedback', feedback);
-    }
+    log('FeedbackManager: Notifying user { feedback }', 'info');
 
     // 2. Presentar UI según el tipo
     this.presentFeedbackUI(feedback);
@@ -261,7 +255,7 @@ export class FeedbackManager {
     if (progress) {
       progress.report({ message, increment });
     } else {
-      this.logger.warn(`Attempted to report progress for unknown step: ${stepId}`);
+      log(`Attempted to report progress for unknown step: ${stepId}`,'warn');
     }
   }
 
