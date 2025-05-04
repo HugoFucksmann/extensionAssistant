@@ -1,19 +1,19 @@
 import { OrchestrationContext } from '../core/context/orchestrationContext';
 import { LoggerService } from '../utils/logger';
 import { EventBus } from '../core/event/eventBus';
-import { BaseAPI } from '../models/baseAPI';
 import { ToolRegistry } from '../tools/core/toolRegistry';
 import { InputAnalysis } from './inputAnalyzer';
 import { ToolSelector } from './toolSelector';
 import { FeedbackManager } from './feedbackManager';
-import { runPrompt } from '../core/promptSystem/promptSystem';
+import { executeModelInteraction  } from '../core/promptSystem/promptSystem';
 
 // Interfaces centralizadas
 export interface ExecutionPlan {
+  id: string; // Added for workflow tracking
   taskUnderstanding: string;
   goals: string[];
   plan: PlanStep[];
-  estimatedComplexity: "simple" | "moderate" | "complex";
+  estimatedComplexity: "simple" | "moderate" | "complex"; 
   potentialChallenges: string[];
 }
 
@@ -39,7 +39,6 @@ export class PlanningEngine {
     private orchestrationContext: OrchestrationContext,
     private logger: LoggerService,
     private eventBus: EventBus,
-    private modelApi: BaseAPI,
     private toolRegistry: ToolRegistry,
     private toolSelector: ToolSelector,
     private feedbackManager: FeedbackManager,
@@ -100,15 +99,15 @@ export class PlanningEngine {
       availableTools: this.toolRegistry.getAvailableTools()
     };
 
-    return runPrompt<ExecutionPlan>(
+    return executeModelInteraction <ExecutionPlan>(
       'planningEngine',
       promptContext,
-      this.modelApi
     );
   }
 
   private convertToExecutionPlan(modulePlan: any): ExecutionPlan {
     return {
+      id: modulePlan.id,
       taskUnderstanding: modulePlan.objective,
       goals: [modulePlan.objective],
       plan: modulePlan.steps.map((step: any, index: number) => ({
@@ -133,11 +132,9 @@ export class PlanningEngine {
       
       if (!this.toolRegistry.getByName(step.toolName)) {
         const alternative = await this.toolSelector.selectTool(
-          plan.taskUnderstanding,
-          step.description,
-          inputAnalysis
+          plan.taskUnderstanding
         );
-        step.toolName = alternative.tool;
+        step.toolName = alternative.toolName;
       }
     }
     
@@ -155,6 +152,7 @@ export class PlanningEngine {
   private createFallbackPlan(userInput: string, inputAnalysis: InputAnalysis): ExecutionPlan {
     const toolName = this.getFallbackTool(inputAnalysis.category);
     return {
+      id: 'fallback-plan',
       taskUnderstanding: `Fallback plan for: ${userInput}`,
       goals: ["Respond to user request with simplified approach"],
       plan: [{

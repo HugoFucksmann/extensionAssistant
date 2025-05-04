@@ -254,6 +254,51 @@ export class FeedbackManager {
   }
 
   /**
+   * Notifica el progreso de un paso específico
+   */
+  public notifyProgress(stepId: string, message: string, increment?: number): void {
+    const progress = this.progressBars.get(stepId);
+    if (progress) {
+      progress.report({ message, increment });
+    } else {
+      this.logger.warn(`Attempted to report progress for unknown step: ${stepId}`);
+    }
+  }
+
+  /**
+   * Notifica sobre procesamiento de archivos
+   * Este método es requerido por WorkflowManager
+   */
+  public notifyFileProcessing(files: string[], message?: string): void {
+    this.notify({
+      type: 'file-selection',
+      files,
+      message: message || `Procesando ${files.length} archivo(s)`,
+      userNotification: {
+        show: true,
+        message: message || `Procesando ${files.length} archivo(s)`,
+        type: 'info'
+      }
+    });
+  }
+
+  /**
+   * Notifica la finalización de un workflow
+   * Este método es requerido por WorkflowManager
+   */
+  public notifyCompletion(message?: string): void {
+    this.notify({
+      type: 'completion',
+      message: message || 'Operación completada con éxito',
+      userNotification: {
+        show: true,
+        message: message || 'Operación completada con éxito',
+        type: 'info'
+      }
+    });
+  }
+
+  /**
    * Elimina una notificación específica
    */
   private dismissNotification(id: string): void {

@@ -1,11 +1,11 @@
 import * as vscode from 'vscode';
-import { BaseAPI } from '../models/baseAPI';
 import { SQLiteStorage } from './storage/db/SQLiteStorage';
 import { ConfigurationManager } from './config/ConfigurationManager';
 import { ErrorHandler } from '../utils/errorHandler';
 import { OrchestratorService } from '../orchestrator/orchestratorService';
 import { EventBus } from './event/eventBus';
 import { logger, LoggerService } from '../utils/logger';
+import { initializePromptSystem } from './promptSystem/promptSystem';
 
 /**
  * Contenedor centralizado de dependencias para resolver dependencias circulares
@@ -25,7 +25,6 @@ export class DependencyContainer {
   
   // Servicios de datos
   private storage: SQLiteStorage | null = null;
-  private baseAPI: BaseAPI | null = null;
   
   // Servicios de orquestación
   private orchestratorService: OrchestratorService | null = null;
@@ -72,16 +71,15 @@ export class DependencyContainer {
     // Inicializar almacenamiento
     this.storage = new SQLiteStorage(this.context);
     
-    // Inicializar API
-    this.baseAPI = new BaseAPI(this.getConfigManager());
-    await this.baseAPI.initialize();
+    // Inicializar sistema de prompts
+    initializePromptSystem(this.getConfigManager());
   }
   
   /**
    * Inicializa el servicio de orquestación
    */
   public async initializeOrchestrator(): Promise<void> {
-    if (!this.baseAPI || !this.configManager || !this.errorHandler || !this.context) {
+    if (!this.configManager || !this.errorHandler || !this.context) {
       throw new Error('Servicios de datos no inicializados. Llame a initializeDataServices() primero.');
     }
     
@@ -90,7 +88,6 @@ export class DependencyContainer {
       eventBus: this.getEventBus(),
       logger: this.getLogger(),
       errorHandler: this.getErrorHandler(),
-      baseAPI: this.getBaseAPI(),
       configurationManager: this.getConfigManager(),
       context: this.getContext()
     });
@@ -140,13 +137,6 @@ export class DependencyContainer {
     return this.storage;
   }
   
-  public getBaseAPI(): BaseAPI {
-    if (!this.baseAPI) {
-      throw new Error('BaseAPI no inicializado');
-    }
-    return this.baseAPI;
-  }
-  
   // Getters para servicios de orquestación
   public getOrchestratorService(): OrchestratorService {
     if (!this.orchestratorService) {
@@ -176,11 +166,6 @@ export class DependencyContainer {
     if (this.orchestratorService) {
       this.orchestratorService.dispose?.();
       this.orchestratorService = null;
-    }
-    
-    if (this.baseAPI) {
-      this.baseAPI.dispose();
-      this.baseAPI = null;
     }
     
     if (this.storage) {

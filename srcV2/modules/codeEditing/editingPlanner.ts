@@ -1,6 +1,5 @@
 import { LoggerService } from '../../utils/logger';
-import { BaseAPI } from '../../models/baseAPI';
-import { runPrompt } from '../../core/promptSystem/promptSystem';
+import { executeModelInteraction } from '../../core/promptSystem/promptSystem';
 
 export interface EditingPlan {
   objective: string;
@@ -15,7 +14,6 @@ export interface EditingPlan {
 export class EditingPlanner {
   constructor(
     private logger: LoggerService,
-    private modelApi: BaseAPI
   ) {
     this.logger.info('EditingPlanner initialized');
   }
@@ -30,10 +28,9 @@ export class EditingPlanner {
         availableTools: this.getAvailableEditingTools()
       };
 
-      const plan = await runPrompt<EditingPlan>(
+      const plan = await executeModelInteraction<EditingPlan>(
         'editing',
         context,
-        this.modelApi
       );
 
       this.logger.info(`Editing plan created with ${plan.steps.length} steps`);

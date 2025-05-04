@@ -1,65 +1,45 @@
-import { OrchestrationContext } from '../core/context/orchestrationContext';
-import { ToolRegistry } from '../tools/core/toolRegistry';
-import { LoggerService } from '../utils/logger';
-import { BaseAPI } from '../models/baseAPI';
-import { runPrompt } from '../core/promptSystem/promptSystem';
-import { InputAnalysis } from './inputAnalyzer';
+import { OrchestrationContext } from "../core/context/orchestrationContext";
+import { executeModelInteraction } from "../core/promptSystem/promptSystem";
+import { ToolRegistry } from "../tools/core/toolRegistry";
+import { LoggerService } from "../utils/logger";
+
 
 export interface ToolSelection {
-  tool: string;
-  reason: string;
+  toolName: string;
+  params: Record<string, any>;
   confidence: number;
 }
 
 export class ToolSelector {
   constructor(
-    private orchestrationContext: OrchestrationContext,
+    private context: OrchestrationContext,
     private toolRegistry: ToolRegistry,
-    private logger: LoggerService,
-    private modelApi: BaseAPI
+    private logger: LoggerService
   ) {}
 
-  public async selectTool(
-    taskDescription: string,
-    stepDescription: string,
-    inputAnalysis: InputAnalysis
-  ): Promise<ToolSelection> {
+  public async selectTool(taskDescription: string): Promise<ToolSelection> {
     try {
-      const context = {
-        ...this.orchestrationContext.get(),
-        taskDescription,
-        stepDescription,
-        inputAnalysis,
-        availableTools: this.toolRegistry.getAvailableTools()
-      };
-
-      const selection = await runPrompt<ToolSelection>(
-        'toolSelector',
-        context,
-        this.modelApi
-      );
-
-      if (!this.validateSelection(selection)) {
-        throw new Error('Invalid tool selection from model');
-      }
-
-      return selection;
-    } catch (err) {
-      this.logger.error('[ToolSelector] Error in selectTool:', {err});
+      this.logger.info('Seleccionando herramienta para tarea', { taskDescription });
       
-      // Fallback robusto
-      const fallbackTools = this.toolRegistry.getAvailableTools();
-      const fallbackTool = fallbackTools[0]?.name || 'defaultTool';
-      return {
-        tool: fallbackTool,
-        reason: 'Fallback: error in automatic selection',
-        confidence: 0
-      };
+      return await executeModelInteraction<ToolSelection>(
+        'toolSelector',
+        {
+          taskDescription,
+          availableTools: this.toolRegistry.getAvailableTools(),
+          context: this.context.get()
+        }
+      );
+    } catch (error) {
+      this.logger.error('Error seleccionando herramienta', { error });
+      return this.getDefaultToolSelection();
     }
   }
 
-  private validateSelection(selection: ToolSelection): boolean {
-    const availableTools = this.toolRegistry.getAvailableTools();
-    return availableTools.some(tool => tool.name === selection.tool);
+  private getDefaultToolSelection(): ToolSelection {
+    return {
+      toolName: 'default',
+      params: {},
+      confidence: 0
+    };
   }
 }

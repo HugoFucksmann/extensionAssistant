@@ -143,8 +143,7 @@ export class BaseAPI {
       
       return await executeModelInteraction<string>(
         'communication',
-        { userMessage: prompt },
-        this
+        { userMessage: prompt }
       );
     } catch (error) {
       console.error('[BaseAPI] Error al usar el sistema de prompts:', error);

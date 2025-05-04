@@ -316,7 +316,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
 		try {
 			// Simplemente limpiar la UI para un nuevo chat
 			this.sendMessageToWebview({
-				type: MESSAGE_TYPES.CHAT_CREATED,
+				type: 'chat:new',
 				chat: {
 					id: `chat_${Date.now()}`,
 					title: 'Nuevo chat',

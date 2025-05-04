@@ -1,6 +1,5 @@
 import { ToolRegistry } from '../../tools/core/toolRegistry';
 import { LoggerService } from '../../utils/logger';
-import { BaseAPI } from '../../models/baseAPI';
 import { OrchestrationContext } from '../../core/context/orchestrationContext';
 
 export interface ProjectModuleResult {
@@ -13,7 +12,6 @@ export class ProjectModule {
   constructor(
     private toolRegistry: ToolRegistry,
     private logger: LoggerService,
-    private modelApi: BaseAPI
   ) {
     this.logger.info('ProjectModule inicializado');
     console.log(`[ProjectModule] Inicializado`);

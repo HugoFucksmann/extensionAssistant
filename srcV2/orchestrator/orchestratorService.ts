@@ -10,9 +10,8 @@ import { PlanningEngine, ExecutionPlan } from './planningEngine';
 import { ToolSelector } from './toolSelector';
 import { WorkflowManager } from './workflowManager';
 import { FeedbackManager } from './feedbackManager';
-import { BaseAPI } from '../models/baseAPI';
-import { ToolRegistry } from '../tools/core/toolRegistry';
 import * as vscode from 'vscode';
+import { ToolRegistry } from '../tools/core/toolRegistry';
 
 export interface OrchestrationResult {
   success: boolean;
@@ -34,7 +33,6 @@ export interface OrchestratorCreateOptions {
   eventBus: EventBus;
   logger: LoggerService;
   errorHandler: ErrorHandler;
-  baseAPI: BaseAPI;
   configurationManager: ConfigurationManager;
   context: vscode.ExtensionContext;
 }
@@ -59,7 +57,7 @@ export class OrchestratorService {
    * Compatible con el patrón usado en extensionHandler.ts
    */
   public static async create(options: OrchestratorCreateOptions): Promise<OrchestratorService> {
-    const { eventBus, logger, errorHandler, baseAPI, configurationManager, context } = options;
+    const { eventBus, logger, errorHandler, configurationManager, context } = options;
     
     // Crear o obtener instancias de componentes necesarios
     const orchestrationContext = new OrchestrationContext();
@@ -69,8 +67,6 @@ export class OrchestratorService {
     const inputAnalyzer = new InputAnalyzer(
       orchestrationContext,
       logger,
-      eventBus,
-      baseAPI
     );
 
     const directActionRouter = new DirectActionRouter(
@@ -92,7 +88,7 @@ export class OrchestratorService {
       orchestrationContext,
       toolRegistry,
       logger,
-      baseAPI
+     
     );
 
     const workflowManager = new WorkflowManager(
@@ -101,14 +97,12 @@ export class OrchestratorService {
       toolSelector,
       toolRegistry,
       feedbackManager,
-      baseAPI
     );
 
     const planningEngine = new PlanningEngine(
       orchestrationContext,
       logger,
       eventBus,
-      baseAPI,
       toolRegistry,
       toolSelector,
       feedbackManager,

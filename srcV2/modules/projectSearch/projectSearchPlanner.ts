@@ -1,6 +1,6 @@
 import { LoggerService } from '../../utils/logger';
-import { BaseAPI } from '../../models/baseAPI';
-import { runPrompt } from '../../core/promptSystem/promptSystem';
+
+import { executeModelInteraction } from '../../core/promptSystem/promptSystem';
 
 export interface ProjectSearchPlan {
   objective: string;
@@ -16,7 +16,7 @@ export interface ProjectSearchPlan {
 export class ProjectSearchPlanner {
   constructor(
     private logger: LoggerService,
-    private modelApi: BaseAPI
+ 
   ) {
     this.logger.info('ProjectSearchPlanner initialized');
   }
@@ -31,10 +31,9 @@ export class ProjectSearchPlanner {
         availableTools: this.getAvailableSearchTools()
       };
 
-      const plan = await runPrompt<ProjectSearchPlan>(
+      const plan = await executeModelInteraction<ProjectSearchPlan>(
         'projectSearch',
         context,
-        this.modelApi
       );
 
       this.logger.info(`Search plan created with ${plan.steps.length} steps`);

@@ -1,6 +1,6 @@
 import { LoggerService } from '../../utils/logger';
-import { BaseAPI } from '../../models/baseAPI';
-import { runPrompt } from '../../core/promptSystem/promptSystem';
+
+import { executeModelInteraction } from '../../core/promptSystem/promptSystem';
 import { ConfigurationManager } from '../../core/config/ConfigurationManager';
 
 export interface ExaminationPlan {
@@ -16,9 +16,8 @@ export interface ExaminationPlan {
 
 export class ExaminationPlanner {
   constructor(
-    private configurationManager: ConfigurationManager,
     private logger: LoggerService,
-    private modelApi: BaseAPI
+
   ) {
     this.logger.info('ExaminationPlanner inicializado');
     console.log(`[ExaminationPlanner] Inicializado`);
@@ -35,10 +34,9 @@ export class ExaminationPlanner {
         availableTools: this.getAvailableExaminationTools()
       };
 
-      const plan = await runPrompt<ExaminationPlan>(
+      const plan = await executeModelInteraction<ExaminationPlan>(
         'examination',
         context,
-        this.modelApi
       );
 
       this.logger.info(`[ExaminationPlanner] Plan creado con ${plan.steps.length} pasos`);

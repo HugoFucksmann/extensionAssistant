@@ -101,7 +101,6 @@ export class ExtensionHandler {
         eventBus: this.dependencyContainer.getEventBus(),
         logger: logger,
         errorHandler: this.dependencyContainer.getErrorHandler(),
-        baseAPI: this.dependencyContainer.getBaseAPI(),
         configurationManager: this.dependencyContainer.getConfigManager(), 
         context: this.context
       });
@@ -124,11 +123,11 @@ export class ExtensionHandler {
       console.log('Comando nuevo chat ejecutado');
     });
     
-    // Registrar comando para cambiar el modelo
+   /*  // Registrar comando para cambiar el modelo
     this.commandRegistry.register(ACTIONS.SET_MODEL, async (args: { modelType: 'ollama' | 'gemini' }) => {
       const baseAPI = this.dependencyContainer.getBaseAPI();
       await baseAPI.setModel(args.modelType);
-    });
+    }); */
     
     // Registrar comando para mostrar el chat
     this.commandRegistry.register('chat:show', async () => {
@@ -177,7 +176,6 @@ public async processMessage(message: string): Promise<string> {
   
   // Getters para componentes de servicio
   public getStorage() { return this.dependencyContainer.getStorage(); }
-  public getBaseAPI() { return this.dependencyContainer.getBaseAPI(); }
   public getCommandRegistry(): CommandRegistry | null { return this.commandRegistry; }
   public getWebViewManager(): WebViewManager | null { return this.webViewManager; }
   public getOrchestratorService(): OrchestratorService { return this.dependencyContainer.getOrchestratorService(); }

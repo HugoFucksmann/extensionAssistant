@@ -1,1 +1,0 @@
-// # NUEVO: Canal bidireccional de comunicación

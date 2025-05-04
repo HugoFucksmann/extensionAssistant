@@ -1,6 +1,6 @@
 import { LoggerService } from '../../utils/logger';
-import { BaseAPI } from '../../models/baseAPI';
-import { runPrompt } from '../../core/promptSystem/promptSystem';
+import { PromptType } from '../../core/promptSystem/types';
+import { executeModelInteraction } from '../../core/promptSystem/promptSystem';
 
 export interface ProjectPlan {
   objective: string;
@@ -14,8 +14,7 @@ export interface ProjectPlan {
 
 export class ProjectPlanner {
   constructor(
-    private logger: LoggerService,
-    private modelApi: BaseAPI
+    private logger: LoggerService
   ) {
     this.logger.info('ProjectPlanner initialized');
   }
@@ -30,14 +29,10 @@ export class ProjectPlanner {
         availableTools: this.getAvailableProjectTools()
       };
 
-      const plan = await runPrompt<ProjectPlan>(
+      return await executeModelInteraction<ProjectPlan>(
         'projectManagement',
-        context,
-        this.modelApi
+        context
       );
-
-      this.logger.info(`Project plan created with ${plan.steps.length} steps`);
-      return plan;
     } catch (error) {
       this.logger.error('Error creating project plan', { error });
       return this.getDefaultPlan();

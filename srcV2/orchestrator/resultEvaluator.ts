@@ -1,8 +1,7 @@
 import { OrchestrationContext } from '../core/context/orchestrationContext';
 import { LoggerService } from '../utils/logger';
-import { BaseAPI } from '../models/baseAPI';
 import { ExecutionPlan } from './planningEngine';
-import { runPrompt } from '../core/promptSystem/promptSystem';
+import { executeModelInteraction } from '../core/promptSystem/promptSystem';
 
 export interface ResultEvaluation {
   success: boolean;
@@ -19,7 +18,6 @@ export class ResultEvaluator {
   constructor(
     private orchestrationContext: OrchestrationContext,
     private logger: LoggerService,
-    private modelAPI: BaseAPI
   ) {}
 
   public async evaluateResult(
@@ -35,10 +33,9 @@ export class ResultEvaluator {
         originalInput
       };
 
-      return await runPrompt<ResultEvaluation>(
+      return await executeModelInteraction<ResultEvaluation>(
         'resultEvaluator',
         context,
-        this.modelAPI
       );
     } catch (error) {
       this.logger.error('[ResultEvaluator] Error evaluating result:', {error});
