@@ -63,70 +63,68 @@ export class ExtensionHandler {
     this.errorHandler = new ErrorHandler(this.configManager);
   }
 
-  /**
-   * Inicializa todos los componentes de la extensión en un orden correcto
-   */
- private async initializeComponents(): Promise<void> {
-    try {
-      logger.info('Inicializando componentes de la extensión...');
-      
-      // 1. Inicializar almacenamiento
-      this.storage = new SQLiteStorage(this.context);
-      
-      // 2. Inicializar API con el gestor de configuración unificado
-      this.baseAPI = new BaseAPI(this.configManager);
-      await this.baseAPI.initialize();
-      
-      // 3. Inicializar servicio de chat
-      this.chatService = new ChatService(
-        this.storage, 
-        this.configManager,
-        this.baseAPI
-      );
-      await this.chatService.initialize();
-      
-      // 3.1 Actualizar errorHandler con el servicio de chat
-      // Ahora que el chatService está inicializado, lo asignamos al errorHandler
-      if (this.chatService) {
-        // Actualizar el errorHandler con el chatService ahora disponible
-        this.errorHandler.chatService = this.chatService;
-      }
-      
-      // 4. Inicializar y registrar comandos
-      this.commandRegistry = new CommandRegistry();
-      this.registerCommands();
-      
-    // 5. Inicializar orquestador SIEMPRE
-this.orchestratorService = await this.initializeOrchestrator();
-console.log(`[ExtensionHandler] Orquestador inicializado: ${!!this.orchestratorService}`);
-if (!this.orchestratorService) {
-  throw new Error('No se pudo inicializar el OrchestratorService. La extensión no puede continuar.');
-}
-      
-      // 6. Inicializar WebView
-      this.webViewManager = new WebViewManager(
-        this.context.extensionUri,
-        this.configManager,
-        this.chatService,
-        this.orchestratorService
-      );
-      const webviewDisposable = this.webViewManager.register(this.context);
-      this.context.subscriptions.push(webviewDisposable);
-      
-      // 7. Inicializar procesador de mensajes
-      this.messageProcessor = new MessageProcessor(
-        this.configManager,
-        this.baseAPI,
-        this.chatService,
-        this.errorHandler,
-      );
-      
-      logger.info('Extensión inicializada correctamente');
-    } catch (error) {
-      logger.error('Error al inicializar la extensión:', {error});
-      throw error;
+/**
+ * Inicializa todos los componentes de la extensión en un orden correcto
+ * - Asegura que OrchestratorService siempre sea inicializado
+ * - Pasa orchestratorService como requerido a MessageProcessor
+ */
+private async initializeComponents(): Promise<void> {
+  try {
+    logger.info('Inicializando componentes de la extensión...');
+    
+    // 1. Inicializar almacenamiento
+    this.storage = new SQLiteStorage(this.context);
+    
+    // 2. Inicializar API con el gestor de configuración unificado
+    this.baseAPI = new BaseAPI(this.configManager);
+    await this.baseAPI.initialize();
+    
+    // 3. Inicializar servicio de chat
+    this.chatService = new ChatService(
+      this.storage, 
+      this.configManager,
+      this.baseAPI
+    );
+    await this.chatService.initialize();
+    
+    // 3.1 Actualizar errorHandler con el servicio de chat
+    if (this.chatService) {
+      this.errorHandler.chatService = this.chatService;
     }
+    
+    // 4. Inicializar y registrar comandos
+    this.commandRegistry = new CommandRegistry();
+    this.registerCommands();
+    
+    // 5. Inicializar orquestador SIEMPRE - simplificado y sin manejo condicional
+    this.orchestratorService = await this.initializeOrchestrator();
+    if (!this.orchestratorService) {
+      throw new Error('No se pudo inicializar el OrchestratorService. La extensión no puede continuar.');
+    }
+    
+    // 6. Inicializar WebView
+    this.webViewManager = new WebViewManager(
+      this.context.extensionUri,
+      this.chatService,
+      this.orchestratorService // Siempre es requerido
+    );
+    const webviewDisposable = this.webViewManager.register(this.context);
+    this.context.subscriptions.push(webviewDisposable);
+    
+    // 7. Inicializar procesador de mensajes
+    this.messageProcessor = new MessageProcessor(
+      this.configManager,
+      this.chatService,
+      this.errorHandler,
+      this.orchestratorService // Ahora es obligatorio
+    );
+    
+    logger.info('Extensión inicializada correctamente');
+  } catch (error) {
+    logger.error('Error al inicializar la extensión:', {error});
+    throw error;
   }
+}
 
   /**
    * Inicializa el orquestador y sus componentes
@@ -179,16 +177,16 @@ if (!this.orchestratorService) {
     );
   }
 
-  /**
-   * Procesa un mensaje de usuario a través del orquestador o directamente
-   */
-  public async processMessage(message: string): Promise<string> {
-    if (!this.messageProcessor) {
-      throw new Error('Procesador de mensajes no inicializado');
-    }
-    
-    return await this.messageProcessor.process(message);
+ /**
+ * Procesa un mensaje de usuario simplificado para usar siempre orquestación
+ */
+public async processMessage(message: string): Promise<string> {
+  if (!this.messageProcessor) {
+    throw new Error('Procesador de mensajes no inicializado');
   }
+  
+  return await this.messageProcessor.process(message);
+}
 
   // Getters para componentes y servicios principales
   public getContext(): vscode.ExtensionContext { return this.context; }

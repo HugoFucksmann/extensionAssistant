@@ -7,6 +7,7 @@ import { ACTIONS, MESSAGE_TYPES } from '../../core/config/constants';
 
 /**
  * Implementación del proveedor de webview
+ * Simplificada para usar exclusivamente el flujo de orquestación
  */
 export class WebviewProvider implements vscode.WebviewViewProvider {
 	private view?: vscode.WebviewView;
@@ -14,27 +15,19 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
 	private webviewReady = false;
 	private stateUnsubscribers: (() => void)[] = [];
 	private configManager: ConfigurationManager;
-	private orchestratorService?: OrchestratorService;
 
 	constructor(
 		private readonly extensionUri: vscode.Uri,
 		private readonly chatService: ChatService,
-		orchestratorService?: OrchestratorService
+		private readonly orchestratorService: OrchestratorService // Obligatorio
 	) {
 		this.configManager = ConfigurationManager.getInstance();
-		this.orchestratorService = orchestratorService;
-		
-		// Logs de depuración para verificar el orquestador
-		console.log(`[WebviewProvider] Constructor - useOrchestration: ${this.configManager.getUseOrchestration()}`);
-		console.log(`[WebviewProvider] Constructor - orchestratorService recibido: ${orchestratorService ? 'SÍ' : 'NO'}`);
 		
 		// Suscribirse a cambios de configuración relevantes
 		this.stateUnsubscribers.push(
 			this.configManager.onChange('modelType', this.handleModelChange.bind(this))
 		);
 	}
-
-	
 
 	/**
 	 * Método requerido por la interfaz WebviewViewProvider
@@ -131,59 +124,52 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
 	
 	/**
 	 * Maneja el envío de un mensaje de chat
+	 * Simplificado para usar exclusivamente el flujo de orquestación
 	 */
-		 private async handleSendMessage(message: string): Promise<void> {
-			if (!message?.trim()) return;
-			
-			 // Notificar al frontend que estamos procesando
-			 this.sendMessageToWebview({
-			 type: MESSAGE_TYPES.PROCESSING,
-		 status: 'start'
-		});
-		 // Verificar si el orquestador está disponible
-console.log(`[WebviewProvider] handleSendMessage - orchestratorService existe: ${!!this.orchestratorService}`);
-		 try {
-		 let response: string;
+	private async handleSendMessage(message: string): Promise<void> {
+		if (!message?.trim()) return;
 		
-		 // Verificar solo si el orquestador está disponible
-		if (this.orchestratorService) {
-		// UNICO FLUJO PERMITIDO: Usar el orquestador
-		 const result = await this.orchestratorService.orchestrateRequest(message);
-		 
-		 // Extraer la respuesta del resultado de orquestación
-		 response = this.extractResponseFromOrchestrationResult(result);
-		 } else {
-		 // Si el único flujo no está disponible, no hacemos nada o lanzamos un error
-		 const errorMessage = "El orquestador no está disponible. No se puede procesar el mensaje.";
-			 console.error(`[WebviewProvider] ${errorMessage}`);
-			 // Opcional: Lanzar un error para que el catch lo maneje
-			 throw new Error(errorMessage);
-			 }
-			 
-			 // Solo enviar respuesta si se obtuvo una del orquestador
-			 if (response !== undefined) { // Verificar que se asignó una respuesta (si no se lanzó error)
-			 this.sendMessageToWebview({
-			 type: MESSAGE_TYPES.MESSAGE,
-			 role: 'assistant',
-			content: response
-			 });
-			 }
-			 } catch (error) {
-			// El catch ahora manejará errores de la orquestación O si el orquestador no estaba disponible
-			 const errorMessage = error instanceof Error ? error.message : 'Error desconocido al procesar el mensaje vía orquestador';
-			 console.error(`[WebviewProvider] Error en flujo de orquestación:`, error);
+		// Notificar al frontend que estamos procesando
+		this.sendMessageToWebview({
+			type: MESSAGE_TYPES.PROCESSING,
+			status: 'start'
+		});
+		
+		try {
+			// Usar el orquestador de manera directa
+			const result = await this.orchestratorService.orchestrateRequest(message);
+			
+			// Extraer la respuesta del resultado de orquestación
+			const response = this.extractResponseFromOrchestrationResult(result);
+			
+			// Añadir el mensaje del usuario a la UI
 			this.sendMessageToWebview({
-			 type: MESSAGE_TYPES.ERROR,
-			 error: errorMessage
-			 });
-			 } finally {
-			 // Notificar al frontend que terminamos de procesar
-			 this.sendMessageToWebview({
-			 type: MESSAGE_TYPES.PROCESSING,
-			 status: 'stop'
-			 });
-			 }
-			}
+				type: MESSAGE_TYPES.MESSAGE,
+				role: 'user',
+				content: message
+			});
+			
+			// Enviar respuesta a la UI
+			this.sendMessageToWebview({
+				type: MESSAGE_TYPES.MESSAGE,
+				role: 'assistant',
+				content: response
+			});
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : 'Error al procesar el mensaje';
+			console.error(`[WebviewProvider] Error en orquestación:`, error);
+			this.sendMessageToWebview({
+				type: MESSAGE_TYPES.ERROR,
+				error: errorMessage
+			});
+		} finally {
+			// Notificar al frontend que terminamos de procesar
+			this.sendMessageToWebview({
+				type: MESSAGE_TYPES.PROCESSING,
+				status: 'stop'
+			});
+		}
+	}
 
 	/**
 	 * Extrae la respuesta del resultado de orquestación
@@ -282,12 +268,11 @@ console.log(`[WebviewProvider] handleSendMessage - orchestratorService existe: $
 	 * Maneja la solicitud de cargar el historial de chats
 	 */
 	private async handleLoadHistory(): Promise<void> {
-		// CORRECCIÓN: Cambiar getChatHistory por getChatList
 		try {
 			const history = await this.chatService.getChatList();
 			this.sendMessageToWebview({
 				type: MESSAGE_TYPES.HISTORY_LOADED,
-				history // Asumiendo que el frontend espera 'history' para la lista de chats
+				history
 			});
 		} catch (error) {
 			console.error('[WebviewProvider] Error al cargar historial:', error);

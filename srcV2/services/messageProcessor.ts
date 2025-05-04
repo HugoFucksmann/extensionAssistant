@@ -1,26 +1,23 @@
-
 import { ChatService } from './chatService';
 import { OrchestratorService } from '../orchestrator/orchestratorService';
 import { ConfigurationManager } from '../core/config/ConfigurationManager';
 import { ErrorHandler } from '../utils/errorHandler';
 import { EventBus } from '../core/event/eventBus';
-import { ACTIONS, MESSAGE_TYPES } from '../core/config/constants';
-import { BaseAPI } from '../models/baseAPI';
-
+import { ACTIONS } from '../core/config/constants';
 
 /**
  * Clase especializada para procesar mensajes del usuario
  * Separa la lógica de procesamiento de mensajes del ExtensionContext
+ * Simplificada para usar exclusivamente el flujo de orquestación
  */
 export class MessageProcessor {
   private eventBus: EventBus;
   
   constructor(
     private configManager: ConfigurationManager,
-    private baseAPI: BaseAPI,
     private chatService: ChatService,
     private errorHandler: ErrorHandler,
-    private orchestratorService?: OrchestratorService
+    private orchestratorService: OrchestratorService // Ahora es un requisito obligatorio
   ) {
     this.eventBus = EventBus.getInstance();
   }
@@ -42,14 +39,8 @@ export class MessageProcessor {
       // Añadir mensaje del usuario al chat
       await this.chatService.addUserMessage(message);
       
-      let response: string;
-      
-      // Determinar si usar orquestación o flujo directo
-      if (this.shouldUseOrchestration()) {
-        response = await this.processWithOrchestration(message);
-      } else {
-        response = await this.processDirectly(message);
-      }
+      // Usar exclusivamente el flujo de orquestación
+      const response = await this.processWithOrchestration(message);
       
       // Añadir respuesta al chat
       await this.chatService.addAssistantResponse(response);
@@ -72,16 +63,7 @@ export class MessageProcessor {
   }
   
   /**
-   * Determina si se debe usar la orquestación para procesar el mensaje
-   */
-  private shouldUseOrchestration(): boolean {
-    return this.configManager.getUseOrchestration() && 
-           !!this.orchestratorService &&
-           (this.orchestratorService as any).isReady?.() !== false;
-  }
-  
-  /**
-   * Procesa un mensaje usando el flujo de orquestación
+   * Procesa un mensaje usando exclusivamente el flujo de orquestación
    * @param message El mensaje del usuario
    * @returns La respuesta generada
    */
@@ -89,7 +71,7 @@ export class MessageProcessor {
     console.log('[INFO] Usando flujo de orquestación');
     
     try {
-      const result = await this.orchestratorService!.orchestrateRequest(message);
+      const result = await this.orchestratorService.orchestrateRequest(message);
       
       if (result.success) {
         let response: string;
@@ -108,20 +90,7 @@ export class MessageProcessor {
       }
     } catch (orchError: any) {
       console.error('[ERROR] Excepción en orquestación:', orchError);
-      
-      // Fallback al flujo directo si la orquestación falla
-      console.log('[INFO] Fallback al flujo directo');
-      return await this.processDirectly(message);
+      throw orchError; // Re-lanzar el error para que sea manejado por el proceso principal
     }
-  }
-  
-  /**
-   * Procesa un mensaje usando el flujo directo
-   * @param message El mensaje del usuario
-   * @returns La respuesta generada
-   */
-  private async processDirectly(message: string): Promise<string> {
-    console.log('[INFO] Usando flujo directo');
-    return await this.baseAPI.generateResponse(message);
   }
 }

@@ -16,9 +16,8 @@ export class WebViewManager {
 
   constructor(
     private readonly extensionUri: vscode.Uri,
-    private readonly configManager: ConfigurationManager,
     private readonly chatService: ChatService,
-    private readonly orchestratorService?: OrchestratorService
+    private readonly orchestratorService: OrchestratorService
   ) {
     // Crear el proveedor de webview con los servicios necesarios
     this.webviewProvider = new WebviewProvider(
@@ -79,7 +78,7 @@ export class WebViewManager {
     }
     
     // Suscribirse a cambios de configuración relevantes
-    this.configManager.onChange('useOrchestration', (_key, value) => {
+    ConfigurationManager.getInstance().onChange('useOrchestration', (_key, value) => {
       // Notificar al webview sobre el cambio en el modo de orquestación
       this.webviewProvider.sendMessageToWebview({
         type: 'orchestration-mode',
