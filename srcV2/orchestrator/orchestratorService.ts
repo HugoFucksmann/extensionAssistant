@@ -10,6 +10,7 @@ import { PlanningEngine, ExecutionPlan } from './planningEngine';
 import { ToolSelector } from './toolSelector';
 import { WorkflowManager } from './workflowManager';
 import { FeedbackManager } from './feedbackManager';
+import { ModuleManager } from '../modules/moduleManager'; // Added missing dependency
 import * as vscode from 'vscode';
 import { ToolRegistry } from '../tools/core/toolRegistry';
 
@@ -84,6 +85,13 @@ export class OrchestratorService {
       context
     );
 
+    const moduleManager = new ModuleManager(
+      logger,
+      toolRegistry,
+      eventBus,
+      errorHandler
+    );
+
     const toolSelector = new ToolSelector(
       orchestrationContext,
       toolRegistry,
@@ -97,6 +105,7 @@ export class OrchestratorService {
       toolSelector,
       toolRegistry,
       feedbackManager,
+      moduleManager
     );
 
     const planningEngine = new PlanningEngine(
@@ -106,7 +115,7 @@ export class OrchestratorService {
       toolRegistry,
       toolSelector,
       feedbackManager,
-      {} // Aquí irían los modulePlanners si los tienes
+      moduleManager
     );
 
     // Crear y retornar la instancia de OrchestratorService

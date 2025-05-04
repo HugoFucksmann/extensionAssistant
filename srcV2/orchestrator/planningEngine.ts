@@ -5,7 +5,8 @@ import { ToolRegistry } from '../tools/core/toolRegistry';
 import { InputAnalysis } from './inputAnalyzer';
 import { ToolSelector } from './toolSelector';
 import { FeedbackManager } from './feedbackManager';
-import { executeModelInteraction  } from '../core/promptSystem/promptSystem';
+import { executeModelInteraction } from '../core/promptSystem/promptSystem';
+import { ModuleManager } from '../modules/moduleManager';
 
 // Interfaces centralizadas
 export interface ExecutionPlan {
@@ -15,6 +16,12 @@ export interface ExecutionPlan {
   plan: PlanStep[];
   estimatedComplexity: "simple" | "moderate" | "complex"; 
   potentialChallenges: string[];
+  metadata?: {
+    category: string;
+    intentClassification?: string;
+    moduleGenerated?: boolean;
+    moduleUsed?: string;
+  };
 }
 
 export interface PlanStep {
@@ -27,14 +34,7 @@ export interface PlanStep {
   fallbackStep: number | null;
 }
 
-// Tipo para los planificadores específicos
-interface ModulePlanner {
-  createPlan(input: string, context: Record<string, any>): Promise<any>;
-}
-
 export class PlanningEngine {
-  private modulePlanners: Record<string, ModulePlanner>;
-
   constructor(
     private orchestrationContext: OrchestrationContext,
     private logger: LoggerService,
@@ -42,10 +42,9 @@ export class PlanningEngine {
     private toolRegistry: ToolRegistry,
     private toolSelector: ToolSelector,
     private feedbackManager: FeedbackManager,
-    modulePlanners: Record<string, ModulePlanner>
+    private moduleManager: ModuleManager
   ) {
-    this.modulePlanners = modulePlanners;
-    this.logger.info('PlanningEngine initialized with module planners');
+    this.logger.info('PlanningEngine initialized with module manager');
   }
 
   public async createPlan(userInput: string, inputAnalysis: InputAnalysis): Promise<ExecutionPlan> {
@@ -55,11 +54,20 @@ export class PlanningEngine {
       const context = this.getPlanContext(userInput, inputAnalysis);
       let executionPlan: ExecutionPlan;
 
-      // Intentar usar planificador específico primero
-      const modulePlan = await this.tryCreateModulePlan(inputAnalysis.category, userInput, context);
+      // Intentar usar un módulo especializado primero
+      const modulePlan = await this.moduleManager.createPlan(
+        userInput,
+        {
+          category: inputAnalysis.category,
+          intentClassification: inputAnalysis.intentClassification,
+          confidence: inputAnalysis.confidence
+        },
+        context
+      );
       
       if (modulePlan) {
-        executionPlan = this.convertToExecutionPlan(modulePlan);
+        // Convertir el plan del módulo al formato ExecutionPlan
+        executionPlan = this.convertToExecutionPlan(modulePlan, inputAnalysis);
       } else {
         // Usar planificador genérico
         executionPlan = await this.createGenericPlan(userInput, inputAnalysis, context);
@@ -75,16 +83,29 @@ export class PlanningEngine {
     }
   }
 
-  private async tryCreateModulePlan(category: string, userInput: string, context: any): Promise<any> {
-    const planner = this.modulePlanners[category];
-    if (!planner) return null;
-
-    try {
-      return await planner.createPlan(userInput, context);
-    } catch (error) {
-      this.logger.warn(`Module planner failed for category ${category}`, { error });
-      return null;
-    }
+  private convertToExecutionPlan(modulePlan: any, inputAnalysis: InputAnalysis): ExecutionPlan {
+    return {
+      id: modulePlan.id || `plan-${Date.now()}`,
+      taskUnderstanding: modulePlan.objective,
+      goals: [modulePlan.objective],
+      plan: modulePlan.steps.map((step: any, index: number) => ({
+        stepNumber: index + 1,
+        description: step.description,
+        toolName: step.toolName,
+        toolParams: step.params,
+        expectedOutput: step.resultKey ? `Resultado en ${step.resultKey}` : 'Ejecución exitosa',
+        isRequired: true,
+        fallbackStep: null
+      })),
+      estimatedComplexity: modulePlan.estimatedComplexity || 'moderate',
+      potentialChallenges: [],
+      metadata: {
+        category: inputAnalysis.category,
+        intentClassification: inputAnalysis.intentClassification,
+        moduleGenerated: true,
+        moduleUsed: modulePlan.moduleUsed || 'unknown'
+      }
+    };
   }
 
   private async createGenericPlan(
@@ -99,28 +120,19 @@ export class PlanningEngine {
       availableTools: this.toolRegistry.getAvailableTools()
     };
 
-    return executeModelInteraction <ExecutionPlan>(
+    const genericPlan = await executeModelInteraction<ExecutionPlan>(
       'planningEngine',
       promptContext,
     );
-  }
-
-  private convertToExecutionPlan(modulePlan: any): ExecutionPlan {
+    
+    // Añadir metadata al plan genérico
     return {
-      id: modulePlan.id,
-      taskUnderstanding: modulePlan.objective,
-      goals: [modulePlan.objective],
-      plan: modulePlan.steps.map((step: any, index: number) => ({
-        stepNumber: index + 1,
-        description: step.description,
-        toolName: step.toolName,
-        toolParams: step.params,
-        expectedOutput: step.resultKey ? `Resultado en ${step.resultKey}` : 'Ejecución exitosa',
-        isRequired: true,
-        fallbackStep: null
-      })),
-      estimatedComplexity: modulePlan.estimatedComplexity || 'moderate',
-      potentialChallenges: []
+      ...genericPlan,
+      metadata: {
+        category: inputAnalysis.category,
+        intentClassification: inputAnalysis.intentClassification,
+        moduleGenerated: false
+      }
     };
   }
 
@@ -131,10 +143,22 @@ export class PlanningEngine {
       this.logProgress(`Validating step ${index + 1}: ${step.description}`);
       
       if (!this.toolRegistry.getByName(step.toolName)) {
+        // Si la herramienta no existe, buscar una alternativa
         const alternative = await this.toolSelector.selectTool(
           plan.taskUnderstanding
         );
+        
+        // Actualizar el nombre de la herramienta
+        this.logger.info(`Replacing tool ${step.toolName} with ${alternative.toolName}`);
         step.toolName = alternative.toolName;
+        
+        // Puede que también sea necesario adaptar los parámetros
+        if (Object.keys(alternative.params).length > 0) {
+          step.toolParams = {
+            ...step.toolParams,
+            ...alternative.params
+          };
+        }
       }
     }
     
@@ -152,7 +176,7 @@ export class PlanningEngine {
   private createFallbackPlan(userInput: string, inputAnalysis: InputAnalysis): ExecutionPlan {
     const toolName = this.getFallbackTool(inputAnalysis.category);
     return {
-      id: 'fallback-plan',
+      id: `fallback-${Date.now()}`,
       taskUnderstanding: `Fallback plan for: ${userInput}`,
       goals: ["Respond to user request with simplified approach"],
       plan: [{
@@ -165,7 +189,12 @@ export class PlanningEngine {
         fallbackStep: null
       }],
       estimatedComplexity: "simple",
-      potentialChallenges: ["This is a simplified fallback plan"]
+      potentialChallenges: ["This is a simplified fallback plan"],
+      metadata: {
+        category: inputAnalysis.category,
+        intentClassification: inputAnalysis.intentClassification,
+        moduleGenerated: false
+      }
     };
   }
 

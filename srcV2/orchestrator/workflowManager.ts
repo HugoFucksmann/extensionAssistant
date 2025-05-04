@@ -5,72 +5,46 @@ import { ToolSelector } from './toolSelector';
 import { ToolRegistry } from '../tools/core/toolRegistry';
 import { OrchestrationContext } from '../core/context/orchestrationContext';
 import { FeedbackManager } from './feedbackManager';
-
-// Importar módulos
-import { EditingModule } from '../modules/codeEditing/editingModule';
-import { ExaminationModule } from '../modules/codeExamination/examinationModule';
-import { ProjectModule } from '../modules/projectManagement/projectModule';
-import { ProjectSearchModule } from '../modules/projectSearch/projectSearchModule';
+import { ModuleManager } from '../modules/moduleManager';
 
 export class WorkflowManager {
-
-  
-  // Módulos especializados
-  private editingModule: EditingModule;
-  private examinationModule: ExaminationModule;
-  private projectModule: ProjectModule;
-  private projectSearchModule: ProjectSearchModule;
-
   constructor(
-    logger: LoggerService,
+    private logger: LoggerService,
     private errorHandler: ErrorHandler,
     private toolSelector: ToolSelector,
     private toolRegistry: ToolRegistry,
-    private feedbackManager: FeedbackManager
+    private feedbackManager: FeedbackManager,
+    private moduleManager: ModuleManager
   ) {
-  
-    
-    // Inicializar módulos sin BaseAPI
-    this.editingModule = new EditingModule(toolRegistry, logger);
-    this.examinationModule = new ExaminationModule(toolRegistry, logger);
-    this.projectModule = new ProjectModule(toolRegistry, logger);
-    this.projectSearchModule = new ProjectSearchModule(toolRegistry, logger);
-    
-  
+    this.logger.info('WorkflowManager initialized with module manager');
   }
 
   public async startWorkflow(plan: ExecutionPlan, context: OrchestrationContext): Promise<any> {
-   
+    // Comprobamos si el plan tiene metadatos que indiquen la categoría
+    const category = plan.metadata?.category;
     
-    // Verificar si existe la propiedad metadata
-    if (plan.hasOwnProperty('metadata')) {
-   
-      
-      const category = (plan as any).metadata.category;
-      if (category) {
-       
+    if (category) {
+      try {
+        // Intentamos ejecutar el plan usando un módulo especializado
+        return await this.executeSpecializedPlan(category, plan, context);
+      } catch (error) {
+        // Si hay un error en la ejecución especializada, lo registramos
+        this.errorHandler.handleError({
+          error,
+          context: 'SpecializedWorkflowExecution',
+          metadata: { 
+            workflowId: plan.id,
+            category
+          }
+        });
         
-        try {
-          const result = await this.executeSpecializedPlan(category, plan, context);
-          
-          return result;
-        } catch (error) {
-          this.errorHandler.handleError({
-            error,
-            context: 'SpecializedWorkflowExecution',
-            metadata: { 
-              workflowId: plan.id,
-              category
-            }
-          });
-          
-          // Fallback a ejecución genérica
-          return this.executeGenericPlan(plan, context);
-        }
+        // Y caemos a la ejecución genérica
+        this.logger.info(`Falling back to generic execution for plan ${plan.id}`);
+        return this.executeGenericPlan(plan, context);
       }
     }
     
-    // Ejecución genérica
+    // Si no hay categoría, usamos la ejecución genérica
     return this.executeGenericPlan(plan, context);
   }
   
@@ -79,56 +53,78 @@ export class WorkflowManager {
     plan: ExecutionPlan, 
     context: OrchestrationContext
   ): Promise<any> {
-    switch (category) {
-      case 'codeEditing':
-        return this.editingModule.executeEditingPlan(plan, context);
-      case 'codeExamination':
-        return this.examinationModule.executeExaminationPlan(plan, context);
-      case 'projectManagement':
-        return this.projectModule.executeProjectPlan(plan, context);
-      case 'projectSearch':
-        return this.projectSearchModule.executeSearchPlan(plan, context);
-      default:
-        throw new Error(`Categoría de módulo no soportada: ${category}`);
+    this.logger.info(`Executing specialized plan for category: ${category}`);
+    this.feedbackManager.notify({
+      type: 'progress',
+      message: `Starting specialized execution for ${category}`,
+      userNotification: {
+        show: true,
+        message: `Processing with ${category} module`,
+        type: 'info'
+      }
+    });
+    
+    try {
+      // Intentamos ejecutar el plan a través del ModuleManager
+      return await this.moduleManager.executePlan(plan, context);
+    } catch (error) {
+      this.logger.error(`Error in specialized execution: ${error instanceof Error ? error.message : String(error)}`);
+      throw error;
     }
   }
 
   private async executeGenericPlan(plan: ExecutionPlan, context: OrchestrationContext): Promise<any> {
-    
+    this.logger.info(`Executing generic plan with ${plan.plan.length} steps`);
+    const results: any[] = [];
     
     for (let i = 0; i < plan.plan.length; i++) {
       const step = plan.plan[i];
-     
-
+      const progressPercentage = ((i + 1) / plan.plan.length) * 100;
+      
       // Notificar progreso
       this.feedbackManager.notifyProgress(
-        `${plan.id}-${i}`, // Use plan id + step index as unique identifier
+        `${plan.id}-${i}`,
         `Processing step ${i + 1}/${plan.plan.length}: ${step.description}`,
-        ((i + 1) / plan.plan.length) * 100
+        progressPercentage
       );
 
       try {
+        // Obtener la herramienta por nombre
         const tool = this.toolRegistry.getByName(step.toolName);
         if (!tool) {
-          throw new Error(`Herramienta no encontrada: ${step.toolName}`);
+          throw new Error(`Tool not found: ${step.toolName}`);
         }
         
+        // Validar parámetros
         if (!tool.validateParams(step.toolParams)) {
-          throw new Error(`Parámetros inválidos para: ${step.toolName}`);
+          throw new Error(`Invalid parameters for tool: ${step.toolName}`);
         }
 
+        // Ejecutar la herramienta
         const startTime = Date.now();
         const result = await tool.execute(step.toolParams);
         const duration = Date.now() - startTime;
         
-       
+        this.logger.info(`Step ${i + 1} executed in ${duration}ms`, {
+          step: step.description,
+          tool: step.toolName,
+          duration
+        });
+        
+        // Guardar resultado
+        results.push(result);
 
         // Actualizar contexto
         const ctxData = context.get();
         const prevSteps = Array.isArray(ctxData.executedSteps) ? ctxData.executedSteps : [];
-        context.set({ executedSteps: [...prevSteps, { step, result }] });
+        context.set({ 
+          executedSteps: [...prevSteps, { step, result }],
+          lastStepResult: result,
+          currentStepIndex: i,
+          totalSteps: plan.plan.length
+        });
 
-        // Notificar archivos si es necesario
+        // Notificar archivos procesados si es necesario
         if (Array.isArray((step.toolParams as any)?.files)) {
           this.feedbackManager.notifyFileProcessing(
             (step.toolParams as any).files,
@@ -137,7 +133,7 @@ export class WorkflowManager {
         }
 
       } catch (error) {
-        this.errorHandler.handleError({
+        const errorInfo = this.errorHandler.handleError({
           error,
           context: 'WorkflowStepExecution',
           metadata: {
@@ -148,12 +144,45 @@ export class WorkflowManager {
           }
         });
         
-        throw error; // Propagamos el error para manejo superior
+        // Verificar si hay un paso de fallback
+        if (step.fallbackStep !== null && typeof step.fallbackStep === 'number') {
+          this.logger.info(`Using fallback step ${step.fallbackStep}`);
+          
+          // Notificar el uso del fallback
+          this.feedbackManager.notify({
+            type: 'warning',
+            message: `Step failed, using fallback step ${step.fallbackStep}`,
+            userNotification: {
+              show: true,
+              message: 'Using alternative approach due to an issue',
+              type: 'warning'
+            }
+          });
+          
+          // Ajustar el índice para ejecutar el paso de fallback
+          i = step.fallbackStep - 1; // -1 porque el bucle incrementará i
+          continue;
+        }
+        
+        // Si es un paso requerido y no hay fallback, falla todo el workflow
+        if (step.isRequired) {
+          this.logger.error(`Required step failed without fallback`);
+          throw error;
+        } else {
+          // Si el paso no es requerido, continuamos con el siguiente
+          this.logger.warn(`Non-required step failed, continuing workflow`);
+          continue;
+        }
       }
     }
     
-    
+    // Notificar finalización exitosa
     this.feedbackManager.notifyCompletion();
-    return context;
+    
+    // Devolvemos el contexto actualizado y los resultados
+    return {
+      context: context.get(),
+      results
+    };
   }
 }
