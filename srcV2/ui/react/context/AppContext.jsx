@@ -3,6 +3,8 @@ import { useLoading } from "../hooks/useLoading";
 import { useMessages } from "../hooks/useMessages";
 import { useProjectFiles } from "../hooks/useProjectFiles";
 import { createBackendService, ACTIONS } from "../services/BackendService";
+import { MESSAGE_TYPES } from '../../../core/config/constants';
+
 
 // Crear el contexto
 const AppContext = createContext(null);
@@ -22,6 +24,13 @@ export const AppProvider = ({ children, vscode }) => {
   
   // Inicializar el servicio de backend
   const [backendService] = useState(() => createBackendService(vscode));
+
+  // Cargar historial automáticamente al montar la app
+  React.useEffect(() => {
+    if (backendService) {
+      backendService.send(ACTIONS.LOAD_HISTORY);
+    }
+  }, [backendService]);
   
   // Utilizar los hooks existentes
   const { loadingState, setLoading, setInitialized } = useLoading();
@@ -90,13 +99,23 @@ export const AppProvider = ({ children, vscode }) => {
       console.log("Historial cargado:", data);
       setHistory(data.history || []);
     };
+
+    const handleChatCreated = (data) => {
+      console.log("Nuevo chat creado:", data.chat);
+      clearMessages(); // Limpiar mensajes anteriores
+      // Opcional: Resetear otros estados (input, archivos seleccionados, etc.)
+      setInput("");
+      setSelectedFiles([]);
+    };
     
     backendService.on('historyLoaded', handleHistoryLoaded);
+    backendService.on(MESSAGE_TYPES.CHAT_CREATED, handleChatCreated);
     
     return () => {
+      backendService.off(MESSAGE_TYPES.CHAT_CREATED, handleChatCreated);
       backendService.off('historyLoaded', handleHistoryLoaded);
     };
-  }, [backendService]);
+  }, [backendService, clearMessages, setInput, setSelectedFiles]);
   
   // Ejecutar la configuración de listeners
   React.useEffect(() => {

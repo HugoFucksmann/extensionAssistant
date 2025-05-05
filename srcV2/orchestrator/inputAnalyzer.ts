@@ -23,17 +23,20 @@ export class InputAnalyzer {
 
   public async analyzeInput(input: string): Promise<InputAnalysis> {
     try {
-      log('InputAnalyzer: Analyzing input { input }'  ,'info');
+      log(`InputAnalyzer: Analyzing input ${input}`, 'info');
       
       return await executeModelInteraction<InputAnalysis>(
         'inputAnalyzer', 
         {
-          userMessage: input,  // Changed from userInput to userMessage
-          context: this.orchestrationContext.get()
+          userPrompt: input,
+          context: {
+            ...this.orchestrationContext.get(),
+            userPrompt: input
+          }
         }
       );
     } catch (error) {
-      log('InputAnalyzer: Error analyzing input { error }','error' );
+      log(`InputAnalyzer: Error analyzing input ${error}`, 'error');
       return this.getDefaultAnalysis(input);
     }
   }

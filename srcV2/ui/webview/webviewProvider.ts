@@ -3,6 +3,8 @@ import { ConfigurationManager } from '../../core/config/ConfigurationManager';
 import { getHtmlContent } from './templates/htmlTemplate';
 import { OrchestratorService } from '../../orchestrator/orchestratorService';
 import { ACTIONS, MESSAGE_TYPES } from '../../core/config/constants';
+import { ChatMemory } from '../../core/storage/memory';
+import { SQLiteStorage } from '../../core/storage/db/SQLiteStorage';
 
 /**
  * Implementación del proveedor de webview
@@ -14,13 +16,15 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
 	private webviewReady = false;
 	private stateUnsubscribers: (() => void)[] = [];
 	private configManager: ConfigurationManager;
+	private chatMemory: ChatMemory;
 
 	constructor(
 		private readonly extensionUri: vscode.Uri,
-		private readonly orchestratorService: OrchestratorService
+		private readonly orchestratorService: OrchestratorService,
+		private readonly storage: SQLiteStorage
 	) {
 		this.configManager = ConfigurationManager.getInstance();
-		
+		this.chatMemory = new ChatMemory(storage);
 		// Suscribirse a cambios de configuración relevantes
 		this.stateUnsubscribers.push(
 			this.configManager.onChange('modelType', this.handleModelChange.bind(this))
@@ -288,56 +292,47 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
 	 */
 	private async handleLoadHistory(): Promise<void> {
 		try {
-			// Implementación temporal: notificar que esta funcionalidad está en desarrollo
-			this.sendMessageToWebview({
-				type: MESSAGE_TYPES.ERROR,
-				error: 'El historial de chats está en desarrollo en el nuevo flujo de orquestación'
-			});
-			
-			// TODO: Implementar la carga del historial a través del orquestador
-			// const history = await this.orchestratorService.getChatList();
-			// this.sendMessageToWebview({
-			//   type: MESSAGE_TYPES.HISTORY_LOADED,
-			//   history
-			// });
+		  const chats = await this.chatMemory.getChatList();
+		  
+		  this.sendMessageToWebview({
+			type: 'historyLoaded', // Asegurar que está en MESSAGE_TYPES
+			history: chats.map(chat => ({
+			  id: chat.id,
+			  title: chat.title || `Chat ${new Date(chat.timestamp).toLocaleString()}`,
+			  timestamp: chat.timestamp,
+			  preview: chat.preview || chat.lastMessagePreview || ''
+			}))
+		  });
 		} catch (error) {
-			console.error('[WebviewProvider] Error al cargar historial:', error);
-			this.sendMessageToWebview({
-				type: MESSAGE_TYPES.ERROR,
-				error: error instanceof Error ? error.message : 'Error al cargar el historial'
-			});
+		  console.error('[WebviewProvider] Error al cargar historial:', error);
+		  this.sendMessageToWebview({
+			type: 'ERROR',
+			error: error instanceof Error ? error.message : 'Error al cargar el historial'
+		  });
 		}
-	}
+	  }
 	
 	/**
 	 * Maneja la creación de un nuevo chat
 	 */
 	private async handleNewChat(): Promise<void> {
 		try {
-			// Simplemente limpiar la UI para un nuevo chat
 			this.sendMessageToWebview({
-				type: 'chat:new',
-				chat: {
-					id: `chat_${Date.now()}`,
-					title: 'Nuevo chat',
-					timestamp: new Date().toISOString(),
-					messages: []
-				}
+			  type: MESSAGE_TYPES.CHAT_CREATED, // Usar la constante correcta
+			  chat: {
+				id: `chat_${Date.now()}`,
+				title: 'Nuevo chat',
+				timestamp: new Date().toISOString(),
+				messages: [] // Asegurar que el array esté vacío
+			  }
 			});
-			
-			// TODO: Implementar la creación de chats a través del orquestador si es necesario
-			// const newChat = await this.orchestratorService.createNewChat();
-			// this.sendMessageToWebview({
-			//   type: MESSAGE_TYPES.CHAT_CREATED,
-			//   chat: newChat
-			// });
-		} catch (error) {
-			this.sendMessageToWebview({
-				type: MESSAGE_TYPES.ERROR,
-				error: error instanceof Error ? error.message : 'Error al crear nuevo chat'
-			});
+		  } catch (error) {
+		  this.sendMessageToWebview({
+			type: MESSAGE_TYPES.ERROR,
+			error: error instanceof Error ? error.message : 'Error al crear nuevo chat'
+		  });
 		}
-	}
+	  }
 	
 	/**
 	 * Notifica el modelo actual al webview

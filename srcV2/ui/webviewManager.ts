@@ -4,6 +4,7 @@ import { OrchestratorService } from '../orchestrator/orchestratorService';
 import { WebviewProvider } from './webview/webviewProvider';
 import { EventBus } from '../core/event/eventBus';
 import { MESSAGE_TYPES } from '../core/config/constants';
+import { SQLiteStorage } from '../core/storage/db/SQLiteStorage';
 
 /**
  * Clase que centraliza toda la gestión de WebView
@@ -17,12 +18,14 @@ export class WebViewManager implements vscode.WebviewViewProvider {
 
   constructor(
     private readonly extensionUri: vscode.Uri,
-    private readonly orchestratorService: OrchestratorService
+    private readonly orchestratorService: OrchestratorService,
+    private readonly storage: SQLiteStorage
   ) {
     // Crear el proveedor de webview con los servicios necesarios
     this.webviewProvider = new WebviewProvider(
       extensionUri,
-      orchestratorService
+      orchestratorService,
+      storage
     );
     
     // Suscribirse a eventos relevantes del sistema

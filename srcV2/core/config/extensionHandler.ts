@@ -73,7 +73,8 @@ export class ExtensionHandler {
       // 4. Inicializar WebView
       this.webViewManager = new WebViewManager(
         this.context.extensionUri,
-        this.dependencyContainer.getOrchestratorService()
+        this.dependencyContainer.getOrchestratorService(),
+        this.dependencyContainer.getStorage()
       );
       
       // Registrar el WebViewManager como proveedor de webview

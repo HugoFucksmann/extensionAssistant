@@ -1,4 +1,4 @@
-import React, { memo } from "react";
+import React, { memo, useEffect } from "react";
 import { useAppContext } from "../context/AppContext";
 import { ACTIONS } from "../services/BackendService";
 
@@ -60,6 +60,20 @@ const Header = () => {
       // Enviar comando al backend para crear un nuevo chat
       backendService.send(ACTIONS.NEW_CHAT);
     };
+
+    useEffect(() => {
+      const handleChatCreated = (data) => {
+        console.log('Nuevo chat creado:', data.chat);
+        // Aquí deberías actualizar el estado de tu aplicación
+        // Por ejemplo, usando un contexto o estado local
+      };
+    
+      backendService.on('chat:created', handleChatCreated);
+      
+      return () => {
+        backendService.off('chat:created', handleChatCreated);
+      };
+    }, [backendService]);
 
     return (
       <header style={styles.header}>
