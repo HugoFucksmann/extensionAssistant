@@ -1,0 +1,1 @@
+export type ModelType = 'ollama' | 'gemini';

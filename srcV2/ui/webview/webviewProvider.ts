@@ -100,7 +100,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
 						break;
 						
 					case ACTIONS.LOAD_CHAT:
-						await this.handleLoadChat(payload.chatId, payload.loadMessages);
+						await this.handleLoadChat(payload.chatId);
 						break;
 						
 					case ACTIONS.LOAD_HISTORY:
@@ -265,21 +265,26 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
 	/**
 	 * Maneja la carga de un chat específico
 	 */
-	private async handleLoadChat(chatId: string, loadMessages: boolean): Promise<void> {
+	private async handleLoadChat(chatId: string): Promise<void> {
 		try {
-			// Implementación temporal: notificar que esta funcionalidad está en desarrollo
-			this.sendMessageToWebview({
-				type: MESSAGE_TYPES.ERROR,
-				error: 'La carga de chats anteriores está en desarrollo en el nuevo flujo de orquestación'
-			});
+			// Cargar chat con mensajes (loadMessages=true)
+			const chat = await this.chatMemory.loadChat(chatId, true);
 			
-			// TODO: Implementar la carga de chats a través del orquestador
-			// const result = await this.orchestratorService.loadChat(chatId, loadMessages);
-			// this.sendMessageToWebview({
-			//   type: MESSAGE_TYPES.CHAT_LOADED,
-			//   chat: result
-			// });
+			if (!chat) {
+				throw new Error('Chat no encontrado');
+			}
+	
+			this.sendMessageToWebview({
+				type: MESSAGE_TYPES.CHAT_LOADED,
+				chat: {
+					id: chat.id,
+					title: chat.title || `Chat ${new Date(chat.timestamp).toLocaleString()}`,
+					messages: chat.messages || [],
+					timestamp: chat.timestamp
+				}
+			});
 		} catch (error) {
+			console.error('[WebviewProvider] Error al cargar chat:', error);
 			this.sendMessageToWebview({
 				type: MESSAGE_TYPES.ERROR,
 				error: error instanceof Error ? error.message : 'Error al cargar el chat'
@@ -349,20 +354,23 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
 	 * Carga el historial de chats si la persistencia está habilitada
 	 */
 	private async loadChatHistory(): Promise<void> {
-		if (this.configManager.getPersistenceEnabled()) {
-			try {
-				// Implementación temporal: no cargar historial automáticamente
-				console.log('[WebviewProvider] Carga de historial deshabilitada en el nuevo flujo de orquestación');
-				
-				// TODO: Implementar la carga del historial a través del orquestador
-				// const chatList = await this.orchestratorService.getChatList();
-				// this.sendMessageToWebview({
-				//   type: MESSAGE_TYPES.HISTORY_LOADED,
-				//   history: chatList
-				// });
-			} catch (error) {
-				console.error('[WebviewProvider] Error al cargar historial:', error);
-			}
+		if (!this.configManager.getPersistenceEnabled()) {
+			return;
+		}
+	
+		try {
+			const chats = await this.chatMemory.getChatList();
+			this.sendMessageToWebview({
+				type: MESSAGE_TYPES.HISTORY_LOADED,
+				history: chats.map(chat => ({
+					id: chat.id,
+					title: chat.title || `Chat ${new Date(chat.timestamp).toLocaleString()}`,
+					lastMessage: chat.lastMessagePreview,
+					timestamp: chat.timestamp
+				}))
+			});
+		} catch (error) {
+			console.error('[WebviewProvider] Error al cargar historial:', error);
 		}
 	}
 

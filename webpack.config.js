@@ -45,7 +45,7 @@ const extensionConfig = {
   ...baseConfig,
   target: "node",
   entry: {
-    extension: "./srcV2/extension.ts",
+    extension: "./srcV3/extension.ts",
   },
   output: {
     path: path.resolve(__dirname, "out"),
@@ -87,7 +87,7 @@ const webviewConfig = {
   ...baseConfig,
   target: "web",
   entry: {
-    webview: "./srcV2/ui/react/webview.jsx",
+    webview: "./srcV3/ui/react/webview.jsx",
   },
   output: {
     path: path.resolve(__dirname, "out"),
