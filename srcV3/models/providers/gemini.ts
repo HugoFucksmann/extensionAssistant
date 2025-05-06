@@ -1,8 +1,6 @@
-// gemini.ts
-// Implementation of the Gemini model API
-
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { ModelAPI } from "../ModelManager";
+import { ModelAPI } from "../config/ModelManager";
+
 
 export class GeminiAPI implements ModelAPI {
   private abortController: AbortController | null = null;

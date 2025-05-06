@@ -1,9 +1,7 @@
-import { ConfigurationManager } from "../config/ConfigurationManager";
-import { GeminiAPI } from "./providers/gemini";
-import { OllamaAPI } from "./providers/ollama";
+import { ConfigurationManager } from "../../config/ConfigurationManager";
+import { GeminiAPI } from "../providers/gemini";
+import { OllamaAPI } from "../providers/ollama";
 import { ModelType } from "./types";
-
-
 
 // Interface for model-specific implementations
 export interface ModelAPI {
@@ -13,15 +11,10 @@ export interface ModelAPI {
 
 /**
  * ModelManager class - Handles model selection and interaction
- * 
- * This class is an internal implementation detail of the prompt system.
- * It should not be used directly by application code.
  */
 export class ModelManager {
   private modelInstance: ModelAPI | null = null;
   private configurationManager: ConfigurationManager;
-
-  private abortController: AbortController | null = null;
 
   /**
    * Constructor for ModelManager
@@ -29,10 +22,6 @@ export class ModelManager {
    */
   constructor(configurationManager: ConfigurationManager) {
     this.configurationManager = configurationManager;
-    
-    // Subscribe to model changes
-   // por implementar
-    
     console.log(`[ModelManager] Initialized with model: ${this.configurationManager.getModelType()}`);
   }
 
@@ -48,7 +37,7 @@ export class ModelManager {
    */
   async setModel(modelType: ModelType): Promise<void> {
     const validModels: ModelType[] = ["ollama", "gemini"];
-    if (!modelType || !validModels.includes(modelType)) {
+    if (!validModels.includes(modelType)) {
       console.error(`[ModelManager] Attempted to change to invalid model: ${modelType}`);
       throw new Error(`Unsupported or invalid model: ${modelType}`);
     }
@@ -101,22 +90,31 @@ export class ModelManager {
 
   /**
    * Sends a prompt to the selected model and returns the raw response
+   * @param prompt The prompt text to send to the model
+   * @returns Promise with the raw response text
    */
   async sendPrompt(prompt: string): Promise<string> {
     if (!prompt || typeof prompt !== 'string' || prompt.trim() === '') {
-      console.error("[ModelManager] Attempted to generate response with invalid prompt.");
       throw new Error("Prompt cannot be empty.");
     }
 
     try {
       const modelType = this.configurationManager.getModelType();
       console.log(`[ModelManager] Generating response with ${modelType} (Prompt len: ${prompt.length})`);
-      console.log(`[ModelManager] PROMPT:\n${prompt.substring(0, 500)}${prompt.length > 500 ? '...' : ''}`);
+      
+      // Debug log truncated prompt
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[ModelManager] PROMPT:\n${prompt.substring(0, 500)}${prompt.length > 500 ? '...' : ''}`);
+      }
       
       const response = await this.getModelInstance().generateResponse(prompt);
       
       console.log(`[ModelManager] Response received (len: ${response.length})`);
-      console.log(`[ModelManager] RESPONSE:\n${response.substring(0, 500)}${response.length > 500 ? '...' : ''}`);
+      
+      // Debug log truncated response
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[ModelManager] RESPONSE:\n${response.substring(0, 500)}${response.length > 500 ? '...' : ''}`);
+      }
       
       return response;
     } catch (error: any) {
@@ -132,8 +130,6 @@ export class ModelManager {
     if (this.modelInstance) {
       console.log(`[ModelManager] Aborting request for ${this.configurationManager.getModelType()}`);
       this.modelInstance.abortRequest();
-    } else {
-      console.log(`[ModelManager] No active model instance to abort.`);
     }
   }
 

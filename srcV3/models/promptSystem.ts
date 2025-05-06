@@ -1,4 +1,4 @@
-import { ConfigurationManager } from '../config/ConfigurationManager';
+
 
 // Types for prompt system
 export type PromptType = 
@@ -23,9 +23,9 @@ import { projectManagementPrompt } from './prompts/prompt.projectManagement';
 import { projectSearchPrompt } from './prompts/prompt.projectSearch';
 import { resultEvaluatorPrompt } from './prompts/prompt.resultEvaluator';
 import { toolSelectorPrompt } from './prompts/prompt.toolSelector';
-import { ModelManager } from './ModelManager';
-import { parseModelResponse } from './modelUtils';
-import { ModelType } from './types';
+import { ModelManager } from './config/ModelManager';
+import { ModelType } from './config/types';
+import { parseModelResponse } from './config/modelUtils';
 
 // Map of prompt types to their templates
 const PROMPT_MAP: Record<PromptType, string> = {
@@ -39,20 +39,16 @@ const PROMPT_MAP: Record<PromptType, string> = {
   toolSelector: toolSelectorPrompt,
 };
 
-// Singleton instance of ModelManager
+// Instancia del ModelManager
 let _modelManager: ModelManager | null = null;
 
 /**
  * Initializes the prompt system
- * @param configManager ConfigurationManager instance
+ * @param modelManager ModelManager instance
  */
-export function initializePromptSystem(configManager: ConfigurationManager): void {
-  if (!_modelManager) {
-    _modelManager = new ModelManager(configManager);
-    console.log('[PromptSystem] Initialized successfully');
-  } else {
-    console.warn('[PromptSystem] Already initialized');
-  }
+export function initializePromptSystem(modelManager: ModelManager): void {
+  _modelManager = modelManager;
+  console.log('[PromptSystem] Initialized successfully');
 }
 
 /**
@@ -61,8 +57,8 @@ export function initializePromptSystem(configManager: ConfigurationManager): voi
  * @param context Context data
  * @returns Variables object for template substitution
  */
-export function buildPromptVariables(type: PromptType, context: Record<string, any>): PromptVariables {
-  // This is where you can add specific processing for each prompt type
+function buildPromptVariables(type: PromptType, context: Record<string, any>): PromptVariables {
+  // Processing específico para cada tipo de prompt
   switch (type) {
     case 'projectManagement':
       return {
@@ -113,26 +109,21 @@ export async function executeModelInteraction<T = any>(
     throw new Error('PromptSystem not initialized. Call initializePromptSystem() first.');
   }
   
-  try {
-    // Get the prompt template
-    const template = PROMPT_MAP[type];
-    if (!template) {
-      throw new Error(`Unknown prompt type: ${type}`);
-    }
-    
-    // Build variables and fill the template
-    const variables = buildPromptVariables(type, context);
-    const filledPrompt = fillPromptTemplate(template, variables);
-    
-    // Send to model and get raw response
-    const rawResponse = await _modelManager.sendPrompt(filledPrompt);
-    
-    // Parse response based on prompt type
-    return parseModelResponse<T>(type, rawResponse);
-  } catch (error) {
-    console.error(`[PromptSystem] Error executing model interaction (${type}):`, error);
-    throw error;
+  // Get the prompt template
+  const template = PROMPT_MAP[type];
+  if (!template) {
+    throw new Error(`Unknown prompt type: ${type}`);
   }
+  
+  // Build variables and fill the template
+  const variables = buildPromptVariables(type, context);
+  const filledPrompt = fillPromptTemplate(template, variables);
+  
+  // Send to model and get raw response
+  const rawResponse = await _modelManager.sendPrompt(filledPrompt);
+  
+  // Parse response based on prompt type
+  return parseModelResponse<T>(type, rawResponse);
 }
 
 /**
@@ -171,8 +162,5 @@ export function abortModelRequest(): void {
  * Releases resources used by the prompt system
  */
 export function disposePromptSystem(): void {
-  if (_modelManager) {
-    _modelManager.dispose();
-    _modelManager = null;
-  }
+  _modelManager = null;
 }

@@ -1,4 +1,4 @@
-import { PromptType } from "./promptSystem";
+import { PromptType } from "../promptSystem";
 
 /**
  * Extracts valid JSON content from a text response, even if it's surrounded
@@ -100,7 +100,6 @@ export function parseModelResponse<T = any>(type: PromptType, rawResponse: strin
   
   // Process based on prompt type
   switch (type) {
-    
     case 'inputAnalyzer':
       // For input analysis, expect a structured result
       return jsonResponse.analysis ? jsonResponse : { 

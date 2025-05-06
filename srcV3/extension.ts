@@ -1,19 +1,23 @@
 import * as vscode from 'vscode';
 import { WebviewProvider } from './ui/webView/webviewProvider';
 import { ConfigurationManager } from './config/ConfigurationManager';
-import { modelService } from './services/modelService';
 
+import { initializePromptSystem } from './models/promptSystem';
+import { ModelManager } from './models/config/ModelManager';
 
 export function activate(context: vscode.ExtensionContext) {
     // Inicializar configuración
     const config = new ConfigurationManager(context);
     
-    // Inicializar servicio de modelos
-    modelService.initialize(config);
+    // Inicializar el sistema con la configuración centralizada
+    const modelManager = new ModelManager(config);
+    
+    // Inicializar el sistema de prompts
+    initializePromptSystem(modelManager);
     
     // Registrar limpieza al desactivar
     context.subscriptions.push({
-        dispose: () => modelService.dispose()
+        dispose: () => modelManager.dispose()
     });
     
     // Inicializar webview
@@ -22,15 +26,15 @@ export function activate(context: vscode.ExtensionContext) {
     // Registrar webview y comandos esenciales
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider('aiChat.chatView', webview),
-        vscode.commands.registerCommand('extensionAssistant.model.change', () => {
+        vscode.commands.registerCommand('extensionAssistant.model.change', async () => {
             const current = config.getModelType();
             const newModel = current === 'ollama' ? 'gemini' : 'ollama';
-            config.setModelType(newModel);
+            await modelManager.setModel(newModel); // Cambia el modelo en ModelManager
             webview.updateModel(newModel);
         })
     );
     
-    console.log('[Extension] Activada con servicio de modelos inicializado');
+    console.log('[Extension] Activada con sistema de modelos inicializado');
 }
 
 export function deactivate() {

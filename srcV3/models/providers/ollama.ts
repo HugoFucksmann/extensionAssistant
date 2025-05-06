@@ -1,7 +1,4 @@
-// ollama.ts
-// Implementation of the Ollama model API
-
-import { ModelAPI } from "../ModelManager";
+import { ModelAPI } from "../config/ModelManager";
 
 export class OllamaAPI implements ModelAPI {
   private abortController: AbortController | null = null;
