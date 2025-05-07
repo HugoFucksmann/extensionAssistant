@@ -1,19 +1,16 @@
+// src/ui/context/VSCodeContext.tsx
 import React, { createContext, useState, useEffect, useContext } from 'react';
-
-type MessageType = 'chat' | 'command' | 'system';
-
-interface ChatMessage {
-  text: string;
-  sender: 'user' | 'assistant' | 'system';
-  timestamp: number;
-  files?: string[];
-}
+import { Chat, ChatMessage } from '../../../config/storage/chatStorage';
 
 interface VSCodeContextType {
   messages: ChatMessage[];
+  chatList: Chat[];
   currentModel: string;
   isLoading: boolean;
-  postMessage: (type: MessageType, payload?: Record<string, unknown>) => void;
+  showHistory: boolean;
+  setShowHistory: (show: boolean) => void;
+  postMessage: (type: string, payload?: Record<string, unknown>) => void;
+  loadChat: (chatId: string) => void;
 }
 
 declare global {
@@ -36,61 +33,102 @@ export const useVSCodeContext = () => {
 
 export const VSCodeProvider = ({ children }: { children: React.ReactNode }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [chatList, setChatList] = useState<Chat[]>([]);
   const [currentModel, setCurrentModel] = useState('ollama');
   const [isLoading, setLoading] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
-  const postMessage = (type: MessageType, payload: Record<string, unknown> = {}) => {
+  const postMessage = (type: string, payload: Record<string, unknown> = {}) => {
     if (type === 'chat') {
-      setMessages(prev => [...prev, {
-        text: payload.text as string || '',
+      // Add user message to UI immediately for better UX
+      const userMessage: ChatMessage = {
+        chatId: payload.chatId as string || '',
+        content: payload.text as string || '',
         sender: 'user',
-        timestamp: Date.now(),
-        files: payload.files as string[] | undefined
-      }]);
+        timestamp: Date.now()
+      };
+      setMessages(prev => [...prev, userMessage]);
       setLoading(true);
     }
     window.vscode.postMessage({ type, ...payload });
   };
 
+  const loadChat = (chatId: string) => {
+    postMessage('command', { 
+      command: 'loadChat', 
+      chatId 
+    });
+    setShowHistory(false);
+  };
+
   useEffect(() => {
-    const handleMessage = (event: MessageEvent<{ type: MessageType } & Record<string, unknown>>) => {
-      const { type, ...payload } = event.data;
+    const handleMessage = (event: MessageEvent<any>) => {
+      const { type, payload } = event.data;
       
       switch (type) {
-        case 'chat':
+        case 'chatResponse':
           setMessages(prev => [...prev, {
-            text: payload.text as string || '',
+            chatId: payload.chatId,
+            content: payload.text,
             sender: 'assistant',
             timestamp: Date.now()
           }]);
           setLoading(false);
           break;
           
-        case 'command':
-          if (payload.command === 'setModel') {
-            setCurrentModel(payload.data as string);
-          }
+        case 'modelChanged':
+          setCurrentModel(payload.modelType);
           break;
           
-        case 'system':
-          if (payload.error) {
-            setMessages(prev => [...prev, {
-              text: `Error: ${payload.error as string}`,
-              sender: 'system',
-              timestamp: Date.now()
-            }]);
-            setLoading(false);
-          }
+        case 'chatListUpdated':
+          setChatList(payload.chats);
+          break;
+          
+        case 'chatLoaded':
+          setMessages(payload.messages);
+          break;
+          
+        case 'historyRequested':
+          setShowHistory(true);
+          break;
+
+        case 'newChat':
+          setMessages([]);
+          break;
+          
+        case 'error':
+          setMessages(prev => [...prev, {
+            chatId: '',
+            content: `Error: ${payload.message}`,
+            sender: 'system',
+            timestamp: Date.now()
+          }]);
+          setLoading(false);
           break;
       }
     };
+
+    // Request chat list on initial load
+    window.vscode.postMessage({ 
+      type: 'command', 
+      command: 'getChatList' 
+    });
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, []);
 
   return (
-    <VSCodeContext.Provider value={{ messages, currentModel, isLoading, postMessage }}>
+    <VSCodeContext.Provider value={{ 
+      messages, 
+      chatList, 
+      currentModel, 
+      isLoading, 
+      showHistory, 
+      setShowHistory, 
+      postMessage, 
+      loadChat 
+    }}>
       {children}
     </VSCodeContext.Provider>
   );

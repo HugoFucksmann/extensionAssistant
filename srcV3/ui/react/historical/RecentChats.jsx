@@ -30,7 +30,7 @@ const styles = {
 };
 
 const RecentChats = () => {
-  const { chatList, loadChat, showHistory } = useVSCodeContext();
+  const { chatList, loadChat, postMessage } = useVSCodeContext();
 
   // History loading should be triggered by handleShowHistory in AppContext or on initial load
 
@@ -46,7 +46,10 @@ const RecentChats = () => {
     <div style={styles.container}>
       <div style={styles.header}>
         <h2 style={styles.title}>Recent Chats</h2>
-        <button style={styles.viewMoreButton} onClick={showHistory}>
+        <button 
+          style={styles.viewMoreButton} 
+          onClick={() => postMessage('command', { command: 'showHistory' })}
+        >
           Ver más
         </button>
       </div>
