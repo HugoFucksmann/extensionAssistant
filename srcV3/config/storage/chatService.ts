@@ -2,13 +2,13 @@
 import * as vscode from 'vscode';
 import { Chat, ChatStorage, ChatMessage } from './chatStorage';
 
-
 /**
  * Service class for managing chat operations
  */
 export class ChatService {
   private storage: ChatStorage;
   private currentChatId: string | null = null;
+  private pendingNewChat: boolean = false;
   
   constructor(context: vscode.ExtensionContext) {
     this.storage = new ChatStorage(context);
@@ -23,6 +23,14 @@ export class ChatService {
     const chat = await this.storage.createChat(title);
     this.currentChatId = chat.id;
     return chat;
+  }
+  
+  /**
+   * Prepares a new chat without saving it to storage
+   */
+  public prepareNewChat(): void {
+    this.currentChatId = null;
+    this.pendingNewChat = true;
   }
   
   /**
@@ -45,6 +53,7 @@ export class ChatService {
     }
     
     this.currentChatId = chatId;
+    this.pendingNewChat = false;
     return this.storage.getChatMessages(chatId);
   }
   
@@ -54,10 +63,11 @@ export class ChatService {
    * @returns Added message
    */
   public async sendUserMessage(content: string): Promise<ChatMessage> {
-    if (!this.currentChatId) {
-      // Create a new chat if none is active
+    if (!this.currentChatId || this.pendingNewChat) {
+      // Create a new chat only when the first message is sent
       const chat = await this.createChat();
       this.currentChatId = chat.id;
+      this.pendingNewChat = false;
     }
     
     const message: ChatMessage = {
@@ -136,6 +146,14 @@ export class ChatService {
    */
   public getCurrentChatId(): string | null {
     return this.currentChatId;
+  }
+  
+  /**
+   * Checks if there's a pending new chat
+   * @returns True if a new chat is pending
+   */
+  public isPendingNewChat(): boolean {
+    return this.pendingNewChat;
   }
   
   /**

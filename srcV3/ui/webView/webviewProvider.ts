@@ -134,9 +134,10 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
   
   private async createNewChat(): Promise<void> {
     try {
-      await this.chatService.createChat();
+      // Instead of creating a chat in storage immediately, just prepare for a new chat
+      this.chatService.prepareNewChat();
       this.postMessage('newChat', {});
-      this.sendChatList();
+      // No need to update the chat list since we haven't saved the chat yet
     } catch (error) {
       this.handleError(error);
     }
