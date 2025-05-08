@@ -11,10 +11,7 @@ export type ModelType = 'ollama' | 'gemini';
  */
 export type ConfigChangeListener = (key: string, value: any, oldValue: any) => void;
 
-/**
- * ConfigurationManager - Clase unificada para gestionar configuraciones y estado de la aplicación
- * Combina las funcionalidades de ConfigSystem, UIStateContext y la configuración de BaseAPI
- */
+
 export class ConfigurationManager {
   private static instance: ConfigurationManager;
   

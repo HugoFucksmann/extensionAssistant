@@ -14,6 +14,9 @@ export function activate(context: vscode.ExtensionContext) {
   const chatService = new ChatService(context, modelManager);
   const orchestrator = new OrchestratorService(chatService);
   const webview = new WebviewProvider(context.extensionUri, config, chatService, orchestrator);
+  
+  // Inicializar theme handler
+  webview.setThemeHandler();
 
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider('aiChat.chatView', webview),
@@ -36,7 +39,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(webview);
 
-  console.log('[Extension] Activated with model system initialized');
+  console.log('[Extension] Activated with theme support');
 }
 
 export function deactivate() {

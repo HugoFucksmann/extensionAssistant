@@ -6,6 +6,7 @@ import { OrchestratorService } from '../../services/orchestratorService';
 
 export class WebviewProvider implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView;
+  private disposables: vscode.Disposable[] = [];
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -19,6 +20,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     this.configureWebview();
     this.setupMessageHandlers();
     this.sendChatList();
+    this.setThemeHandler();
   }
 
   private configureWebview(): void {
@@ -161,7 +163,37 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     this.view?.webview.postMessage({ type, payload });
   }
 
+  public setThemeHandler() {
+    // Enviar tema inicial
+    this.postMessage('themeChanged', { 
+      isDarkMode: vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Dark 
+    });
+
+    // Escuchar cambios de tema
+    this.disposables.push(
+      vscode.window.onDidChangeActiveColorTheme(theme => {
+        this.postMessage('themeChanged', { 
+          isDarkMode: theme.kind === vscode.ColorThemeKind.Dark 
+        });
+      })
+    );
+
+    // Manejar preferencia de tema desde la webview
+    if (this.view) {
+      this.disposables.push(
+        this.view.webview.onDidReceiveMessage(message => {
+          if (message.type === 'setThemePreference') {
+            this.configManager.setValue('uiTheme', 
+              message.isDarkMode ? 'dark' : 'light'
+            );
+          }
+        })
+      );
+    }
+  }
+
   public dispose(): void {
     // Aquí podrías cerrar el ChatService si implementás un método close()
+    this.disposables.forEach(disposable => disposable.dispose());
   }
 }

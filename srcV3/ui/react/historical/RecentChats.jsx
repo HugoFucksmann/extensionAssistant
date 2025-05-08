@@ -1,41 +1,60 @@
-import React from "react";
-import { useVSCodeContext } from "../context/VSCodeContext";
-import ChatList from "./ChatList";
+import React from 'react';
+import { useVSCodeContext } from '../context/VSCodeContext';
+import ChatList from './ChatList';
 
-const styles = {
-  container: {
-    padding: "20px",
-    maxWidth: "600px",
-    margin: "0 auto",
-  },
-  title: {
-    fontSize: "1.5em",
-    marginBottom: "15px",
-    color: "var(--vscode-foreground)",
-  },
-  header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: "15px",
-  },
-  viewMoreButton: {
-    backgroundColor: "var(--vscode-button-background)",
-    color: "var(--vscode-button-foreground)",
-    border: "none",
-    padding: "5px 10px",
-    fontSize: "1em",
-    cursor: "pointer",
-  },
-};
+export const RecentChats = () => {
+  const { theme, chatList, loadChat, postMessage } = useVSCodeContext();
 
-const RecentChats = () => {
-  const { chatList, loadChat, postMessage } = useVSCodeContext();
+  const styles = {
+    container: {
+      padding: theme.spacing.large,
+      maxWidth: "600px",
+      margin: "0 auto",
+      backgroundColor: theme.colors.background,
+      borderRadius: theme.borderRadius.medium
+    },
+    title: {
+      fontSize: theme.typography.title,
+      marginBottom: theme.spacing.large,
+      color: theme.colors.text,
+    },
+    header: {
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      marginBottom: theme.spacing.large,
+    },
+    viewMoreButton: {
+      backgroundColor: theme.colors.secondary,
+      color: theme.colors.text,
+      border: `1px solid ${theme.colors.border}`,
+      padding: `${theme.spacing.small} ${theme.spacing.medium}`,
+      fontSize: theme.typography.text,
+      borderRadius: theme.borderRadius.small,
+      cursor: 'pointer',
+      transition: 'all 0.2s',
+      '&:hover': {
+        backgroundColor: theme.colors.primary,
+        transform: 'translateY(-1px)'
+      },
+      '&:active': {
+        transform: 'translateY(0)'
+      }
+    },
+    noChatsText: {
+      fontSize: theme.typography.text,
+      color: theme.colors.text,
+    },
+  };
 
   // History loading should be triggered by handleShowHistory in AppContext or on initial load
 
   if (!chatList || chatList.length === 0) {
-    return <p>No hay chats guardados</p>;
+    return (
+      <div style={styles.container}>
+        <p style={styles.noChatsText}>No hay chats guardados</p>
+      </div>
+    );
   }
 
   const recentChats = chatList

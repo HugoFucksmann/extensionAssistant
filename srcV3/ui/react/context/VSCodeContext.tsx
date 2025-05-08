@@ -1,6 +1,8 @@
 // src/ui/context/VSCodeContext.tsx
-import React, { createContext, useState, useEffect, useContext } from 'react';
-import { Chat, ChatMessage } from '../../../config/storageGG/chatStorage';
+import React, { createContext, useState, useEffect, useContext, useMemo } from 'react';
+import { Chat, ChatMessage } from '../../../storage/models/entities';
+import { ThemeType } from '../theme/theme';
+import { getTheme } from '../theme/theme';
 
 interface VSCodeContextType {
   messages: ChatMessage[];
@@ -11,6 +13,9 @@ interface VSCodeContextType {
   setShowHistory: (show: boolean) => void;
   postMessage: (type: string, payload?: Record<string, unknown>) => void;
   loadChat: (chatId: string) => void;
+  theme: ThemeType;
+  isDarkMode: boolean;
+  toggleTheme: () => void;
 }
 
 declare global {
@@ -37,6 +42,9 @@ export const VSCodeProvider = ({ children }: { children: React.ReactNode }) => {
   const [currentModel, setCurrentModel] = useState('ollama');
   const [isLoading, setLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  const theme = useMemo(() => getTheme(isDarkMode), [isDarkMode]);
 
   const postMessage = (type: string, payload: Record<string, unknown> = {}) => {
     if (type === 'chat') {
@@ -59,6 +67,12 @@ export const VSCodeProvider = ({ children }: { children: React.ReactNode }) => {
       chatId 
     });
     setShowHistory(false);
+  };
+
+  const toggleTheme = () => {
+    const newMode = !isDarkMode;
+    setIsDarkMode(newMode);
+    window.vscode.postMessage({ type: 'setThemePreference', isDarkMode: newMode });
   };
 
   useEffect(() => {
@@ -105,6 +119,10 @@ export const VSCodeProvider = ({ children }: { children: React.ReactNode }) => {
           }]);
           setLoading(false);
           break;
+
+        case 'themeChanged':
+          setIsDarkMode(payload.isDarkMode);
+          break;
       }
     };
 
@@ -113,6 +131,8 @@ export const VSCodeProvider = ({ children }: { children: React.ReactNode }) => {
       type: 'command', 
       command: 'getChatList' 
     });
+
+    window.vscode.postMessage({ type: 'getTheme' });
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
@@ -127,7 +147,10 @@ export const VSCodeProvider = ({ children }: { children: React.ReactNode }) => {
       showHistory, 
       setShowHistory, 
       postMessage, 
-      loadChat 
+      loadChat,
+      theme,
+      isDarkMode,
+      toggleTheme
     }}>
       {children}
     </VSCodeContext.Provider>

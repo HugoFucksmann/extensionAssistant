@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { styles } from "../styles";
+import { useVSCodeContext } from "../../../context/VSCodeContext";
 import AttachedFiles from "../AttachedFiles";
 
 const IconEdit = () => (
@@ -19,9 +19,58 @@ const IconEdit = () => (
 );
 
 export const UserMessage = ({ message, onEdit, messageIndex }) => {
+  const { theme } = useVSCodeContext();
   const [isEditing, setIsEditing] = useState(false);
   const [editedText, setEditedText] = useState(message.text);
   const textareaRef = useRef(null);
+
+  const messageStyles = {
+    container: {
+      backgroundColor: theme.colors.messageUserBg,
+      color: theme.colors.text,
+      padding: theme.spacing.medium,
+      borderRadius: theme.borderRadius.medium,
+      marginBottom: theme.spacing.medium,
+      maxWidth: '80%',
+      alignSelf: 'flex-end',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.12)',
+      border: `1px solid ${theme.colors.border}`
+    },
+    header: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: theme.spacing.small
+    },
+    editButton: {
+      background: 'none',
+      border: 'none',
+      cursor: 'pointer',
+      padding: theme.spacing.small,
+      color: theme.colors.text,
+      '&:hover': {
+        color: theme.colors.primary
+      }
+    },
+    messageText: {
+      lineHeight: 1.5,
+      whiteSpace: 'pre-wrap'
+    },
+    editInput: {
+      minHeight: '20px',
+      maxHeight: '100px',
+      width: '100%',
+      backgroundColor: theme.colors.chatInputBg,
+      color: theme.colors.text,
+      border: `1px solid ${theme.colors.border}`,
+      borderRadius: theme.borderRadius.small,
+      padding: theme.spacing.small,
+      resize: 'none',
+      fontFamily: 'inherit',
+      fontSize: 'inherit',
+      overflow: 'auto'
+    }
+  };
 
   const handleEdit = () => {
     setIsEditing(true);
@@ -31,7 +80,6 @@ export const UserMessage = ({ message, onEdit, messageIndex }) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (editedText.trim() !== "") {
-        // Mantener los archivos en su formato original
         onEdit(messageIndex, editedText, message.files);
         setIsEditing(false);
       }
@@ -42,18 +90,18 @@ export const UserMessage = ({ message, onEdit, messageIndex }) => {
     const textarea = textareaRef.current;
     if (textarea) {
       textarea.style.height = "auto";
-      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`; // Limita la altura máxima a 200px
+      textarea.style.height = `${Math.min(textarea.scrollHeight, 200)}px`;
     }
   }, [editedText]);
 
   return (
-    <div style={{ ...styles.message, ...styles.userMessage }}>
-      <div style={styles.userMessageHeader}>
+    <div style={messageStyles.container}>
+      <div style={messageStyles.header}>
         <AttachedFiles files={message.files || []} />
         {!isEditing && (
           <button
             onClick={handleEdit}
-            style={styles.editButton}
+            style={messageStyles.editButton}
             title="Editar mensaje"
           >
             <IconEdit />
@@ -66,26 +114,12 @@ export const UserMessage = ({ message, onEdit, messageIndex }) => {
           value={editedText}
           onChange={(e) => setEditedText(e.target.value)}
           onKeyDown={handleKeyPress}
-          style={{
-            ...styles.editInput,
-            minHeight: "20px",
-            maxHeight: "100px",
-            width: "100%",
-            backgroundColor: "var(--vscode-input-background)",
-            color: "var(--vscode-input-foreground)",
-            border: "1px solid var(--vscode-input-border)",
-            borderRadius: "4px",
-            padding: "8px",
-            resize: "none",
-            fontFamily: "inherit",
-            fontSize: "inherit",
-            overflow: "auto",
-          }}
+          style={messageStyles.editInput}
           autoFocus
           placeholder="Presiona Enter para enviar"
         />
       ) : (
-        <div>{message.text}</div>
+        <div style={messageStyles.messageText}>{message.text}</div>
       )}
     </div>
   );

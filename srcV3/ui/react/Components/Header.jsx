@@ -1,47 +1,8 @@
 import React, { memo, useContext } from "react";
 import { useVSCodeContext } from "../context/VSCodeContext";
 
-const styles = {
-  header: {
-    padding: "10px",
-    borderBottom: "1px solid var(--vscode-sideBar-border)",
-    fontSize: "14px",
-    fontWeight: "bold",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  buttonsContainer: {
-    display: "flex",
-    gap: "8px",
-  },
-  button: {
-    backgroundColor: "var(--vscode-button-secondaryBackground)",
-    color: "var(--vscode-button-foreground)",
-    border: "none",
-    padding: "6px",
-    borderRadius: "3px",
-    cursor: "pointer",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  closeButton: {
-    backgroundColor: "var(--vscode-errorForeground)",
-  },
-  select: {
-    backgroundColor: "var(--vscode-dropdown-background)",
-    color: "var(--vscode-dropdown-foreground)",
-    border: "1px solid var(--vscode-dropdown-border)",
-    padding: "4px 8px",
-    borderRadius: "2px",
-    fontSize: "12px",
-    outline: "none",
-  }
-};
-
 const Header = () => {
-  const { currentModel, postMessage } = useVSCodeContext();
+  const { currentModel, postMessage, theme } = useVSCodeContext();
 
   try {
     const handleModelChange = (event) => {
@@ -58,6 +19,51 @@ const Header = () => {
 
     const handleShowHistory = () => {
       postMessage('command', { command: 'showHistory' });
+    };
+
+    const styles = {
+      header: {
+        padding: theme.spacing.medium,
+        backgroundColor: theme.colors.background,
+        color: theme.colors.text,
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        borderRadius: `0 0 ${theme.borderRadius.medium} ${theme.borderRadius.medium}`,
+        boxShadow: `0 2px 4px ${theme.colors.border}`
+      },
+      title: {
+        fontSize: theme.typography.title,
+        fontWeight: "bold"
+      },
+      button: {
+        backgroundColor: theme.colors.secondary,
+        color: theme.colors.text,
+        border: `1px solid ${theme.colors.border}`,
+        padding: `${theme.spacing.small} ${theme.spacing.medium}`,
+        borderRadius: theme.borderRadius.small,
+        fontSize: theme.typography.text,
+        cursor: "pointer",
+        '&:hover': {
+          opacity: 0.9
+        }
+      },
+      buttonsContainer: {
+        display: "flex",
+        gap: "8px",
+      },
+      closeButton: {
+        backgroundColor: "var(--vscode-errorForeground)",
+      },
+      select: {
+        backgroundColor: "var(--vscode-dropdown-background)",
+        color: "var(--vscode-dropdown-foreground)",
+        border: "1px solid var(--vscode-dropdown-border)",
+        padding: "4px 8px",
+        borderRadius: "2px",
+        fontSize: "12px",
+        outline: "none",
+      }
     };
 
     return (

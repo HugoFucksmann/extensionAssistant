@@ -47,4 +47,21 @@ export class ConfigurationManager {
     setValue<T>(key: string, value: T): Thenable<void> {
         return this.context.globalState.update(key, value);
     }
+
+    /**
+     * Obtiene el tema de UI preferido
+     * @returns 'dark' | 'light' | 'system'
+     */
+    getUiTheme(): 'dark' | 'light' | 'system' {
+        return this.getValue('uiTheme', 'system');
+    }
+
+    /**
+     * Establece el tema de UI preferido
+     * @param theme Nuevo tema
+     * @returns Promise de actualización
+     */
+    setUiTheme(theme: 'dark' | 'light' | 'system'): Thenable<void> {
+        return this.setValue('uiTheme', theme);
+    }
 }
