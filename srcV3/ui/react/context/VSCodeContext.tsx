@@ -1,6 +1,6 @@
 // src/ui/context/VSCodeContext.tsx
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import { Chat, ChatMessage } from '../../../config/storage/chatStorage';
+import { Chat, ChatMessage } from '../../../config/storageGG/chatStorage';
 
 interface VSCodeContextType {
   messages: ChatMessage[];
