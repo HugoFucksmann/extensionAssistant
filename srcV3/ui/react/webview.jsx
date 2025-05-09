@@ -17,15 +17,22 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     height: '100vh',
+    maxHeight: '100vh',
     color: 'var(--vscode-foreground)',
     backgroundColor: 'var(--vscode-sideBar-background)',
-    overflow: 'hidden'
+    overflow: 'hidden',
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0
   },
   content: {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    overflow: 'hidden'
+    overflow: 'hidden',
+    height: '100%'
   },
 };
 
@@ -48,11 +55,12 @@ function Chat() {
     flexDirection: 'column-reverse',
     alignItems: 'center',
     justifyContent: 'center',
-    height: '100%',
+    height: 'calc(100vh - 40px)',
     width: '100%',
     padding: '20px',
     boxSizing: 'border-box',
-    gap: '16px'
+    gap: '16px',
+    overflow: 'hidden'
   };
 
   return (
@@ -70,7 +78,9 @@ function Chat() {
               <RecentChats />
             </ChatMessages>
           </div>
-          <ChatInput />
+          <div style={{display: 'flex', justifyContent: 'center', padding: '0 12px', backgroundColor: 'var(--vscode-sideBar-background)'}}>
+            <ChatInput />
+          </div>
         </>
       )}
     </div>
