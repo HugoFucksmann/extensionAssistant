@@ -2,7 +2,8 @@ import * as vscode from 'vscode';
 import { IChatRepository } from '../storage/interfaces/IChatRepository';
 import { ChatRepository } from '../storage/repositories/chatRepository';
 import { Chat, ChatMessage } from '../storage/models/entities';
-import { ModelManager } from '../models/config/ModelManager'; // <-- Import ModelManager
+import { ModelManager } from '../models/config/ModelManager';
+import { OrchestratorService } from './orchestratorService'; // Import OrchestratorService
 
 /**
  * Service for managing conversation interactions and integrating the AI model.
@@ -13,8 +14,8 @@ export class ChatService {
   private currentChatId: string | null = null;
   private pendingNewChat: boolean = false;
   
-  // ChatService now depends on ModelManager
-  constructor(context: vscode.ExtensionContext, private modelManager: ModelManager) {
+  // ChatService now depends on ModelManager and OrchestratorService
+  constructor(context: vscode.ExtensionContext, private modelManager: ModelManager, private orchestrator: OrchestratorService) {
     this.repository = new ChatRepository(context);
   }
   
@@ -72,7 +73,6 @@ export class ChatService {
     return messages;
   }
   
-  
   /**
    * Updates a conversation's title
    */
@@ -98,6 +98,62 @@ export class ChatService {
    * Gets the current conversation ID
    */
   public getCurrentConversationId(): string | null {
+    return this.currentChatId;
+  }
+  
+  /**
+   * Gets the current chat ID
+   */
+  public getCurrentChatId(): string | null {
+    return this.currentChatId;
+  }
+  
+  /**
+   * Sends a message in the current conversation
+   */
+  public async sendMessage(text: string, files?: string[]): Promise<ChatMessage> {
+    const chatId = await this.ensureChat();
+    
+    // 1. Guardar mensaje usuario
+    const userMessage = {
+      id: '',
+      chatId,
+      content: text,
+      sender: 'user' as const,
+      timestamp: Date.now(),
+      files: files || []
+    };
+    
+    const savedUserMessage = await this.repository.addMessage(userMessage);
+    
+    // 2. Procesar con orquestador (pasando chatId)
+    const responseContent = await this.orchestrator.processUserMessage(chatId, text, files);
+    
+    // 3. Guardar y retornar respuesta
+    const assistantMessage = {
+      id: '',
+      chatId,
+      content: responseContent,
+      sender: 'assistant' as const,
+      timestamp: Date.now(),
+      files: files || []
+    };
+    
+    return this.repository.addMessage(assistantMessage);
+  }
+  
+  /**
+   * Saves a message to the repository
+   */
+  public async saveMessage(message: ChatMessage): Promise<ChatMessage> {
+    return this.repository.addMessage(message);
+  }
+  
+  private async ensureChat(): Promise<string> {
+    if (!this.currentChatId) {
+      const newChat = await this.createConversation();
+      return newChat.id;
+    }
     return this.currentChatId;
   }
 }

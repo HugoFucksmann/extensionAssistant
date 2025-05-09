@@ -13,9 +13,9 @@ export function activate(context: vscode.ExtensionContext) {
   const modelManager = new ModelManager(config);
   initializePromptSystem(modelManager);
 
-  const chatService = new ChatService(context, modelManager);
   const fileSystemService = new FileSystemService();
-  const orchestrator = new OrchestratorService(chatService);
+  const orchestrator = new OrchestratorService();
+  const chatService = new ChatService(context, modelManager, orchestrator);
   const webview = new WebviewProvider(context.extensionUri, config, chatService, orchestrator, fileSystemService);
   
   // Initialize theme handler

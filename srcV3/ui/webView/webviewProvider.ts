@@ -59,21 +59,23 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  private async handleChatMessage(text: string, files?: string[]): Promise<void> {
-    if (!text.trim() && (!files || files.length === 0)) return;
-  
-    try {
-      const assistantMessage = await this.orchestrator.processUserMessage(text, files);
+  private async handleChatMessage(text: string, files: string[] = []): Promise<void> {
+    if (!text.trim() && files.length === 0) return;
 
+    try {
+      const responseText = await this.chatService.sendMessage(text, files);
+      
       this.postMessage('chatResponse', {
-        text: assistantMessage.content,
-        chatId: assistantMessage.chatId,
-        timestamp: assistantMessage.timestamp
+        text: responseText.content,
+        chatId: responseText.chatId,
+        timestamp: responseText.timestamp
       });
       
       this.sendChatList();
-    } catch (error) {
-      this.handleError(error);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+      console.error('Error handling chat message:', error);
+      this.postMessage('chat:error', { error: errorMessage });
     }
   }
   

@@ -1,122 +1,81 @@
-export const styles = (theme) => ({
+// Estilos separados en un archivo para mejor mantenibilidad
+export const getStyles = (theme) => ({
   container: {
     width: '100%',
-    maxWidth: 'calc(100% - 24px)',
-    borderRadius: theme.borderRadius.medium,
-    backgroundColor: theme.colors.background,
-    padding: theme.spacing.medium,
-    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+    background: theme.colors.background,
+    padding: '12px',
+    borderTop: `1px solid ${theme.colors.border}`,
     boxSizing: 'border-box'
   },
   inputContainer: {
+    position: 'relative',
     display: 'flex',
-    alignItems: 'center',
-    position: 'relative'
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: '8px',
+    width: '100%'
   },
   input: {
-    flex: 1,
-    minWidth: 0,
-    height: '38px',
-    padding: '0 52px 0 16px',
-    border: 'none',
-    borderRadius: theme.borderRadius.small,
-    backgroundColor: theme.colors.chatInputBg,
+    flex: '1',
+    background: theme.colors.inputBg || theme.colors.background,
     color: theme.colors.text,
+    border: `1px solid ${theme.colors.border}`,
+    borderRadius: theme.borderRadius.small,
+    padding: '8px 12px',
+    fontSize: '14px',
+    lineHeight: '1.4',
+    minHeight: '36px',
+    maxHeight: '150px',
+    overflowY: 'auto',
     outline: 'none',
-    boxSizing: 'border-box'
+    resize: 'none',
+    fontFamily: 'inherit'
   },
   sendButton: {
-    position: 'absolute',
-    right: '8px',
-    top: '50%',
-    transform: 'translateY(-40%)',
     background: 'none',
     border: 'none',
+    padding: '8px',
     cursor: 'pointer',
-    padding: '6px'
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   controlsRow: {
     display: 'flex',
     justifyContent: 'space-between',
-    gap: theme.spacing.medium,
-    padding: `0 ${theme.spacing.small}`
+    alignItems: 'center',
+    marginTop: '8px'
   },
   leftControls: {
     display: 'flex',
-    gap: theme.spacing.medium
+    position: 'relative'
   },
   rightControls: {
-    display: 'flex',
-    gap: theme.spacing.medium
+    display: 'flex'
   },
   modelSelector: {
     display: 'flex',
     alignItems: 'center',
-    gap: theme.spacing.small,
-    cursor: 'pointer',
+    padding: '4px 8px',
+    borderRadius: theme.borderRadius.small,
+    background: theme.colors.buttonBg || theme.colors.background,
+    border: `1px solid ${theme.colors.border}`,
+    fontSize: '12px',
     color: theme.colors.text,
-    position: 'relative'
+    cursor: 'pointer'
   },
   modelSelectorArrow: {
-    marginLeft: theme.spacing.small,
-    transition: 'transform 0.2s',
-    fontSize: '0.8em'
+    marginLeft: '4px',
+    fontSize: '8px'
   },
-  mentionDropdown: {
-    position: 'absolute',
-    zIndex: 1000,
-    width: '250px',
-    maxHeight: '300px',
-    backgroundColor: theme.colors.dropdownBg || theme.colors.background,
-    border: `1px solid ${theme.colors.border}`,
-    borderRadius: theme.borderRadius.small,
-    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-    overflow: 'hidden',
-    display: 'flex',
-    flexDirection: 'column'
-  },
-  searchContainer: {
-    padding: theme.spacing.small,
-    borderBottom: `1px solid ${theme.colors.border}`
-  },
-  searchInput: {
-    width: '100%',
-    padding: `${theme.spacing.small} ${theme.spacing.medium}`,
-    border: `1px solid ${theme.colors.border}`,
-    borderRadius: theme.borderRadius.small,
-    backgroundColor: theme.colors.inputBg || theme.colors.background,
-    color: theme.colors.text,
-    fontSize: '12px',
-    outline: 'none'
-  },
-  fileList: {
-    margin: 0,
-    padding: 0,
-    listStyle: 'none',
-    overflowY: 'auto',
-    maxHeight: '250px'
-  },
-  fileItem: {
-    padding: `${theme.spacing.small} ${theme.spacing.medium}`,
+  fileButton: {
+    background: 'none',
+    border: 'none',
     cursor: 'pointer',
-    fontSize: '12px',
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    borderBottom: `1px solid ${theme.colors.border}`,
-    color: theme.colors.text
-  },
-  noFiles: {
-    padding: theme.spacing.medium,
-    textAlign: 'center',
-    color: theme.colors.textMuted,
-    fontSize: '12px'
-  },
-  header: {
-    padding: `${theme.spacing.small} ${theme.spacing.medium}`,
-    borderBottom: `1px solid ${theme.colors.border}`,
-    fontWeight: 'bold',
-    fontSize: '12px',
-    color: theme.colors.text
+    padding: '4px',
+    color: theme.colors.text,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center'
   }
 });

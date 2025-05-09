@@ -6,9 +6,10 @@ export interface Chat {
 }
 
 export interface ChatMessage {
-    id?: string;
-    chatId: string;
-    content: string;
-    sender: 'user' | 'assistant' | 'system';
-    timestamp: number;
+  id?: string; // Hacer opcional para creación
+  chatId: string;
+  content: string;
+  sender: 'user' | 'assistant' | 'system';
+  timestamp: number;
+  files?: string[];
 }
