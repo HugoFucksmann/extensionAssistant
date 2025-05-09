@@ -1,175 +1,122 @@
-export const styles = {
-  // ChatInput styles
+export const styles = (theme) => ({
   container: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "8px",
-    padding: "8px",
-    borderTop: "1px solid #e5e7eb",
+    width: '100%',
+    maxWidth: 'calc(100% - 24px)',
+    borderRadius: theme.borderRadius.medium,
+    backgroundColor: theme.colors.background,
+    padding: theme.spacing.medium,
+    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+    boxSizing: 'border-box'
   },
-  textareaContainer: {
-    position: "relative",
-    display: "flex",
-    width: "100%",
+  inputContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    position: 'relative'
   },
-  textarea: {
-    width: "100%",
-    resize: "none",
-    minHeight: "36px",
-    maxHeight: "150px",
-    padding: "8px 40px 8px 16px",
-    borderRadius: "8px",
-    border: "1px solid var(--vscode-input-border)",
-    backgroundColor: "var(--vscode-input-background)",
-    color: "var(--vscode-input-foreground)",
-    fontSize: "12px",
-    outline: "none",
-    overflowY: "auto",
-    lineHeight: "1.5",
-    scrollbarWidth: "thin",
-    scrollbarColor: "var(--vscode-scrollbarSlider-background) transparent",
+  input: {
+    flex: 1,
+    minWidth: 0,
+    height: '38px',
+    padding: '0 52px 0 16px',
+    border: 'none',
+    borderRadius: theme.borderRadius.small,
+    backgroundColor: theme.colors.chatInputBg,
+    color: theme.colors.text,
+    outline: 'none',
+    boxSizing: 'border-box'
   },
   sendButton: {
-    position: "absolute",
-    right: "8px",
-    bottom: "8px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "4px",
-    background: "none",
-    border: "none",
-    cursor: "pointer",
-    borderRadius: "4px",
-    color: "var(--vscode-button-foreground)",
-    transition: "all 0.2s ease",
-    "&:hover": {
-      backgroundColor: "var(--vscode-button-hoverBackground)",
-    },
+    position: 'absolute',
+    right: '8px',
+    top: '50%',
+    transform: 'translateY(-40%)',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    padding: '6px'
   },
-  actionsRow: {
-    display: "flex",
-    justifyContent: "flex-end",
-    alignItems: "center",
+  controlsRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: theme.spacing.medium,
+    padding: `0 ${theme.spacing.small}`
   },
-
-  // FileSelector styles
-  filesWrapper: {
-    position: "relative",
+  leftControls: {
+    display: 'flex',
+    gap: theme.spacing.medium
   },
-  filesContainer: {
-    display: "flex",
-    flexWrap: "wrap",
-    gap: "4px",
-    padding: "4px",
-    alignItems: "center",
+  rightControls: {
+    display: 'flex',
+    gap: theme.spacing.medium
   },
-  fileTag: {
-    display: "flex",
-    alignItems: "center",
-    backgroundColor: "var(--vscode-button-secondaryBackground)",
-    color: "var(--vscode-button-secondaryForeground)",
-    padding: "2px 8px",
-    borderRadius: "4px",
-    fontSize: "12px",
+  modelSelector: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: theme.spacing.small,
+    cursor: 'pointer',
+    color: theme.colors.text,
+    position: 'relative'
   },
-  removeButton: {
-    marginLeft: "4px",
-    border: "none",
-    background: "none",
-    color: "var(--vscode-button-secondaryForeground)",
-    cursor: "pointer",
-    padding: "0 4px",
-    fontSize: "12px",
+  modelSelectorArrow: {
+    marginLeft: theme.spacing.small,
+    transition: 'transform 0.2s',
+    fontSize: '0.8em'
   },
-  addButton: {
-    display: "flex",
-    alignItems: "center",
-    padding: "2px 2px",
-    backgroundColor: "transparent",
-    border: "1px dashed var(--vscode-button-secondaryBackground)",
-    borderRadius: "4px",
-    cursor: "pointer",
-    color: "var(--vscode-button-secondaryForeground)",
-  },
-  dropdown: {
-    position: "absolute",
-    bottom: "100%",
-    left: 0,
-    right: 0,
-    backgroundColor: "var(--vscode-dropdown-background)",
-    border: "1px solid var(--vscode-dropdown-border)",
-    maxHeight: "300px",
-    overflowY: "auto",
+  mentionDropdown: {
+    position: 'absolute',
+    zIndex: 1000,
+    width: '250px',
+    maxHeight: '300px',
+    backgroundColor: theme.colors.dropdownBg || theme.colors.background,
+    border: `1px solid ${theme.colors.border}`,
+    borderRadius: theme.borderRadius.small,
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column'
   },
   searchContainer: {
-    padding: "8px",
-    borderBottom: "1px solid var(--vscode-dropdown-border)",
-    position: "sticky",
-    top: 0,
-    backgroundColor: "var(--vscode-dropdown-background)",
-    zIndex: 1,
+    padding: theme.spacing.small,
+    borderBottom: `1px solid ${theme.colors.border}`
   },
   searchInput: {
-    width: "100%",
-    padding: "8px 12px",
-    border: "1px solid var(--vscode-input-border)",
-    borderRadius: "4px",
-    fontSize: "12px",
-    backgroundColor: "var(--vscode-input-background)",
-    color: "var(--vscode-input-foreground)",
-    outline: "none",
-    "&:focus": {
-      borderColor: "var(--vscode-focusBorder)",
-    },
+    width: '100%',
+    padding: `${theme.spacing.small} ${theme.spacing.medium}`,
+    border: `1px solid ${theme.colors.border}`,
+    borderRadius: theme.borderRadius.small,
+    backgroundColor: theme.colors.inputBg || theme.colors.background,
+    color: theme.colors.text,
+    fontSize: '12px',
+    outline: 'none'
   },
   fileList: {
     margin: 0,
     padding: 0,
-    listStyle: "none",
+    listStyle: 'none',
+    overflowY: 'auto',
+    maxHeight: '250px'
   },
   fileItem: {
-    padding: "4px 8px",
-    cursor: "pointer",
-    fontSize: "12px",
-    color: "var(--vscode-foreground)",
-    "&:hover": {
-      backgroundColor: "var(--vscode-list-hoverBackground)",
-    },
+    padding: `${theme.spacing.small} ${theme.spacing.medium}`,
+    cursor: 'pointer',
+    fontSize: '12px',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    borderBottom: `1px solid ${theme.colors.border}`,
+    color: theme.colors.text
   },
-
-  // ModeSwitch styles
-  modeSwitch: {
-    display: "flex",
-    gap: "8px",
+  noFiles: {
+    padding: theme.spacing.medium,
+    textAlign: 'center',
+    color: theme.colors.textMuted,
+    fontSize: '12px'
   },
-  modeButton: {
-    display: "flex",
-    alignItems: "center",
-    gap: "4px",
-    padding: "4px 8px",
-    borderRadius: "4px",
-    border: "none",
-    cursor: "pointer",
-    fontSize: "12px",
-    transition: "all 0.2s",
-  },
-  activeMode: {
-    backgroundColor: "var(--vscode-button-background)",
-    color: "var(--vscode-button-foreground)",
-  },
-  inactiveMode: {
-    backgroundColor: "transparent",
-    color: "var(--vscode-foreground)",
-  },
-
-  // States
-  disabled: {
-    opacity: 0.5,
-    cursor: "not-allowed",
-    pointerEvents: "none",
-  },
-  inactive: {
-    opacity: 0.3,
-  },
-};
+  header: {
+    padding: `${theme.spacing.small} ${theme.spacing.medium}`,
+    borderBottom: `1px solid ${theme.colors.border}`,
+    fontWeight: 'bold',
+    fontSize: '12px',
+    color: theme.colors.text
+  }
+});

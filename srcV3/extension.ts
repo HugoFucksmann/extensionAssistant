@@ -5,6 +5,8 @@ import { initializePromptSystem } from './models/promptSystem';
 import { ModelManager } from './models/config/ModelManager';
 import { ChatService } from './services/chatService';
 import { OrchestratorService } from './services/orchestratorService';
+import { FileSystemService } from './services/fileSystemService';
+
 
 export function activate(context: vscode.ExtensionContext) {
   const config = new ConfigurationManager(context);
@@ -12,8 +14,9 @@ export function activate(context: vscode.ExtensionContext) {
   initializePromptSystem(modelManager);
 
   const chatService = new ChatService(context, modelManager);
+  const fileSystemService = new FileSystemService();
   const orchestrator = new OrchestratorService(chatService);
-  const webview = new WebviewProvider(context.extensionUri, config, chatService, orchestrator);
+  const webview = new WebviewProvider(context.extensionUri, config, chatService, orchestrator, fileSystemService);
   
   // Initialize theme handler
   webview.setThemeHandler();
@@ -53,7 +56,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(webview);
 
-  console.log('[Extension] Activated with theme support and titlebar commands');
+  console.log('[Extension] Activated with theme support, file system access and titlebar commands');
 }
 
 export function deactivate() {

@@ -4,7 +4,7 @@ import { ChatMessage } from '../storage/models/entities';
 export class OrchestratorService {
   constructor(private chatService: ChatService) {}
 
-  public async processUserMessage(userText: string): Promise<ChatMessage> {
+  public async processUserMessage(userText: string, files?: string[]): Promise<ChatMessage> {
     // Asegura que haya un chat activo
     const chatId = await this.ensureChat();
 

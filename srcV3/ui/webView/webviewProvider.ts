@@ -3,6 +3,7 @@ import { ConfigurationManager } from '../../config/ConfigurationManager';
 import { getHtmlContent } from './htmlTemplate';
 import { ChatService } from '../../services/chatService';
 import { OrchestratorService } from '../../services/orchestratorService';
+import { FileSystemService } from '../../services/fileSystemService';
 
 export class WebviewProvider implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView;
@@ -12,7 +13,8 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     private readonly extensionUri: vscode.Uri,
     private readonly configManager: ConfigurationManager,
     private readonly chatService: ChatService,
-    private readonly orchestrator: OrchestratorService
+    private readonly orchestrator: OrchestratorService,
+    private readonly fileSystemService: FileSystemService
   ) {}
 
   public resolveWebviewView(webviewView: vscode.WebviewView): void {
@@ -45,7 +47,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
       try {
         switch (message.type) {
           case 'chat':
-            await this.handleChatMessage(message.text);
+            await this.handleChatMessage(message.text, message.files);
             break;
           case 'command':
             await this.handleCommand(message);
@@ -57,11 +59,11 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  private async handleChatMessage(text: string): Promise<void> {
-    if (!text.trim()) return;
+  private async handleChatMessage(text: string, files?: string[]): Promise<void> {
+    if (!text.trim() && (!files || files.length === 0)) return;
   
     try {
-      const assistantMessage = await this.orchestrator.processUserMessage(text);
+      const assistantMessage = await this.orchestrator.processUserMessage(text, files);
 
       this.postMessage('chatResponse', {
         text: assistantMessage.content,
@@ -103,6 +105,14 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
       case 'showHistory':
         // Handle showHistory command in webview
         this.showChatHistory();
+        break;
+        
+      case 'getProjectFiles':
+        await this.getProjectFiles();
+        break;
+        
+      case 'getFileContents':
+        await this.getFileContents(message.filePath);
         break;
     }
   }
@@ -155,11 +165,36 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
       this.handleError(error);
     }
   }
+  
+  /**
+   * Fetch project files and send them to the webview
+   */
+  private async getProjectFiles(): Promise<void> {
+    try {
+      const files = await this.fileSystemService.getWorkspaceFiles();
+      this.postMessage('projectFiles', { files });
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+  
+  /**
+   * Get contents of a file and send to webview
+   * @param filePath Path of the file relative to workspace
+   */
+  private async getFileContents(filePath: string): Promise<void> {
+    try {
+      const content = await this.fileSystemService.getFileContents(filePath);
+      this.postMessage('fileContents', { filePath, content });
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
 
   private handleError(error: unknown): void {
     console.error('Webview error:', error);
     this.postMessage('error', {
-      message: error instanceof Error ? error.message : 'Ocurrió un error',
+      message: error instanceof Error ? error.message : 'An error occurred',
     });
   }
 
