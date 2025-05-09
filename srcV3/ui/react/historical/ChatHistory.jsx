@@ -13,6 +13,7 @@ const styles = {
     zIndex: 1000,
     display: "flex",
     flexDirection: "column",
+    padding: "0px 16px",
   },
   header: {
     padding: "10px",

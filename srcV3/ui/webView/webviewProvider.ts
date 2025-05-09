@@ -99,7 +99,20 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
         await this.configManager.setValue('modelType', message.modelType);
         this.updateModel(message.modelType);
         break;
+
+      case 'showHistory':
+        // Handle showHistory command in webview
+        this.showChatHistory();
+        break;
     }
+  }
+
+  public showChatHistory(): void {
+    // First, ensure we've loaded the chat list
+    this.sendChatList();
+    
+    // Then send message to show history UI
+    this.postMessage('historyRequested', {});
   }
 
   private async sendChatList(): Promise<void> {

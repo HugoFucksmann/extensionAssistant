@@ -8,7 +8,7 @@ const ChatList = ({ chats, onChatClick }) => {
     list: {
       display: 'flex',
       flexDirection: 'column',
-      gap: theme.spacing.small
+      gap: theme.spacing.medium
     },
     chatItem: {
       padding: theme.spacing.medium,

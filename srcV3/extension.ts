@@ -39,7 +39,8 @@ export function activate(context: vscode.ExtensionContext) {
     }),
 
     vscode.commands.registerCommand('extensionAssistant.chat.history', () => {
-      webview.postMessage('command', { command: 'showHistory' });
+      // Show history panel by updating the state in the webview
+      webview.showChatHistory();
     }),
 
     vscode.commands.registerCommand('extensionAssistant.model.change', async () => {
