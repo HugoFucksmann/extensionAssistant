@@ -14,6 +14,7 @@ const ChatList = ({ chats, onChatClick }) => {
       padding: theme.spacing.medium,
       borderRadius: theme.borderRadius.medium,
       backgroundColor: theme.colors.secondary,
+      color: theme.colors.text,
       cursor: 'pointer',
       '&:hover': {
         backgroundColor: theme.colors.primary

@@ -70,11 +70,6 @@
         "icon": "$(gear)"
       },
       {
-        "command": "extensionAssistant.switchModel",
-        "title": "Cambiar Modelo de IA",
-        "icon": "$(circuit-board)"
-      },
-      {
         "command": "extensionAssistant.chat.history",
         "title": "Mostrar Historial de Chats",
         "icon": "$(history)"
@@ -93,14 +88,9 @@
           "group": "navigation@2"
         },
         {
-          "command": "extensionAssistant.switchModel",
-          "when": "view == aiChat.chatView",
-          "group": "navigation@3"
-        },
-        {
           "command": "extensionAssistant.settings",
           "when": "view == aiChat.chatView",
-          "group": "navigation@4"
+          "group": "navigation@3"
         }
       ]
     }

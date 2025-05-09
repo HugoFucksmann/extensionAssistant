@@ -35,13 +35,15 @@ const ChatInput = () => {
     },
     input: {
       flex: 1,
+      minWidth: 0,
       height: '38px',
       padding: '0 52px 0 16px',
       border: 'none',
       borderRadius: '4px',
       backgroundColor: theme.colors.chatInputBg,
-      color: theme.colors.background,
-      outline: 'none'
+      color: theme.colors.text,
+      outline: 'none',
+      boxSizing: 'border-box'
     },
     sendButton: {
       position: 'absolute',

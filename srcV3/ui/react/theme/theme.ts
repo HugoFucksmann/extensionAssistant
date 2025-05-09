@@ -30,9 +30,9 @@ export type ThemeType = {
 export const getTheme = (isDarkMode: boolean): ThemeType => ({
   colors: {
     primary: isDarkMode ? '#007acc' : '#006ab1',
-    secondary: isDarkMode ? '#252526' : '#f3f3f3',
+    secondary: isDarkMode ? '#252526' : '#e9ebf0',
     text: isDarkMode ? '#e0e0e0' : '#333333',
-    background: isDarkMode ? '#1e1e1e' : '#ffffff',
+    background: isDarkMode ? '#1e1e1e' : '#f5fbff',
     border: isDarkMode ? '#454545' : '#cccccc',
     chatInputBg: isDarkMode ? '#2a2d2e' : '#f3f3f3',
     messageUserBg: isDarkMode ? '#0e639c' : '#007acc',
