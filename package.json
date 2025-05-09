@@ -60,10 +60,50 @@
         "title": "Abrir Chat de IA"
       },
       {
-        "command": "extensionAssistant.sendTestMessage",
-        "title": "Enviar mensaje de prueba"
+        "command": "extensionAssistant.newChat",
+        "title": "Nuevo Chat",
+        "icon": "$(add)"
+      },
+      {
+        "command": "extensionAssistant.settings",
+        "title": "Configuración del Asistente",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "extensionAssistant.switchModel",
+        "title": "Cambiar Modelo de IA",
+        "icon": "$(circuit-board)"
+      },
+      {
+        "command": "extensionAssistant.chat.history",
+        "title": "Mostrar Historial de Chats",
+        "icon": "$(history)"
       }
-    ]
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "extensionAssistant.newChat",
+          "when": "view == aiChat.chatView",
+          "group": "navigation@1"
+        },
+        {
+          "command": "extensionAssistant.chat.history",
+          "when": "view == aiChat.chatView",
+          "group": "navigation@2"
+        },
+        {
+          "command": "extensionAssistant.switchModel",
+          "when": "view == aiChat.chatView",
+          "group": "navigation@3"
+        },
+        {
+          "command": "extensionAssistant.settings",
+          "when": "view == aiChat.chatView",
+          "group": "navigation@4"
+        }
+      ]
+    }
   },
   "scripts": {
     "webpack": "webpack --mode development",

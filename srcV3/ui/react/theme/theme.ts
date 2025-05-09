@@ -34,7 +34,7 @@ export const getTheme = (isDarkMode: boolean): ThemeType => ({
     text: isDarkMode ? '#e0e0e0' : '#333333',
     background: isDarkMode ? '#1e1e1e' : '#ffffff',
     border: isDarkMode ? '#454545' : '#cccccc',
-    chatInputBg: isDarkMode ? '#252526' : '#f3f3f3',
+    chatInputBg: isDarkMode ? '#2a2d2e' : '#f3f3f3',
     messageUserBg: isDarkMode ? '#0e639c' : '#007acc',
     messageAssistantBg: isDarkMode ? '#2d2d2d' : '#f0f0f0',
     error: isDarkMode ? '#f14c4c' : '#e51400'

@@ -1,48 +1,78 @@
-import React from "react";
+import React, { useContext } from "react";
 import ReactDOM from "react-dom";
-import Header from "./Components/Header";
 import ChatInput from "./Components/InputChat/ChatInput";
 
-// Importar componentes de manera estática en lugar de usar lazy loading
+// Import components statically instead of using lazy loading
 import ChatHistory from "./historical/ChatHistory";
 import RecentChats from "./historical/RecentChats";
 import ChatMessages from "./Components/ChatMessages/ChatMessages";
 
-import { VSCodeProvider } from "./context/VSCodeContext";
+import { VSCodeProvider, useVSCodeContext } from "./context/VSCodeContext";
 
-// Mensaje de depuración
-console.log('Webview script cargado');
+// Debug message
+console.log('Webview script loaded');
 
 const styles = {
   container: {
-    display: "flex",
-    flexDirection: "column",
-    height: "100vh",
-    color: "var(--vscode-foreground)",
-    backgroundColor: "var(--vscode-sideBar-background)",
-    overflow: "hidden",
+    display: 'flex',
+    flexDirection: 'column',
+    height: '100vh',
+    color: 'var(--vscode-foreground)',
+    backgroundColor: 'var(--vscode-sideBar-background)',
+    overflow: 'hidden'
   },
   content: {
     flex: 1,
-    display: "flex",
-    flexDirection: "column",
-    overflow: "auto",
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden'
   },
 };
 
-// Componente principal
+// Main component
 function Chat() {
-  console.log('Renderizando componente Chat');
+  const { messages } = useVSCodeContext();
+  const isEmpty = messages.length === 0;
+
+  const containerStyle = {
+    ...styles.container,
+    ...(isEmpty && {
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: '20px'
+    })
+  };
+
+  const emptyStateContainer = {
+    display: 'flex',
+    flexDirection: 'column-reverse',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '100%',
+    width: '100%',
+    padding: '20px',
+    boxSizing: 'border-box',
+    gap: '16px'
+  };
+
   return (
-    <div style={styles.container}>
-      <Header />
+    <div style={containerStyle}>
       <ChatHistory />
-      <div style={styles.content}>
-        <ChatMessages>
+      {isEmpty ? (
+        <div style={emptyStateContainer}>
           <RecentChats />
-        </ChatMessages>
-      </div>
-      <ChatInput />
+          <ChatInput />
+        </div>
+      ) : (
+        <>
+          <div style={styles.content}>
+            <ChatMessages>
+              <RecentChats />
+            </ChatMessages>
+          </div>
+          <ChatInput />
+        </>
+      )}
     </div>
   );
 }
@@ -59,7 +89,7 @@ let vscode;
 try {
   vscode = acquireVsCodeApi();
 } catch (error) {
-  console.error('Error al adquirir vscode API:', error);
+  console.error('Error acquiring vscode API:', error);
   vscode = {
       postMessage: (msg) => console.log('[Mock] postMessage:', msg),
       getState: () => ({ modelType: 'gemini' }),
@@ -67,34 +97,34 @@ try {
   };
 }
 
-// Función para renderizar la aplicación con manejo de errores mejorado
+// Function to render the application with improved error handling
 function renderApp() {
   const root = document.getElementById("root");
   if (!root) {
-    console.error('Elemento root no encontrado');
+    console.error('Root element not found');
     return;
   }
   
   try {
-    console.log('Renderizando React app');
+    console.log('Rendering React app');
     ReactDOM.render(
       <VSCodeProvider>
         <Chat />
       </VSCodeProvider>,
       root
     );
-    console.log('React app renderizada correctamente');
+    console.log('React app rendered successfully');
   } catch (error) {
-    console.error('Error al renderizar React app:', error);
-    // Fallback para mostrar algo en caso de error
+    console.error('Error rendering React app:', error);
+    // Fallback to show something in case of error
     root.innerHTML = `
       <div style="padding: 20px; color: red;">
-        <h2>Error al cargar la UI</h2>
+        <h2>Error loading UI</h2>
         <pre>${error.message}</pre>
       </div>
     `;
   }
 }
 
-// Iniciar la aplicación
+// Start the application
 renderApp();

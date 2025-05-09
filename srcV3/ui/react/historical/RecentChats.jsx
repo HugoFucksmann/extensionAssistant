@@ -7,11 +7,14 @@ export const RecentChats = () => {
 
   const styles = {
     container: {
-      padding: theme.spacing.large,
-      maxWidth: "600px",
-      margin: "0 auto",
+      width: '100%',
+      maxWidth: 'calc(100% - 24px)',
+      borderRadius: '8px',
       backgroundColor: theme.colors.background,
-      borderRadius: theme.borderRadius.medium
+      padding: '12px',
+      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+      boxSizing: 'border-box',
+      margin: '0 auto'
     },
     title: {
       fontSize: theme.typography.title,

@@ -21,6 +21,10 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     this.setupMessageHandlers();
     this.sendChatList();
     this.setThemeHandler();
+    
+    // Send the initial model type to the webview
+    const modelType = this.configManager.getModelType();
+    this.updateModel(modelType);
   }
 
   private configureWebview(): void {
@@ -71,16 +75,10 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     }
   }
   
-
   private async handleCommand(message: any): Promise<void> {
     const { command } = message;
 
     switch (command) {
-      case 'setModel':
-        await this.configManager.setModelType(message.data);
-        this.updateModel(message.data);
-        break;
-
       case 'getChatList':
         await this.sendChatList();
         break;
@@ -89,20 +87,17 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
         await this.loadChat(message.chatId);
         break;
 
-      case 'newChat':
-        await this.createNewChat();
+      case 'updateChatTitle':
+        await this.updateChatTitle(message.chatId, message.title);
         break;
-
-      case 'showHistory':
-        this.postMessage('historyRequested', {});
-        break;
-
+        
       case 'deleteChat':
         await this.deleteChat(message.chatId);
         break;
 
-      case 'updateChatTitle':
-        await this.updateChatTitle(message.chatId, message.title);
+      case 'switchModel':
+        await this.configManager.setValue('modelType', message.modelType);
+        this.updateModel(message.modelType);
         break;
     }
   }
@@ -121,7 +116,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private async createNewChat(): Promise<void> {
+  public async createNewChat(): Promise<void> {
     try {
       this.chatService.prepareNewConversation();
       this.postMessage('newChat', {});
@@ -164,12 +159,12 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
   }
 
   public setThemeHandler() {
-    // Enviar tema inicial
+    // Send initial theme
     this.postMessage('themeChanged', { 
       isDarkMode: vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Dark 
     });
 
-    // Escuchar cambios de tema
+    // Listen for theme changes
     this.disposables.push(
       vscode.window.onDidChangeActiveColorTheme(theme => {
         this.postMessage('themeChanged', { 
@@ -178,7 +173,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
       })
     );
 
-    // Manejar preferencia de tema desde la webview
+    // Handle theme preference from webview
     if (this.view) {
       this.disposables.push(
         this.view.webview.onDidReceiveMessage(message => {
@@ -193,7 +188,6 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
   }
 
   public dispose(): void {
-    // Aquí podrías cerrar el ChatService si implementás un método close()
     this.disposables.forEach(disposable => disposable.dispose());
   }
 }

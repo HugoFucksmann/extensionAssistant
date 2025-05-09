@@ -37,7 +37,7 @@ export const useVSCodeContext = () => {
 };
 
 export const VSCodeProvider = ({ children }: { children: React.ReactNode }) => {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => []);
   const [chatList, setChatList] = useState<Chat[]>([]);
   const [currentModel, setCurrentModel] = useState('ollama');
   const [isLoading, setLoading] = useState(false);
@@ -131,8 +131,6 @@ export const VSCodeProvider = ({ children }: { children: React.ReactNode }) => {
       type: 'command', 
       command: 'getChatList' 
     });
-
-    window.vscode.postMessage({ type: 'getTheme' });
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
