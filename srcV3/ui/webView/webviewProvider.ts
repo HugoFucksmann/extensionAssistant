@@ -63,6 +63,10 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     if (!text.trim() && files.length === 0) return;
 
     try {
+      /**
+       * Sends a chat message through the chat service and retrieves the response text.
+       * @returns The response text object containing content, chatId, and timestamp.
+       */
       const responseText = await this.chatService.sendMessage(text, files);
       
       this.postMessage('chatResponse', {

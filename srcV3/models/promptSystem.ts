@@ -9,7 +9,6 @@ export type PromptType =
   | 'projectManagement'
   | 'projectSearch'
   | 'resultEvaluator'
-  | 'toolSelector';
 
 // Type for variables that can be passed to prompts
 export type PromptVariables = Record<string, any>;
@@ -22,7 +21,7 @@ import { examinationPrompt } from './prompts/prompt.examination';
 import { projectManagementPrompt } from './prompts/prompt.projectManagement';
 import { projectSearchPrompt } from './prompts/prompt.projectSearch';
 import { resultEvaluatorPrompt } from './prompts/prompt.resultEvaluator';
-import { toolSelectorPrompt } from './prompts/prompt.toolSelector';
+
 import { ModelManager } from './config/ModelManager';
 import { ModelType } from './config/types';
 import { parseModelResponse } from './config/modelUtils';
@@ -36,7 +35,6 @@ const PROMPT_MAP: Record<PromptType, string> = {
   projectManagement: projectManagementPrompt,
   projectSearch: projectSearchPrompt,
   resultEvaluator: resultEvaluatorPrompt,
-  toolSelector: toolSelectorPrompt,
 };
 
 // Instancia del ModelManager

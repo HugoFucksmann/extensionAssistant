@@ -19,12 +19,10 @@ INSTRUCCIONES:
 Tu respuesta debe ser un objeto JSON con la siguiente estructura:
 {
   "needsFullPlanning": boolean,
-  "category": "codeExamination" | "codeEditing" | "projectManagement" | "communication" | "projectSearch",
-  "directAction": {
+  "directActions": Array<{
     "tool": string,
     "params": object
-  } | null,
-  "confidence": number,
+  }> | null,
   "relevantContext": string[],
   "intentClassification": string
 }
