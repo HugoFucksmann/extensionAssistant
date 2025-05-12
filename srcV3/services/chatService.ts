@@ -3,7 +3,7 @@ import { IChatRepository } from '../storage/interfaces/IChatRepository';
 import { ChatRepository } from '../storage/repositories/chatRepository';
 import { Chat, ChatMessage } from '../storage/models/entities';
 import { ModelManager } from '../models/config/ModelManager';
-import { OrchestratorService } from './orchestratorService'; // Import OrchestratorService
+import { Orchestrator } from '../orchestrator/orchestrator'; // Replace OrchestratorService import
 
 /**
  * Service for managing conversation interactions and integrating the AI model.
@@ -14,8 +14,8 @@ export class ChatService {
   private currentChatId: string | null = null;
   private pendingNewChat: boolean = false;
   
-  // ChatService now depends on ModelManager and OrchestratorService
-  constructor(context: vscode.ExtensionContext, private modelManager: ModelManager, private orchestrator: OrchestratorService) {
+  // ChatService now depends on ModelManager and Orchestrator
+  constructor(context: vscode.ExtensionContext, private modelManager: ModelManager, private orchestrator: Orchestrator) {
     this.repository = new ChatRepository(context);
   }
   

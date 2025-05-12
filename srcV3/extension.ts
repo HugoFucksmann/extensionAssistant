@@ -4,7 +4,7 @@ import { ConfigurationManager } from './config/ConfigurationManager';
 import { initializePromptSystem } from './models/promptSystem';
 import { ModelManager } from './models/config/ModelManager';
 import { ChatService } from './services/chatService';
-import { OrchestratorService } from './services/orchestratorService';
+import { Orchestrator } from './orchestrator/orchestrator'; // Update import statement
 import { FileSystemService } from './services/fileSystemService';
 
 
@@ -14,7 +14,7 @@ export function activate(context: vscode.ExtensionContext) {
   initializePromptSystem(modelManager);
 
   const fileSystemService = new FileSystemService();
-  const orchestrator = new OrchestratorService();
+  const orchestrator = new Orchestrator(); // Replace OrchestratorService with Orchestrator
   const chatService = new ChatService(context, modelManager, orchestrator);
   const webview = new WebviewProvider(context.extensionUri, config, chatService, orchestrator, fileSystemService);
   

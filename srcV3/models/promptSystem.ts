@@ -9,6 +9,7 @@ export type PromptType =
   | 'projectManagement'
   | 'projectSearch'
   | 'resultEvaluator'
+  | 'conversationResponder';
 
 // Type for variables that can be passed to prompts
 export type PromptVariables = Record<string, any>;
@@ -25,6 +26,7 @@ import { resultEvaluatorPrompt } from './prompts/prompt.resultEvaluator';
 import { ModelManager } from './config/ModelManager';
 import { ModelType } from './config/types';
 import { parseModelResponse } from './config/modelUtils';
+import { conversationPrompt } from './prompts/intentions/prompt.conversation';
 
 // Map of prompt types to their templates
 const PROMPT_MAP: Record<PromptType, string> = {
@@ -35,6 +37,7 @@ const PROMPT_MAP: Record<PromptType, string> = {
   projectManagement: projectManagementPrompt,
   projectSearch: projectSearchPrompt,
   resultEvaluator: resultEvaluatorPrompt,
+  conversationResponder: conversationPrompt
 };
 
 // Instancia del ModelManager

@@ -16,10 +16,7 @@ export class OrchestratorService {
     projectContext: projectInfo || {}
   });
 
-
-  
-
-    // Generar respuesta simulada
-    return `Respuesta Modelo: ${JSON.stringify(analysis)}` 
+    // Devolver el análisis directamente
+    return JSON.stringify(analysis.analysis);
   }
 }
