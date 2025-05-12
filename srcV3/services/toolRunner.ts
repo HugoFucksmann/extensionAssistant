@@ -2,6 +2,11 @@ import * as vscode from 'vscode';
 import { getWorkspaceFiles } from '../tools/filesystemTools/getWorkspaceFiles';
 import { getFileContents } from '../tools/filesystemTools/getFileContents';
 
+
+
+
+
+
 // Interfaz para definir la estructura de una herramienta
 interface Tool {
   execute: (...args: any[]) => Promise<any>;

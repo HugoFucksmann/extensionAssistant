@@ -32,3 +32,9 @@ export async function parseGitignore(rootDir: string): Promise<string[]> {
     return [];
   }
 }
+
+export function getMainWorkspacePath(): string {
+  const workspaceFolders = vscode.workspace.workspaceFolders;
+  if (!workspaceFolders?.[0]) throw new Error('No workspace folder found');
+  return normalizePath(workspaceFolders[0].uri.fsPath);
+}
