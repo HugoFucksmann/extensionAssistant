@@ -127,9 +127,9 @@ export class ToolRunner {
     return results;
   }
 
-  /**
-   * Ejecuta un plan secuencial de tools con mejor manejo de contexto
-   */
+  
+/*  //  * Ejecuta un plan secuencial de tools con mejor manejo de contexto
+  
   public static async executePlan(
     plan: Array<{
       tool: string;
@@ -167,7 +167,7 @@ export class ToolRunner {
     }
     
     return context;
-  }
+  } */
 
   /**
    * Lista todas las tools disponibles

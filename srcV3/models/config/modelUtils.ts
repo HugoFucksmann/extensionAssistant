@@ -1,11 +1,15 @@
-import { PromptType } from "../promptSystem";
+// src/models/config/modelUtils.ts
+
+// Import PromptType and InputAnalysisResult from types.ts
+import { PromptType, InputAnalysisResult } from '../../orchestrator/execution/types';
+
 
 /**
  * Extracts valid JSON content from a text response, even if it's surrounded
  * by additional text or enclosed in triple quotes.
- * 
+ *
  * @param text Full response text
- * @param defaultValue Default value if JSON can't be extracted
+ * @param defaultValue Default value if JSON can't be extracted or parsed
  * @returns Extracted JSON object or default value
  */
 export function extractJsonFromText<T>(text: string, defaultValue: T): T {
@@ -13,115 +17,158 @@ export function extractJsonFromText<T>(text: string, defaultValue: T): T {
     return defaultValue;
   }
 
+  const cleanedText = text.trim();
+
   // Try direct parsing first
   try {
-    return JSON.parse(text) as T;
+    const parsed = JSON.parse(cleanedText);
+     // Basic check: if it's an object or array, it's likely intended JSON
+    if (typeof parsed === 'object' && parsed !== null) {
+       return parsed as T;
+    }
+    // If it's a primitive (string, number, boolean), it's probably not the expected JSON object
+    console.warn("[extractJsonFromText] Direct parse resulted in a primitive, not an object/array.");
   } catch (e) {
     // Not valid JSON directly, try to extract it
   }
 
-  // Look for JSON between triple quotes
+  // Look for JSON between triple quotes (```json ... ``` or ``` ... ```)
   const tripleQuotesRegex = /```(?:json)?\s*([\s\S]*?)\s*```/;
-  const tripleQuotesMatch = text.match(tripleQuotesRegex);
-  
+  const tripleQuotesMatch = cleanedText.match(tripleQuotesRegex);
+
   if (tripleQuotesMatch && tripleQuotesMatch[1]) {
     try {
-      return JSON.parse(tripleQuotesMatch[1]) as T;
+      // Use the captured group (content inside the quotes)
+      const parsed = JSON.parse(tripleQuotesMatch[1]);
+       if (typeof parsed === 'object' && parsed !== null) {
+           return parsed as T;
+       }
+       console.warn("[extractJsonFromText] JSON inside triple quotes parsed to a primitive.");
     } catch (e) {
+      console.warn("[extractJsonFromText] Failed to parse JSON inside triple quotes:", e);
       // Not valid JSON inside triple quotes
     }
   }
 
-  // Look for any valid JSON object in the text
+  // Look for any valid JSON object in the text (less reliable)
+  // This regex is basic and might fail on nested structures or complex strings
   const jsonRegex = /(\{[\s\S]*?\})/g;
-  const jsonMatches = text.match(jsonRegex);
-  
-  if (jsonMatches) {
-    for (const potentialJson of jsonMatches) {
-      try {
-        return JSON.parse(potentialJson) as T;
-      } catch (e) {
-        // Continue with next match
-      }
+  let match;
+  let lastAttemptedJson: string | undefined;
+  // Use exec in a loop to find all matches
+  while ((match = jsonRegex.exec(cleanedText)) !== null) {
+    try {
+      // Use the captured group (the content of the object)
+      lastAttemptedJson = match[1];
+      const parsed = JSON.parse(lastAttemptedJson);
+       if (typeof parsed === 'object' && parsed !== null) {
+           console.warn("[extractJsonFromText] Successfully extracted JSON from text (not in markdown).");
+           return parsed as T;
+       }
+       console.warn("[extractJsonFromText] JSON extracted from text parsed to a primitive.");
+    } catch (e) {
+      // Continue with next match
     }
   }
 
+
+  console.warn("[extractJsonFromText] No valid JSON object found or extracted from text.");
+  if (lastAttemptedJson) {
+      console.warn("[extractJsonFromText] Last failed JSON parse attempt:", lastAttemptedJson);
+  }
   // If all fails, return default value
   return defaultValue;
 }
 
-/**
- * Processes a model response to extract relevant content.
- * 
- * @param response Model response
- * @param expectedJsonFormat Whether response is expected to be in JSON format
- * @returns Processed response content
- */
-export function processModelResponse(response: string, expectedJsonFormat: boolean = false): string {
-  if (!response) {
-    return "No response received from model.";
-  }
+// processModelResponse is removed
 
-  // If we don't expect JSON, return response as is
-  if (!expectedJsonFormat) {
-    return response;
-  }
-
-  // Try to extract JSON and get 'content' property or similar
-  const jsonResponse = extractJsonFromText<any>(response, null);
-  
-  if (jsonResponse) {
-    // Look for common properties that might contain main content
-    for (const prop of ['content', 'message', 'text', 'response']) {
-      if (typeof jsonResponse[prop] === 'string') {
-        return jsonResponse[prop];
-      }
-    }
-    
-    // If we don't find any known property but have valid JSON,
-    // convert it back to formatted string
-    return JSON.stringify(jsonResponse, null, 2);
-  }
-  
-  // If we couldn't extract valid JSON, return original response
-  return response;
-}
 
 /**
  * Parses a model response based on the prompt type used to generate it.
- * 
+ *
  * @param type Type of prompt used to generate the response
  * @param rawResponse Raw model response
  * @returns Processed response according to prompt type
  */
 export function parseModelResponse<T = any>(type: PromptType, rawResponse: string): T {
-  // First try to extract any JSON in the response
-  const jsonResponse = extractJsonFromText<any>(rawResponse, { message: rawResponse });
-  
-  // Process based on prompt type
+  const cleanedResponse = rawResponse.trim();
+
   switch (type) {
     case 'inputAnalyzer':
-      // For input analysis, expect a structured result
-      return jsonResponse.analysis ? jsonResponse : { 
-        analysis: processModelResponse(rawResponse) 
-      } as T;
-      
-    case 'planningEngine':
-      // For planning, expect a plan structure
-      return jsonResponse.plan ? jsonResponse : {
-        plan: processModelResponse(rawResponse)
-      } as T;
-      
-    case 'projectManagement':
-      // For project management, expect project data
-      return jsonResponse.projectData ? jsonResponse : {
-        projectData: jsonResponse
-      } as T;
-    
-    // Add more cases for other prompt types
-    
+      // Expects InputAnalysisResult JSON
+      return extractJsonFromText<InputAnalysisResult>(cleanedResponse, {
+          intent: 'unknown',
+          objective: 'Parsing failed',
+          extractedEntities: {
+              filesMentioned: [],
+              functionsMentioned: [],
+              errorsMentioned: [],
+              customKeywords: [],
+          },
+          confidence: 0,
+          error: 'Failed to parse model response JSON'
+      } as InputAnalysisResult) as T;
+
+    case 'explainCodePrompt':
+        // Expects { explanation: string, ... } JSON
+        const explainJson = extractJsonFromText<any>(cleanedResponse, {
+            explanation: "Sorry, I couldn't generate the explanation.",
+            error: 'Failed to parse explanation JSON'
+        });
+        // The handler expects the full object, not just the string
+        return explainJson as T;
+
+
+    case 'fixCodePrompt':
+        // Expects { messageToUser: string, proposedChanges: [], ... } JSON
+        const fixJson = extractJsonFromText<any>(cleanedResponse, {
+            messageToUser: "Sorry, I couldn't generate a fix proposal.",
+            proposedChanges: [], // Ensure this is always an array
+            error: 'Failed to parse fix proposal JSON'
+        });
+         // The handler expects the full object
+        return fixJson as T;
+
+    case 'conversationResponder':
+      // Primarily expects a string message, but might return JSON with 'messageToUser'
+      try {
+          const jsonResponse = extractJsonFromText<any>(cleanedResponse, null);
+          // If JSON was found AND it has a 'messageToUser' string property, return that string.
+          if (jsonResponse && typeof jsonResponse.messageToUser === 'string') {
+              return jsonResponse.messageToUser as T; // Return just the string message
+          }
+          // If JSON was found but didn't have 'messageToUser', log and fall through
+          if (jsonResponse !== null) {
+               console.warn(`[parseModelResponse] Conversation JSON found but no 'messageToUser' key:`, jsonResponse);
+          }
+      } catch (e) {
+          // extractJsonFromText already logs parsing errors, just continue to text fallback
+      }
+
+      // Fallback: Return the cleaned text, stripping potential markdown or code blocks
+      let textResponse = cleanedResponse;
+      textResponse = textResponse.replace(/```[\s\S]*?```/g, '').trim(); // Remove code blocks
+      textResponse = textResponse.replace(/^#+\s.*$/gm, '').trim(); // Remove markdown headers
+      // Add other cleanup as needed
+
+      return textResponse as T;
+
+    // Add cases for other prompt types if they have specific parsing needs
+    // case 'planningEngine': // Expects { plan: ... } JSON
+    // case 'projectManagement': // Expects { projectData: ... } JSON
+    // ... add defaults for these too
+
     default:
-      // For other types, return full JSON or object with original response
-      return jsonResponse as T;
+      // Default handling: Assume it might be JSON or just text.
+      // Try JSON first, if it's an object/array, return it. Otherwise, return the cleaned text.
+      try {
+          const jsonResponse = extractJsonFromText<any>(cleanedResponse, null);
+          if (jsonResponse && typeof jsonResponse === 'object') {
+              return jsonResponse as T;
+          }
+      } catch (e) {
+          // Not JSON, fall through
+      }
+      return cleanedResponse as T; // Return cleaned text if not parsable JSON object
   }
 }

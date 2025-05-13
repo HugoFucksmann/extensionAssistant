@@ -1,11 +1,24 @@
 // src/orchestrator/execution/types.ts
 
+// ... (other interfaces)
 
+// Define the expected structure for input analysis
+export interface InputAnalysisResult {
+  intent: 'conversation' | 'explainCode' | 'fixCode' | 'unknown';
+  objective: string;
+  extractedEntities: {
+    filesMentioned: string[];
+    functionsMentioned: string[];
+    errorsMentioned: string[];
+    customKeywords: string[];
+    [key: string]: any; // Allow other entities
+  };
+  confidence: number;
+  [key: string]: any; // Allow other analysis data
+}
 
-/**
- * Define a single step in an execution flow.
- * Can be a tool call or a model prompt interaction.
- */
+// Define a single step in an execution flow.
+// Can be a tool call or a model prompt interaction.
 export interface ExecutionStep {
   /** Unique name for this step within its context (useful for logging/debugging). */
   name: string;
@@ -42,17 +55,37 @@ export interface StepResult<T = any> {
     skipped?: boolean;
 }
 
-// Define the expected structure for input analysis (can also be defined here)
-export interface InputAnalysisResult {
-  intent: 'conversation' | 'explainCode' | 'fixCode' | 'unknown'; // Added 'unknown'
-  objective: string;
-  extractedEntities: {
-    filesMentioned: string[];
-    functionsMentioned: string[];
-    errorsMentioned: string[];
-    customKeywords: string[];
-    [key: string]: any; // Allow other entities
-  };
-  confidence: number;
-  [key: string]: any; // Allow other analysis data
+
+export interface IExecutor {
+  /**
+   * Executes the specified action with the provided parameters
+   * @param action The action identifier to execute
+   * @param params Parameters required by the action
+   * @returns Promise resolving to the result of the execution
+   */
+  execute(action: string, params: Record<string, any>): Promise<any>;
+
+  /**
+   * Checks if this executor can handle the specified action
+   * @param action The action identifier to check
+   * @returns true if this executor can handle the action, false otherwise
+   */
+  canExecute(action: string): boolean;
 }
+
+// --- Updated PromptType ---
+// Define types for prompt system
+export type PromptType =
+  | 'inputAnalyzer'
+  | 'planningEngine'
+  | 'editing'
+  | 'examination'
+  | 'projectManagement'
+  | 'projectSearch'
+  | 'resultEvaluator'
+  | 'conversationResponder'
+  | 'explainCodePrompt' // <-- New
+  | 'fixCodePrompt'; // <-- New
+
+// Type for variables that can be passed to prompts
+export type PromptVariables = Record<string, any>;

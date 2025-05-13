@@ -1,18 +1,7 @@
+// src/models/promptSystem.ts
 
-
-// Types for prompt system
-export type PromptType = 
-  | 'inputAnalyzer'
-  | 'planningEngine'
-  | 'editing'
-  | 'examination'
-  | 'projectManagement'
-  | 'projectSearch'
-  | 'resultEvaluator'
-  | 'conversationResponder';
-
-// Type for variables that can be passed to prompts
-export type PromptVariables = Record<string, any>;
+// Import PromptType from types.ts
+import { PromptType, PromptVariables } from '../orchestrator/execution/types'; // <-- Import from types.ts
 
 // Import prompt templates
 import { inputAnalyzerPrompt } from './prompts/prompt.inputAnalyzer';
@@ -22,11 +11,17 @@ import { examinationPrompt } from './prompts/prompt.examination';
 import { projectManagementPrompt } from './prompts/prompt.projectManagement';
 import { projectSearchPrompt } from './prompts/prompt.projectSearch';
 import { resultEvaluatorPrompt } from './prompts/prompt.resultEvaluator';
+import { conversationPrompt } from './prompts/intentions/prompt.conversation';
+
+// Import the new prompt templates (create these files next)
+import { explainCodePrompt } from './prompts/intentions/prompt.explainCode'; // <-- New
+import { fixCodePrompt } from './prompts/intentions/prompt.fixCode'; // <-- New
+
 
 import { ModelManager } from './config/ModelManager';
 import { ModelType } from './config/types';
-import { parseModelResponse } from './config/modelUtils';
-import { conversationPrompt } from './prompts/intentions/prompt.conversation';
+import { parseModelResponse } from './config/modelUtils'; // Ensure this is the refactored version
+
 
 // Map of prompt types to their templates
 const PROMPT_MAP: Record<PromptType, string> = {
@@ -37,8 +32,13 @@ const PROMPT_MAP: Record<PromptType, string> = {
   projectManagement: projectManagementPrompt,
   projectSearch: projectSearchPrompt,
   resultEvaluator: resultEvaluatorPrompt,
-  conversationResponder: conversationPrompt
+  conversationResponder: conversationPrompt,
+  // Add new prompt types here, remove old specific ones
+  explainCodePrompt: explainCodePrompt, // <-- New
+  fixCodePrompt: fixCodePrompt, // <-- New
 };
+
+// PromptType union is now defined in types.ts and imported
 
 // Instancia del ModelManager
 let _modelManager: ModelManager | null = null;
@@ -60,6 +60,8 @@ export function initializePromptSystem(modelManager: ModelManager): void {
  */
 function buildPromptVariables(type: PromptType, context: Record<string, any>): PromptVariables {
   // Processing específico para cada tipo de prompt
+  // The new prompts will likely need access to the full gathered context.
+  // We can pass the entire context data used for resolution.
   switch (type) {
     case 'projectManagement':
       return {
@@ -67,9 +69,21 @@ function buildPromptVariables(type: PromptType, context: Record<string, any>): P
         action: context.action || "analyze",
         // Add more context variables as needed
       };
-    
-    // Add more cases for other prompt types
-    
+
+    case 'explainCodePrompt':
+    case 'fixCodePrompt':
+        // These handlers will gather context and put it into the InteractionContext.
+        // The prompt template can then access it via {{placeholder}} or we pass it explicitly.
+        // Passing the resolution context explicitly is cleaner for the prompt template.
+        return {
+            objective: context.objective,
+            userMessage: context.userMessage,
+            extractedEntities: context.extractedEntities,
+            chatHistory: context.chatHistoryString, // Use the string representation
+            // Pass the full gathered context data
+            fullContextData: context // Pass the entire resolution context object
+        };
+
     default:
       // For simple cases, just pass the context as is
       return context;
@@ -86,9 +100,14 @@ function fillPromptTemplate(template: string, variables: PromptVariables): strin
   let filledTemplate = template;
   for (const [key, value] of Object.entries(variables)) {
     const placeholder = `{{${key}}}`;
+    // Handle objects/arrays by stringifying, primitives directly
+    const stringValue = typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || value === null || value === undefined
+        ? String(value) // Use String() for primitives, handles null/undefined gracefully
+        : JSON.stringify(value, null, 2); // Pretty print objects/arrays
+
     filledTemplate = filledTemplate.replace(
       new RegExp(placeholder, 'g'),
-      typeof value === 'string' ? value : JSON.stringify(value)
+      stringValue.replace(/\$/g, '$$$$') // Escape '$' to prevent issues in replace
     );
   }
   return filledTemplate;
@@ -97,33 +116,34 @@ function fillPromptTemplate(template: string, variables: PromptVariables): strin
 /**
  * Main entry point for all model interactions
  * This function should be the only way to interact with the model from any part of the application
- * 
+ *
  * @param type Prompt type to execute
  * @param context Context with variables for the prompt
  * @returns Parsed response according to prompt type
  */
 export async function executeModelInteraction<T = any>(
   type: PromptType,
-  context: Record<string, any>
+  context: Record<string, any> // This is the resolution context from InteractionContext
 ): Promise<T> {
   if (!_modelManager) {
     throw new Error('PromptSystem not initialized. Call initializePromptSystem() first.');
   }
-  
+
   // Get the prompt template
   const template = PROMPT_MAP[type];
   if (!template) {
     throw new Error(`Unknown prompt type: ${type}`);
   }
-  
+
   // Build variables and fill the template
+  // buildPromptVariables now takes the resolution context directly
   const variables = buildPromptVariables(type, context);
   const filledPrompt = fillPromptTemplate(template, variables);
-  
+
   // Send to model and get raw response
   const rawResponse = await _modelManager.sendPrompt(filledPrompt);
-  
-  // Parse response based on prompt type
+
+  // Parse response based on prompt type using the refactored parseModelResponse
   return parseModelResponse<T>(type, rawResponse);
 }
 
@@ -135,7 +155,7 @@ export async function changeModel(modelType: ModelType): Promise<void> {
   if (!_modelManager) {
     throw new Error('PromptSystem not initialized. Call initializePromptSystem() first.');
   }
-  
+
   await _modelManager.setModel(modelType);
 }
 
@@ -146,7 +166,7 @@ export function getCurrentModel(): ModelType {
   if (!_modelManager) {
     throw new Error('PromptSystem not initialized. Call initializePromptSystem() first.');
   }
-  
+
   return _modelManager.getCurrentModel();
 }
 

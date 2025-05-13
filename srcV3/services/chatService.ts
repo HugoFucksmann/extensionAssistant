@@ -114,7 +114,7 @@ export class ChatService {
    */
   public async sendMessage(text: string, files?: string[]): Promise<ChatMessage> {
     const chatId = await this.ensureChat();
-    
+
     // 1. Guardar mensaje usuario
     const userMessage = {
       id: '',
@@ -124,25 +124,34 @@ export class ChatService {
       timestamp: Date.now(),
       files: files || []
     };
-    
+
     const savedUserMessage = await this.repository.addMessage(userMessage);
 
     const projectInfo = await getProjectInfo();
-    const messageHistory = await this.repository.getMessages(chatId);
-    
+    const messageHistory = await this.repository.getMessages(chatId); // Get full history for context
+
     // 2. Procesar con orquestador (pasando chatId e historial)
-    const responseContent = await this.orchestrator.processUserMessage(chatId, text, files, projectInfo, messageHistory);
-    
-    // 3. Guardar y retornar respuesta
+    // The orchestrator.processUserMessage should return the string content
+    // for the assistant's chat message. Any complex results (like diffs)
+    // should be stored by the handler in the InteractionContext for the UI to read.
+    const assistantResponseContent = await this.orchestrator.processUserMessage(chatId, text, files, projectInfo, messageHistory);
+
+    // 3. Guardar y retornar respuesta del asistente
     const assistantMessage = {
       id: '',
       chatId,
-      content: responseContent,
+      // Ensure the content is a string. Orchestrator should handle this,
+      // but a final check here is safe.
+      content: typeof assistantResponseContent === 'string' ? assistantResponseContent : JSON.stringify(assistantResponseContent), // Fallback to stringify if not string
       sender: 'assistant' as const,
       timestamp: Date.now(),
-      files: files || []
+      // Files might be associated with the assistant message if the handler
+      // indicates it (e.g., "Here is the modified file:"), but typically
+      // files are associated with the user's input or referenced in the content.
+      // For now, let's not copy user files to assistant message unless needed.
+      files: [] // Or potentially files referenced *by the assistant* if the handler provides them
     };
-    
+
     return this.repository.addMessage(assistantMessage);
   }
   

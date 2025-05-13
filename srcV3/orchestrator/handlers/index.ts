@@ -1,6 +1,4 @@
-// src/orchestrator/handlers/index.ts
-
 export { BaseHandler } from './baseHandler';
 export { ConversationHandler } from './conversationHandler';
-/* export { ExplainCodeHandler } from './explainCodeHandler';
-export { FixCodeHandler } from './fixCodeHandler'; */
+export { ExplainCodeHandler } from './explainCodeHandler'; 
+export { FixCodeHandler } from './fixCodeHandler'; 
