@@ -4,6 +4,7 @@ import { ChatRepository } from '../storage/repositories/chatRepository';
 import { Chat, ChatMessage } from '../storage/models/entities';
 import { ModelManager } from '../models/config/ModelManager';
 import { Orchestrator } from '../orchestrator/orchestrator'; // Replace OrchestratorService import
+import { getProjectInfo } from '../modules/getProjectInfo';
 
 /**
  * Service for managing conversation interactions and integrating the AI model.
@@ -125,9 +126,11 @@ export class ChatService {
     };
     
     const savedUserMessage = await this.repository.addMessage(userMessage);
+
+    const projectInfo = await getProjectInfo();
     
     // 2. Procesar con orquestador (pasando chatId)
-    const responseContent = await this.orchestrator.processUserMessage(chatId, text, files);
+    const responseContent = await this.orchestrator.processUserMessage(chatId, text, files, projectInfo);
     
     // 3. Guardar y retornar respuesta
     const assistantMessage = {
