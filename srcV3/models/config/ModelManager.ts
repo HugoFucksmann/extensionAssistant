@@ -79,7 +79,7 @@ export class ModelManager {
       console.log(`[ModelManager] Generating response with ${modelType} (Prompt len: ${prompt.length})`);
       
       if (process.env.NODE_ENV === 'development') {
-        console.log(`[ModelManager] PROMPT:\n${prompt.substring(0, 500)}${prompt.length > 500 ? '...' : ''}`);
+        console.log(`[ModelManager] PROMPT:\n${prompt}`);
       }
       
       const response = await this.getModelInstance().generateResponse(prompt);
@@ -87,7 +87,7 @@ export class ModelManager {
       console.log(`[ModelManager] Response received (len: ${response.length})`);
       
       if (process.env.NODE_ENV === 'development') {
-        console.log(`[ModelManager] RESPONSE:\n${response.substring(0, 500)}${response.length > 500 ? '...' : ''}`);
+        console.log(`[ModelManager] RESPONSE:\n${response}`);
       }
       
       return response;

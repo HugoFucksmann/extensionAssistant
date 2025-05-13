@@ -16,16 +16,11 @@ export class PromptExecutor implements IExecutor {
     // Get all values from the PromptType union
     const allPromptTypes: PromptType[] = [
       'inputAnalyzer',
-      'planningEngine',
-      'editing',
-      'examination',
-      'projectManagement',
-      'projectSearch',
       'resultEvaluator',
       'conversationResponder',
       'explainCodePrompt',
       'fixCodePrompt',
-      'codeValidator', // Added codeValidator
+      'codeValidator'
     ];
     this.validPromptTypes = new Set(allPromptTypes);
   }

@@ -1,11 +1,7 @@
 import * as vscode from 'vscode';
 import { getWorkspaceFiles } from '../tools/filesystemTools/getWorkspaceFiles';
 import { getFileContents } from '../tools/filesystemTools/getFileContents';
-
-
-
-
-
+import { getActiveEditorContent } from '../tools/filesystemTools/getActiveEditorContent';
 
 // Interfaz para definir la estructura de una herramienta
 interface Tool {
@@ -24,7 +20,10 @@ export class ToolRunner {
       validateParams: () => true // No requiere parámetros
     },
     'filesystem.getFileContents': {
-      execute: async (params) => getFileContents(params.filePath),
+      execute: async (params) => {
+        const contents = await getFileContents(params.filePath);
+        return contents.toString();
+      },
       validateParams: (params) => {
         if (!params.filePath || typeof params.filePath !== 'string') {
           return 'Se requiere filePath como string';
@@ -32,6 +31,10 @@ export class ToolRunner {
         return true;
       },
       requiredParams: ['filePath']
+    },
+    'filesystem.getActiveEditorContent': {
+      execute: getActiveEditorContent,
+      validateParams: () => true
     }
     // Registrar más tools aquí según se vayan creando
   };
@@ -126,48 +129,6 @@ export class ToolRunner {
     
     return results;
   }
-
-  
-/*  //  * Ejecuta un plan secuencial de tools con mejor manejo de contexto
-  
-  public static async executePlan(
-    plan: Array<{
-      tool: string;
-      params?: Record<string, any>;
-      storeAs?: string; // Alias para el resultado
-      useContext?: boolean; // Indica si se debe pasar el contexto completo (false por defecto)
-      contextMap?: Record<string, string>; // Mapeo de nombres de contexto a nombres de parámetros
-    }>
-  ): Promise<Record<string, any>> {
-    const context: Record<string, any> = {};
-    
-    for (const step of plan) {
-      let stepParams = { ...step.params || {} };
-      
-      // Gestión mejorada del contexto
-      if (step.useContext) {
-        // Pasar todo el contexto si se solicita explícitamente
-        stepParams = { ...stepParams, context };
-      }
-      
-      // Mapeo específico de valores del contexto a parámetros
-      if (step.contextMap) {
-        for (const [contextKey, paramName] of Object.entries(step.contextMap)) {
-          if (context[contextKey] !== undefined) {
-            stepParams[paramName] = context[contextKey];
-          }
-        }
-      }
-      
-      const result = await this.runTool(step.tool, stepParams);
-      
-      if (step.storeAs) {
-        context[step.storeAs] = result;
-      }
-    }
-    
-    return context;
-  } */
 
   /**
    * Lista todas las tools disponibles

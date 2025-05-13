@@ -1,18 +1,22 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
 import * as path from 'path';
-import { safeReadFile } from './core';
 
 export async function getFileContents(filePath: string): Promise<string> {
-  const workspaceFolders = vscode.workspace.workspaceFolders || [];
-  
-  for (const folder of workspaceFolders) {
-    try {
-      const fullPath = path.join(folder.uri.fsPath, filePath);
-      return await safeReadFile(fullPath);
-    } catch {
-      continue;
+  try {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!workspaceFolder) {
+      return 'file not found';
     }
+    
+    const fullPath = path.join(workspaceFolder, filePath);
+    
+    if (!fs.existsSync(fullPath)) {
+      return 'file not found';
+    }
+    
+    return fs.readFileSync(fullPath, 'utf-8');
+  } catch (error) {
+    return 'file not found';
   }
-  
-  throw new Error(`File not found in workspace: ${filePath}`);
 }
