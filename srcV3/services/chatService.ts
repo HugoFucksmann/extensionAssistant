@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { IChatRepository } from '../storage/interfaces/IChatRepository';
 import { ChatRepository } from '../storage/repositories/chatRepository';
-import { Chat, ChatMessage } from '../storage/models/entities';
+import { Chat, ChatMessage } from '../storage/interfaces/entities';
 import { ModelManager } from '../models/config/ModelManager';
 import { Orchestrator } from '../orchestrator/orchestrator'; // Replace OrchestratorService import
 import { getProjectInfo } from '../modules/getProjectInfo';

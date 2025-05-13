@@ -111,26 +111,34 @@ export function parseModelResponse<T = any>(type: PromptType, rawResponse: strin
 
     case 'explainCodePrompt':
         // Expects { explanation: string, ... } JSON
-        const explainJson = extractJsonFromText<any>(cleanedResponse, {
+        // The handler expects the full object, not just the string
+        return extractJsonFromText<any>(cleanedResponse, {
             explanation: "Sorry, I couldn't generate the explanation.",
             error: 'Failed to parse explanation JSON'
-        });
-        // The handler expects the full object, not just the string
-        return explainJson as T;
+        }) as T;
 
 
     case 'fixCodePrompt':
         // Expects { messageToUser: string, proposedChanges: [], ... } JSON
-        const fixJson = extractJsonFromText<any>(cleanedResponse, {
+         // The handler expects the full object
+        return extractJsonFromText<any>(cleanedResponse, {
             messageToUser: "Sorry, I couldn't generate a fix proposal.",
             proposedChanges: [], // Ensure this is always an array
             error: 'Failed to parse fix proposal JSON'
-        });
-         // The handler expects the full object
-        return fixJson as T;
+        }) as T;
+
+    case 'codeValidator':
+         // Expects { isValid: boolean, feedback: string, ... } JSON
+         return extractJsonFromText<any>(cleanedResponse, {
+             isValid: false,
+             feedback: "Sorry, I couldn't validate the fix proposal.",
+             error: 'Failed to parse validation JSON'
+         }) as T;
+
 
     case 'conversationResponder':
-      // Primarily expects a string message, but might return JSON with 'messageToUser'
+      // Primarily expects a string message, but the prompt output is JSON { messageToUser: string }
+      // We should parse the JSON and return the messageToUser property.
       try {
           const jsonResponse = extractJsonFromText<any>(cleanedResponse, null);
           // If JSON was found AND it has a 'messageToUser' string property, return that string.
@@ -146,12 +154,14 @@ export function parseModelResponse<T = any>(type: PromptType, rawResponse: strin
       }
 
       // Fallback: Return the cleaned text, stripping potential markdown or code blocks
+      // This fallback might be less necessary if the prompt is strictly instructed to return JSON.
+      // Consider removing this fallback if you want strict JSON output enforcement.
       let textResponse = cleanedResponse;
       textResponse = textResponse.replace(/```[\s\S]*?```/g, '').trim(); // Remove code blocks
       textResponse = textResponse.replace(/^#+\s.*$/gm, '').trim(); // Remove markdown headers
       // Add other cleanup as needed
 
-      return textResponse as T;
+      return textResponse as T; // Return cleaned text if not parsable JSON object with messageToUser
 
     // Add cases for other prompt types if they have specific parsing needs
     // case 'planningEngine': // Expects { plan: ... } JSON

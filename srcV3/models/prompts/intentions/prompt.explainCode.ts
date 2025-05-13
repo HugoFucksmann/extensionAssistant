@@ -1,35 +1,65 @@
-// src/models/prompts/prompt.explainCode.ts
+// src/models/prompts/intentions/prompt.explainCode.ts
 
-// This prompt is used by the ExplainCodeHandler.
-// It receives gathered context and should provide a clear explanation.
-// It should return JSON: { explanation: string, filesExplained?: string[], keyConcepts?: string[] }
+import { BasePromptVariables } from '../../../orchestrator/execution/types';
+import { mapContextToBaseVariables } from '../../promptSystem'; // Import the helper
 
-export const explainCodePrompt = `
-You are an AI assistant specialized in explaining code within a software project.
-Your goal is to explain code snippets, files, or concepts based on the user's request and the provided context.
-Be concise, accurate, and focus on the user's specific objective.
-
-Respond ONLY with a JSON object.
-The JSON object must have the following structure:
-{
-  "explanation": "string", // The main explanation text. Use markdown for formatting (code blocks, lists, bold).
-  "filesExplained": "string[]", // Optional: List of files that were primarily explained.
-  "keyConcepts": "string[]", // Optional: List of key concepts mentioned in the explanation.
-  "error": "string" // Optional: If you cannot provide an explanation, explain why briefly.
+// Define variables specific to the explainCode prompt
+export interface ExplainCodePromptVariables extends BasePromptVariables {
+  // BasePromptVariables already includes: userMessage, chatHistory, objective, extractedEntities, projectContext, activeEditorContent, fileContent:*, searchResults:*
+  // No additional specific variables needed for this template based on current structure.
+  // The template uses keys directly from BasePromptVariables.
 }
 
-Do NOT include any other text outside the JSON object.
-Ensure the JSON is valid and correctly formatted.
+export const explainCodePrompt = `
+Eres un asistente experto en explicar código. Tu tarea es proporcionar una explicación clara y concisa del código relevante basado en el objetivo del usuario y el contexto proporcionado.
 
-Here is the user's objective and message:
-Objective: {{objective}}
-User Message: {{userMessage}}
+Objetivo del usuario:
+"{{objective}}"
 
-Here is the recent chat history (for context and tone):
+Mensaje original del usuario:
+"{{userMessage}}"
+
+Historial reciente:
 {{chatHistory}}
 
-Here is the relevant project and code context gathered:
-{{fullContextData}}
+Entidades clave extraídas:
+{{extractedEntities}}
 
-Based on the above, provide a clear explanation focusing on the user's objective.
+Contexto del proyecto:
+{{projectContext}}
+
+Código relevante:
+{{activeEditorContent}}
+{{fileContent:.*}} // Placeholder to include all dynamically added file content (fillPromptTemplate handles this regex-like key)
+
+Instrucciones:
+- Explica el código en relación con el objetivo del usuario.
+- Sé conciso pero completo.
+- Usa ejemplos si es útil.
+- Si no hay código relevante o no puedes entenderlo, indícalo.
+- Responde en español.
+
+Salida:
+{
+  "explanation": string,
+  "relevantCodeSnippet"?: string, // Optional: a snippet from the context that is key to the explanation
+  "error"?: string // Optional: if explanation failed
+}
 `;
+
+// Builder function for ExplainCodePromptVariables
+export function buildExplainCodeVariables(contextData: Record<string, any>): ExplainCodePromptVariables {
+    // Get base variables using the helper
+    const baseVariables = mapContextToBaseVariables(contextData);
+
+    // For explainCode, the variables are exactly the base variables
+    const explainCodeVariables: ExplainCodePromptVariables = {
+        ...baseVariables,
+        // No specific mapping needed beyond BasePromptVariables
+    };
+
+    // Clean up undefined values if necessary
+    // Object.keys(explainCodeVariables).forEach(key => explainCodeVariables[key] === undefined && delete explainCodeVariables[key]);
+
+    return explainCodeVariables;
+}

@@ -17,9 +17,9 @@ export class FixCodeHandler extends BaseHandler {
     async handle(): Promise<string> { // Return type is string
         const analysis = this.context.getAnalysisResult();
         const objective = this.context.getObjective();
-        const entities = this.context.getExtractedEntities();
-        const userMessage = this.context.getValue<string>('userMessage');
-        const referencedFiles = this.context.getValue<string[]>('referencedFiles');
+        // const entities = this.context.getExtractedEntities(); // Pulled by builder now
+        // const userMessage = this.context.getValue<string>('userMessage'); // Pulled by builder now
+        // const referencedFiles = this.context.getValue<string[]>('referencedFiles'); // Pulled by builder now if needed
 
         const chatId = this.context.getChatId();
 
@@ -40,11 +40,11 @@ export class FixCodeHandler extends BaseHandler {
             type: 'tool' as const,
             execute: 'filesystem.getActiveEditorContent',
             params: {},
-            storeAs: 'activeEditorContentForFix' // Standard key for active editor content for fix
+            storeAs: 'activeEditorContent' // Use standardized key
         });
 
-        // Read any specific files the user mentioned
-        const filesToReadExplicitly = (entities?.filesMentioned || []);
+        // Read any specific files the user mentioned (entities.filesMentioned is in context after analysis)
+        const filesToReadExplicitly = (analysis?.extractedEntities?.filesMentioned || []);
         if (filesToReadExplicitly.length > 0) {
              console.log(`[FixCodeHandler:${chatId}] Explicitly mentioned files to read: ${filesToReadExplicitly.join(', ')}.`);
              gatheringSteps.push(...filesToReadExplicitly.map((filePath, index) => ({
@@ -52,12 +52,12 @@ export class FixCodeHandler extends BaseHandler {
                   type: 'tool' as const,
                   execute: 'filesystem.getFileContents',
                   params: { filePath: filePath },
-                  storeAs: `fileContent:${filePath.replace(/[^a-zA-Z0-9]/g, '_')}_forFix` // Store with unique key
+                  storeAs: `fileContent:${filePath.replace(/[^a-zA-Z0-9]/g, '_')}` // Store with standard dynamic key
              })));
         }
 
         // If entities mention errors, maybe search the workspace
-        const errorsToSearch = entities?.errorsMentioned || [];
+        const errorsToSearch = analysis?.extractedEntities?.errorsMentioned || [];
         if (errorsToSearch.length > 0) {
              console.log(`[FixCodeHandler:${chatId}] Errors mentioned, searching workspace...`);
              // Only search for the first few errors to keep context size manageable
@@ -65,9 +65,9 @@ export class FixCodeHandler extends BaseHandler {
              gatheringSteps.push(...errorsForSearch.map((errorMsg, index) => ({
                  name: `searchError:${index}`,
                  type: 'tool' as const,
-                 execute: 'project.search',
+                 execute: 'project.search', // Assuming this tool exists
                  params: { query: errorMsg, scope: 'workspace' },
-                 storeAs: `searchResults:${errorMsg.replace(/[^a-zA-Z0-9]/g, '_')}`
+                 storeAs: `searchResults:${errorMsg.replace(/[^a-zA-Z0-9]/g, '_')}` // Store with standard dynamic key
              })));
         }
 
@@ -90,9 +90,9 @@ export class FixCodeHandler extends BaseHandler {
 
          // Check if *any* code content was gathered. If not, we can't fix code.
          const resolutionContext = this.context.getResolutionContext();
-         const hasCodeContent = Object.keys(resolutionContext).some(key =>
-             (key.startsWith('fileContent:') || key === 'activeEditorContentForFix') && resolutionContext[key] !== undefined && resolutionContext[key] !== null
-         );
+         const hasCodeContent = resolutionContext.activeEditorContent !== undefined ||
+                                Object.keys(resolutionContext).some(key => key.startsWith('fileContent:') && resolutionContext[key] !== undefined && resolutionContext[key] !== null);
+
 
          if (!hasCodeContent) {
               console.warn(`[FixCodeHandler:${chatId}] No code content gathered.`);
@@ -105,16 +105,10 @@ export class FixCodeHandler extends BaseHandler {
         const proposeFixStep: ExecutionStep = {
             name: 'proposeCodeFix',
             type: 'prompt' as const,
-            execute: 'fixCodePrompt', // <-- Use the single new prompt type
+            execute: 'fixCodePrompt', // Use the prompt type
             params: {
-                // buildPromptVariables in promptSystem will take the resolution context
-                // and map these keys, but listing them here makes the dependency clear.
-                objective: objective,
-                userMessage: userMessage,
-                extractedEntities: entities,
-                chatHistory: this.context.getHistoryForModel(5),
-                 // The fullContextData will be passed via buildPromptVariables
-                // fullContextData: this.context.getResolutionContext(), // This is handled by buildPromptVariables
+                // No need to list context variables here anymore.
+                // The buildFixCodeVariables function in prompt.fixCode.ts will get them from the full context.
             },
             storeAs: 'proposedFixResult' // Store the parsed result object { messageToUser, proposedChanges, ... }
         };
@@ -143,7 +137,7 @@ export class FixCodeHandler extends BaseHandler {
 
             // Store the proposed changes in a dedicated context key that the UI can easily access
             if (proposedChanges) {
-                this.context.setValue('proposedChanges', proposedChanges);
+                this.context.setValue('proposedChanges', proposedChanges); // Standard key for proposed changes
                 console.log(`[FixCodeHandler:${chatId}] Proposed changes stored in context.`);
             } else {
                  console.warn(`[FixCodeHandler:${chatId}] Fix prompt returned success but no proposedChanges array.`);
@@ -162,18 +156,19 @@ export class FixCodeHandler extends BaseHandler {
 
         // --- Optional: Internal Validation ---
         // Only run validation if the proposal step was successful AND returned proposed changes
-        if (proposeResultStep.success && proposedChanges && proposedChanges.length > 0) {
+        // Check context for 'proposedChanges' as it might have been set to undefined above
+        const currentProposedChanges = this.context.getValue<any[]>('proposedChanges');
+        if (proposeResultStep.success && currentProposedChanges && currentProposedChanges.length > 0) {
             console.log(`[FixCodeHandler:${chatId}] Running validation step for proposed fix...`);
             // Assuming 'codeValidator' prompt/tool exists and takes proposedChanges
             const validateFixStep: ExecutionStep = {
                 name: 'validateProposedFix',
                 type: 'prompt' as const, // Or 'tool'
-                execute: 'codeValidator', // Assuming this prompt/tool exists
+                execute: 'codeValidator', // Use the prompt type
                 params: {
-                    proposedChanges: proposedChanges, // Pass the proposed changes structure
-                    originalCode: this.context.getValue('activeEditorContentForFix'), // Pass original code for context
-                    fullContextData: this.context.getResolutionContext(), // Pass relevant gathered context
-                    objective: objective
+                    // No need to list context variables here.
+                    // The buildCodeValidatorVariables function in prompt.codeValidator.ts will get them from the full context,
+                    // including 'proposedChanges' which we just stored.
                 },
                 storeAs: 'fixValidationResult' // Store the validation result { isValid, feedback }
             };
@@ -203,7 +198,7 @@ export class FixCodeHandler extends BaseHandler {
                  responseMessage += `\n\nValidation: ${validationMessage}`;
             }
 
-        } else if (!proposedChanges || proposedChanges.length === 0) {
+        } else if (!currentProposedChanges || currentProposedChanges.length === 0) {
              console.warn(`[FixCodeHandler:${chatId}] No proposed changes available for validation.`);
              // Ensure validation status reflects no changes were validated
              this.context.setValue('proposedFixValidationPassed', false);

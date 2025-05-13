@@ -1,7 +1,7 @@
 // src/orchestrator/execution/PromptExecutor.ts
 
 import { executeModelInteraction } from "../../models/promptSystem";
-import { IExecutor, PromptType } from "./types"; // <-- Import PromptType from types.ts
+import { IExecutor, PromptType } from "./types";
 
 
 /**
@@ -23,8 +23,9 @@ export class PromptExecutor implements IExecutor {
       'projectSearch',
       'resultEvaluator',
       'conversationResponder',
-      'explainCodePrompt', // <-- New
-      'fixCodePrompt', // <-- New
+      'explainCodePrompt',
+      'fixCodePrompt',
+      'codeValidator', // Added codeValidator
     ];
     this.validPromptTypes = new Set(allPromptTypes);
   }
@@ -40,13 +41,15 @@ export class PromptExecutor implements IExecutor {
   }
 
   /**
-   * Executes the specified prompt with the provided parameters
+   * Executes the specified prompt with the provided parameters.
+   * For PromptExecutor, the 'params' parameter is the full resolution context data.
    * @param action The prompt type to execute
-   * @param params Parameters required by the prompt
+   * @param fullContextData The full resolution context data from InteractionContext
    * @returns Promise resolving to the result of the model interaction
    */
-  async execute(action: string, params: Record<string, any>): Promise<any> {
+  async execute(action: string, fullContextData: Record<string, any>): Promise<any> {
     // Cast action to PromptType as we've validated it in canExecute
-    return executeModelInteraction(action as PromptType, params);
+    // Pass the full context data directly to executeModelInteraction
+    return executeModelInteraction(action as PromptType, fullContextData);
   }
 }

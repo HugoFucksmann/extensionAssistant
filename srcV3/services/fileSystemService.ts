@@ -142,7 +142,7 @@ export class FileSystemService {
         }, Promise.resolve(false));
         
         if (shouldExclude && matchedPattern) {
-          console.log(`[FileSystemService] Excluyendo '${unixRelativePath}' por patrón: ${matchedPattern}`);
+         
           continue;
         }
         

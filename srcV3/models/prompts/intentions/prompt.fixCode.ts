@@ -1,57 +1,74 @@
-// src/models/prompts/prompt.fixCode.ts
+// src/models/prompts/intentions/prompt.fixCode.ts
 
-// This prompt is used by the FixCodeHandler.
-// It receives gathered context about a problem and should propose a fix.
-// It should return JSON: { messageToUser: string, proposedChanges: [], explanation: string, error: string }
-// proposedChanges should be an array of edits suitable for a VS Code WorkspaceEdit.
+import { BasePromptVariables } from '../../../orchestrator/execution/types';
+import { mapContextToBaseVariables } from '../../promptSystem'; // Import the helper
 
-export const fixCodePrompt = `
-You are an AI assistant specialized in fixing code issues within a software project.
-Your goal is to diagnose the problem described by the user and propose precise code changes based on the provided context.
-Be accurate and provide only the necessary changes.
-
-Respond ONLY with a JSON object.
-The JSON object must have the following structure:
-{
-  "messageToUser": "string", // A concise human-readable summary of the proposed fix.
-  "proposedChanges": [ // An array of changes to apply. Each item describes changes for one file.
-    {
-      "filePath": "string", // The full path to the file to modify.
-      "edits": [ // An array of edits within this file.
-        {
-          "range": { // The range of text to replace (VS Code Range format).
-            "start": { "line": "number", "character": "number" }, // 0-based line and character
-            "end": { "line": "number", "character": "number" }
-          },
-          "newText": "string" // The text to replace the range with. Use "" for deletion.
-        }
-        // Add more edits for the same file if needed.
-      ]
-    }
-    // Add more objects for other files if needed.
-  ],
-  "explanation": "string", // Optional: A brief technical explanation of the fix.
-  "error": "string" // Optional: If you cannot propose a fix, explain why briefly.
+// Define variables specific to the fixCode prompt
+export interface FixCodePromptVariables extends BasePromptVariables {
+  // BasePromptVariables already includes: userMessage, chatHistory, objective, extractedEntities, projectContext, activeEditorContent, fileContent:*, searchResults:*
+  // No additional specific variables needed for this template based on current structure.
+  // The template uses keys directly from BasePromptVariables.
 }
 
-Constraints for "proposedChanges":
-- The "filePath" must be a path that was provided in the context.
-- Lines and characters in "range" must be 0-based.
-- Provide only the minimal necessary changes.
-- Ensure the JSON is valid and correctly formatted.
-- If no changes are needed or possible, return an empty "proposedChanges" array and set "messageToUser" accordingly.
+export const fixCodePrompt = `
+Eres un asistente experto en identificar y proponer soluciones a problemas de código. Tu tarea es analizar el objetivo del usuario, el contexto proporcionado (código, errores, resultados de búsqueda) y proponer cambios de código para resolver el problema.
 
-Do NOT include any other text outside the JSON object.
+Objetivo del usuario:
+"{{objective}}"
 
-Here is the user's objective (the problem description) and message:
-Objective: {{objective}}
-User Message: {{userMessage}}
+Mensaje original del usuario:
+"{{userMessage}}"
 
-Here is the recent chat history (for context):
+Historial reciente:
 {{chatHistory}}
 
-Here is the relevant project and code context gathered (file contents, search results, etc.):
-{{fullContextData}}
+Entidades clave extraídas:
+{{extractedEntities}}
 
-Based on the above, diagnose the problem and provide the necessary code changes in the specified JSON format.
+Contexto del proyecto:
+{{projectContext}}
+
+Código relevante:
+{{activeEditorContent}}
+{{fileContent:.*}} // Placeholder to include all dynamically added file content
+
+Resultados de búsqueda (si aplica):
+{{searchResults:.*}} // Placeholder to include all dynamically added search results
+
+Instrucciones:
+- Identifica la causa raíz del problema basado en el objetivo y el contexto.
+- Propón cambios de código específicos para resolver el problema.
+- Los cambios deben estar en un formato que pueda ser aplicado (por ejemplo, diff, o una estructura de cambios clara).
+- Proporciona un mensaje al usuario explicando el problema y la solución propuesta.
+- Si no puedes identificar el problema o proponer una solución, indícalo claramente.
+- Responde en español.
+
+Salida (JSON):
+{
+  "messageToUser": string, // Mensaje explicativo para el usuario
+  "proposedChanges": Array<{ // Estructura de cambios propuesta (ejemplo básico, adaptar según herramienta de aplicación)
+    "filePath": string,
+    "patch": string // Formato diff o similar
+    // O alternativamente: "startLine": number, "endLine": number, "newContent": string
+  }> | [],
+  "diagnosis"?: string, // Optional: detailed explanation of the problem found
+  "error"?: string // Optional: if fix proposal failed
+}
 `;
+
+// Builder function for FixCodePromptVariables
+export function buildFixCodeVariables(contextData: Record<string, any>): FixCodePromptVariables {
+    // Get base variables using the helper
+    const baseVariables = mapContextToBaseVariables(contextData);
+
+    // For fixCode, the variables are exactly the base variables
+    const fixCodeVariables: FixCodePromptVariables = {
+        ...baseVariables,
+        // No specific mapping needed beyond BasePromptVariables
+    };
+
+    // Clean up undefined values if necessary
+    // Object.keys(fixCodeVariables).forEach(key => fixCodeVariables[key] === undefined && delete fixCodeVariables[key]);
+
+    return fixCodeVariables;
+}

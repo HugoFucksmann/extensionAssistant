@@ -1,8 +1,6 @@
-// src/orchestrator/execution/types.ts
 
-// ... (other interfaces)
+export type PromptVariables = Record<string, any>;
 
-// Define the expected structure for input analysis
 export interface InputAnalysisResult {
   intent: 'conversation' | 'explainCode' | 'fixCode' | 'unknown';
   objective: string;
@@ -26,7 +24,7 @@ export interface ExecutionStep {
   type: 'tool' | 'prompt';
   /** The specific tool name or prompt type to execute. */
   execute: string; // e.g., 'filesystem.getFileContents' or 'inputAnalyzer'
-  /** Parameters for the tool or prompt. Can contain {{placeholder}} patterns. */
+  /** Parameters for the tool or prompt. Can contain {{placeholder}} patterns for tool steps. For prompt steps, these are non-contextual config params. */
   params?: Record<string, any>;
   /** Optional condition function to determine if this step should run. Checks against the context data used for parameter resolution. */
   condition?: (contextData: Record<string, any>) => boolean;
@@ -60,7 +58,7 @@ export interface IExecutor {
   /**
    * Executes the specified action with the provided parameters
    * @param action The action identifier to execute
-   * @param params Parameters required by the action
+   * @param params Parameters required by the action. For prompt executors, this is the full context data.
    * @returns Promise resolving to the result of the execution
    */
   execute(action: string, params: Record<string, any>): Promise<any>;
@@ -84,8 +82,30 @@ export type PromptType =
   | 'projectSearch'
   | 'resultEvaluator'
   | 'conversationResponder'
-  | 'explainCodePrompt' // <-- New
-  | 'fixCodePrompt'; // <-- New
+  | 'explainCodePrompt'
+  | 'fixCodePrompt'
+  | 'codeValidator'; // Added codeValidator as it was mentioned in fixCodeHandler
 
-// Type for variables that can be passed to prompts
-export type PromptVariables = Record<string, any>;
+// --- Standardized Prompt Variable Interfaces ---
+
+/** Base interface for common variables available to most prompts. */
+export interface BasePromptVariables {
+    userMessage: string; // The current user's message
+    chatHistory: string; // Recent conversation history (formatted string)
+    objective?: string; // The user's overall objective for the turn/session
+    extractedEntities?: InputAnalysisResult['extractedEntities']; // Entities extracted from user input
+    projectContext?: any; // Information about the current project/workspace
+    activeEditorContent?: string; // Content of the active text editor
+    [key: `fileContent:${string}`]: string | undefined; // Content of specific files, keyed by a sanitized path
+    [key: `searchResults:${string}`]: any | undefined; // Results from search operations, keyed by query/identifier
+    // Add other common keys as needed
+}
+
+/**
+ * Defines the structure for registering prompt templates and their variable builders.
+ * Used in promptSystem.ts
+ */
+export interface PromptDefinition<T extends BasePromptVariables = BasePromptVariables> {
+    template: string;
+    buildVariables: (contextData: Record<string, any>) => T;
+}

@@ -1,4 +1,4 @@
-import { Chat, ChatMessage } from "../models/entities";
+import { Chat, ChatMessage } from "./entities";
 import { IRepository } from "./IRepository";
 
 

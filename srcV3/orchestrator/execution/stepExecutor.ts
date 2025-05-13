@@ -29,12 +29,27 @@ export class StepExecutor {
         const stepStartTime = Date.now();
         console.log(`[StepExecutor:${chatId}] Running step '${step.name}' (Type: ${step.type}, Execute: ${step.execute})...`);
 
-        // 1. Resolve parameters using the resolution context
-        let resolvedParams: Record<string, any> | undefined;
+        // Get the full resolution context data *before* resolving parameters
+        const resolutionContextData = context.getResolutionContext();
+
+        // 1. Resolve parameters (only for tool steps)
+        let executionParams: Record<string, any>;
         try {
-            const resolutionContextData = context.getResolutionContext();
-            resolvedParams = this.resolveParameters(step.params || {}, resolutionContextData);
-            console.log(`[StepExecutor:${chatId}] Params resolved for '${step.name}':`, resolvedParams);
+            if (step.type === 'tool') {
+                 // Resolve {{placeholder}} params for tool steps using the resolution context
+                 executionParams = this.resolveParameters(step.params || {}, resolutionContextData);
+                 console.log(`[StepExecutor:${chatId}] Tool params resolved for '${step.name}':`, executionParams);
+            } else if (step.type === 'prompt') {
+                 // For prompt steps, the executor (PromptExecutor) expects the full resolution context data.
+                 // Any 'params' in the step definition are treated as non-contextual config by the executor/promptSystem.
+                 // We pass the full context data as the primary parameter source for the prompt builder.
+                 executionParams = resolutionContextData;
+                 // Optionally merge non-contextual step.params if the executor/promptSystem needs them separately
+                 // executionParams = { ...resolutionContextData, _stepParams: step.params || {} }; // Example of merging
+                 console.log(`[StepExecutor:${chatId}] Prompt step '${step.name}' will receive full context data.`);
+            } else {
+                 throw new Error(`Unknown step type: ${step.type}`);
+            }
         } catch (paramResolveError: any) {
              console.error(`[StepExecutor:${chatId}] Parameter resolution failed for '${step.name}':`, paramResolveError);
              return {
@@ -45,13 +60,15 @@ export class StepExecutor {
              };
         }
 
+
         // 2. Check condition if present
         if (step.condition) {
-             const resolutionContextData = context.getResolutionContext();
              try {
+                // Condition function receives the full resolution context data
                 if (!step.condition(resolutionContextData)) {
                     console.log(`[StepExecutor:${chatId}] Skipping step '${step.name}' due to condition.`);
                     if (step.storeAs) {
+                         // Store a marker indicating the step was skipped
                          context.setValue(step.storeAs, { skipped: true, timestamp: Date.now(), stepName: step.name });
                     }
                     return { success: true, result: 'skipped', timestamp: Date.now(), step, skipped: true };
@@ -74,15 +91,15 @@ export class StepExecutor {
         try {
             // 3. Find appropriate executor for this step
             const executor = this.executorRegistry.getExecutorFor(step.execute);
-            
+
             if (!executor) {
                 success = false;
                 error = new Error(`No executor found for action: ${step.execute}`);
                 console.error(`[StepExecutor:${chatId}] ${error.message}`);
             } else {
                 try {
-                    // Execute the step using the appropriate executor
-                    rawResult = await executor.execute(step.execute, resolvedParams || {});
+                    // Execute the step using the appropriate executor, passing the prepared params
+                    rawResult = await executor.execute(step.execute, executionParams);
                     success = true;
                     console.log(`[StepExecutor:${chatId}] Step execution succeeded for '${step.name}'.`);
                 } catch (executionError) {
@@ -102,6 +119,7 @@ export class StepExecutor {
              context.setValue(step.storeAs, rawResult);
              console.log(`[StepExecutor:${chatId}] Stored successful result for '${step.name}' at '${step.storeAs}'.`);
         } else if (step.storeAs && !success) {
+             // Store error information if the step failed and storeAs was specified
              context.setValue(`${step.storeAs}_error`, error?.message || 'Execution failed');
              console.warn(`[StepExecutor:${chatId}] Step '${step.name}' failed. Stored error indicator at '${step.storeAs}_error'.`);
         }
@@ -113,13 +131,14 @@ export class StepExecutor {
             error: error,
             timestamp: Date.now(),
             step: step,
-            skipped: false
+            skipped: false // This field is set explicitly in the condition block if skipped
         };
     }
 
     /**
      * Recursively resolves parameter placeholders (e.g., {{key}}) in a params object.
      * Looks up values in the provided contextData. Handles nested objects and arrays.
+     * This is primarily used for *tool* step parameters.
      */
     private resolveParameters(params: any, contextData: Record<string, any>): any {
         if (typeof params !== 'object' || params === null) {
@@ -136,6 +155,7 @@ export class StepExecutor {
         for (const [key, value] of Object.entries(params)) {
             if (typeof value === 'string' && value.startsWith('{{') && value.endsWith('}}')) {
                 const contextKey = value.substring(2, value.length - 2);
+                // Look up the value in the context data
                 resolvedParams[key] = contextData[contextKey] !== undefined ? contextData[contextKey] : null;
             } else {
                 // Recursively resolve nested objects/arrays

@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 import * as sqlite3 from 'sqlite3';
 import { randomUUID } from 'crypto';
 import { IChatRepository } from '../interfaces/IChatRepository';
-import { Chat, ChatMessage } from '../models/entities';
+import { Chat, ChatMessage } from '../interfaces/entities';
 import { DatabaseManager } from '../database/DatabaseManager';
 
 export class ChatRepository implements IChatRepository {

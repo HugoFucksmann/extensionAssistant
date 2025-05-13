@@ -1,46 +1,31 @@
 // src/models/promptSystem.ts
 
-// Import PromptType from types.ts
-import { PromptType, PromptVariables } from '../orchestrator/execution/types'; // <-- Import from types.ts
+// Import PromptType and PromptVariables from types.ts
+import { PromptDefinition, PromptType, PromptVariables, BasePromptVariables } from '../orchestrator'; // <-- Import PromptDefinition and BasePromptVariables
 
-// Import prompt templates
-import { inputAnalyzerPrompt } from './prompts/prompt.inputAnalyzer';
-import { planningEnginePrompt } from './prompts/prompt.planningEngine';
-import { editingPrompt } from './prompts/prompt.editing';
-import { examinationPrompt } from './prompts/prompt.examination';
-import { projectManagementPrompt } from './prompts/prompt.projectManagement';
-import { projectSearchPrompt } from './prompts/prompt.projectSearch';
-import { resultEvaluatorPrompt } from './prompts/prompt.resultEvaluator';
-import { conversationPrompt } from './prompts/intentions/prompt.conversation';
-
-// Import the new prompt templates (create these files next)
-import { explainCodePrompt } from './prompts/intentions/prompt.explainCode'; // <-- New
-import { fixCodePrompt } from './prompts/intentions/prompt.fixCode'; // <-- New
-
+// Import prompt templates AND their builder functions
+import {
+  inputAnalyzerPrompt,
+  buildInputAnalyzerVariables,
+  codeValidatorPrompt,
+  buildCodeValidatorVariables
+} from './prompts';
 
 import { ModelManager } from './config/ModelManager';
 import { ModelType } from './config/types';
-import { parseModelResponse } from './config/modelUtils'; // Ensure this is the refactored version
+import { parseModelResponse } from './config/modelUtils';
 
 
-// Map of prompt types to their templates
-const PROMPT_MAP: Record<PromptType, string> = {
-  inputAnalyzer: inputAnalyzerPrompt,
-  planningEngine: planningEnginePrompt,
-  editing: editingPrompt,
-  examination: examinationPrompt,
-  projectManagement: projectManagementPrompt,
-  projectSearch: projectSearchPrompt,
-  resultEvaluator: resultEvaluatorPrompt,
-  conversationResponder: conversationPrompt,
-  // Add new prompt types here, remove old specific ones
-  explainCodePrompt: explainCodePrompt, // <-- New
-  fixCodePrompt: fixCodePrompt, // <-- New
+// Map of prompt types to their templates AND builder functions
+const PROMPT_DEFINITIONS: Partial<Record<PromptType, PromptDefinition<any>>> = { // Use PromptDefinition type
+  inputAnalyzer: { template: inputAnalyzerPrompt, buildVariables: buildInputAnalyzerVariables },
+  codeValidator: { template: codeValidatorPrompt, buildVariables: buildCodeValidatorVariables },
+  
+ 
 };
 
-// PromptType union is now defined in types.ts and imported
 
-// Instancia del ModelManager
+
 let _modelManager: ModelManager | null = null;
 
 /**
@@ -53,42 +38,54 @@ export function initializePromptSystem(modelManager: ModelManager): void {
 }
 
 /**
- * Builds variables for the prompt template based on the prompt type and context
+ * Helper function to map common context data keys to BasePromptVariables.
+ * This centralizes the logic for extracting standard variables.
+ * @param contextData Full resolution context data from InteractionContext
+ * @returns An object conforming to BasePromptVariables
+ */
+export function mapContextToBaseVariables(contextData: Record<string, any>): BasePromptVariables {
+     const baseVariables: BasePromptVariables = {
+        userMessage: contextData.userMessage || '',
+        chatHistory: contextData.chatHistoryString || '', // Assuming chatHistoryString is the key from context
+        objective: contextData.objective,
+        extractedEntities: contextData.extractedEntities,
+        projectContext: contextData.projectInfo, // Assuming projectInfo is the key from context
+        activeEditorContent: contextData.activeEditorContent, // Assuming activeEditorContent is the key from context
+     };
+
+     // Add dynamic keys like file content and search results using a safe approach
+     const dynamicVariables = Object.keys(contextData)
+        .filter(key => key.startsWith('fileContent:') || key.startsWith('searchResults:'))
+        // Initialize accumulator with a type that allows string indexing
+        .reduce((acc: Record<string, any>, key) => {
+            acc[key] = contextData[key];
+            return acc;
+        }, {} as Record<string, any>); // Explicitly type the initial value
+
+    // Combine base and dynamic variables
+    return {
+        ...baseVariables,
+        ...dynamicVariables,
+    };
+}
+
+
+/**
+ * Builds variables for the prompt template based on the prompt type and context.
+ * This function now delegates to the specific builder function registered for the prompt type.
  * @param type Prompt type
- * @param context Context data
+ * @param contextData Full resolution context data from InteractionContext
  * @returns Variables object for template substitution
  */
-function buildPromptVariables(type: PromptType, context: Record<string, any>): PromptVariables {
-  // Processing específico para cada tipo de prompt
-  // The new prompts will likely need access to the full gathered context.
-  // We can pass the entire context data used for resolution.
-  switch (type) {
-    case 'projectManagement':
-      return {
-        projectInfo: context.projectInfo || {},
-        action: context.action || "analyze",
-        // Add more context variables as needed
-      };
-
-    case 'explainCodePrompt':
-    case 'fixCodePrompt':
-        // These handlers will gather context and put it into the InteractionContext.
-        // The prompt template can then access it via {{placeholder}} or we pass it explicitly.
-        // Passing the resolution context explicitly is cleaner for the prompt template.
-        return {
-            objective: context.objective,
-            userMessage: context.userMessage,
-            extractedEntities: context.extractedEntities,
-            chatHistory: context.chatHistoryString, // Use the string representation
-            // Pass the full gathered context data
-            fullContextData: context // Pass the entire resolution context object
-        };
-
-    default:
-      // For simple cases, just pass the context as is
-      return context;
-  }
+function buildPromptVariables(type: PromptType, contextData: Record<string, any>): PromptVariables {
+    const definition = PROMPT_DEFINITIONS[type];
+    if (!definition) {
+        throw new Error(`No prompt definition found for type: ${type}`);
+    }
+    // Call the specific builder function for this prompt type, which uses the helper
+    return definition.buildVariables(contextData);
 }
+
 
 /**
  * Fills a prompt template with variables
@@ -99,8 +96,8 @@ function buildPromptVariables(type: PromptType, context: Record<string, any>): P
 function fillPromptTemplate(template: string, variables: PromptVariables): string {
   let filledTemplate = template;
   for (const [key, value] of Object.entries(variables)) {
+    // Handle exact matches first
     const placeholder = `{{${key}}}`;
-    // Handle objects/arrays by stringifying, primitives directly
     const stringValue = typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || value === null || value === undefined
         ? String(value) // Use String() for primitives, handles null/undefined gracefully
         : JSON.stringify(value, null, 2); // Pretty print objects/arrays
@@ -110,6 +107,52 @@ function fillPromptTemplate(template: string, variables: PromptVariables): strin
       stringValue.replace(/\$/g, '$$$$') // Escape '$' to prevent issues in replace
     );
   }
+
+  // Handle dynamic keys like {{fileContent:.*}} or {{searchResults:.*}}
+  // This requires iterating through the variables again to find keys matching the pattern
+  // and replacing the pattern placeholder in the template.
+  // NOTE: This is a simplified approach. A more robust templating engine might be better for complex cases.
+  // For now, let's assume placeholders like {{fileContent:.*}} mean "include all variables starting with 'fileContent:'"
+   const dynamicPlaceholderRegex = /\{\{(\w+):.\*\}}/g; // Matches {{prefix:.*}}
+   let match;
+   // Use a loop with exec to find all occurrences
+   while ((match = dynamicPlaceholderRegex.exec(filledTemplate)) !== null) {
+       const prefix = match[1]; // e.g., 'fileContent' or 'searchResults'
+       const dynamicPlaceholder = match[0]; // e.g., '{{fileContent:.*}}'
+
+       const relevantDynamicVariables = Object.entries(variables)
+           .filter(([key]) => key.startsWith(`${prefix}:`));
+
+       if (relevantDynamicVariables.length > 0) {
+           const dynamicContent = relevantDynamicVariables
+               .map(([key, value]) => {
+                   // Format dynamic content - include the key/path/query
+                   const contentString = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+                   const originalKey = key.substring(prefix.length + 1); // Remove prefix and colon
+                   // Use markdown code blocks for code content
+                   const codeBlockLang = prefix === 'fileContent' ? key.split('.').pop() : ''; // Guess language from file extension
+                   return `### ${prefix.replace(/([A-Z])/g, ' $1').trim()}: ${originalKey}\n\n${codeBlockLang ? '```' + codeBlockLang + '\n' : ''}${contentString}${codeBlockLang ? '\n```' : ''}\n`;
+               })
+               .join('\n---\n'); // Separator between dynamic items
+
+           // Replace the placeholder with the formatted dynamic content
+           // Need to use the match index to replace correctly in the loop
+           filledTemplate = filledTemplate.substring(0, match.index) +
+                            dynamicContent +
+                            filledTemplate.substring(match.index + dynamicPlaceholder.length);
+           // Adjust the lastIndex for the next iteration because the string length changed
+           dynamicPlaceholderRegex.lastIndex = match.index + dynamicContent.length;
+
+       } else {
+           // Remove the placeholder if no matching dynamic variables were found
+            filledTemplate = filledTemplate.replace(new RegExp(dynamicPlaceholder, 'g'), '');
+            // No need to adjust lastIndex if the placeholder is just removed (length decreases)
+            // Reset lastIndex to continue search from the beginning of the modified string segment
+            dynamicPlaceholderRegex.lastIndex = match.index; // Search again from where the placeholder was
+       }
+   }
+
+
   return filledTemplate;
 }
 
@@ -118,27 +161,28 @@ function fillPromptTemplate(template: string, variables: PromptVariables): strin
  * This function should be the only way to interact with the model from any part of the application
  *
  * @param type Prompt type to execute
- * @param context Context with variables for the prompt
+ * @param context Full resolution context data from InteractionContext
  * @returns Parsed response according to prompt type
  */
 export async function executeModelInteraction<T = any>(
   type: PromptType,
-  context: Record<string, any> // This is the resolution context from InteractionContext
+  context: Record<string, any> // This is the full resolution context from InteractionContext
 ): Promise<T> {
   if (!_modelManager) {
     throw new Error('PromptSystem not initialized. Call initializePromptSystem() first.');
   }
 
-  // Get the prompt template
-  const template = PROMPT_MAP[type];
-  if (!template) {
+  // Get the prompt definition (template and builder)
+  const definition = PROMPT_DEFINITIONS[type];
+  if (!definition) {
     throw new Error(`Unknown prompt type: ${type}`);
   }
 
-  // Build variables and fill the template
-  // buildPromptVariables now takes the resolution context directly
+  // Build variables using the specific builder function and the full context
   const variables = buildPromptVariables(type, context);
-  const filledPrompt = fillPromptTemplate(template, variables);
+
+  // Fill the template
+  const filledPrompt = fillPromptTemplate(definition.template, variables);
 
   // Send to model and get raw response
   const rawResponse = await _modelManager.sendPrompt(filledPrompt);

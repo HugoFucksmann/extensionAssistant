@@ -1,6 +1,6 @@
 // src/ui/context/VSCodeContext.tsx
 import React, { createContext, useState, useEffect, useContext, useMemo } from 'react';
-import { Chat, ChatMessage } from '../../../storage/models/entities';
+import { Chat, ChatMessage } from '../../../storage/interfaces/entities';
 import { ThemeType } from '../theme/theme';
 import { getTheme } from '../theme/theme';
 

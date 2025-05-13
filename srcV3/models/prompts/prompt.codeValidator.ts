@@ -1,37 +1,63 @@
-// src/models/prompts/prompt.codeValidator.ts
+import { BasePromptVariables } from '../../orchestrator';
+import { mapContextToBaseVariables } from '../promptSystem';
 
-// This prompt is used by the FixCodeHandler for optional internal validation.
-// It receives the proposed changes and context and should evaluate if the fix seems correct/valid.
-// It should return JSON: { isValid: boolean, feedback: string, error: string }
 
-export const codeValidatorPrompt = `
-You are an AI assistant specialized in validating code changes.
-Your task is to review a set of proposed code changes in the context of the original code and the user's objective.
-Determine if the proposed changes are likely correct, address the objective, and are syntactically plausible.
-You do not execute code, but perform a static analysis based on the provided text.
-
-Respond ONLY with a JSON object.
-The JSON object must have the following structure:
-{
-  "isValid": "boolean", // True if the changes seem correct and address the objective, false otherwise.
-  "feedback": "string", // A concise message explaining the validation result (e.g., "Looks good.", "Potential syntax error.", "Doesn't seem to address the root cause.").
-  "error": "string" // Optional: If you cannot perform the validation, explain why briefly.
+// Define variables specific to the codeValidator prompt
+export interface CodeValidatorPromptVariables extends BasePromptVariables {
+    // BasePromptVariables already includes: userMessage, chatHistory, objective, extractedEntities, projectContext, activeEditorContent, fileContent:*, searchResults:*
+    // This prompt needs the proposed changes and potentially the original code/context for validation.
+    proposedChanges: any[]; // The structure of proposed changes from the fix prompt
+    originalCode?: string; // The original code content that was intended to be fixed
+    // Any other context needed for validation (e.g., relevant file contents) is already in BasePromptVariables dynamic keys
 }
 
-Do NOT include any other text outside the JSON object.
-Ensure the JSON is valid and correctly formatted.
+export const codeValidatorPrompt = `
+Eres un asistente experto en validar propuestas de cambios de código. Tu tarea es revisar una propuesta de solución para un problema de código, evaluar si es probable que funcione y proporcionar feedback.
 
-Here is the user's original objective:
-Objective: {{objective}}
+Objetivo original del usuario:
+"{{objective}}"
 
-Here is the original code context where changes are proposed:
-{{originalCode}}
-
-Here are the proposed changes in JSON format:
+Propuesta de cambios a validar:
 {{proposedChanges}}
 
-Here is additional relevant context:
-{{fullContextData}}
+Código original relevante (si aplica):
+{{originalCode}}
 
-Based on the above, evaluate the proposed changes and provide your validation result.
+Contexto adicional:
+{{activeEditorContent}}
+{{fileContent:.*}}
+{{searchResults:.*}}
+
+Instrucciones:
+- Analiza la "propuesta de cambios" en el contexto del "objetivo original del usuario" y el "código original relevante" y "contexto adicional".
+- Evalúa si la propuesta de cambios es lógicamente correcta y es probable que resuelva el problema.
+- Considera posibles efectos secundarios o errores introducidos por la propuesta.
+- Proporciona feedback claro sobre la validación.
+- Indica si la propuesta parece válida o no.
+- Responde en español.
+
+Salida (JSON):
+{
+  "isValid": boolean, // true if the proposal seems valid, false otherwise
+  "feedback": string, // Explanation of the validation result (why it's valid/invalid)
+  "error"?: string // Optional: if validation process failed internally
+}
 `;
+
+// Builder function for CodeValidatorPromptVariables
+export function buildCodeValidatorVariables(contextData: Record<string, any>): CodeValidatorPromptVariables {
+    // Get base variables using the helper
+    const baseVariables = mapContextToBaseVariables(contextData);
+
+    // Map base variables and specific context data to CodeValidatorPromptVariables structure
+    const validatorVariables: CodeValidatorPromptVariables = {
+        ...baseVariables, // Include all base variables
+        proposedChanges: contextData.proposedChanges || [], // Assuming proposedChanges is stored in context
+        originalCode: contextData.activeEditorContent, // Use the standard activeEditorContent key
+    };
+
+    // Clean up undefined values if necessary
+    // Object.keys(validatorVariables).forEach(key => validatorVariables[key] === undefined && delete validatorVariables[key]);
+
+    return validatorVariables;
+}
