@@ -14,13 +14,7 @@ export class ConversationHandler extends BaseHandler {
      * @returns A promise resolving to the generated assistant message.
      */
     async handle(): Promise<string> {
-        // Get relevant information from the context (optional here, as the prompt builder will do it)
-        // const analysis = this.context.getAnalysisResult();
-        // const objective = analysis?.objective || "Respond to the user's message appropriately"; // Default objective if none found
-        // const userMessage = this.context.getValue<string>('userMessage');
-        // const chatHistory = this.context.getHistoryForModel(20);
-        // const projectInfo = this.context.getValue<any>('projectInfo');
-        // const referencedFilesContent = this.context.getValue('referencedFilesContent'); // This key is not standard
+     
 
         console.log(`[ConversationHandler:${this.context.getChatId()}] Handling conversation intent.`); // Objective will be pulled by builder
 
@@ -35,7 +29,7 @@ export class ConversationHandler extends BaseHandler {
             params: {
                 // No need to list context variables here anymore.
                 // The buildConversationVariables function in prompt.conversation.ts will get them from the full context.
-                // Example non-contextual param: temperature: 0.7
+        
             },
             storeAs: 'conversationResponse' // Store the parsed result object
         };

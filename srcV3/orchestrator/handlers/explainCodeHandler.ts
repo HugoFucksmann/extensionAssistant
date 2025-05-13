@@ -17,9 +17,7 @@ export class ExplainCodeHandler extends BaseHandler {
     async handle(): Promise<string> {
         const analysis = this.context.getAnalysisResult();
         const objective = this.context.getObjective();
-        // const entities = this.context.getExtractedEntities(); // Pulled by builder now
-        // const userMessage = this.context.getValue<string>('userMessage'); // Pulled by builder now
-        // const referencedFiles = this.context.getValue<string[]>('referencedFiles'); // Pulled by builder now if needed
+       
 
         const chatId = this.context.getChatId();
 

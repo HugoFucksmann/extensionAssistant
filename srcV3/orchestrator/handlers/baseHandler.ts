@@ -92,5 +92,5 @@ export abstract class BaseHandler {
          return results;
      }
 
-     // gatherContextIteratively method is removed
+  
 }

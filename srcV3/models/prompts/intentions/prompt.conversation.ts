@@ -1,15 +1,12 @@
 // src/models/prompts/intentions/prompt.conversation.ts
 
 import { BasePromptVariables } from '../../../orchestrator/execution/types';
-import { mapContextToBaseVariables } from '../../promptSystem'; // Import the helper
+import { mapContextToBaseVariables } from '../../promptSystem';
 
-// Define variables specific to the conversation prompt
 export interface ConversationPromptVariables extends BasePromptVariables {
-  // BasePromptVariables already includes: userMessage, chatHistory, objective, extractedEntities, projectContext, fileContent:*, searchResults:*
-  // This prompt template uses 'recentMessages' instead of 'chatHistory'. We'll map it in the builder.
-  recentMessages: string; // Alias for chatHistory
-  summary?: string; // Alias for projectContext summary
-  referencedFilesContent?: any; // Placeholder if we decide to aggregate file content here
+  recentMessages: string;
+  summary?: string;
+  referencedFilesContent?: any;
 }
 
 export const conversationPrompt = `
@@ -41,21 +38,14 @@ Salida:
 }
 `;
 
-// Builder function for ConversationPromptVariables
 export function buildConversationVariables(contextData: Record<string, any>): ConversationPromptVariables {
-    // Get base variables using the helper
     const baseVariables = mapContextToBaseVariables(contextData);
 
-    // Map base variables and context data to ConversationPromptVariables structure
     const conversationVariables: ConversationPromptVariables = {
-        ...baseVariables, // Include all base variables
-        recentMessages: baseVariables.chatHistory, // Map chatHistory to recentMessages
-        summary: baseVariables.projectContext ? `Project: ${JSON.stringify(baseVariables.projectContext, null, 2)}` : "No project context available.", // Map projectContext to summary
-        // referencedFilesContent: baseVariables.fileContentsByPath // Example if we grouped file contents
+        ...baseVariables,
+        recentMessages: baseVariables.chatHistory,
+        summary: baseVariables.projectContext ? `Project: ${JSON.stringify(baseVariables.projectContext, null, 2)}` : "No project context available."
     };
-
-    // Clean up undefined values if necessary, though fillPromptTemplate handles null/undefined
-    // Object.keys(conversationVariables).forEach(key => conversationVariables[key] === undefined && delete conversationVariables[key]);
 
     return conversationVariables;
 }
