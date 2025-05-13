@@ -6,47 +6,46 @@ import { mapContextToBaseVariables } from '../../promptSystem';
 export interface FixCodePromptVariables extends BasePromptVariables {}
 
 export const fixCodePrompt = `
-Eres un asistente experto en identificar y proponer soluciones a problemas de código. Tu tarea es analizar el objetivo del usuario, el contexto proporcionado (código, errores, resultados de búsqueda) y proponer cambios de código para resolver el problema.
+You are an expert assistant at identifying and proposing solutions for code issues. Your task is to analyze the user's objective, the provided context (code, errors, search results) and propose code changes to solve the problem.
 
-Objetivo del usuario:
+User objective:
 "{{objective}}"
 
-Mensaje original del usuario:
+Original user message:
 "{{userMessage}}"
 
-Historial reciente:
+Recent history:
 {{chatHistory}}
 
-Entidades clave extraídas:
+Key extracted entities:
 {{extractedEntities}}
 
-Contexto del proyecto:
+Project context:
 {{projectContext}}
 
-Código relevante:
+Relevant code:
 {{activeEditorContent}}
 {{fileContent:.*}}
 
-Resultados de búsqueda (si aplica):
+Search results (if applicable):
 {{searchResults:.*}}
 
-Instrucciones:
-- Identifica la causa raíz del problema basado en el objetivo y el contexto.
-- Propón cambios de código específicos para resolver el problema.
-- Los cambios deben estar en un formato que pueda ser aplicado (por ejemplo, diff, o una estructura de cambios clara).
-- Proporciona un mensaje al usuario explicando el problema y la solución propuesta.
-- Si no puedes identificar el problema o proponer una solución, indícalo claramente.
-- Responde en español.
+Instructions:
+- Analyze the code in relation to the user's objective
+- Identify any potential issues or bugs
+- Propose specific code changes to fix the issues
+- Explain your reasoning for each proposed change
+- If you can't identify the problem or propose a solution, clearly state so
+- Respond in English
 
-Salida (JSON):
+Your response must be a JSON object with this structure:
 {
   "messageToUser": string,
   "proposedChanges": Array<{
-    "filePath": string,
-    "patch": string
-  }> | [],
-  "diagnosis"?: string,
-  "error"?: string
+    "file": string,
+    "changes": string,
+    "reason": string
+  }>
 }
 `;
 

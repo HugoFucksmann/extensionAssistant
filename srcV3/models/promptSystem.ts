@@ -1,6 +1,7 @@
 import { PromptDefinition, PromptType, PromptVariables, BasePromptVariables } from '../orchestrator';
 import { inputAnalyzerPrompt, buildInputAnalyzerVariables, codeValidatorPrompt, buildCodeValidatorVariables } from './prompts';
 import { explainCodePrompt } from './prompts/intentions/prompt.explainCode';
+import { fixCodePrompt } from './prompts/intentions/prompt.fixCode';
 import { ModelManager } from './config/ModelManager';
 import { ModelType } from './config/types';
 import { parseModelResponse } from './config/modelUtils';
@@ -8,7 +9,8 @@ import { parseModelResponse } from './config/modelUtils';
 const PROMPT_DEFINITIONS: Partial<Record<PromptType, PromptDefinition<any>>> = {
   inputAnalyzer: { template: inputAnalyzerPrompt, buildVariables: buildInputAnalyzerVariables },
   codeValidator: { template: codeValidatorPrompt, buildVariables: buildCodeValidatorVariables },
-  explainCodePrompt: { template: explainCodePrompt, buildVariables: mapContextToBaseVariables }
+  explainCodePrompt: { template: explainCodePrompt, buildVariables: mapContextToBaseVariables },
+  fixCodePrompt: { template: fixCodePrompt, buildVariables: mapContextToBaseVariables }
 };
 
 let _modelManager: ModelManager | null = null;

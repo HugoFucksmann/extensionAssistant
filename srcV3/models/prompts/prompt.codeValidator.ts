@@ -7,31 +7,33 @@ export interface CodeValidatorPromptVariables extends BasePromptVariables {
 }
 
 export const codeValidatorPrompt = `
-Eres un asistente experto en validar propuestas de cambios de código. Tu tarea es revisar una propuesta de solución para un problema de código, evaluar si es probable que funcione y proporcionar feedback.
+You are an expert assistant at validating code changes. Your task is to analyze the proposed changes in the context of the original code and user objective, and provide validation feedback.
 
-Objetivo original del usuario:
+Original user objective:
 "{{objective}}"
 
-Propuesta de cambios a validar:
-{{proposedChanges}}
+Original user message:
+"{{userMessage}}"
 
-Código original relevante (si aplica):
-{{originalCode}}
-
-Contexto adicional:
+Original code:
 {{activeEditorContent}}
 {{fileContent:.*}}
+
+Proposed changes:
+{{proposedChanges}}
+
+Additional context:
 {{searchResults:.*}}
 
-Instrucciones:
-- Analiza la "propuesta de cambios" en el contexto del "objetivo original del usuario" y el "código original relevante" y "contexto adicional".
-- Evalúa si la propuesta de cambios es lógicamente correcta y es probable que resuelva el problema.
-- Considera posibles efectos secundarios o errores introducidos por la propuesta.
-- Proporciona feedback claro sobre la validación.
-- Indica si la propuesta parece válida o no.
-- Responde en español.
+Instructions:
+- Analyze the "proposed changes" in the context of the "original user objective" and "original relevant code" and "additional context".
+- Evaluate whether the proposed changes are logically correct and likely to solve the problem.
+- Consider potential side effects or errors introduced by the proposal.
+- Provide clear feedback about the validation.
+- Indicate whether the proposal appears valid or not.
+- Respond in English.
 
-Salida (JSON):
+Your response must be a JSON object with this structure:
 {
   "isValid": boolean,
   "feedback": string,
