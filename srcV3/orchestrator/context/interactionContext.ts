@@ -3,9 +3,13 @@
 import { InputAnalysisResult } from '../execution/types'; // Importa el tipo de análisis
 
 interface ChatMessage {
-    role: 'user' | 'assistant';
+    role?: 'user' | 'assistant';
     content: string;
     timestamp: number;
+    // Campos para compatibilidad con el formato del repositorio
+    sender?: 'user' | 'assistant' | 'system';
+    chatId?: string;
+    files?: string[];
 }
 
 // Define la forma del estado interno del contexto
@@ -55,7 +59,10 @@ export class InteractionContext {
     }
 
     getHistoryForModel(limit?: number): string {
-        return this.getHistory(limit).map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`).join('\n');
+        return this.getHistory(limit).map(msg => {
+            const role = msg.role || (msg.sender === 'system' ? 'assistant' : msg.sender || 'assistant');
+            return `${role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`;
+        }).join('\n');
     }
 
     /**

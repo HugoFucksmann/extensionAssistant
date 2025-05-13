@@ -16,7 +16,7 @@ export class ConversationHandler extends BaseHandler {
     async handle(): Promise<string> {
         // Get relevant information from the context
         const analysis = this.context.getAnalysisResult();
-        const objective = analysis?.objective; // Get the objective from analysis
+        const objective = analysis?.objective || "Respond to the user's message appropriately"; // Default objective if none found
         const userMessage = this.context.getValue<string>('userMessage');
         const chatHistory = this.context.getHistoryForModel(20);
         const projectInfo = this.context.getValue<any>('projectInfo');
@@ -32,10 +32,10 @@ export class ConversationHandler extends BaseHandler {
             params: {
                 objective: objective,
                 userMessage: userMessage,
-                chatHistory: chatHistory,
-                extractedEntities: analysis?.extractedEntities,
-                projectContext: projectInfo,
-                referencedFilesContent: referencedFilesContent,
+                summary: projectInfo ? `Project: ${JSON.stringify(projectInfo, null, 2)}` : "No project context available.",
+                recentMessages: chatHistory,
+                extractedEntities: analysis?.extractedEntities || {},
+                referencedFilesContent: referencedFilesContent || []
             },
             storeAs: 'conversationResponse'
         };

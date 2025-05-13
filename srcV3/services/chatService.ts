@@ -128,9 +128,10 @@ export class ChatService {
     const savedUserMessage = await this.repository.addMessage(userMessage);
 
     const projectInfo = await getProjectInfo();
+    const messageHistory = await this.repository.getMessages(chatId);
     
-    // 2. Procesar con orquestador (pasando chatId)
-    const responseContent = await this.orchestrator.processUserMessage(chatId, text, files, projectInfo);
+    // 2. Procesar con orquestador (pasando chatId e historial)
+    const responseContent = await this.orchestrator.processUserMessage(chatId, text, files, projectInfo, messageHistory);
     
     // 3. Guardar y retornar respuesta
     const assistantMessage = {

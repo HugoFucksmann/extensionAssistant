@@ -6,13 +6,14 @@ Aquí tienes el objetivo actual, un resumen del contexto previo y los últimos m
 Objetivo del usuario:
 "{{objective}}"
 
-Resumen del contexto anterior:
-{{summary}}
+Mensaje actual del usuario:
+"{{userMessage}}"
 
-Últimos mensajes recientes:
+Historial de conversación reciente:
 {{recentMessages}}
 
---- end mesages ---
+Entidades extraídas:
+{{extractedEntities}}
 
 Responde con un mensaje útil y coherente con la conversación.
 

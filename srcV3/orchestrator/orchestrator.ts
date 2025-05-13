@@ -5,6 +5,7 @@ import { ExecutionStep, InputAnalysisResult, StepResult } from './execution/type
 import { BaseHandler } from './handlers/baseHandler'; // Base handler
 import { ConversationHandler,/*  ExplainCodeHandler, FixCodeHandler */ } from './handlers'; // Importa los handlers específicos (los crearemos después)
 import { ToolRunner } from '../services/toolRunner';
+import { ChatMessage } from '../storage/models/entities';
 
 
 /**
@@ -64,7 +65,7 @@ export class Orchestrator {
      * @param projectInfo Optional general project information.
      * @returns A promise resolving to the response string for the user.
      */
-    public async processUserMessage(chatId: string, text: string, files?: string[], projectInfo?: any): Promise<string | any> { // Return type can be string or object for UI actions
+    public async processUserMessage(chatId: string, text: string, files?: string[], projectInfo?: any, messageHistory?: ChatMessage[]): Promise<string | any> { // Return type can be string or object for UI actions
         const context = this.getOrCreateContext(chatId);
 
         // 1. Add user input to history and context state
@@ -72,7 +73,7 @@ export class Orchestrator {
         context.setValue('userMessage', text); // Store as current message for easy access
         context.setValue('referencedFiles', files || []); // Store referenced files
         context.setValue('projectInfo', projectInfo); // Store project info
-
+        context.setValue('messageHistory', messageHistory || []); // Store message history
         console.log(`[Orchestrator:${chatId}] Processing message: "${text}"`);
 
         let analysis: InputAnalysisResult | undefined;
