@@ -1,6 +1,6 @@
 // src/orchestrator/handlers/baseHandler.ts
 
-import { InteractionContext } from '../context/interactionContext';
+import { FlowContext } from '../context/flowContext';
 import { StepExecutor } from '../execution/stepExecutor';
 import { ExecutionStep, StepResult } from '../execution/types';
 
@@ -10,10 +10,10 @@ import { ExecutionStep, StepResult } from '../execution/types';
  * Includes helper methods for running steps.
  */
 export abstract class BaseHandler {
-    protected context: InteractionContext;
+    protected context: FlowContext;
     protected stepExecutor: StepExecutor;
 
-    constructor(context: InteractionContext, stepExecutor: StepExecutor) {
+    constructor(context: FlowContext, stepExecutor: StepExecutor) {
         this.context = context;
         this.stepExecutor = stepExecutor;
     }
