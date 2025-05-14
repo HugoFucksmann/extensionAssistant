@@ -75,7 +75,7 @@ export interface IExecutor {
 // Define types for prompt system
 export type PromptType =
   | 'inputAnalyzer'
-  | 'planningEngine'
+  | 'planningEngine' // Could use this alias for 'planner'
   | 'editing'
   | 'examination'
   | 'projectManagement'
@@ -85,20 +85,20 @@ export type PromptType =
   | 'explainCodePrompt'
   | 'fixCodePrompt'
   | 'codeValidator'
-  |'planner';
+  | 'planner'; 
 // --- Standardized Prompt Variable Interfaces ---
 
 /** Base interface for common variables available to most prompts. */
 export interface BasePromptVariables {
-    userMessage: string; // The current user's message
-    chatHistory: string; // Recent conversation history (formatted string)
-    objective?: string; // The user's overall objective for the turn/session
-    extractedEntities?: InputAnalysisResult['extractedEntities']; // Entities extracted from user input
-    projectContext?: any; // Information about the current project/workspace
-    activeEditorContent?: string; // Content of the active text editor
-    [key: `fileContent:${string}`]: string | undefined; // Content of specific files, keyed by a sanitized path
-    [key: `searchResults:${string}`]: any | undefined; // Results from search operations, keyed by query/identifier
-    // Add other common keys as needed
+  userMessage: string; // The current user's message
+  chatHistory: string; // Recent conversation history (formatted string)
+  objective?: string; // The user's overall objective for the turn/session
+  extractedEntities?: InputAnalysisResult['extractedEntities']; // Entities extracted from user input
+  projectContext?: any; // Information about the current project/workspace
+  activeEditorContent?: string; // Content of the active text editor
+  [key: `fileContent:${string}`]: string | undefined; // Content of specific files, keyed by a sanitized path
+  [key: `searchResults:${string}`]: any | undefined; // Results from search operations, keyed by query/identifier
+  // Add other common keys as needed
 }
 
 /**
@@ -106,8 +106,9 @@ export interface BasePromptVariables {
  * Used in promptSystem.ts
  */
 export interface PromptDefinition<T extends BasePromptVariables = BasePromptVariables> {
-    template: string;
-    buildVariables: (resolutionContextData: Record<string, any>) => T;
+  template: string;
+  // buildVariables now receives the flattened resolution context data
+  buildVariables: (resolutionContextData: Record<string, any>) => T;
 }
 
 // --- Tool Parameter Interfaces ---
@@ -150,8 +151,30 @@ export type ToolParams =
   | ProjectSearchWorkspaceParams
   | CodeManipulationApplyWorkspaceEditParams;
 
-  // Import the PlannerResponse type structure
-import { PlannerResponse } from '../../models/prompts/intentions/prompt.planner';
+/**
+ * Defines the structure for variables specifically for the planner prompt.
+ * Extends BasePromptVariables.
+ */
+export interface PlannerPromptVariables extends BasePromptVariables {
+  currentFlowState: Record<string, any>; // The current state of the FlowContext (results of previous steps)
+  availableTools: string; // Description/list of available tools
+  availablePrompts: string; // Description/list of available prompts (excluding planner itself)
+  planningHistory: Array<{ action: string; result: any; error?: any; stepName: string }>; // History of planning decisions and step results in this flow
+  planningIteration: number; // Current iteration number of the planning loop
+}
 
-// Export the PlannerResponse type
-export { PlannerResponse };
+
+/**
+* Defines the expected output structure for the planner prompt.
+* This is the instruction the model receives on how to format its response.
+*/
+export interface PlannerResponse {
+  action: 'tool' | 'prompt' | 'respond';
+  toolName?: string; // Required if action is 'tool'
+  promptType?: PromptType; // Required if action is 'prompt'
+  params?: Record<string, any>; // Parameters for the tool/prompt/respond
+  storeAs?: string; // Optional key to store the result of the tool/prompt execution in FlowContext
+  reasoning: string; // Explanation for the chosen action
+  // Add optional fields for debugging or UI hints
+  // uiMessage?: string; // Message to show the user while executing this step
+}

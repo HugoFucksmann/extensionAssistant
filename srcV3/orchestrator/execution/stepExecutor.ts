@@ -119,11 +119,13 @@ export class StepExecutor {
         }
 
         // 4. Store result in FlowContext state if storeAs is specified and the step was successful
+        // This logic is correct and will store results using the key provided by the planner.
         if (step.storeAs && success) {
              flowContext.setValue(step.storeAs, rawResult);
              console.log(`[StepExecutor:${chatId}] Stored successful result for '${step.name}' at '${step.storeAs}' in FlowContext.`);
         } else if (step.storeAs && !success) {
              // Store error information if the step failed and storeAs was specified
+             // Store a specific error key based on storeAs name
              flowContext.setValue(`${step.storeAs}_error`, error?.message || 'Execution failed');
              console.warn(`[StepExecutor:${chatId}] Step '${step.name}' failed. Stored error indicator at '${step.storeAs}_error' in FlowContext.`);
         }
@@ -161,7 +163,21 @@ export class StepExecutor {
             if (typeof value === 'string' && value.startsWith('{{') && value.endsWith('}}')) {
                 const contextKey = value.substring(2, value.length - 2);
                 // Look up the value in the resolution context data
-                resolvedParams[key] = resolutionContextData[contextKey] !== undefined ? resolutionContextData[contextKey] : null;
+                // Handle nested access like {{analysisResult.intent}}
+                const keys = contextKey.split('.');
+                let currentValue: any = resolutionContextData;
+                let found = true;
+                for (const k of keys) {
+                    if (currentValue && typeof currentValue === 'object' && k in currentValue) {
+                        currentValue = currentValue[k];
+                    } else {
+                        found = false;
+                        currentValue = undefined; // Or null? Let's use undefined
+                        break;
+                    }
+                }
+                resolvedParams[key] = found ? currentValue : null; // Use null if not found, consistent with original logic
+
             } else {
                 // Recursively resolve nested objects/arrays
                 resolvedParams[key] = this.resolveParameters(value, resolutionContextData);
