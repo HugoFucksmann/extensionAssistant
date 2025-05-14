@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { readdir, stat, normalizePath, parseGitignore } from './core';
+import { readdir, stat, normalizePath, parseGitignore } from '../core/core';
 
 export const DEFAULT_EXCLUSIONS = {
   dirs: ['node_modules', '.git', 'dist', 'build', '.vscode', '.github', 'out'],

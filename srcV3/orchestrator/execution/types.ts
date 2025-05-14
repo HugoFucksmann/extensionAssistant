@@ -1,4 +1,4 @@
-
+import * as vscode from 'vscode';
 export type PromptVariables = Record<string, any>;
 
 export interface InputAnalysisResult {
@@ -109,3 +109,43 @@ export interface PromptDefinition<T extends BasePromptVariables = BasePromptVari
     template: string;
     buildVariables: (contextData: Record<string, any>) => T;
 }
+
+// --- Tool Parameter Interfaces ---
+
+export interface FilesystemGetFileContentsParams {
+  filePath: string;
+}
+
+export interface FilesystemGetWorkspaceFilesParams {
+  // No parameters needed
+}
+
+export interface EditorGetActiveEditorContentParams {
+  // No parameters needed
+}
+
+export interface ProjectGetPackageDependenciesParams {
+  projectPath: string;
+}
+
+export interface ProjectGetProjectInfoParams {
+  // No parameters needed
+}
+
+export interface ProjectSearchWorkspaceParams {
+  query: string;
+}
+
+export interface CodeManipulationApplyWorkspaceEditParams {
+  edits: vscode.WorkspaceEdit[];
+}
+
+// Union type for all tool parameters
+export type ToolParams =
+  | FilesystemGetFileContentsParams
+  | FilesystemGetWorkspaceFilesParams
+  | EditorGetActiveEditorContentParams
+  | ProjectGetPackageDependenciesParams
+  | ProjectGetProjectInfoParams
+  | ProjectSearchWorkspaceParams
+  | CodeManipulationApplyWorkspaceEditParams;

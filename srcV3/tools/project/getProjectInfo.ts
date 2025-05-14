@@ -1,7 +1,7 @@
 import * as path from 'path';
-import { getWorkspaceFiles } from '../tools/filesystemTools/getWorkspaceFiles';
-import { getPackageDependencies } from '../tools/filesystemTools/getPackageDependencies';
-import { getMainWorkspacePath } from '../tools/filesystemTools/core';
+import { getWorkspaceFiles } from '../filesystem/getWorkspaceFiles';
+import { getMainWorkspacePath } from '../core/core';
+import { getPackageDependencies } from './getPackageDependencies';
 
 export async function getProjectInfo(): Promise<{
     mainLanguage: string,

@@ -51,7 +51,7 @@ export async function activate(context: vscode.ExtensionContext) {
   const chatService = new ChatService(context, modelManager, orchestrator, globalContext, sessionContext); // Pass contexts
 
   // Initialize WebviewProvider (requires ChatService and FileSystemService)
-  const webview = new WebviewProvider(context.extensionUri, config, chatService, fileSystemService);
+  const webview = new WebviewProvider(context.extensionUri, config, chatService);
 
   // Initialize theme handler (logic remains in WebviewProvider)
   webview.setThemeHandler();

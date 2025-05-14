@@ -1,0 +1,1 @@
+export { applyWorkspaceEdit } from './applyWorkspaceEdit';

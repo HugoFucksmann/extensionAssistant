@@ -2,6 +2,10 @@
 
 import { BaseHandler } from './baseHandler';
 import { ExecutionStep, StepResult, InputAnalysisResult } from '../execution/types';
+// Import FlowContext instead of InteractionContext
+import { FlowContext } from '../context';
+import { StepExecutor } from '../execution/stepExecutor';
+
 
 /**
  * Handler specifically for 'fixCode' intent.
@@ -9,19 +13,25 @@ import { ExecutionStep, StepResult, InputAnalysisResult } from '../execution/typ
  */
 export class FixCodeHandler extends BaseHandler {
 
+    // Constructor receives FlowContext
+    constructor(context: FlowContext, stepExecutor: StepExecutor) {
+        super(context, stepExecutor); // Pass FlowContext to BaseHandler
+    }
+
     /**
      * Handles the 'fixCode' intent.
      * Gathers context, sends it to a single fix prompt, and processes the result.
      * @returns A promise resolving to a string message for the user.
      */
     async handle(): Promise<string> { // Return type is string
+        // Access data via FlowContext methods or getResolutionContext
         const analysis = this.context.getAnalysisResult();
         const objective = this.context.getObjective();
-        // const entities = this.context.getExtractedEntities(); // Pulled by builder now
-        // const userMessage = this.context.getValue<string>('userMessage'); // Pulled by builder now
-        // const referencedFiles = this.context.getValue<string[]>('referencedFiles'); // Pulled by builder now if needed
+        // const entities = this.context.getExtractedEntities(); // Access via analysis or getResolutionContext
+        // const userMessage = this.context.getValue<string>('userMessage'); // Access via getResolutionContext
+        // const referencedFiles = this.context.getValue<string[]>('referencedFiles'); // Access via getResolutionContext
 
-        const chatId = this.context.getChatId();
+        const chatId = this.context.getChatId(); // Get chat ID from FlowContext
 
         if (!objective) {
              console.warn(`[FixCodeHandler:${chatId}] No objective found in analysis.`);
@@ -34,13 +44,13 @@ export class FixCodeHandler extends BaseHandler {
         // Define all relevant context gathering steps upfront.
         const gatheringSteps: ExecutionStep[] = [];
 
-        // Always try to get the active editor content
+        // Always try to get the active editor content using the new tool name
         gatheringSteps.push({
             name: 'readActiveEditorForFix',
             type: 'tool' as const,
-            execute: 'filesystem.getActiveEditorContent',
-            params: {},
-            storeAs: 'activeEditorContent' // Use standardized key
+            execute: 'editor.getActiveEditorContent', // Updated tool name
+            params: {}, // No params needed for this tool
+            storeAs: 'activeEditorContent' // Use standardized key in FlowContext
         });
 
         // Read any specific files the user mentioned (entities.filesMentioned is in context after analysis)
@@ -50,13 +60,13 @@ export class FixCodeHandler extends BaseHandler {
              gatheringSteps.push(...filesToReadExplicitly.map((filePath, index) => ({
                   name: `readMentionedFile:${index}:${filePath}`,
                   type: 'tool' as const,
-                  execute: 'filesystem.getFileContents',
-                  params: { filePath: filePath },
-                  storeAs: `fileContent:${filePath.replace(/[^a-zA-Z0-9]/g, '_')}` // Store with standard dynamic key
+                  execute: 'filesystem.getFileContents', // Updated tool name
+                  params: { filePath: filePath }, // Parameter name matches tool expectation
+                  storeAs: `fileContent:${filePath.replace(/[^a-zA-Z0-9]/g, '_')}` // Store with standard dynamic key in FlowContext
              })));
         }
 
-        // If entities mention errors, maybe search the workspace
+        // If entities mention errors, maybe search the workspace using the new tool name
         const errorsToSearch = analysis?.extractedEntities?.errorsMentioned || [];
         if (errorsToSearch.length > 0) {
              console.log(`[FixCodeHandler:${chatId}] Errors mentioned, searching workspace...`);
@@ -65,17 +75,19 @@ export class FixCodeHandler extends BaseHandler {
              gatheringSteps.push(...errorsForSearch.map((errorMsg, index) => ({
                  name: `searchError:${index}`,
                  type: 'tool' as const,
-                 execute: 'project.search', // Assuming this tool exists
-                 params: { query: errorMsg, scope: 'workspace' },
-                 storeAs: `searchResults:${errorMsg.replace(/[^a-zA-Z0-9]/g, '_')}` // Store with standard dynamic key
+                 execute: 'project.search', // Updated tool name (placeholder)
+                 params: { query: errorMsg, scope: 'workspace' }, // Parameter names match tool expectation
+                 storeAs: `searchResults:${errorMsg.replace(/[^a-zA-Z0-9]/g, '_')}` // Store with standard dynamic key in FlowContext
              })));
         }
 
         // Add other potential gathering steps here (e.g., find references, get related files)
+        // using new tool names (placeholders for future)
 
 
-        // Execute all gathering steps in parallel
+        // Execute all gathering steps in parallel (using BaseHandler helper)
         console.log(`[FixCodeHandler:${chatId}] Running context gathering steps...`);
+        // runStepsParallel uses StepExecutor internally, which uses FlowContext.getResolutionContext()
         const gatheringResults = await this.runStepsParallel(gatheringSteps);
 
          gatheringResults.forEach(result => {
@@ -84,12 +96,13 @@ export class FixCodeHandler extends BaseHandler {
              } else if (result.skipped) {
                   console.log(`[FixCodeHandler:${chatId}] Gathering step skipped: ${result.step.name}`);
              } else {
-                  console.log(`[FixCodeHandler:${chatId}] Gathering step succeeded: ${result.step.name}. Stored as '${result.step.storeAs}'.`);
+                  console.log(`[FixCodeHandler:${chatId}] Gathering step succeeded: ${result.step.name}. Stored as '${result.step.storeAs}' in FlowContext.`);
              }
          });
 
          // Check if *any* code content was gathered. If not, we can't fix code.
-         const resolutionContext = this.context.getResolutionContext();
+         // Access the FlowContext state directly or via getResolutionContext
+         const resolutionContext = this.context.getResolutionContext(); // Get flattened context
          const hasCodeContent = resolutionContext.activeEditorContent !== undefined ||
                                 Object.keys(resolutionContext).some(key => key.startsWith('fileContent:') && resolutionContext[key] !== undefined && resolutionContext[key] !== null);
 
@@ -108,16 +121,17 @@ export class FixCodeHandler extends BaseHandler {
             execute: 'fixCodePrompt', // Use the prompt type
             params: {
                 // No need to list context variables here anymore.
-                // The buildFixCodeVariables function in prompt.fixCode.ts will get them from the full context.
+                // The buildFixCodeVariables function in prompt.fixCode.ts
+                // will get them from the full resolution context passed by StepExecutor.
             },
-            storeAs: 'proposedFixResult' // Store the parsed result object { messageToUser, proposedChanges, ... }
+            storeAs: 'proposedFixResult' // Store the parsed result object { messageToUser, proposedChanges, ... } in FlowContext
         };
 
         console.log(`[FixCodeHandler:${chatId}] Running fix proposal step...`);
-        // The parseModelResponse for fixCodePrompt is expected to return { messageToUser: string, proposedChanges: [], ... }
+        // runExecutionStep uses StepExecutor internally, which passes FlowContext.getResolutionContext()
         const proposeResultStep: StepResult<{ messageToUser?: string, proposedChanges?: any[], error?: string }> = await this.runExecutionStep(proposeFixStep);
 
-        // Process the fix proposal result
+        // Process the fix proposal result from the StepResult
         let responseMessage = "I've analyzed the issue and generated a potential fix.";
         let proposedChanges: any[] | undefined;
         let fixError: string | undefined;
@@ -135,10 +149,10 @@ export class FixCodeHandler extends BaseHandler {
                  responseMessage = "Successfully ran fix process, but the model didn't provide a specific message.";
             }
 
-            // Store the proposed changes in a dedicated context key that the UI can easily access
+            // Store the proposed changes in a dedicated FlowContext key that the UI can easily access
             if (proposedChanges) {
-                this.context.setValue('proposedChanges', proposedChanges); // Standard key for proposed changes
-                console.log(`[FixCodeHandler:${chatId}] Proposed changes stored in context.`);
+                this.context.setValue('proposedChanges', proposedChanges); // Standard key for proposed changes in FlowContext
+                console.log(`[FixCodeHandler:${chatId}] Proposed changes stored in FlowContext.`);
             } else {
                  console.warn(`[FixCodeHandler:${chatId}] Fix prompt returned success but no proposedChanges array.`);
                  // Ensure 'proposedChanges' is explicitly set to undefined or null if not provided
@@ -156,23 +170,25 @@ export class FixCodeHandler extends BaseHandler {
 
         // --- Optional: Internal Validation ---
         // Only run validation if the proposal step was successful AND returned proposed changes
-        // Check context for 'proposedChanges' as it might have been set to undefined above
+        // Check FlowContext for 'proposedChanges' as it might have been set to undefined above
         const currentProposedChanges = this.context.getValue<any[]>('proposedChanges');
         if (proposeResultStep.success && currentProposedChanges && currentProposedChanges.length > 0) {
             console.log(`[FixCodeHandler:${chatId}] Running validation step for proposed fix...`);
             // Assuming 'codeValidator' prompt/tool exists and takes proposedChanges
             const validateFixStep: ExecutionStep = {
                 name: 'validateProposedFix',
-                type: 'prompt' as const, // Or 'tool'
+                type: 'prompt' as const, // Or 'tool' if validation is a tool
                 execute: 'codeValidator', // Use the prompt type
                 params: {
                     // No need to list context variables here.
-                    // The buildCodeValidatorVariables function in prompt.codeValidator.ts will get them from the full context,
-                    // including 'proposedChanges' which we just stored.
+                    // The buildCodeValidatorVariables function in prompt.codeValidator.ts
+                    // will get them from the full resolution context, including 'proposedChanges'
+                    // which we just stored in FlowContext.
                 },
-                storeAs: 'fixValidationResult' // Store the validation result { isValid, feedback }
+                storeAs: 'fixValidationResult' // Store the validation result { isValid, feedback } in FlowContext
             };
 
+            // runExecutionStep uses StepExecutor internally, which passes FlowContext.getResolutionContext()
             const validationResultStep: StepResult<{ isValid?: boolean, feedback?: string, error?: string }> = await this.runExecutionStep(validateFixStep);
 
             let validationMessage = "";
@@ -189,7 +205,7 @@ export class FixCodeHandler extends BaseHandler {
                 validationMessage = `Warning: Automated validation of the fix failed (${validationResultStep.error?.message || 'unknown error'}).`;
             }
 
-            // Store validation status in context
+            // Store validation status in FlowContext
             this.context.setValue('proposedFixValidationPassed', validationSuccessful);
             this.context.setValue('proposedFixValidationMessage', validationMessage);
 
@@ -200,7 +216,7 @@ export class FixCodeHandler extends BaseHandler {
 
         } else if (!currentProposedChanges || currentProposedChanges.length === 0) {
              console.warn(`[FixCodeHandler:${chatId}] No proposed changes available for validation.`);
-             // Ensure validation status reflects no changes were validated
+             // Ensure validation status reflects no changes were validated in FlowContext
              this.context.setValue('proposedFixValidationPassed', false);
              this.context.setValue('proposedFixValidationMessage', "No changes proposed to validate.");
              responseMessage += "\n\nNote: No changes were proposed.";

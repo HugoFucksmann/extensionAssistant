@@ -1,6 +1,7 @@
 import path from 'path';
+import { safeReadFile } from '../core/core';
 
-import { safeReadFile } from './core';
+
 
 export async function getPackageDependencies(projectPath: string): Promise<string[]> {
   try {

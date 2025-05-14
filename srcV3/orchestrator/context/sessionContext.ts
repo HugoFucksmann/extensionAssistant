@@ -1,7 +1,7 @@
 // src/orchestrator/context/sessionContext.ts
 import * as vscode from 'vscode';
 import { GlobalContext, GlobalContextState } from './globalContext';
-import { getProjectInfo as fetchProjectInfo } from '../../modules/getProjectInfo'; // Import the actual function
+import { getProjectInfo as fetchProjectInfo } from '../../tools/project/getProjectInfo'; // Import the actual function
 
 interface SessionContextState {
     [key: string]: any;  // Add this line to allow string indexing
