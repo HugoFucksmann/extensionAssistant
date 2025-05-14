@@ -1,33 +1,28 @@
-import {  PromptType, PromptVariables, BasePromptVariables } from '../orchestrator';
+import { PromptDefinition, PromptType, PromptVariables, BasePromptVariables, PlannerResponse } from '../orchestrator'; // Import PlannerResponse
 import { inputAnalyzerPrompt, buildInputAnalyzerVariables, codeValidatorPrompt, buildCodeValidatorVariables } from './prompts';
 import { explainCodePrompt } from './prompts/intentions/prompt.explainCode';
 import { fixCodePrompt } from './prompts/intentions/prompt.fixCode';
 import { conversationPrompt } from './prompts/intentions/prompt.conversation';
 import { buildConversationVariables } from './prompts/intentions/prompt.conversation';
+// Import the new planner prompt definition and builder
+import { plannerPrompt, buildPlannerVariables } from './prompts/intentions/prompt.planner';
+
 import { ModelManager } from './config/ModelManager';
 import { ModelType } from './config/types';
 import { parseModelResponse } from './config/modelUtils';
 
-// Import the FlowContext type
-import { FlowContext } from '../orchestrator/context';
-
-// Update PromptDefinition buildVariables type to accept FlowContext
-interface PromptDefinition<T extends BasePromptVariables = BasePromptVariables> {
-    template: string;
-    // Build variables now receives the FlowContext (or the resolution context derived from it)
-    // Let's keep it accepting Record<string, any> which is the output of FlowContext.getResolutionContext()
-    // This allows us to keep buildVariables functions simpler for now.
-    buildVariables: (resolutionContextData: Record<string, any>) => T;
-}
+// Need access to ToolRunner to list tools for the planner prompt variables
 
 
-// PROMPT_DEFINITIONS map remains largely the same, just ensuring correct buildVariables functions are used
+
+// Update PROMPT_DEFINITIONS to include the new planner prompt
 const PROMPT_DEFINITIONS: Partial<Record<PromptType, PromptDefinition<any>>> = {
   inputAnalyzer: { template: inputAnalyzerPrompt, buildVariables: buildInputAnalyzerVariables },
   codeValidator: { template: codeValidatorPrompt, buildVariables: buildCodeValidatorVariables },
-  explainCodePrompt: { template: explainCodePrompt, buildVariables: mapContextToBaseVariables }, // mapContextToBaseVariables will be updated
-  fixCodePrompt: { template: fixCodePrompt, buildVariables: mapContextToBaseVariables }, // mapContextToBaseVariables will be updated
-  conversationResponder: { template: conversationPrompt, buildVariables: buildConversationVariables } // buildConversationVariables will be updated
+  explainCodePrompt: { template: explainCodePrompt, buildVariables: mapContextToBaseVariables },
+  fixCodePrompt: { template: fixCodePrompt, buildVariables: mapContextToBaseVariables },
+  conversationResponder: { template: conversationPrompt, buildVariables: buildConversationVariables },
+  planner: { template: plannerPrompt, buildVariables: buildPlannerVariables } // Register the planner prompt
 };
 
 let _modelManager: ModelManager | null = null;
@@ -37,24 +32,19 @@ export function initializePromptSystem(modelManager: ModelManager): void {
   console.log('[PromptSystem] Initialized successfully');
 }
 
-/**
- * Updated mapping function: Takes the flattened resolution context
- * and maps relevant keys to the BasePromptVariables structure.
- * FlowContext.getResolutionContext is responsible for gathering data from all layers.
- */
+// mapContextToBaseVariables remains the same, it maps flattened context to BasePromptVariables
 export function mapContextToBaseVariables(resolutionContextData: Record<string, any>): BasePromptVariables {
   const baseVariables: BasePromptVariables = {
     userMessage: resolutionContextData.userMessage || '',
-    chatHistory: resolutionContextData.chatHistoryString || '', // From ConversationContext via FlowContext
-    objective: resolutionContextData.analysisResult?.objective, // From FlowContext
-    extractedEntities: resolutionContextData.analysisResult?.extractedEntities, // From FlowContext
-    projectContext: resolutionContextData.projectInfo, // From GlobalContext via Session/Conv/Flow
-    activeEditorContent: resolutionContextData.activeEditorContent // From SessionContext via Conv/Flow
+    chatHistory: resolutionContextData.chatHistoryString || '',
+    objective: resolutionContextData.analysisResult?.objective,
+    extractedEntities: resolutionContextData.analysisResult?.extractedEntities,
+    projectContext: resolutionContextData.projectInfo,
+    activeEditorContent: resolutionContextData.activeEditorContent
   };
 
-  // Add dynamic variables like file contents and search results from FlowContext state
   const dynamicVariables = Object.keys(resolutionContextData)
-    .filter(key => key.startsWith('fileContent:') || key.startsWith('searchResults:'))
+    .filter(key => key.startsWith('fileContent:') || key.startsWith('searchResults:') || key.startsWith('toolResult:') || key.startsWith('promptResult:')) // Add potential prefixes for step results
     .reduce<Record<string, any>>((acc, key) => {
       acc[key] = resolutionContextData[key];
       return acc;
@@ -63,78 +53,51 @@ export function mapContextToBaseVariables(resolutionContextData: Record<string, 
   return { ...baseVariables, ...dynamicVariables };
 }
 
-// Update buildVariables functions in specific prompt files if they don't already
-// use mapContextToBaseVariables or need custom logic accessing nested context.
-// For now, mapContextToBaseVariables should suffice for BasePromptVariables.
-// Example: buildInputAnalyzerVariables and buildConversationVariables might need minor tweaks
-// if they access context data keys that are now nested or moved. Let's check those.
-
-// No changes needed in buildInputAnalyzerVariables, as it already accesses keys expected in resolutionContextData
-// function buildInputAnalyzerVariables(resolutionContextData: Record<string, any>): InputAnalyzerPromptVariables {
-//     const baseVariables = mapContextToBaseVariables(resolutionContextData); // Uses updated mapContextToBaseVariables
-
-//     const analyzerVariables: InputAnalyzerPromptVariables = {
-//         ...baseVariables,
-//         userPrompt: baseVariables.userMessage, // Gets from baseVariables
-//         referencedFiles: resolutionContextData.referencedFiles || [] // Gets directly from resolutionContextData (from FlowContext state)
-//     };
-//     return analyzerVariables;
-// }
-
-// No changes needed in buildConversationVariables, as it already accesses keys expected in resolutionContextData
-// function buildConversationVariables(resolutionContextData: Record<string, any>): ConversationPromptVariables {
-//     const baseVariables = mapContextToBaseVariables(resolutionContextData); // Uses updated mapContextToBaseVariables
-
-//     const conversationVariables: ConversationPromptVariables = {
-//         ...baseVariables,
-//         recentMessages: baseVariables.chatHistory, // Gets from baseVariables
-//         summary: resolutionContextData.summary ? `Conversation Summary: ${resolutionContextData.summary}` // Gets from ConvContext via resolutionContextData
-//                  : (baseVariables.projectContext ? `Project Context: ${JSON.stringify(baseVariables.projectContext, null, 2)}` : "No specific context available.")
-//     };
-//     return conversationVariables;
-// }
-
-// No changes needed in buildCodeValidatorVariables, as it uses mapContextToBaseVariables and accesses expected keys
-// function buildCodeValidatorVariables(resolutionContextData: Record<string, any>): CodeValidatorPromptVariables {
-//     const baseVariables = mapContextToBaseVariables(resolutionContextData); // Uses updated mapContextToBaseVariables
-
-//     const validatorVariables: CodeValidatorPromptVariables = {
-//         ...baseVariables,
-//         proposedChanges: resolutionContextData.proposedChanges || [], // Gets from FlowContext state via resolutionContextData
-//         originalCode: resolutionContextData.activeEditorContent // Gets from SessionContext via resolutionContextData
-//     };
-//     return validatorVariables;
-// }
-
-
+// Update buildPromptVariables to handle the new planner variables builder
 function buildPromptVariables(type: PromptType, resolutionContextData: Record<string, any>): PromptVariables {
   const definition = PROMPT_DEFINITIONS[type];
   if (!definition) {
     throw new Error(`No prompt definition found for type: ${type}`);
   }
-  // Pass the resolution context data to the specific buildVariables function
-  return definition.buildVariables(resolutionContextData);
+
+  // If the prompt type is 'planner', the buildVariables function needs access to ToolRunner and PROMPT_DEFINITIONS
+  // We can pass them here, or modify buildPlannerVariables to import them directly.
+  // Let's modify buildPlannerVariables to import ToolRunner and access PROMPT_DEFINITIONS via closure/export.
+  // The current implementation of buildPlannerVariables imports ToolRunner and assumes PROMPT_DEFINITIONS is available in its scope.
+  // To make PROMPT_DEFINITIONS available, we can export it or pass it. Passing is cleaner.
+  // Let's update buildPlannerVariables signature and call site.
+
+  // Refactored buildPromptVariables to pass necessary dependencies to specific builders if needed
+   if (type === 'planner') {
+       // buildPlannerVariables needs ToolRunner and PROMPT_DEFINITIONS
+       // We can pass them explicitly, or modify buildPlannerVariables to import ToolRunner
+       // and access PROMPT_DEFINITIONS via an exported getter or similar.
+       // Let's modify buildPlannerVariables to import ToolRunner and use a getter for PROMPT_DEFINITIONS.
+       // This keeps the signature consistent.
+       return definition.buildVariables(resolutionContextData); // buildPlannerVariables will handle its dependencies
+   } else {
+       // Other builders just need the resolution context data
+       return definition.buildVariables(resolutionContextData);
+   }
 }
 
+// Add a getter for PROMPT_DEFINITIONS so buildPlannerVariables can access it
+export function getPromptDefinitions(): Partial<Record<PromptType, PromptDefinition<any>>> {
+    return PROMPT_DEFINITIONS;
+}
+
+
 function fillPromptTemplate(template: string, variables: PromptVariables): string {
+  // This function remains largely the same, it takes the template and the built variables
+  // and performs the substitution. The logic for dynamic placeholders {{prefix:.*}}
+  // and static placeholders {{key}} should handle the structure of `variables`
+  // which is derived from the resolution context.
+
   let filledTemplate = template;
-  for (const [key, value] of Object.entries(variables)) {
-    const placeholder = `{{${key}}}`;
-    // Ensure value is converted to string safely for substitution
-    const stringValue = typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || value === null || value === undefined
-      ? String(value)
-      : JSON.stringify(value, null, 2); // Safely stringify objects/arrays
 
-    // Replace all occurrences, escape $ for replace
-    filledTemplate = filledTemplate.replace(
-      new RegExp(placeholder.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'g'), // Escape regex special chars
-      stringValue.replace(/\$/g, '$$$$') // Escape $ for replace
-    );
-  }
-
-  // Handle dynamic placeholders like {{prefix:.*}}
-  // This logic seems specific to fileContent and searchResults based on the original implementation.
-  // It iterates through variables and finds keys starting with the prefix, then formats them.
+  // First, handle dynamic placeholders like {{prefix:.*}}
+  // This logic iterates through the *template* to find dynamic placeholders
+  // and then looks for corresponding keys in the *variables* object.
   const dynamicPlaceholderRegex = /\{\{(\w+):.\*\}}/g;
   let match;
   let lastIndex = 0;
@@ -152,18 +115,24 @@ function fillPromptTemplate(template: string, variables: PromptVariables): strin
       if (relevantDynamicVariables.length > 0) {
           const dynamicContent = relevantDynamicVariables
               .map(([key, value]) => {
-                  const contentString = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+                  // Safely stringify complex values
+                  const contentString = typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || value === null || value === undefined
+                    ? String(value)
+                    : JSON.stringify(value, null, 2);
+
                   const originalKey = key.substring(prefix.length + 1); // Get the part after the prefix
                   // Try to infer language for code block based on originalKey (filepath)
                   const codeBlockLang = prefix === 'fileContent' ? originalKey.split('.').pop() : '';
 
+                  // Format the dynamic content block
                   return `### ${prefix.replace(/([A-Z])/g, ' $1').trim()} for ${originalKey}:\n\n${codeBlockLang ? '```' + codeBlockLang + '\n' : ''}${contentString}${codeBlockLang ? '\n```' : ''}\n`;
               })
               .join('\n---\n'); // Separator between dynamic content blocks
 
           output += dynamicContent;
-          // Adjust lastIndex based on how much we added, though regex lastIndex is based on template match
-          // A more robust way would be to build the string piece by piece as done here.
+          // No need to adjust lastIndex based on added content length here,
+          // as we are building a new string 'output' and lastIndex tracks
+          // position in the original 'template'.
       } else {
           // If no dynamic variables found for the placeholder, output nothing or a marker
           // output += `[No ${prefix} found]`; // Or just nothing
@@ -171,17 +140,20 @@ function fillPromptTemplate(template: string, variables: PromptVariables): strin
   }
   output += template.substring(lastIndex); // Add remaining part of the template
 
-  // Now, replace static placeholders {{key}} in the output
+
+  // Second, handle static placeholders {{key}} in the generated output string
    let finalOutput = output;
    for (const [key, value] of Object.entries(variables)) {
-       // Skip dynamic keys that were handled above
+       // Skip keys that were already handled by dynamic placeholders (they start with a prefix and ':')
        if (key.includes(':')) continue;
 
        const placeholder = `{{${key}}}`;
+       // Safely stringify complex values
        const stringValue = typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || value === null || value === undefined
          ? String(value)
          : JSON.stringify(value, null, 2);
 
+       // Replace all occurrences, escape regex special chars and $ for replace
        finalOutput = finalOutput.replace(
          new RegExp(placeholder.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'g'),
          stringValue.replace(/\$/g, '$$$$')
@@ -189,8 +161,8 @@ function fillPromptTemplate(template: string, variables: PromptVariables): strin
    }
 
 
-   // Remove any remaining unresolved static placeholders if any, though buildVariables should provide all required
-   finalOutput = finalOutput.replace(/\{\{.*?\}\}/g, '');
+   // Optional: Remove any remaining unresolved static placeholders if any, though buildVariables should provide all required
+   // finalOutput = finalOutput.replace(/\{\{.*?\}\}/g, '');
 
 
   return finalOutput;
@@ -199,7 +171,7 @@ function fillPromptTemplate(template: string, variables: PromptVariables): strin
 
 export async function executeModelInteraction<T = any>(
   type: PromptType,
-  // Now accepts the resolution context data generated by FlowContext
+  // Accepts the resolution context data generated by FlowContext
   resolutionContextData: Record<string, any>
 ): Promise<T> {
   if (!_modelManager) {
@@ -214,9 +186,13 @@ export async function executeModelInteraction<T = any>(
   // Build variables using the provided resolution context data
   const variables = buildPromptVariables(type, resolutionContextData);
   const filledPrompt = fillPromptTemplate(definition.template, variables);
+
+  // Use parseModelResponse to handle JSON extraction based on prompt type
   const rawResponse = await _modelManager.sendPrompt(filledPrompt);
   return parseModelResponse<T>(type, rawResponse);
 }
+
+// ... (changeModel, getCurrentModel, abortModelRequest, disposePromptSystem remain the same)
 
 export async function changeModel(modelType: ModelType): Promise<void> {
   if (!_modelManager) {

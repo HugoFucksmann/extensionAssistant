@@ -84,8 +84,8 @@ export type PromptType =
   | 'conversationResponder'
   | 'explainCodePrompt'
   | 'fixCodePrompt'
-  | 'codeValidator'; // Added codeValidator as it was mentioned in fixCodeHandler
-
+  | 'codeValidator'
+  |'planner';
 // --- Standardized Prompt Variable Interfaces ---
 
 /** Base interface for common variables available to most prompts. */
@@ -107,7 +107,7 @@ export interface BasePromptVariables {
  */
 export interface PromptDefinition<T extends BasePromptVariables = BasePromptVariables> {
     template: string;
-    buildVariables: (contextData: Record<string, any>) => T;
+    buildVariables: (resolutionContextData: Record<string, any>) => T;
 }
 
 // --- Tool Parameter Interfaces ---
@@ -149,3 +149,9 @@ export type ToolParams =
   | ProjectGetProjectInfoParams
   | ProjectSearchWorkspaceParams
   | CodeManipulationApplyWorkspaceEditParams;
+
+  // Import the PlannerResponse type structure
+import { PlannerResponse } from '../../models/prompts/intentions/prompt.planner';
+
+// Export the PlannerResponse type
+export { PlannerResponse };
