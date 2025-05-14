@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { ConfigurationManager } from '../../config/ConfigurationManager';
 import { getHtmlContent } from './htmlTemplate';
 import { ChatService } from '../../services/chatService';
-import { OrchestratorService } from '../../services/orchestratorService';
+
 import { FileSystemService } from '../../services/fileSystemService';
 
 export class WebviewProvider implements vscode.WebviewViewProvider {
@@ -13,7 +13,6 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     private readonly extensionUri: vscode.Uri,
     private readonly configManager: ConfigurationManager,
     private readonly chatService: ChatService,
-    private readonly orchestrator: OrchestratorService,
     private readonly fileSystemService: FileSystemService
   ) {}
 

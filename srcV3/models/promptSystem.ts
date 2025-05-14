@@ -2,6 +2,8 @@ import { PromptDefinition, PromptType, PromptVariables, BasePromptVariables } fr
 import { inputAnalyzerPrompt, buildInputAnalyzerVariables, codeValidatorPrompt, buildCodeValidatorVariables } from './prompts';
 import { explainCodePrompt } from './prompts/intentions/prompt.explainCode';
 import { fixCodePrompt } from './prompts/intentions/prompt.fixCode';
+import { conversationPrompt } from './prompts/intentions/prompt.conversation';
+import { buildConversationVariables } from './prompts/intentions/prompt.conversation';
 import { ModelManager } from './config/ModelManager';
 import { ModelType } from './config/types';
 import { parseModelResponse } from './config/modelUtils';
@@ -10,7 +12,8 @@ const PROMPT_DEFINITIONS: Partial<Record<PromptType, PromptDefinition<any>>> = {
   inputAnalyzer: { template: inputAnalyzerPrompt, buildVariables: buildInputAnalyzerVariables },
   codeValidator: { template: codeValidatorPrompt, buildVariables: buildCodeValidatorVariables },
   explainCodePrompt: { template: explainCodePrompt, buildVariables: mapContextToBaseVariables },
-  fixCodePrompt: { template: fixCodePrompt, buildVariables: mapContextToBaseVariables }
+  fixCodePrompt: { template: fixCodePrompt, buildVariables: mapContextToBaseVariables },
+  conversationResponder: { template: conversationPrompt, buildVariables: buildConversationVariables }
 };
 
 let _modelManager: ModelManager | null = null;
