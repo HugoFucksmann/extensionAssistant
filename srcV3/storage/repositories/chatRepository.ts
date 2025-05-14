@@ -19,20 +19,28 @@ export class ChatRepository implements IChatRepository {
    * Initialize chat tables
    */
   private initializeTable(): void {
+    console.log('[DEBUG] Initializing database tables');
+    const outputChannel = vscode.window.createOutputChannel('DB Init Debug');
+    outputChannel.appendLine('Starting table initialization');
     this.db.serialize(() => {
+      // Force drop and recreate tables
+      this.db.run('DROP TABLE IF EXISTS messages');
+      this.db.run('DROP TABLE IF EXISTS chats');
+      
       // Create chats table
       this.db.run(`
-        CREATE TABLE IF NOT EXISTS chats (
+        CREATE TABLE chats (
           id TEXT PRIMARY KEY,
           title TEXT NOT NULL,
           timestamp INTEGER NOT NULL,
           preview TEXT
         )
       `);
+      outputChannel.appendLine('Chats table initialized');
       
       // Create messages table
       this.db.run(`
-        CREATE TABLE IF NOT EXISTS messages (
+        CREATE TABLE messages (
           id TEXT PRIMARY KEY,
           chat_id TEXT NOT NULL,
           content TEXT NOT NULL,
@@ -41,6 +49,8 @@ export class ChatRepository implements IChatRepository {
           FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE
         )
       `);
+      outputChannel.appendLine('Messages table initialized');
+      outputChannel.appendLine('Table initialization complete');
     });
   }
   

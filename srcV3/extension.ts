@@ -4,8 +4,9 @@ import { ConfigurationManager } from './config/ConfigurationManager';
 import { initializePromptSystem } from './models/promptSystem';
 import { ModelManager } from './models/config/ModelManager';
 import { ChatService } from './services/chatService';
-import { Orchestrator } from './orchestrator/orchestrator'; // Update import statement
+import { Orchestrator } from './orchestrator/orchestrator'; 
 import { FileSystemService } from './services/fileSystemService';
+import { DatabaseManager } from './storage/database/DatabaseManager';
 
 
 export function activate(context: vscode.ExtensionContext) {
@@ -14,7 +15,7 @@ export function activate(context: vscode.ExtensionContext) {
   initializePromptSystem(modelManager);
 
   const fileSystemService = new FileSystemService();
-  const orchestrator = new Orchestrator(); // Replace OrchestratorService with Orchestrator
+  const orchestrator = new Orchestrator(); 
   const chatService = new ChatService(context, modelManager, orchestrator);
   const webview = new WebviewProvider(context.extensionUri, config, chatService, fileSystemService);
   
@@ -51,6 +52,21 @@ export function activate(context: vscode.ExtensionContext) {
       const newModel = current === 'ollama' ? 'gemini' : 'ollama';
       await modelManager.setModel(newModel);
       webview.updateModel(newModel);
+    }),
+
+    // Register reset command
+    vscode.commands.registerCommand('extension.resetDatabase', async () => {
+      try {
+        const dbManager = DatabaseManager.getInstance(context);
+        await dbManager.resetDatabase();
+        
+        vscode.window.showInformationMessage('Database reset successfully!');
+      } catch (error) {
+        console.error('[Database Reset Error]', error);
+        vscode.window.showErrorMessage(
+          `Database reset failed: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
     })
   );
 
