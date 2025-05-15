@@ -6,7 +6,7 @@ import { ModelManager } from './models/config/ModelManager';
 import { ChatService } from './services/chatService';
 import { Orchestrator } from './orchestrator/orchestrator';
 import { FileSystemService } from './services/fileSystemService'; // Keep for now, will refactor in Stage 2
-import { DatabaseManager } from './storage/database/DatabaseManager';
+import { DatabaseManager } from './store/database/DatabaseManager';
 
 // Import new context classes
 import { GlobalContext, SessionContext, ConversationContext, FlowContext } from './orchestrator/context';

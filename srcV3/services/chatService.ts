@@ -1,7 +1,8 @@
+// src/services/ChatService.ts
 import * as vscode from 'vscode';
-import { IChatRepository } from '../storage/interfaces/IChatRepository';
-import { ChatRepository } from '../storage/repositories/chatRepository';
-import { Chat, ChatMessage } from '../storage/interfaces/entities';
+import { IChatRepository } from '../store/interfaces/IChatRepository';
+import { ChatRepository } from '../store/repositories/chatRepository';
+import { Chat, ChatMessage } from '../store/interfaces/entities';
 import { ModelManager } from '../models/config/ModelManager';
 import { Orchestrator } from '../orchestrator/orchestrator';
 // Remove getProjectInfo import if sessionContext handles it or orchestrator gets it

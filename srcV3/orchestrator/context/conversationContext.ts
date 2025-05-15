@@ -1,6 +1,6 @@
 // src/orchestrator/context/conversationContext.ts
 import { SessionContext } from './sessionContext';
-import { ChatMessage } from '../../storage/interfaces/entities';
+import { ChatMessage } from '../../store/interfaces/entities';
 import { FlowContext } from './flowContext';
 
 interface ConversationContextState {

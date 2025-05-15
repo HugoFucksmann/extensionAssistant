@@ -1,0 +1,13 @@
+{
+  "material-icon-theme.folders.associations": {
+    "orchestrator": "update",
+    "prompts": "markdown",
+    "execution": "scripts",
+    "intentions": "tools",
+    "react": "react-components",
+    "webview": "views",
+    "handlers": "Stack",
+    "srcV3": "SRC"
+  },
+  "material-icon-theme.folders.theme": "specific"
+}
