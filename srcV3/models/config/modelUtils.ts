@@ -1,136 +1,184 @@
 // src/models/config/modelUtils.ts
+// Assuming this file contains utility functions for model interactions
 
-// Import PromptType and InputAnalysisResult from types.ts
-import { PromptType, InputAnalysisResult } from '../../orchestrator/execution/types';
+import { PromptType, InputAnalysisResult, PlannerResponse, StepResult, FixCodePlannerResponse, EditingPromptResponse, ProjectManagementParamsFormatterResponse } from "../../orchestrator/execution/types"; // Import ProjectManagementParamsFormatterResponse
 
 /**
- * Extracts valid JSON content from a text response, even if it's surrounded
- * by additional text or enclosed in triple quotes.
- *
- * @param text Full response text
- * @param defaultValue Default value if JSON can't be extracted or parsed
- * @returns Extracted JSON object or default value
+ * Parses the raw string response from the model based on the prompt type.
+ * This function needs logic to understand the expected format for each PromptType.
+ * @param promptType The type of prompt that was sent.
+ * @param rawResponse The raw string response from the model.
+ * @returns The parsed result, which might be a JSON object or a string.
+ * @throws Error if parsing fails critically or the format is invalid for critical types.
  */
-export function extractJsonFromText<T>(text: string, defaultValue: T): T {
-  if (!text || typeof text !== 'string') {
-    return defaultValue;
-  }
+export function parseModelResponse<T = any>(promptType: PromptType, rawResponse: string): T {
+    console.log(`[ModelUtils] Parsing response for prompt type '${promptType}'`); // Reduced logging of raw response
 
-  const cleanedText = text.trim();
-
-  try {
-    const parsed = JSON.parse(cleanedText);
-    if (typeof parsed === 'object' && parsed !== null) {
-      return parsed as T;
-    }
-    console.warn("[extractJsonFromText] Direct parse resulted in a primitive, not an object/array.");
-  } catch (e) {}
-
-  const tripleQuotesRegex = /```(?:json)?\s*([\s\S]*?)\s*```/;
-  const tripleQuotesMatch = cleanedText.match(tripleQuotesRegex);
-
-  if (tripleQuotesMatch && tripleQuotesMatch[1]) {
     try {
-      const parsed = JSON.parse(tripleQuotesMatch[1]);
-      if (typeof parsed === 'object' && parsed !== null) {
-        return parsed as T;
-      }
-      console.warn("[extractJsonFromText] JSON inside triple quotes parsed to a primitive.");
-    } catch (e) {
-      console.warn("[extractJsonFromText] Failed to parse JSON inside triple quotes:", e);
+        switch (promptType) {
+            case 'inputAnalyzer':
+                // Input Analyzer is expected to return a JSON object matching InputAnalysisResult
+                const analysisResult = parseJsonSafely<InputAnalysisResult>(rawResponse);
+                if (!analysisResult || typeof analysisResult.intent !== 'string' || typeof analysisResult.objective !== 'string' || typeof analysisResult.extractedEntities !== 'object') {
+                     console.warn(`[ModelUtils] Input Analyzer response did not match expected structure for JSON:`, rawResponse);
+                     // Return a default 'unknown' analysis result on parse failure
+                     return {
+                          intent: 'unknown',
+                          objective: 'Analysis failed',
+                          extractedEntities: {},
+                          confidence: 0.1,
+                          error: 'Model response parsing failed or invalid structure'
+                     } as T;
+                }
+                // Ensure extractedEntities keys are arrays if they exist
+                if (analysisResult.extractedEntities) {
+                     Object.keys(analysisResult.extractedEntities).forEach(key => {
+                         if (!Array.isArray((analysisResult.extractedEntities as any)[key])) {
+                              console.warn(`[ModelUtils] Input Analyzer extractedEntities key '${key}' is not an array. Setting to empty array.`);
+                              (analysisResult.extractedEntities as any)[key] = [];
+                         }
+                     });
+                }
+                // Ensure confidence is a number
+                if (typeof analysisResult.confidence !== 'number' || analysisResult.confidence < 0 || analysisResult.confidence > 1) {
+                     console.warn(`[ModelUtils] Input Analyzer confidence is not a valid number (0-1). Setting to 0.1.`);
+                     analysisResult.confidence = 0.1;
+                }
+
+                return analysisResult as T;
+
+            case 'planner': // General Planner
+            case 'fixCodePlanner': // Fix Code Agent's Planner
+                // Both planners are expected to return a JSON object matching PlannerResponse (or FixCodePlannerResponse, which is the same structure)
+                const plannerResponse = parseJsonSafely<PlannerResponse>(rawResponse); // Use PlannerResponse interface for parsing
+                 if (!plannerResponse || typeof plannerResponse.action !== 'string' || typeof plannerResponse.reasoning !== 'string') {
+                      const errorMsg = `Planner response (${promptType}) did not match expected structure.`;
+                      console.error(`[ModelUtils] ${errorMsg} Raw:`, rawResponse);
+                       // Throw an error for critical parsing failures like planners
+                      throw new Error(errorMsg);
+                 }
+                return plannerResponse as T;
+
+            case 'codeValidator':
+                 // Code Validator is expected to return a JSON object like { isValid: boolean, error?: string }
+                 const validationResult = parseJsonSafely<{ isValid: boolean; error?: string }>(rawResponse);
+                 if (!validationResult || typeof validationResult.isValid !== 'boolean') {
+                      console.warn(`[ModelUtils] Code Validator response did not match expected structure for JSON:`, rawResponse);
+                       // Return a default invalid result on parse failure
+                      return { isValid: false, error: "Model response parsing failed or invalid structure" } as T;
+                 }
+                 return validationResult as T;
+
+            case 'editingPrompt': // Editing prompt expects WorkspaceEdit JSON
+                 const editingResponse = parseJsonSafely<EditingPromptResponse>(rawResponse);
+                 // Basic validation: check if it's an object and has documentChanges or changes (optional)
+                 // An empty edit {} or { documentChanges: [] } is valid, so we check if it's an object.
+                 if (editingResponse === null || typeof editingResponse !== 'object') {
+                      const errorMsg = `Editing prompt response did not return a valid JSON object.`;
+                      console.warn(`[ModelUtils] ${errorMsg} Raw:`, rawResponse);
+                      // Return null or an empty edit object to indicate failure/no edits
+                      return null as T; // Agent should handle null/empty edit results
+                 }
+                 // TODO: More thorough validation of the WorkspaceEdit structure if needed
+                 return editingResponse as T;
+
+            case 'projectManagementParamsFormatter': // New: Project Management Params Formatter expects JSON
+                 const paramsResponse = parseJsonSafely<ProjectManagementParamsFormatterResponse>(rawResponse);
+                 // Basic validation: check if it's an object
+                 if (paramsResponse === null || typeof paramsResponse !== 'object') {
+                      const errorMsg = `Project Management Params Formatter response did not return a valid JSON object.`;
+                      console.warn(`[ModelUtils] ${errorMsg} Raw:`, rawResponse);
+                      // Return null or an empty object to indicate failure/no params
+                      return null as T; // Agent should handle null/empty param results
+                 }
+                 // TODO: More specific validation based on the *expected* tool parameters if possible
+                 return paramsResponse as T;
+
+
+            case 'conversationResponder':
+            case 'explainCodePrompt':
+            case 'fixCodePrompt': // fixCodePrompt might return JSON with proposedCode, or just a string message
+            case 'searchResultsFormatter':
+            case 'examinationResultsFormatter':
+                 // These prompts are likely expected to return a string or a simple object containing a string message.
+                 // The exact format depends on the prompt template instructions.
+                 // Attempt JSON parsing first, then fall back to raw string.
+                 try {
+                     const jsonResult = JSON.parse(rawResponse);
+                     // console.log(`[ModelUtils] Parsed JSON for ${promptType}:`, jsonResult); // Log parsed JSON
+                     // You might add checks here for specific keys expected by the agent
+                     // e.g., if (promptType === 'fixCodePrompt' && typeof jsonResult.proposedCode === 'string') return jsonResult;
+                     // For now, return the parsed JSON object if successful.
+                     return jsonResult as T;
+                 } catch (jsonError) {
+                     // console.log(`[ModelUtils] Could not parse JSON for ${promptType}, returning raw string.`); // Log fallback
+                     // If JSON parsing fails, assume the raw response is the intended string content
+                     return rawResponse as T;
+                 }
+
+            case 'consoleCommandFormatter':
+                 // This prompt is expected to return a simple string (the command)
+                 // It might sometimes output JSON if the model misunderstands,
+                 // but the primary expectation is a string.
+                 // Let's return the raw string directly, trimming whitespace.
+                 return rawResponse.trim() as T;
+
+
+            // TODO: Add parsing logic for other prompt types as they are added
+
+            default:
+                // Default behavior: attempt JSON parsing, otherwise return raw string
+                try {
+                    const jsonResult = JSON.parse(rawResponse);
+                    // console.log(`[ModelUtils] Default parsing (JSON) for ${promptType}:`, jsonResult); // Log default JSON parse
+                    return jsonResult as T;
+                } catch (e) {
+                    // console.log(`[ModelUtils] Default parsing (raw string) for ${promptType}.`); // Log default raw parse
+                    return rawResponse as T;
+                }
+        }
+    } catch (error) {
+        // Catch errors thrown by specific parsing cases (like planner) or unexpected errors
+        console.error(`[ModelUtils] Error during parsing for prompt type '${promptType}':`, error);
+        // Re-throw the error so the StepExecutor/Agent can handle it
+        throw error;
     }
-  }
-
-  const jsonRegex = /(\{[\s\S]*?\})/g;
-  let match;
-  let lastAttemptedJson: string | undefined;
-  while ((match = jsonRegex.exec(cleanedText)) !== null) {
-    try {
-      lastAttemptedJson = match[1];
-      const parsed = JSON.parse(lastAttemptedJson);
-      if (typeof parsed === 'object' && parsed !== null) {
-        console.warn("[extractJsonFromText] Successfully extracted JSON from text (not in markdown).");
-        return parsed as T;
-      }
-      console.warn("[extractJsonFromText] JSON extracted from text parsed to a primitive.");
-    } catch (e) {}
-  }
-
-  console.warn("[extractJsonFromText] No valid JSON object found or extracted from text.");
-  if (lastAttemptedJson) {
-    console.warn("[extractJsonFromText] Last failed JSON parse attempt:", lastAttemptedJson);
-  }
-  return defaultValue;
 }
 
 /**
- * Parses a model response based on the prompt type used to generate it.
- *
- * @param type Type of prompt used to generate the response
- * @param rawResponse Raw model response
- * @returns Processed response according to prompt type
+ * Safely attempts to parse a JSON string.
+ * @param jsonString The string to parse.
+ * @returns The parsed object or null if parsing fails.
  */
-export function parseModelResponse<T = any>(type: PromptType, rawResponse: string): T {
-  const cleanedResponse = rawResponse.trim();
+function parseJsonSafely<T>(jsonString: string): T | null {
+    try {
+        // Attempt to clean up common JSON issues like trailing commas or comments
+        // This is a basic attempt; a more robust solution might use a library.
+        let cleanedString = jsonString.trim();
 
-  switch (type) {
-    case 'inputAnalyzer':
-      return extractJsonFromText<InputAnalysisResult>(cleanedResponse, {
-        intent: 'unknown',
-        objective: 'Parsing failed',
-        extractedEntities: {
-          filesMentioned: [],
-          functionsMentioned: [],
-          errorsMentioned: [],
-          customKeywords: []
-        },
-        confidence: 0,
-        error: 'Failed to parse model response JSON'
-      } as InputAnalysisResult) as T;
-
-    case 'explainCodePrompt':
-      return extractJsonFromText<any>(cleanedResponse, {
-        explanation: "Sorry, I couldn't generate the explanation.",
-        error: 'Failed to parse explanation JSON'
-      }) as T;
-
-    case 'fixCodePrompt':
-      return extractJsonFromText<any>(cleanedResponse, {
-        messageToUser: "Sorry, I couldn't generate a fix proposal.",
-        proposedChanges: [],
-        error: 'Failed to parse fix proposal JSON'
-      }) as T;
-
-    case 'codeValidator':
-      return extractJsonFromText<any>(cleanedResponse, {
-        isValid: false,
-        feedback: "Sorry, I couldn't validate the fix proposal.",
-        error: 'Failed to parse validation JSON'
-      }) as T;
-
-    case 'conversationResponder':
-      try {
-        const jsonResponse = extractJsonFromText<any>(cleanedResponse, null);
-        if (jsonResponse && typeof jsonResponse.messageToUser === 'string') {
-          return jsonResponse.messageToUser as T;
+        // Remove leading/trailing code block markers if present
+        if (cleanedString.startsWith('```json')) {
+            cleanedString = cleanedString.substring('```json'.length);
+            if (cleanedString.endsWith('```')) {
+                cleanedString = cleanedString.substring(0, cleanedString.length - '```'.length);
+            }
+        } else if (cleanedString.startsWith('```')) {
+             cleanedString = cleanedString.substring('```'.length);
+             if (cleanedString.endsWith('```')) {
+                 cleanedString = cleanedString.substring(0, cleanedString.length - '```'.length);
+             }
         }
-        if (jsonResponse !== null) {
-          console.warn(`[parseModelResponse] Conversation JSON found but no 'messageToUser' key:`, jsonResponse);
-        }
-      } catch (e) {}
 
-      let textResponse = cleanedResponse;
-      textResponse = textResponse.replace(/```[\s\S]*?```/g, '').trim();
-      textResponse = textResponse.replace(/^#+\s.*$/gm, '').trim();
-      return textResponse as T;
 
-    default:
-      try {
-        const jsonResponse = extractJsonFromText<any>(cleanedResponse, null);
-        if (jsonResponse && typeof jsonResponse === 'object') {
-          return jsonResponse as T;
-        }
-      } catch (e) {}
-      return cleanedResponse as T;
-  }
+        // Basic attempt to remove trailing commas before closing braces/brackets
+        cleanedString = cleanedString.replace(/,\s*([\]}])/g, '$1');
+         // Basic attempt to remove comments (single line //) - be cautious with strings
+         cleanedString = cleanedString.split('\n').filter(line => !line.trim().startsWith('//')).join('\n');
+
+
+        return JSON.parse(cleanedString) as T;
+    } catch (e) {
+        console.error('[ModelUtils] JSON parse failed:', e, 'Raw string:', jsonString);
+        return null;
+    }
 }

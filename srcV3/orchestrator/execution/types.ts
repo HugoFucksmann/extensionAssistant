@@ -1,9 +1,19 @@
+// src/orchestrator/execution/types.ts
+
 import * as vscode from 'vscode';
+import { FlowContext } from '../context/flowContext';
+import { StepExecutor } from './stepExecutor';
+import { TerminalRunCommandParams as TerminalRunCommandParamsImport } from '../../tools/terminal/runCommand';
+import { FilesystemCreateFileParams as FilesystemCreateFileParamsImport } from '../../tools/filesystem/createFile'; // Import new tool params
+import { FilesystemCreateDirectoryParams as FilesystemCreateDirectoryParamsImport } from '../../tools/filesystem/createDirectory'; // Import new tool params
+import { ProjectInstallDependenciesParams as ProjectInstallDependenciesParamsImport } from '../../tools/project/installDependencies'; // Import new tool params
+import { ProjectAddDependencyParams as ProjectAddDependencyParamsImport } from '../../tools/project/addDependency'; // Import new tool params
+
 
 export type PromptVariables = Record<string, any>;
 
 export interface InputAnalysisResult {
-  intent: 'conversation' | 'explainCode' | 'fixCode' | 'unknown';
+  intent: 'conversation' | 'explainCode' | 'fixCode' | 'unknown' | 'search' | 'console' | 'editing' | 'examination' | 'projectManagement'; // 'projectManagement' is here
   objective: string;
   extractedEntities: {
     filesMentioned: string[];
@@ -69,23 +79,46 @@ export interface IExecutor {
    * @param action The action identifier to check
    * @returns true if this executor can handle the action, false otherwise
    */
-  canExecute(action: string): boolean;
+   canExecute(action: string): boolean;
 }
+
+// --- New: Agent Interface ---
+/**
+ * Represents a specialized agent responsible for handling a specific intent.
+ * Agents receive the FlowContext and use the StepExecutor (provided in constructor)
+ * to run steps to fulfill their intent.
+ */
+export interface IAgent {
+    /**
+     * Executes the logic for this agent based on the FlowContext.
+     * @param flowContext The context for the current turn.
+     * @returns A Promise resolving to the final response content (string or any data).
+     */
+    execute(flowContext: FlowContext): Promise<string | any>;
+}
+
 
 // --- Updated PromptType ---
 // Define types for prompt system
 export type PromptType =
   | 'inputAnalyzer'
-  | 'editing' // Not used in provided code, but kept if part of broader system
-  | 'examination' // Not used
-  | 'projectManagement' // Not used
-  | 'projectSearch' // Not used
-  | 'resultEvaluator' // Not used
+  | 'editing' // Intent type
+  | 'examination' // Intent type
+  | 'projectManagement' // Intent type
+  | 'projectSearch' // Intent type (Note: SearchAgent handles this)
+  | 'resultEvaluator'
   | 'conversationResponder'
   | 'explainCodePrompt'
   | 'fixCodePrompt'
   | 'codeValidator'
-  | 'planner'; // Removed planningEngine alias
+  | 'planner' // General planner (used by UnknownIntentAgent)
+  | 'searchResultsFormatter'
+  | 'fixCodePlanner' // Agent-specific planner
+  | 'consoleCommandFormatter'
+  | 'editingPrompt'
+  | 'examinationResultsFormatter'
+  | 'projectManagementParamsFormatter'; // New prompt type
+
 
 // --- Standardized Prompt Variable Interfaces ---
 
@@ -119,7 +152,13 @@ export interface EditorGetActiveEditorContentParams { /* No parameters needed */
 export interface ProjectGetPackageDependenciesParams { projectPath: string; }
 export interface ProjectGetProjectInfoParams { /* No parameters needed */ }
 export interface ProjectSearchWorkspaceParams { query: string; }
-export interface CodeManipulationApplyWorkspaceEditParams { edits: vscode.WorkspaceEdit[]; }
+export interface CodeManipulationApplyWorkspaceEditParams { edits: vscode.WorkspaceEdit[]; } // Expects a VS Code WorkspaceEdit structure
+export type TerminalRunCommandParams = TerminalRunCommandParamsImport;
+export type FilesystemCreateFileParams = FilesystemCreateFileParamsImport; // Add new tool params
+export type FilesystemCreateDirectoryParams = FilesystemCreateDirectoryParamsImport; // Add new tool params
+export type ProjectInstallDependenciesParams = ProjectInstallDependenciesParamsImport; // Add new tool params
+export type ProjectAddDependencyParams = ProjectAddDependencyParamsImport; // Add new tool params
+
 
 // Union type for all tool parameters
 export type ToolParams =
@@ -129,10 +168,16 @@ export type ToolParams =
   | ProjectGetPackageDependenciesParams
   | ProjectGetProjectInfoParams
   | ProjectSearchWorkspaceParams
-  | CodeManipulationApplyWorkspaceEditParams;
+  | CodeManipulationApplyWorkspaceEditParams
+  | TerminalRunCommandParams
+  | FilesystemCreateFileParams // Add to union
+  | FilesystemCreateDirectoryParams // Add to union
+  | ProjectInstallDependenciesParams // Add to union
+  | ProjectAddDependencyParams; // Add to union
+
 
 /**
- * Defines the structure for variables specifically for the planner prompt.
+ * Defines the structure for variables specifically for the general planner prompt.
  * Extends BasePromptVariables.
  */
 export interface PlannerPromptVariables extends BasePromptVariables {
@@ -144,7 +189,7 @@ export interface PlannerPromptVariables extends BasePromptVariables {
 }
 
 /**
-* Defines the expected output structure for the planner prompt.
+* Defines the expected output structure for the general planner prompt.
 * This is the instruction the model receives on how to format its response.
 */
 export interface PlannerResponse {
@@ -154,4 +199,119 @@ export interface PlannerResponse {
   params?: Record<string, any>;
   storeAs?: string;
   reasoning: string;
+}
+
+// --- FixCodePlanner Specifics ---
+
+/**
+ * Defines the structure for variables specifically for the fixCodePlanner prompt.
+ * Extends BasePromptVariables and includes fix-code-specific context.
+ */
+export interface FixCodePlannerPromptVariables extends BasePromptVariables {
+    currentFlowState: Record<string, any>; // Full context state is useful
+    planningHistory: Array<{ action: string; result: any; error?: any; stepName: string }>; // History for this agent's steps
+    fixCodeIteration: number; // Current iteration within the fix process
+    // Add specific keys for easier access in the prompt template
+    originalCodeContent?: string; // The code being fixed
+    proposedFixResult?: any; // Result from the fixCodePrompt
+    validationResult?: any; // Result from the codeValidator
+    // Add other relevant context like errors, file paths, etc.
+    targetFilePath?: string; // The path of the file being fixed
+    analysisResult?: InputAnalysisResult; // Full analysis result
+}
+
+/**
+ * Defines the expected output structure for the fixCodePlanner prompt.
+ * Can reuse PlannerResponse structure or define a more specific one.
+ * Let's reuse PlannerResponse for consistency in action types ('tool', 'prompt', 'respond').
+ */
+export type FixCodePlannerResponse = PlannerResponse;
+
+// --- ConsoleCommandFormatter Specifics ---
+
+/**
+ * Defines the structure for variables specifically for the consoleCommandFormatter prompt.
+ * Extends BasePromptVariables and includes console-specific context.
+ */
+export interface ConsoleCommandFormatterPromptVariables extends BasePromptVariables {
+    // Add specific keys for easier access in the prompt template
+    commandObjective: string; // The specific task the command should achieve
+    // Include any extracted entities relevant to command parameters (e.g., package name, file name)
+    extractedEntities?: InputAnalysisResult['extractedEntities'];
+}
+
+// --- EditingPrompt Specifics ---
+
+/**
+ * Defines the structure for variables specifically for the editingPrompt.
+ * Extends BasePromptVariables and includes editing-specific context.
+ */
+export interface EditingPromptVariables extends BasePromptVariables {
+    editingObjective: string; // The specific task the edit should achieve
+    // Include relevant code content
+    codeContentToEdit?: string;
+    targetFilePath?: string; // The path of the file being edited
+    // Include any extracted entities relevant to the edit (e.g., function name, line number)
+    extractedEntities?: InputAnalysisResult['extractedEntities'];
+}
+
+/**
+ * Defines the expected output structure for the editingPrompt.
+ * This prompt is expected to return a JSON object that represents a vscode.WorkspaceEdit.
+ * The structure should match the JSON serialization of vscode.WorkspaceEdit.
+ */
+export interface EditingPromptResponse {
+    documentChanges?: Array<{
+        textDocument: { uri: string; version?: number };
+        edits: Array<{ range: { start: { line: number; character: number }; end: { line: number; character: number } }; newText: string }>;
+    }>;
+    changes?: Record<string, Array<{ range: { start: { line: number; character: number }; end: { line: number; character: number } }; newText: string }>>;
+}
+
+// --- ExaminationResultsFormatter Specifics ---
+
+/**
+ * Defines the structure for variables specifically for the examinationResultsFormatter prompt.
+ * Extends BasePromptVariables and includes examination-specific context.
+ */
+export interface ExaminationResultsFormatterPromptVariables extends BasePromptVariables {
+    examinationObjective: string; // The specific task the examination should achieve
+    // Include results from examination tools
+    projectInfoResult?: any; // Result from project.getProjectInfo
+    packageDependenciesResult?: any; // Result from project.getPackageDependencies
+    // Add other examination results here as tools are added (e.g., code analysis results)
+    // codeAnalysisResult?: any;
+}
+
+// --- ProjectManagementParamsFormatter Specifics ---
+
+/**
+ * Defines the structure for variables specifically for the projectManagementParamsFormatter prompt.
+ * Extends BasePromptVariables and includes project management-specific context.
+ */
+export interface ProjectManagementParamsFormatterVariables extends BasePromptVariables {
+    projectManagementObjective: string; // The specific task the project management action should achieve
+    // Include any extracted entities relevant to the action (e.g., file name, directory name, package name)
+    extractedEntities?: InputAnalysisResult['extractedEntities'];
+    // Include project context for deciding package manager, paths, etc.
+    projectContext?: any;
+    // Include any previous steps or context that helps determine parameters
+    // currentFlowState: Record<string, any>; // Could include full state if needed
+}
+
+/**
+ * Defines the expected output structure for the projectManagementParamsFormatter prompt.
+ * This prompt is expected to return a JSON object containing the parameters
+ * for a specific project management tool call.
+ * The structure will vary depending on the target tool.
+ * Example for creating a file: { "filePath": "src/utils/helper.js", "content": "// helper function\n" }
+ * Example for adding a dependency: { "packageName": "axios", "dev": false }
+ */
+export interface ProjectManagementParamsFormatterResponse {
+    // This needs to be flexible to match different tool parameter interfaces.
+    // Using Record<string, any> for flexibility, but the prompt instructions
+    // must be very clear about the expected keys/types for each *type* of action.
+    // A more advanced approach might involve the prompt returning the tool name *and* params.
+    // For now, let's assume the agent already knows *which* tool to call and just needs the params formatted.
+    [key: string]: any;
 }

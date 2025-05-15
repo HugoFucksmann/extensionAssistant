@@ -1,7 +1,7 @@
 // src/models/prompts/intentions/prompt.planner.ts
 
 import { BasePromptVariables, PlannerPromptVariables } from '../../../orchestrator/execution/types';
-import { ToolRunner } from '../../../tools'; // Assuming ToolRunner is in this path
+import { ToolRunner } from '../../../tools/core/toolRunner';
 
 import { mapContextToBaseVariables, getPromptDefinitions } from '../../promptSystem';
 

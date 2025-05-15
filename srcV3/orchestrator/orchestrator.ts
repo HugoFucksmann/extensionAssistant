@@ -3,16 +3,29 @@
 import { FlowContext, GlobalContext, SessionContext, ConversationContext } from './context';
 import { ExecutorFactory } from './execution/executorFactory';
 import { StepExecutor } from './execution/stepExecutor';
-import { ExecutionStep, PlannerResponse, StepResult } from './execution/types'; // Removed unused types
+import { ExecutionStep, PlannerResponse, StepResult, InputAnalysisResult } from './execution/types';
+import { IAgent } from './execution/types';
+
+// Import agent implementations
+import { ConversationAgent } from './agents/ConversationAgent';
+import { FixCodeAgent } from './agents/FixCodeAgent';
+import { ExplainCodeAgent } from './agents/ExplainCodeAgent';
+import { UnknownIntentAgent } from './agents/UnknownIntentAgent';
+import { SearchAgent } from './agents/SearchAgent';
+import { ConsoleAgent } from './agents/ConsoleAgent';
+import { EditingAgent } from './agents/EditingAgent';
+import { ExaminationAgent } from './agents/ExaminationAgent';
+import { ProjectManagementAgent } from './agents/ProjectManagementAgent'; // Import ProjectManagementAgent
+
 
 /**
- * Maximum number of planning iterations to prevent infinite loops.
+ * Maximum number of planning iterations for agents that use an internal loop (like UnknownIntentAgent and FixCodeAgent).
  */
-const MAX_PLANNING_ITERATIONS = 15;
+const MAX_AGENT_ITERATIONS = 15;
 
 /**
- * Main orchestrator that manages conversations and drives the incremental planning process.
- * Manages active ConversationContexts and executes steps based on planner prompt output.
+ * Main orchestrator that acts as a router based on initial intent analysis.
+ * Manages active ConversationContexts and delegates execution to specialized agents.
  */
 export class Orchestrator {
     private globalContext: GlobalContext;
@@ -20,14 +33,45 @@ export class Orchestrator {
     private activeConversations: Map<string, ConversationContext> = new Map();
 
     private stepExecutor: StepExecutor;
+    private agentRegistry: Map<InputAnalysisResult['intent'], (executor: StepExecutor) => IAgent>; // Registry for agents
 
     constructor(globalContext: GlobalContext, sessionContext: SessionContext) {
         this.globalContext = globalContext;
         this.sessionContext = sessionContext;
         const registry = ExecutorFactory.createExecutorRegistry();
         this.stepExecutor = new StepExecutor(registry);
-        // console.log('[Orchestrator] Initialized'); // Reduced logging
+
+        // Initialize the agent registry
+        this.agentRegistry = new Map();
+        this.registerAgents();
+
+        console.log('[Orchestrator] Initialized (Router Mode)');
     }
+
+    private registerAgents(): void {
+        // Register agents by the intent they handle
+        this.agentRegistry.set('conversation', (executor) => new ConversationAgent(executor));
+        // Pass MAX_AGENT_ITERATIONS to agents that use an internal loop
+        this.agentRegistry.set('fixCode', (executor) => new FixCodeAgent(executor, MAX_AGENT_ITERATIONS));
+        this.agentRegistry.set('explainCode', (executor) => new ExplainCodeAgent(executor));
+        this.agentRegistry.set('search', (executor) => new SearchAgent(executor));
+        this.agentRegistry.set('console', (executor) => new ConsoleAgent(executor));
+        this.agentRegistry.set('editing', (executor) => new EditingAgent(executor));
+        this.agentRegistry.set('examination', (executor) => new ExaminationAgent(executor));
+        this.agentRegistry.set('projectManagement', (executor) => new ProjectManagementAgent(executor)); // Register ProjectManagementAgent
+
+
+        // TODO: Register other agents here if needed (e.g., 'resultEvaluator')
+        // this.agentRegistry.set('resultEvaluator', (executor) => new ResultEvaluatorAgent(executor));
+
+
+        // Register the fallback agent for 'unknown' intent
+        this.agentRegistry.set('unknown', (executor) => new UnknownIntentAgent(executor, MAX_AGENT_ITERATIONS));
+
+
+        console.log('[Orchestrator] Registered agents for intents:', Array.from(this.agentRegistry.keys()));
+    }
+
 
     addConversationContext(convContext: ConversationContext): void {
         this.activeConversations.set(convContext.getChatId(), convContext);
@@ -46,30 +90,31 @@ export class Orchestrator {
     }
 
     /**
-     * Processes a user message by running the planning loop.
+     * Processes a user message by analyzing intent and delegating to the appropriate agent.
      * Receives the FlowContext for the current turn.
      */
     public async processUserMessage(flowContext: FlowContext): Promise<string | any> {
         const chatId = flowContext.getChatId();
         const userMessageText = flowContext.getValue<string>('userMessage') || '';
 
-        console.log(`[Orchestrator:${chatId}] Starting planning for: "${userMessageText.substring(0, 50)}..."`); // More concise log
+        console.log(`[Orchestrator:${chatId}] Starting processing for: "${userMessageText.substring(0, 50)}..."`);
 
-        let finalResponse: string | any = "Sorry, I couldn't complete the task.";
-        let planningIteration = 0;
+        let finalResponse: string | any = "Sorry, I couldn't understand your request.";
 
         // --- Step 1: Initial Input Analysis ---
+        // This step remains in the Orchestrator as it determines which agent to route to.
         if (!flowContext.getValue('analysisResult')) {
              const analyzeStep: ExecutionStep = {
                  name: 'analyzeUserInput',
                  type: 'prompt',
                  execute: 'inputAnalyzer',
-                 params: {},
+                 params: {}, // inputAnalyzer prompt uses the full context
                  storeAs: 'analysisResult'
              };
              console.log(`[Orchestrator:${chatId}] Running initial analysis...`);
              const analysisResultStep = await this.stepExecutor.runStep(analyzeStep, flowContext);
 
+             // Log analysis step to history
              const currentHistory = flowContext.getValue<Array<any>>('planningHistory') || [];
              currentHistory.push({
                  action: 'prompt:inputAnalyzer',
@@ -79,8 +124,10 @@ export class Orchestrator {
              });
              flowContext.setValue('planningHistory', currentHistory);
 
+
              if (!analysisResultStep.success || !analysisResultStep.result) {
-                 console.warn(`[Orchestrator:${chatId}] Initial analysis failed:`, analysisResultStep.error?.message); // More concise log
+                 console.warn(`[Orchestrator:${chatId}] Initial analysis failed:`, analysisResultStep.error?.message);
+                 // Set a default 'unknown' intent if analysis fails completely
                  if (!flowContext.getAnalysisResult()) {
                       flowContext.setValue('analysisResult', { intent: 'unknown', objective: 'Analysis failed', extractedEntities: {}, confidence: 0.1, error: analysisResultStep.error?.message || 'Analysis step failed' });
                  }
@@ -92,158 +139,50 @@ export class Orchestrator {
         }
 
         const initialAnalysis = flowContext.getAnalysisResult();
-        console.log(`[Orchestrator:${chatId}] Analysis Intent: ${initialAnalysis?.intent}, Objective: ${initialAnalysis?.objective}`); // Concise log
+        // Use 'unknown' as a fallback if analysisResult or intent is missing/malformed
+        const intent = initialAnalysis?.intent || 'unknown';
+        console.log(`[Orchestrator:${chatId}] Analysis Intent: ${intent}, Objective: ${initialAnalysis?.objective}`);
 
-        // --- Step 2: The Planning Loop ---
-        while (planningIteration < MAX_PLANNING_ITERATIONS) {
-            planningIteration++;
-            console.log(`[Orchestrator:${chatId}] Planning iteration ${planningIteration}`);
+        // --- Step 2: Route to Agent ---
+        const agentFactory = this.agentRegistry.get(intent);
 
-            flowContext.setValue('planningIteration', planningIteration);
+        if (!agentFactory) {
+             console.error(`[Orchestrator:${chatId}] No agent registered for intent: '${intent}'`);
+             finalResponse = `Sorry, I don't know how to handle requests related to "${intent}".`;
+              const currentHistory = flowContext.getValue<Array<any>>('planningHistory') || [];
+              currentHistory.push({
+                  action: 'routingError',
+                  stepName: 'agentRouting',
+                  result: { intent },
+                  error: new Error(`No agent found for intent: ${intent}`)
+              });
+              flowContext.setValue('planningHistory', currentHistory);
 
-            const plannerStep: ExecutionStep = {
-                name: `plannerStep:${planningIteration}`,
-                type: 'prompt',
-                execute: 'planner',
-                params: {},
-            };
-
-            let plannerResult: StepResult<PlannerResponse>;
-            let nextAction: PlannerResponse | undefined;
-
+        } else {
             try {
-                plannerResult = await this.stepExecutor.runStep(plannerStep, flowContext);
+                // Create the agent instance and execute it
+                const agent = agentFactory(this.stepExecutor);
+                console.log(`[Orchestrator:${chatId}] Routing to agent: ${agent.constructor.name} for intent '${intent}'`);
+                finalResponse = await agent.execute(flowContext);
+                console.log(`[Orchestrator:${chatId}] Agent ${agent.constructor.name} finished execution.`);
 
-                const currentHistory = flowContext.getValue<Array<any>>('planningHistory') || [];
-                 currentHistory.push({
-                     action: 'prompt:planner',
-                     stepName: plannerStep.name,
-                     result: plannerResult.result,
-                     error: plannerResult.error
-                 });
-                 flowContext.setValue('planningHistory', currentHistory);
-
-                if (!plannerResult.success || !plannerResult.result) {
-                    console.error(`[Orchestrator:${chatId}] Planner step failed or returned no result:`, plannerResult.error?.message);
-                    finalResponse = `Sorry, the planning process failed at iteration ${planningIteration}. Error: ${plannerResult.error?.message || 'Unknown error'}`;
-                    break;
-                }
-
-                nextAction = plannerResult.result;
-                console.log(`[Orchestrator:${chatId}] Planner decided action: '${nextAction.action}'`);
-
-            } catch (plannerError: any) {
-                 console.error(`[Orchestrator:${chatId}] UNEXPECTED Error during planner step:`, plannerError);
+            } catch (agentError: any) {
+                console.error(`[Orchestrator:${chatId}] Error during agent execution (${intent} agent):`, agentError);
+                finalResponse = `Sorry, an error occurred while trying to fulfill your request (${intent} task). Error: ${agentError.message}`;
                  const currentHistory = flowContext.getValue<Array<any>>('planningHistory') || [];
                  currentHistory.push({
-                     action: 'prompt:planner',
-                     stepName: `plannerStep:${planningIteration}`,
+                     action: 'agentExecutionError',
+                     stepName: `${intent}Agent`,
                      result: null,
-                     error: plannerError
+                     error: agentError
                  });
                  flowContext.setValue('planningHistory', currentHistory);
-
-                 finalResponse = `Sorry, an unexpected error occurred during planning at iteration ${planningIteration}. Error: ${plannerError.message}`;
-                 break;
-            }
-
-            // --- Step 3: Execute the decided action ---
-            if (!nextAction) {
-                 console.error(`[Orchestrator:${chatId}] Planner returned no valid action.`);
-                 finalResponse = `Sorry, the planner did not return a valid action at iteration ${planningIteration}.`;
-                 const currentHistory = flowContext.getValue<Array<any>>('planningHistory') || [];
-                 currentHistory.push({
-                     action: 'invalidPlannerOutput',
-                     stepName: `plannerStep:${planningIteration}`,
-                     result: plannerResult?.result,
-                     error: new Error("Planner returned null or undefined action")
-                 });
-                 flowContext.setValue('planningHistory', currentHistory);
-                 break;
-            }
-
-            if (nextAction.action === 'respond') {
-                finalResponse = nextAction.params?.messageToUser || "Task completed.";
-                console.log(`[Orchestrator:${chatId}] Planner decided to respond. Finalizing.`);
-                 const currentHistory = flowContext.getValue<Array<any>>('planningHistory') || [];
-                 currentHistory.push({
-                     action: 'respond',
-                     stepName: `respondStep:${planningIteration}`,
-                     result: { messageToUser: finalResponse },
-                     error: null
-                 });
-                 flowContext.setValue('planningHistory', currentHistory);
-                break;
-            } else if (nextAction.action === 'tool' || nextAction.action === 'prompt') {
-                const actionName = nextAction.toolName || nextAction.promptType;
-                if (!actionName) {
-                    console.error(`[Orchestrator:${chatId}] Planner decided '${nextAction.action}' but did not specify name.`);
-                    finalResponse = `Sorry, the planner decided to execute a step but didn't specify which one at iteration ${planningIteration}.`;
-                    const currentHistory = flowContext.getValue<Array<any>>('planningHistory') || [];
-                    currentHistory.push({
-                        action: nextAction.action,
-                        stepName: `executionError:${planningIteration}`,
-                        result: nextAction,
-                        error: new Error(`Action name missing for type ${nextAction.action}`)
-                    });
-                    flowContext.setValue('planningHistory', currentHistory);
-                    break;
-                }
-
-                const executionStep: ExecutionStep = {
-                    name: `${nextAction.action}Step:${planningIteration}:${actionName}`,
-                    type: nextAction.action,
-                    execute: actionName,
-                    params: nextAction.params || {},
-                    storeAs: nextAction.storeAs,
-                };
-
-                console.log(`[Orchestrator:${chatId}] Executing step: '${executionStep.name}'`);
-                const executionResult = await this.stepExecutor.runStep(executionStep, flowContext);
-
-                const currentHistory = flowContext.getValue<Array<any>>('planningHistory') || [];
-                currentHistory.push({
-                    action: `${executionStep.type}:${executionStep.execute}`,
-                    stepName: executionStep.name,
-                    result: executionResult.result,
-                    error: executionResult.error
-                });
-                flowContext.setValue('planningHistory', currentHistory);
-
-                if (!executionResult.success && !executionResult.skipped) {
-                    console.error(`[Orchestrator:${chatId}] Step execution failed: '${executionStep.name}'`, executionResult.error?.message);
-                    console.log(`[Orchestrator:${chatId}] Step failed, continuing planning loop.`);
-                } else if (executionResult.skipped) {
-                     console.log(`[Orchestrator:${chatId}] Step execution skipped: '${executionStep.name}'.`);
-                } else {
-                    console.log(`[Orchestrator:${chatId}] Step execution succeeded: '${executionStep.name}'.`);
-                }
-
-            } else {
-                console.error(`[Orchestrator:${chatId}] Planner returned unknown action type: '${nextAction.action}'`);
-                finalResponse = `Sorry, the planner returned an invalid action type at iteration ${planningIteration}.`;
-                 const currentHistory = flowContext.getValue<Array<any>>('planningHistory') || [];
-                 currentHistory.push({
-                     action: 'unknown',
-                     stepName: `invalidPlannerAction:${planningIteration}`,
-                     result: nextAction,
-                     error: new Error(`Unknown action type: ${nextAction.action}`)
-                 });
-                 flowContext.setValue('planningHistory', currentHistory);
-                break;
             }
         }
 
-        // --- Step 4: Final Response ---
-        if (planningIteration >= MAX_PLANNING_ITERATIONS) {
-             console.warn(`[Orchestrator:${chatId}] Planning loop reached maximum iterations (${MAX_PLANNING_ITERATIONS}). Stopping.`);
-             if (finalResponse === "Sorry, I couldn't complete the task.") {
-                  finalResponse = `Sorry, I could not determine the final response within the maximum number of planning steps (${MAX_PLANNING_ITERATIONS}).`;
-             }
-        }
+        console.log(`[Orchestrator:${chatId}] Processing finished.`);
 
-        console.log(`[Orchestrator:${chatId}] Planning process finished.`);
-
+        // Dispose the FlowContext after the turn is complete
         flowContext.dispose();
 
         return finalResponse;
@@ -253,5 +192,6 @@ export class Orchestrator {
         console.log('[Orchestrator] Disposing.');
         this.activeConversations.forEach(context => context.dispose());
         this.activeConversations.clear();
+        // Agents are not stateful beyond a single turn, so no need to dispose them here.
     }
 }

@@ -1,18 +1,24 @@
 // src/tools/index.ts
 
-// Export all tools from their modules
-export * as filesystem from './filesystem';
-export * as editor from './editor';
-export * as project from './project';
-export * as codeManipulation from './codeManipulation';
+// Filesystem Tools
+export { getWorkspaceFiles } from './filesystem/getWorkspaceFiles';
+export { getFileContents } from './filesystem/getFileContents';
+export { createFile } from './filesystem/createFile'; // Export new tool
+export { createDirectory } from './filesystem/createDirectory'; // Export new tool
 
-// Export core tool utilities
-export * from './core/core';
-export * from './core/toolRunner';
+// Editor Tools
+export { getActiveEditorContent } from './editor/getActiveEditorContent';
 
-// Re-export individual tools for backward compatibility
-export { getWorkspaceFiles } from './filesystem';
-export { getFileContents } from './filesystem';
-export { getActiveEditorContent } from './editor';
-export { getPackageDependencies, getProjectInfo, searchWorkspace } from './project';
-export { applyWorkspaceEdit } from './codeManipulation';
+// Project Tools
+export { getPackageDependencies } from './project/getPackageDependencies';
+export { getProjectInfo } from './project/getProjectInfo';
+export { searchWorkspace } from './project/searchWorkspace';
+export { installDependencies } from './project/installDependencies'; // Export new tool
+export { addDependency } from './project/addDependency'; // Export new tool
+
+
+// Code Manipulation Tools (Future)
+export { applyWorkspaceEdit } from './codeManipulation/applyWorkspaceEdit'; // Assuming this exists
+
+// Terminal Tools
+export { runCommand } from './terminal/runCommand';

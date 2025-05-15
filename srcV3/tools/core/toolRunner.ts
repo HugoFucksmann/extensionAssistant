@@ -1,15 +1,20 @@
 import * as vscode from 'vscode';
 // Import all tools from the new structured index
 import * as tools from '..';
+import { TerminalRunCommandParams } from '../terminal/runCommand';
+import { FilesystemCreateFileParams } from '../filesystem/createFile';
+import { FilesystemCreateDirectoryParams } from '../filesystem/createDirectory';
+import { ProjectInstallDependenciesParams } from '../project/installDependencies';
+import { ProjectAddDependencyParams } from '../project/addDependency';
 
 // Interfaz para definir la estructura de una herramienta (mantener)
-interface Tool {
-  execute: (...args: any[]) => Promise<any>;
-  validateParams?: (params: Record<string, any>) => boolean | string;
-  requiredParams?: string[];
+interface ToolDefinition<T = any> {
+  execute: (params: T) => Promise<any>;
+  validateParams: (params: Record<string, any>) => string | boolean;
+  requiredParams?: (keyof T)[];
 }
 
-type ToolRegistry = Record<string, Tool>;
+type ToolRegistry = Record<string, ToolDefinition>;
 
 export class ToolRunner {
 
@@ -22,14 +27,44 @@ export class ToolRunner {
     },
     'filesystem.getFileContents': {
       execute: tools.getFileContents,
-      validateParams: (params) => {
+      validateParams: (params: Record<string, any>) => {
         if (!params.filePath || typeof params.filePath !== 'string') {
-          return 'Se requiere filePath como string';
+          return 'filePath must be a string';
         }
         return true;
       },
       requiredParams: ['filePath']
     },
+    'filesystem.createFile': { // Add new tool
+        execute: tools.createFile,
+        validateParams: (params: Record<string, any>) => {
+            if (!params.filePath || typeof params.filePath !== 'string') {
+                return 'filePath must be a string';
+            }
+            if (params.content !== undefined && typeof params.content !== 'string') {
+                 return 'content must be a string if provided';
+            }
+             if (params.overwrite !== undefined && typeof params.overwrite !== 'boolean') {
+                 return 'overwrite must be a boolean if provided';
+            }
+            return true;
+        },
+        requiredParams: ['filePath']
+    },
+     'filesystem.createDirectory': { // Add new tool
+        execute: tools.createDirectory,
+        validateParams: (params: Record<string, any>) => {
+            if (!params.directoryPath || typeof params.directoryPath !== 'string') {
+                return 'directoryPath must be a string';
+            }
+             if (params.recursive !== undefined && typeof params.recursive !== 'boolean') {
+                 return 'recursive must be a boolean if provided';
+            }
+            return true;
+        },
+        requiredParams: ['directoryPath']
+    },
+
 
     // Editor Tools
     'editor.getActiveEditorContent': {
@@ -41,9 +76,9 @@ export class ToolRunner {
     // Project Tools
     'project.getPackageDependencies': {
       execute: tools.getPackageDependencies,
-      validateParams: (params) => {
+      validateParams: (params: Record<string, any>) => {
         if (!params.projectPath || typeof params.projectPath !== 'string') {
-          return 'Se requiere projectPath como string';
+          return 'projectPath must be a string';
         }
         return true;
       },
@@ -56,25 +91,77 @@ export class ToolRunner {
     },
     'project.searchWorkspace': {
       execute: tools.searchWorkspace,
-      validateParams: (params) => {
+      validateParams: (params: Record<string, any>) => {
         if (!params.query || typeof params.query !== 'string') {
-          return 'Se requiere query como string';
+          return 'query must be a string';
         }
         return true;
       },
       requiredParams: ['query']
     },
+    'project.installDependencies': { // Add new tool
+        execute: tools.installDependencies,
+        validateParams: (params: Record<string, any>) => {
+            if (params.projectPath !== undefined && typeof params.projectPath !== 'string') {
+                 return 'projectPath must be a string if provided';
+            }
+             if (params.packageManager !== undefined && typeof params.packageManager !== 'string') { // Could add check for specific manager names
+                 return 'packageManager must be a string if provided';
+            }
+            return true; // No required params if defaulting to workspace root/npm
+        },
+        requiredParams: []
+    },
+     'project.addDependency': { // Add new tool
+        execute: tools.addDependency,
+        validateParams: (params: Record<string, any>) => {
+            if (!params.packageName || (Array.isArray(params.packageName) && params.packageName.length === 0) || (!Array.isArray(params.packageName) && typeof params.packageName !== 'string')) {
+                return 'packageName must be a string or array of strings';
+            }
+            if (params.dev !== undefined && typeof params.dev !== 'boolean') {
+                 return 'dev must be a boolean if provided';
+            }
+             if (params.packageManager !== undefined && typeof params.packageManager !== 'string') { // Could add check for specific manager names
+                 return 'packageManager must be a string if provided';
+            }
+             if (params.projectPath !== undefined && typeof params.projectPath !== 'string') {
+                 return 'projectPath must be a string if provided';
+            }
+            return true;
+        },
+        requiredParams: ['packageName']
+    },
+
 
     // Code Manipulation Tools
     'codeManipulation.applyWorkspaceEdit': {
       execute: tools.applyWorkspaceEdit,
-      validateParams: (params) => {
-        if (!params.edits || !Array.isArray(params.edits)) {
-          return 'Se requiere edits como array';
+      validateParams: (params: Record<string, any>) => {
+        if (!params.edits || (typeof params.edits !== 'object')) { // Check if it's an object, not just array
+          return 'edits must be an object (WorkspaceEdit)';
         }
+        // TODO: More detailed validation of edit structure
         return true;
       },
       requiredParams: ['edits']
+    },
+
+    // Terminal Tools
+    'terminal.runCommand': {
+        execute: tools.runCommand,
+        validateParams: (params: Record<string, any>) => {
+            if (!params.command || typeof params.command !== 'string') {
+                return 'command must be a string';
+            }
+            if (params.terminalName !== undefined && typeof params.terminalName !== 'string') {
+                 return 'terminalName must be a string if provided';
+            }
+             if (params.showTerminal !== undefined && typeof params.showTerminal !== 'boolean') {
+                 return 'showTerminal must be a boolean if provided';
+            }
+            return true;
+        },
+        requiredParams: ['command']
     }
   };
 
@@ -88,32 +175,33 @@ export class ToolRunner {
   ): Promise<any> {
     const tool = this.TOOLS[toolName];
     if (!tool) {
-      throw new Error(`Tool no registrada: ${toolName}`);
+      throw new Error(`Tool not registered: ${toolName}`);
     }
 
-    // Validación de parámetros (usando validateParams o requiredParams del tool)
+    // Parameter validation (using validateParams or requiredParams from tool)
     if (tool.validateParams) {
       const validationResult = tool.validateParams(params);
       if (typeof validationResult === 'string') {
-        throw new Error(`Error de validación en ${toolName}: ${validationResult}`);
+        throw new Error(`Validation error in ${toolName}: ${validationResult}`);
       }
     } else if (tool.requiredParams) {
       for (const param of tool.requiredParams) {
-        // Check if the parameter is missing OR explicitly null/undefined
-        if (params[param] === undefined || params[param] === null) {
-          throw new Error(`Parámetro requerido faltante en ${toolName}: ${param}`);
+        const paramKey = typeof param === 'symbol' ? String(param) : param;
+        if (params[paramKey] === undefined || params[paramKey] === null) {
+          throw new Error(`Missing required parameter in ${toolName}: ${paramKey}`);
         }
       }
     }
 
     try {
       // Pass the resolved parameters directly to the tool's execute function
+      // The tool implementation is responsible for casting/using the params correctly
       return await tool.execute(params);
     } catch (error: any) {
       // Log the error and re-throw
       console.error(`[ToolRunner] Error executing tool ${toolName}:`, error);
-      // Show error message in VS Code UI for user feedback
-      vscode.window.showErrorMessage(`Error ejecutando tool ${toolName}: ${error.message || String(error)}`);
+      // Show error message in VS Code UI for user feedback (optional, orchestrator might handle this)
+      // vscode.window.showErrorMessage(`Error executing tool ${toolName}: ${error.message || String(error)}`);
       throw error; // Re-throw the error for the orchestrator/handler to catch
     }
   }
