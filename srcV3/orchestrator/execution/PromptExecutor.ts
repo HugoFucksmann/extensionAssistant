@@ -1,9 +1,7 @@
 // src/orchestrator/execution/PromptExecutor.ts
 
 import { executeModelInteraction } from "../../models/promptSystem";
-// Import PromptType from the central types file
 import { IExecutor, PromptType } from "./types";
-
 
 /**
  * PromptExecutor implements the IExecutor interface for AI prompt-based actions.
@@ -14,18 +12,18 @@ export class PromptExecutor implements IExecutor {
 
   constructor() {
     // Initialize with all known prompt types from the PromptType union
-    // Make sure 'planner' is included here
     const allPromptTypes: PromptType[] = [
       'inputAnalyzer',
-      'resultEvaluator',
       'conversationResponder',
       'explainCodePrompt',
       'fixCodePrompt',
       'codeValidator',
-      'planner' // <--- Add 'planner' here
+      'planner',
+       // Add other prompt types here as they are implemented and used
+       // 'editing', 'examination', 'projectManagement', 'projectSearch', 'resultEvaluator'
     ];
     this.validPromptTypes = new Set(allPromptTypes);
-    console.log('[PromptExecutor] Initialized with valid prompt types:', Array.from(this.validPromptTypes));
+    // console.log('[PromptExecutor] Initialized with valid prompt types:', Array.from(this.validPromptTypes)); // Reduced logging
   }
 
   /**
@@ -34,7 +32,6 @@ export class PromptExecutor implements IExecutor {
    * @returns true if the prompt type is recognized
    */
   canExecute(action: string): boolean {
-    // Check if the action is a valid PromptType
     return this.validPromptTypes.has(action as PromptType);
   }
 
@@ -42,12 +39,10 @@ export class PromptExecutor implements IExecutor {
    * Executes the specified prompt with the provided parameters.
    * For PromptExecutor, the 'params' parameter is the full resolution context data.
    * @param action The prompt type to execute
-   * @param fullContextData The full resolution context data from InteractionContext (now FlowContext)
+   * @param fullContextData The full resolution context data from FlowContext
    * @returns Promise resolving to the result of the model interaction
    */
   async execute(action: string, fullContextData: Record<string, any>): Promise<any> {
-    // Cast action to PromptType as we've validated it in canExecute
-    // Pass the full context data directly to executeModelInteraction
     return executeModelInteraction(action as PromptType, fullContextData);
   }
 }

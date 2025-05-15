@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+
 export type PromptVariables = Record<string, any>;
 
 export interface InputAnalysisResult {
@@ -9,14 +10,16 @@ export interface InputAnalysisResult {
     functionsMentioned: string[];
     errorsMentioned: string[];
     customKeywords: string[];
-    [key: string]: any; // Allow other entities
+    [key: string]: any;
   };
   confidence: number;
-  [key: string]: any; // Allow other analysis data
+  [key: string]: any;
 }
 
-// Define a single step in an execution flow.
-// Can be a tool call or a model prompt interaction.
+/**
+ * Define a single step in an execution flow.
+ * Can be a tool call or a model prompt interaction.
+ */
 export interface ExecutionStep {
   /** Unique name for this step within its context (useful for logging/debugging). */
   name: string;
@@ -28,11 +31,10 @@ export interface ExecutionStep {
   params?: Record<string, any>;
   /** Optional condition function to determine if this step should run. Checks against the context data used for parameter resolution. */
   condition?: (contextData: Record<string, any>) => boolean;
-  /** Key in the InteractionContext to store the successful result of this step. */
+  /** Key in the FlowContext to store the successful result of this step. */
   storeAs?: string;
   /** Optional: Timeout for the step in milliseconds. */
   timeout?: number;
-  // Add other properties as needed (e.g., retries, error handling behavior)
 }
 
 /**
@@ -52,7 +54,6 @@ export interface StepResult<T = any> {
     /** If the step was skipped due to a condition. */
     skipped?: boolean;
 }
-
 
 export interface IExecutor {
   /**
@@ -75,71 +76,50 @@ export interface IExecutor {
 // Define types for prompt system
 export type PromptType =
   | 'inputAnalyzer'
-  | 'planningEngine' // Could use this alias for 'planner'
-  | 'editing'
-  | 'examination'
-  | 'projectManagement'
-  | 'projectSearch'
-  | 'resultEvaluator'
+  | 'editing' // Not used in provided code, but kept if part of broader system
+  | 'examination' // Not used
+  | 'projectManagement' // Not used
+  | 'projectSearch' // Not used
+  | 'resultEvaluator' // Not used
   | 'conversationResponder'
   | 'explainCodePrompt'
   | 'fixCodePrompt'
   | 'codeValidator'
-  | 'planner'; 
+  | 'planner'; // Removed planningEngine alias
+
 // --- Standardized Prompt Variable Interfaces ---
 
 /** Base interface for common variables available to most prompts. */
 export interface BasePromptVariables {
-  userMessage: string; // The current user's message
-  chatHistory: string; // Recent conversation history (formatted string)
-  objective?: string; // The user's overall objective for the turn/session
-  extractedEntities?: InputAnalysisResult['extractedEntities']; // Entities extracted from user input
-  projectContext?: any; // Information about the current project/workspace
-  activeEditorContent?: string; // Content of the active text editor
-  [key: `fileContent:${string}`]: string | undefined; // Content of specific files, keyed by a sanitized path
-  [key: `searchResults:${string}`]: any | undefined; // Results from search operations, keyed by query/identifier
-  // Add other common keys as needed
+  userMessage: string;
+  chatHistory: string;
+  objective?: string;
+  extractedEntities?: InputAnalysisResult['extractedEntities'];
+  projectContext?: any;
+  activeEditorContent?: string;
+  [key: `fileContent:${string}`]: string | undefined;
+  [key: `searchResults:${string}`]: any | undefined;
+  [key: string]: any; // Allow other dynamic variables
 }
 
 /**
  * Defines the structure for registering prompt templates and their variable builders.
- * Used in promptSystem.ts
  */
 export interface PromptDefinition<T extends BasePromptVariables = BasePromptVariables> {
   template: string;
-  // buildVariables now receives the flattened resolution context data
   buildVariables: (resolutionContextData: Record<string, any>) => T;
 }
 
 // --- Tool Parameter Interfaces ---
+// Kept as is, assuming they are used by ToolRunner implementations
 
-export interface FilesystemGetFileContentsParams {
-  filePath: string;
-}
-
-export interface FilesystemGetWorkspaceFilesParams {
-  // No parameters needed
-}
-
-export interface EditorGetActiveEditorContentParams {
-  // No parameters needed
-}
-
-export interface ProjectGetPackageDependenciesParams {
-  projectPath: string;
-}
-
-export interface ProjectGetProjectInfoParams {
-  // No parameters needed
-}
-
-export interface ProjectSearchWorkspaceParams {
-  query: string;
-}
-
-export interface CodeManipulationApplyWorkspaceEditParams {
-  edits: vscode.WorkspaceEdit[];
-}
+export interface FilesystemGetFileContentsParams { filePath: string; }
+export interface FilesystemGetWorkspaceFilesParams { /* No parameters needed */ }
+export interface EditorGetActiveEditorContentParams { /* No parameters needed */ }
+export interface ProjectGetPackageDependenciesParams { projectPath: string; }
+export interface ProjectGetProjectInfoParams { /* No parameters needed */ }
+export interface ProjectSearchWorkspaceParams { query: string; }
+export interface CodeManipulationApplyWorkspaceEditParams { edits: vscode.WorkspaceEdit[]; }
 
 // Union type for all tool parameters
 export type ToolParams =
@@ -156,13 +136,12 @@ export type ToolParams =
  * Extends BasePromptVariables.
  */
 export interface PlannerPromptVariables extends BasePromptVariables {
-  currentFlowState: Record<string, any>; // The current state of the FlowContext (results of previous steps)
-  availableTools: string; // Description/list of available tools
-  availablePrompts: string; // Description/list of available prompts (excluding planner itself)
-  planningHistory: Array<{ action: string; result: any; error?: any; stepName: string }>; // History of planning decisions and step results in this flow
-  planningIteration: number; // Current iteration number of the planning loop
+  currentFlowState: Record<string, any>;
+  availableTools: string;
+  availablePrompts: string;
+  planningHistory: Array<{ action: string; result: any; error?: any; stepName: string }>;
+  planningIteration: number;
 }
-
 
 /**
 * Defines the expected output structure for the planner prompt.
@@ -170,11 +149,9 @@ export interface PlannerPromptVariables extends BasePromptVariables {
 */
 export interface PlannerResponse {
   action: 'tool' | 'prompt' | 'respond';
-  toolName?: string; // Required if action is 'tool'
-  promptType?: PromptType; // Required if action is 'prompt'
-  params?: Record<string, any>; // Parameters for the tool/prompt/respond
-  storeAs?: string; // Optional key to store the result of the tool/prompt execution in FlowContext
-  reasoning: string; // Explanation for the chosen action
-  // Add optional fields for debugging or UI hints
-  // uiMessage?: string; // Message to show the user while executing this step
+  toolName?: string;
+  promptType?: PromptType;
+  params?: Record<string, any>;
+  storeAs?: string;
+  reasoning: string;
 }

@@ -1,21 +1,11 @@
 // src/models/prompts/intentions/prompt.planner.ts
 
-// Import types from the central types file
-import { BasePromptVariables, PromptVariables, PromptType, PlannerResponse, PlannerPromptVariables } from '../../../orchestrator/execution/types'; // Import PlannerResponse and PlannerPromptVariables
-import { ToolRunner } from '../../../tools';
+import { BasePromptVariables, PlannerPromptVariables } from '../../../orchestrator/execution/types';
+import { ToolRunner } from '../../../tools'; // Assuming ToolRunner is in this path
 
 import { mapContextToBaseVariables, getPromptDefinitions } from '../../promptSystem';
 
-
-
-// Define the expected output structure for the planner prompt (REMOVED - now in types.ts)
-// export interface PlannerResponse { ... }
-
-// Define the variables needed for the planner prompt (REMOVED - now in types.ts)
-// export interface PlannerPromptVariables extends BasePromptVariables { ... }
-
-
-// Define the prompt template for the planner (remains the same)
+// Define the prompt template for the planner
 export const plannerPrompt = `
 You are an AI assistant responsible for planning and executing tasks based on user requests within a VS Code extension. Your goal is to determine the single best next action to take to fulfill the user's objective, given the current context and the results of previous steps.
 
@@ -69,26 +59,21 @@ Your response must be a JSON object matching the \`PlannerResponse\` structure.
 Now, based on the current context, what is the single best next action?
 `;
 
-// Function to build variables for the planner prompt (remains the same)
+// Function to build variables for the planner prompt
 export function buildPlannerVariables(resolutionContextData: Record<string, any>): PlannerPromptVariables {
-    const baseVariables = mapContextToBaseVariables(resolutionContextData); // Use the existing mapping
+    const baseVariables = mapContextToBaseVariables(resolutionContextData);
 
-    // Get list of available tools and prompts (excluding planner)
     const availableTools = ToolRunner.listTools().join(', ');
-    const availablePrompts = Object.keys(getPromptDefinitions()).filter(type => type !== 'planner').join(', '); // Use getter for PROMPT_DEFINITIONS
+    const availablePrompts = Object.keys(getPromptDefinitions()).filter(type => type !== 'planner').join(', ');
 
-    // Get planning history and iteration from FlowContext (stored by Orchestrator)
     const planningHistory = resolutionContextData.planningHistory || [];
     const planningIteration = resolutionContextData.planningIteration || 1;
 
-    // Prepare currentFlowState - exclude potentially large or circular objects if necessary,
-    // but for now, passing the full resolution context data is intended.
     const currentFlowState = resolutionContextData;
-
 
     const plannerVariables: PlannerPromptVariables = {
         ...baseVariables,
-        currentFlowState: currentFlowState, // Pass the full flattened context state
+        currentFlowState: currentFlowState,
         availableTools: availableTools,
         availablePrompts: availablePrompts,
         planningHistory: planningHistory,

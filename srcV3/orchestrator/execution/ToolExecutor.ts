@@ -13,7 +13,6 @@ export class ToolExecutor implements IExecutor {
    * @returns true if the tool exists in ToolRunner
    */
   canExecute(action: string): boolean {
-    // ToolRunner.listTools() now returns names like 'filesystem.getFileContents'
     return ToolRunner.listTools().includes(action);
   }
 
@@ -25,7 +24,6 @@ export class ToolExecutor implements IExecutor {
    * @returns Promise resolving to the result of the tool execution
    */
   async execute(action: string, params: Record<string, any>): Promise<any> {
-    // ToolRunner.runTool expects the full tool name and resolved parameters
     return ToolRunner.runTool(action, params);
   }
 }

@@ -1,6 +1,5 @@
 import { IExecutor } from "./types";
 
-
 /**
  * Registry for step executors. Maintains a collection of executors and
  * provides a way to find the appropriate executor for a given action.

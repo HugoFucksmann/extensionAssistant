@@ -8,26 +8,23 @@ import { DatabaseManager } from '../database/DatabaseManager';
 
 export class ChatRepository implements IChatRepository {
   private db: sqlite3.Database;
-  
+
   constructor(context: vscode.ExtensionContext) {
     const dbManager = DatabaseManager.getInstance(context);
     this.db = dbManager.getDatabase();
     this.initializeTable();
   }
-  
+
   /**
    * Initialize chat tables
+   * NOTE: This uses DROP TABLE for simplicity during development/reset.
+   * A production system would require schema migration logic.
    */
   private initializeTable(): void {
-    console.log('[DEBUG] Initializing database tables');
-    const outputChannel = vscode.window.createOutputChannel('DB Init Debug');
-    outputChannel.appendLine('Starting table initialization');
     this.db.serialize(() => {
-      // Force drop and recreate tables
       this.db.run('DROP TABLE IF EXISTS messages');
       this.db.run('DROP TABLE IF EXISTS chats');
-      
-      // Create chats table
+
       this.db.run(`
         CREATE TABLE chats (
           id TEXT PRIMARY KEY,
@@ -36,9 +33,7 @@ export class ChatRepository implements IChatRepository {
           preview TEXT
         )
       `);
-      outputChannel.appendLine('Chats table initialized');
-      
-      // Create messages table
+
       this.db.run(`
         CREATE TABLE messages (
           id TEXT PRIMARY KEY,
@@ -49,21 +44,16 @@ export class ChatRepository implements IChatRepository {
           FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE
         )
       `);
-      outputChannel.appendLine('Messages table initialized');
-      outputChannel.appendLine('Table initialization complete');
     });
   }
-  
-  /**
-   * Creates a new chat
-   */
+
   public async create(chat: Chat): Promise<Chat> {
     return new Promise((resolve, reject) => {
       const chatWithId = {
         ...chat,
         id: chat.id || randomUUID()
       };
-      
+
       this.db.run(
         'INSERT INTO chats (id, title, timestamp) VALUES (?, ?, ?)',
         [chatWithId.id, chatWithId.title, chatWithId.timestamp],
@@ -78,10 +68,7 @@ export class ChatRepository implements IChatRepository {
       );
     });
   }
-  
-  /**
-   * Finds a chat by ID
-   */
+
   public async findById(id: string): Promise<Chat | null> {
     return new Promise((resolve, reject) => {
       this.db.get(
@@ -98,10 +85,7 @@ export class ChatRepository implements IChatRepository {
       );
     });
   }
-  
-  /**
-   * Gets all chats
-   */
+
   public async findAll(): Promise<Chat[]> {
     return new Promise((resolve, reject) => {
       this.db.all('SELECT * FROM chats ORDER BY timestamp DESC', (err, rows) => {
@@ -114,20 +98,16 @@ export class ChatRepository implements IChatRepository {
       });
     });
   }
-  
-  /**
-   * Updates a chat
-   */
+
   public async update(id: string, item: Partial<Chat>): Promise<void> {
-    // Build update query dynamically based on provided fields
     const fields = Object.keys(item).filter(key => key !== 'id');
     if (fields.length === 0) {
       return Promise.resolve();
     }
-    
+
     const setClause = fields.map(field => `${field} = ?`).join(', ');
     const values = fields.map(field => (item as any)[field]);
-    
+
     return new Promise((resolve, reject) => {
       this.db.run(
         `UPDATE chats SET ${setClause} WHERE id = ?`,
@@ -143,33 +123,20 @@ export class ChatRepository implements IChatRepository {
       );
     });
   }
-  
-  /**
-   * Updates a chat's title
-   */
+
   public async updateTitle(chatId: string, title: string): Promise<void> {
     return this.update(chatId, { title });
   }
-  
-  /**
-   * Updates a chat's timestamp
-   */
+
   public async updateTimestamp(chatId: string): Promise<void> {
     return this.update(chatId, { timestamp: Date.now() });
   }
-  
-  /**
-   * Updates a chat's preview
-   */
+
   public async updatePreview(chatId: string, preview: string): Promise<void> {
-    // Take first 100 characters as preview
     const trimmedPreview = preview.length > 100 ? `${preview.substring(0, 97)}...` : preview;
     return this.update(chatId, { preview: trimmedPreview });
   }
-  
-  /**
-   * Deletes a chat
-   */
+
   public async delete(id: string): Promise<void> {
     return new Promise((resolve, reject) => {
       this.db.run('DELETE FROM chats WHERE id = ?', [id], (err) => {
@@ -182,17 +149,14 @@ export class ChatRepository implements IChatRepository {
       });
     });
   }
-  
-  /**
-   * Adds a message to a chat
-   */
+
   public async addMessage(message: ChatMessage): Promise<ChatMessage> {
     return new Promise((resolve, reject) => {
       const messageWithId = {
         ...message,
         id: message.id || randomUUID()
       };
-      
+
       this.db.run(
         'INSERT INTO messages (id, chat_id, content, sender, timestamp) VALUES (?, ?, ?, ?, ?)',
         [messageWithId.id, messageWithId.chatId, messageWithId.content, messageWithId.sender, messageWithId.timestamp],
@@ -201,7 +165,6 @@ export class ChatRepository implements IChatRepository {
             console.error('[ChatRepository] Error adding message:', err.message);
             reject(err);
           } else {
-            // Update chat timestamp and preview for user messages
             try {
               if (message.sender === 'user') {
                 await this.updatePreview(message.chatId, message.content);
@@ -210,17 +173,14 @@ export class ChatRepository implements IChatRepository {
               resolve(messageWithId);
             } catch (err) {
               console.error('[ChatRepository] Error updating chat after message:', err);
-              resolve(messageWithId); // Still return message even if preview update fails
+              resolve(messageWithId);
             }
           }
         }
       );
     });
   }
-  
-  /**
-   * Gets all messages for a chat
-   */
+
   public async getMessages(chatId: string): Promise<ChatMessage[]> {
     return new Promise((resolve, reject) => {
       this.db.all(

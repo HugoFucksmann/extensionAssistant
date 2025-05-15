@@ -5,7 +5,6 @@ import { PromptExecutor } from "./PromptExecutor";
 import { ToolExecutor } from "./ToolExecutor";
 import { IExecutor } from "./types";
 
-
 export class ExecutorFactory {
   /**
    * Creates and initializes a fully configured ExecutorRegistry with all available executors.
@@ -17,8 +16,6 @@ export class ExecutorFactory {
     // Register standard executors
     registry.register(new ToolExecutor());
     registry.register(new PromptExecutor());
-
-    // More executors can be registered here in the future
 
     return registry;
   }

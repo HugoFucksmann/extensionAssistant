@@ -1,16 +1,14 @@
 // src/orchestrator/context/globalContext.ts
 import * as vscode from 'vscode';
-import { ConfigurationManager } from '../../config/ConfigurationManager';
+import { ConfigurationManager } from '../../config/ConfigurationManager'; // Assuming this exists
 
 export interface GlobalContextState {
-    [key: string]: any;  // Add this line
-    // Add global/project-wide data here
+    [key: string]: any;
     projectInfo?: {
         mainLanguage: string;
         secondaryLanguage?: string;
         dependencies: string[];
     };
-    // Add other global state relevant across sessions/workspaces
 }
 
 /**
@@ -21,55 +19,36 @@ export interface GlobalContextState {
 export class GlobalContext {
     private state: GlobalContextState;
     private context: vscode.ExtensionContext;
-    private configManager: ConfigurationManager;
+    private configManager: ConfigurationManager; // Assuming this exists
 
     constructor(context: vscode.ExtensionContext, configManager: ConfigurationManager) {
         this.context = context;
         this.configManager = configManager;
-        this.state = this.loadState() || {}; // Load state on creation
-        console.log('[GlobalContext] Initialized.', this.state);
+        this.state = this.loadState() || {};
+        // console.log('[GlobalContext] Initialized.', this.state); // Reduced logging
     }
 
     private loadState(): GlobalContextState | undefined {
-        // Use a consistent key for global state
-        const savedState = this.context.globalState.get<GlobalContextState>('extensionAssistant.globalContext');
-        return savedState;
+        return this.context.globalState.get<GlobalContextState>('extensionAssistant.globalContext');
     }
 
     async saveState(): Promise<void> {
-        // Save the current state
         await this.context.globalState.update('extensionAssistant.globalContext', this.state);
-        console.log('[GlobalContext] State saved.');
+        // console.log('[GlobalContext] State saved.'); // Reduced logging
     }
 
-    /**
-     * Gets the current global context state.
-     */
     getState(): GlobalContextState {
-        return JSON.parse(JSON.stringify(this.state)); // Return a copy
+        return JSON.parse(JSON.stringify(this.state));
     }
 
-    /**
-     * Sets a specific value in the global context state.
-     * @param key The key to set.
-     * @param value The value to store.
-     */
     setValue<K extends keyof GlobalContextState>(key: K, value: GlobalContextState[K]): void {
         this.state[key] = value;
-        // Optional: save state immediately on change or rely on deactivate save
-        // this.saveState();
     }
 
-    /**
-     * Gets a specific value from the global context state.
-     * @param key The key to get.
-     * @returns The value associated with the key, or undefined.
-     */
     getValue<K extends keyof GlobalContextState>(key: K): GlobalContextState[K] | undefined {
         return this.state[key];
     }
 
-    // Add specific getters for common global data
     getProjectInfo(): GlobalContextState['projectInfo'] {
         return this.state.projectInfo;
     }
@@ -78,9 +57,7 @@ export class GlobalContext {
         this.setValue('projectInfo', info);
     }
 
-    // Add disposal logic if needed (e.g., clearing state on uninstall)
     dispose(): void {
-        // In this simple model, saving on deactivate is handled externally.
-        // For complex scenarios, you might want more elaborate lifecycle management.
+        // No specific disposal needed beyond saving state on deactivate (handled externally)
     }
 }

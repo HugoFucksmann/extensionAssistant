@@ -10,7 +10,7 @@ export interface ChatMessage {
   chatId: string;
   content: string;
   sender: 'user' | 'assistant' | 'system';
-  role?: 'user' | 'assistant' | 'system'; // Optional role property
+  role?: 'user' | 'assistant' | 'system'; 
   timestamp: number;
   files?: string[];
 }

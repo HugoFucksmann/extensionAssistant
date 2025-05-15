@@ -1,60 +1,47 @@
-import {  PromptType, PromptVariables, BasePromptVariables, PlannerResponse } from '../orchestrator'; // Import PlannerResponse
+import { PromptType, BasePromptVariables, PlannerResponse, PromptVariables } from '../orchestrator'; // Import PlannerResponse
 import { inputAnalyzerPrompt, buildInputAnalyzerVariables, codeValidatorPrompt, buildCodeValidatorVariables } from './prompts';
-import { explainCodePrompt } from './prompts/intentions/prompt.explainCode';
-import { fixCodePrompt } from './prompts/intentions/prompt.fixCode';
-import { conversationPrompt } from './prompts/intentions/prompt.conversation';
-import { buildConversationVariables } from './prompts/intentions/prompt.conversation';
-// Import the new planner prompt definition and builder
-import { plannerPrompt, buildPlannerVariables } from './prompts/intentions/prompt.planner';
+import { explainCodePrompt } from './prompts/intentions/prompt.explainCode'; // Assuming these exist
+import { fixCodePrompt } from './prompts/intentions/prompt.fixCode'; // Assuming these exist
+import { conversationPrompt, buildConversationVariables } from './prompts/intentions/prompt.conversation'; // Assuming these exist
+import { plannerPrompt, buildPlannerVariables } from './prompts/intentions/prompt.planner'; // Assuming these exist
 
-import { ModelManager } from './config/ModelManager';
-import { ModelType } from './config/types';
-import { parseModelResponse } from './config/modelUtils';
+import { ModelManager } from './config/ModelManager'; // Assuming this exists
+import { ModelType } from './config/types'; // Assuming this exists
+import { parseModelResponse } from './config/modelUtils'; // Assuming this exists
 
-// Need access to ToolRunner to list tools for the planner prompt variables
-// This import is now handled within buildPlannerVariables itself
-// import { ToolRunner } from '../services/toolRunner';
-
-
-// Update PromptDefinition buildVariables type to accept resolution context data
 interface PromptDefinition<T extends BasePromptVariables = BasePromptVariables> {
     template: string;
     buildVariables: (resolutionContextData: Record<string, any>) => T;
 }
 
-
-// PROMPT_DEFINITIONS map remains largely the same, just ensuring correct buildVariables functions are used
 const PROMPT_DEFINITIONS: Partial<Record<PromptType, PromptDefinition<any>>> = {
   inputAnalyzer: { template: inputAnalyzerPrompt, buildVariables: buildInputAnalyzerVariables },
   codeValidator: { template: codeValidatorPrompt, buildVariables: buildCodeValidatorVariables },
-  explainCodePrompt: { template: explainCodePrompt, buildVariables: mapContextToBaseVariables }, // mapContextToBaseVariables will be updated
-  fixCodePrompt: { template: fixCodePrompt, buildVariables: mapContextToBaseVariables }, // mapContextToBaseVariables will be updated
-  conversationResponder: { template: conversationPrompt, buildVariables: buildConversationVariables }, // buildConversationVariables will be updated
-  planner: { template: plannerPrompt, buildVariables: buildPlannerVariables } // Register the planner prompt
+  explainCodePrompt: { template: explainCodePrompt, buildVariables: mapContextToBaseVariables },
+  fixCodePrompt: { template: fixCodePrompt, buildVariables: mapContextToBaseVariables },
+  conversationResponder: { template: conversationPrompt, buildVariables: buildConversationVariables },
+  planner: { template: plannerPrompt, buildVariables: buildPlannerVariables }
 };
 
 let _modelManager: ModelManager | null = null;
 
 export function initializePromptSystem(modelManager: ModelManager): void {
   _modelManager = modelManager;
-  console.log('[PromptSystem] Initialized successfully');
+  // console.log('[PromptSystem] Initialized'); // Reduced logging
 }
 
-// mapContextToBaseVariables remains the same, it maps flattened context to BasePromptVariables
 export function mapContextToBaseVariables(resolutionContextData: Record<string, any>): BasePromptVariables {
   const baseVariables: BasePromptVariables = {
     userMessage: resolutionContextData.userMessage || '',
-    chatHistory: resolutionContextData.chatHistoryString || '', // From ConversationContext via FlowContext
-    objective: resolutionContextData.analysisResult?.objective, // From FlowContext
-    extractedEntities: resolutionContextData.analysisResult?.extractedEntities, // From FlowContext
-    projectContext: resolutionContextData.projectInfo, // From GlobalContext via Session/Conv/Flow
-    activeEditorContent: resolutionContextData.activeEditorContent // From SessionContext via Conv/Flow
+    chatHistory: resolutionContextData.chatHistoryString || '',
+    objective: resolutionContextData.analysisResult?.objective,
+    extractedEntities: resolutionContextData.analysisResult?.extractedEntities,
+    projectContext: resolutionContextData.projectInfo,
+    activeEditorContent: resolutionContextData.activeEditorContent
   };
 
-  // Add dynamic variables like file contents and search results from FlowContext state
-  // Include any key that is not one of the standard base variables
   const dynamicVariables = Object.keys(resolutionContextData)
-    .filter(key => !(key in baseVariables) && key !== 'chatHistoryString' && key !== 'planningHistory' && key !== 'planningIteration' && key !== 'analysisResult') // Exclude standard base keys and planning keys
+    .filter(key => !(key in baseVariables) && key !== 'chatHistoryString' && key !== 'planningHistory' && key !== 'planningIteration' && key !== 'analysisResult')
     .reduce<Record<string, any>>((acc, key) => {
       acc[key] = resolutionContextData[key];
       return acc;
@@ -63,35 +50,29 @@ export function mapContextToBaseVariables(resolutionContextData: Record<string, 
   return { ...baseVariables, ...dynamicVariables };
 }
 
-
-// buildPromptVariables remains the same, it passes resolutionContextData to the specific builder
 function buildPromptVariables(type: PromptType, resolutionContextData: Record<string, any>): PromptVariables {
   const definition = PROMPT_DEFINITIONS[type];
   if (!definition) {
     throw new Error(`No prompt definition found for type: ${type}`);
   }
-  // Pass the resolution context data to the specific buildVariables function
   return definition.buildVariables(resolutionContextData);
 }
 
-// Add a getter for PROMPT_DEFINITIONS so buildPlannerVariables can access it
 export function getPromptDefinitions(): Partial<Record<PromptType, PromptDefinition<any>>> {
     return PROMPT_DEFINITIONS;
 }
 
-
-// fillPromptTemplate remains the same, it substitutes placeholders using the built variables
 function fillPromptTemplate(template: string, variables: PromptVariables): string {
-  let filledTemplate = template;
+  let output = template;
 
-  // First, handle dynamic placeholders like {{prefix:.*}}
+  // Handle dynamic placeholders like {{prefix:.*}} first
   const dynamicPlaceholderRegex = /\{\{(\w+):.\*\}}/g;
   let match;
   let lastIndex = 0;
-  let output = '';
+  let dynamicOutput = '';
 
   while ((match = dynamicPlaceholderRegex.exec(template)) !== null) {
-      output += template.substring(lastIndex, match.index);
+      dynamicOutput += template.substring(lastIndex, match.index);
       lastIndex = dynamicPlaceholderRegex.lastIndex;
 
       const prefix = match[1];
@@ -112,20 +93,16 @@ function fillPromptTemplate(template: string, variables: PromptVariables): strin
               })
               .join('\n---\n');
 
-          output += dynamicContent;
-      } else {
-          // If no dynamic variables found, remove the placeholder
-          // output += `[No ${prefix} found]`; // Or just nothing
+          dynamicOutput += dynamicContent;
       }
   }
-  output += template.substring(lastIndex);
+  dynamicOutput += template.substring(lastIndex);
 
 
-  // Second, handle static placeholders {{key}} in the generated output string
-   let finalOutput = output;
+  // Handle static placeholders {{key}} in the generated output string
+   let finalOutput = dynamicOutput;
    for (const [key, value] of Object.entries(variables)) {
-       // Skip keys that were already handled by dynamic placeholders (they start with a prefix and ':')
-       if (key.includes(':')) continue;
+       if (key.includes(':')) continue; // Skip keys handled by dynamic placeholders
 
        const placeholder = `{{${key}}}`;
        const stringValue = typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean' || value === null || value === undefined
@@ -134,21 +111,18 @@ function fillPromptTemplate(template: string, variables: PromptVariables): strin
 
        finalOutput = finalOutput.replace(
          new RegExp(placeholder.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'), 'g'),
-         stringValue.replace(/\$/g, '$$$$')
+         stringValue.replace(/\$/g, '$$$$') // Escape $ for replace
        );
    }
 
-   // Remove any remaining unresolved static placeholders if any
+   // Remove any remaining unresolved static placeholders
    finalOutput = finalOutput.replace(/\{\{.*?\}\}/g, '');
-
 
   return finalOutput;
 }
 
-
 export async function executeModelInteraction<T = any>(
   type: PromptType,
-  // Accepts the resolution context data generated by FlowContext
   resolutionContextData: Record<string, any>
 ): Promise<T> {
   if (!_modelManager) {
@@ -160,28 +134,20 @@ export async function executeModelInteraction<T = any>(
     throw new Error(`Unknown prompt type: ${type}`);
   }
 
-  // Build variables using the provided resolution context data
   const variables = buildPromptVariables(type, resolutionContextData);
   const filledPrompt = fillPromptTemplate(definition.template, variables);
 
-  // Use parseModelResponse to handle JSON extraction based on prompt type
   const rawResponse = await _modelManager.sendPrompt(filledPrompt);
   return parseModelResponse<T>(type, rawResponse);
 }
 
-// ... (changeModel, getCurrentModel, abortModelRequest, disposePromptSystem remain the same)
-
 export async function changeModel(modelType: ModelType): Promise<void> {
-  if (!_modelManager) {
-    throw new Error('PromptSystem not initialized. Call initializePromptSystem() first.');
-  }
+  if (!_modelManager) throw new Error('PromptSystem not initialized.');
   await _modelManager.setModel(modelType);
 }
 
 export function getCurrentModel(): ModelType {
-  if (!_modelManager) {
-    throw new Error('PromptSystem not initialized. Call initializePromptSystem() first.');
-  }
+  if (!_modelManager) throw new Error('PromptSystem not initialized.');
   return _modelManager.getCurrentModel();
 }
 
@@ -192,7 +158,6 @@ export function abortModelRequest(): void {
 }
 
 export function disposePromptSystem(): void {
-  // ModelManager dispose handles aborting requests internally
   if (_modelManager) {
       _modelManager.dispose();
       _modelManager = null;

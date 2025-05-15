@@ -1,17 +1,15 @@
 // src/orchestrator/context/sessionContext.ts
 import * as vscode from 'vscode';
 import { GlobalContext, GlobalContextState } from './globalContext';
-import { getProjectInfo as fetchProjectInfo } from '../../tools/project/getProjectInfo'; // Import the actual function
+import { getProjectInfo as fetchProjectInfo } from '../../tools/project/getProjectInfo'; // Assuming this exists
 
 interface SessionContextState {
-    [key: string]: any;  // Add this line to allow string indexing
-    // Add session/workspace-specific data here
+    [key: string]: any;
     workspacePath?: string;
     activeEditorInfo?: {
         fileName: string;
         languageId: string;
     };
-    // Add caches, temporary data, etc.
 }
 
 /**
@@ -23,20 +21,18 @@ export class SessionContext {
     private state: SessionContextState;
     private context: vscode.ExtensionContext;
     private globalContext: GlobalContext;
-    private projectInfoPromise: Promise<GlobalContextState['projectInfo']> | null = null; // Cache for project info fetching
+    private projectInfoPromise: Promise<GlobalContextState['projectInfo']> | null = null;
 
     constructor(context: vscode.ExtensionContext, globalContext: GlobalContext) {
         this.context = context;
         this.globalContext = globalContext;
-        this.state = {}; // Session state typically starts fresh
+        this.state = {};
 
-        // Initialize workspace path
         const workspaceFolders = vscode.workspace.workspaceFolders;
         if (workspaceFolders && workspaceFolders.length > 0) {
             this.state.workspacePath = workspaceFolders[0].uri.fsPath;
         }
 
-        // Listen for active editor changes (example of updating session state)
         context.subscriptions.push(
             vscode.window.onDidChangeActiveTextEditor(editor => {
                 if (editor) {
@@ -47,11 +43,10 @@ export class SessionContext {
                 } else {
                     this.state.activeEditorInfo = undefined;
                 }
-                 console.log('[SessionContext] Active editor updated:', this.state.activeEditorInfo?.fileName);
+                 // console.log('[SessionContext] Active editor updated:', this.state.activeEditorInfo?.fileName); // Reduced logging
             })
         );
 
-        // Set initial active editor info
         const activeEditor = vscode.window.activeTextEditor;
         if (activeEditor) {
              this.state.activeEditorInfo = {
@@ -60,7 +55,7 @@ export class SessionContext {
              };
         }
 
-        console.log('[SessionContext] Initialized.', this.state);
+        // console.log('[SessionContext] Initialized.', this.state); // Reduced logging
     }
 
     getState(): SessionContextState {
@@ -97,18 +92,16 @@ export class SessionContext {
             return existingInfo;
         }
 
-        // If not cached, fetch it once and store it
         if (!this.projectInfoPromise) {
             this.projectInfoPromise = fetchProjectInfo().catch(err => {
                  console.error('[SessionContext] Error fetching project info:', err);
-                 this.projectInfoPromise = null; // Allow retry on next call
+                 this.projectInfoPromise = null;
                  return undefined;
             });
             this.projectInfoPromise.then(info => {
                  if (info) {
                       this.globalContext.setProjectInfo(info);
-                      // Decide if global state should be saved immediately or on deactivate
-                      this.globalContext.saveState();
+                      this.globalContext.saveState(); // Save to global state
                  }
             });
         }
@@ -116,9 +109,7 @@ export class SessionContext {
         return this.projectInfoPromise;
     }
 
-
     dispose(): void {
-        // Clean up listeners if any
-        // No explicit state saving as it's session-specific
+        // Listeners added to context.subscriptions are disposed automatically
     }
 }
