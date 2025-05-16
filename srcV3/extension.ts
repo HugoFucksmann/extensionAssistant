@@ -5,11 +5,10 @@ import { initializePromptSystem, disposePromptSystem, executeModelInteraction, g
 import { ModelManager } from './models/config/ModelManager';
 import { ChatService } from './services/chatService';
 import { Orchestrator } from './orchestrator/orchestrator';
-import { FileSystemService } from './services/fileSystemService'; // Keep for now
 import { DatabaseManager } from './store/database/DatabaseManager';
 
 // Import new context classes
-import { GlobalContext, SessionContext, ConversationContext, FlowContext } from './orchestrator/context';
+import { GlobalContext, SessionContext } from './orchestrator/context';
 
 // Import new agents service
 import { AgentOrchestratorService } from './orchestrator/agents/AgentOrchestratorService';

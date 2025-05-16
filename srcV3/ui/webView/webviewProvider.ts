@@ -189,23 +189,26 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
 
   private async getProjectFiles(): Promise<void> {
     try {
-      const files = await ToolRunner.runTool('filesystem.getWorkspaceFiles', {});
-      this.postMessage('projectFiles', { files });
+        const files = await ToolRunner.runTool('filesystem.getWorkspaceFiles', {}); // AHORA
+        this.postMessage('projectFiles', { files });
     } catch (error) {
-      this.handleError(error);
-      this.postMessage('projectFiles', { files: [], error: error instanceof Error ? error.message : String(error) });
+        this.handleError(error);
+        this.postMessage('projectFiles', { files: [], error: error instanceof Error ? error.message : String(error) });
     }
-  }
+}
 
-  private async getFileContents(filePath: string): Promise<void> {
+private async getFileContents(filePath: string): Promise<void> {
     try {
-      const content = await ToolRunner.runTool('filesystem.getFileContents', { filePath });
-      this.postMessage('fileContents', { filePath, content });
+      
+        const content = await ToolRunner.runTool('filesystem.getFileContents', { filePath }); // AHORA
+        this.postMessage('fileContents', { filePath, content });
     } catch (error) {
-      this.handleError(error);
-      this.postMessage('fileContents', { filePath, content: `Error loading file: ${error instanceof Error ? error.message : String(error)}`, error: error instanceof Error ? error.message : String(error) });
+        this.handleError(error);
+        this.postMessage('fileContents', { filePath, content: `Error loading file: ${error instanceof Error ? error.message : String(error)}`, error: error instanceof Error ? error.message : String(error) });
     }
-  }
+}
+
+  
 
   private handleError(error: unknown): void {
     console.error('Webview error:', error);
