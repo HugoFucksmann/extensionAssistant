@@ -2,11 +2,11 @@
 
 import * as vscode from 'vscode';
 import { ConversationContext } from "../context/conversationContext";
-import { IMemoryRepository, MemoryItem } from "../../store/repositories/MemoryRepository";
 import { MemoryRepository } from "../../store/repositories/MemoryRepository";
 import { executeModelInteraction, getPromptDefinitions } from "../../models/promptSystem";
 import { buildMemoryExtractorVariables } from "../../models/prompts";
 import { EventEmitter } from 'events';
+import { IMemoryRepository, MemoryItem } from '../../store';
 
 // Define the interface for the prompt system functions we need
 interface PromptSystemFunctions {

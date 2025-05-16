@@ -1,13 +1,14 @@
 // src/services/ChatService.ts
 import * as vscode from 'vscode';
-import { IChatRepository } from '../store/interfaces/IChatRepository';
-import { ChatRepository } from '../store/repositories/chatRepository';
-import { Chat, ChatMessage } from '../store/interfaces/entities';
+
+
+
 import { ModelManager } from '../models/config/ModelManager';
 import { Orchestrator } from '../orchestrator/orchestrator';
 import { GlobalContext, SessionContext, ConversationContext, FlowContext } from '../orchestrator/context';
 import { AgentOrchestratorService } from '../orchestrator/agents/AgentOrchestratorService';
-import { MemoryItem } from '../store/repositories/MemoryRepository';
+
+import { Chat, ChatMessage, ChatRepository, IChatRepository, MemoryItem } from '../store';
 
 
 // Define the maximum number of planning attempts for a single user turn, including replanning.

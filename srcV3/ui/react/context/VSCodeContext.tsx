@@ -1,8 +1,9 @@
 // src/ui/context/VSCodeContext.tsx
 import React, { createContext, useState, useEffect, useContext, useMemo } from 'react';
-import { Chat, ChatMessage } from '../../../store/interfaces/entities';
+
 import { ThemeType } from '../theme/theme';
 import { getTheme } from '../theme/theme';
+import { Chat, ChatMessage } from '../../../store';
 
 interface VSCodeContextType {
   messages: ChatMessage[];

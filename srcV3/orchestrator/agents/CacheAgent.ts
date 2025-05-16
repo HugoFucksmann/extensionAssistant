@@ -1,6 +1,6 @@
 // src/orchestrator/agents/CacheAgent.ts
 
-import { CacheRepository, CacheItem } from "../../store/repositories/CacheRepository";
+import { CacheRepository } from "../../store/repositories/CacheRepository";
 import * as crypto from 'crypto';
 import * as vscode from 'vscode'; // Needed for context to get repo
 
@@ -34,7 +34,8 @@ export class CacheAgent {
     public async get(baseKey: string, content: string): Promise<any | null> {
         const key = this.generateCacheKey(baseKey, content);
         try {
-            const item = await this.repository.get(key);
+            // *** FIX: Use the new method name getItem ***
+            const item = await this.repository.getItem(key);
             if (item) {
                 console.log(`[CacheAgent] Cache hit for key: ${key}`);
                 return item.data;
@@ -55,7 +56,8 @@ export class CacheAgent {
       */
      public async getExact(key: string): Promise<any | null> {
          try {
-             const item = await this.repository.get(key);
+             // *** FIX: Use the new method name getItem ***
+             const item = await this.repository.getItem(key);
              if (item) {
                  console.log(`[CacheAgent] Exact cache hit for key: ${key}`);
                  return item.data;
@@ -79,6 +81,7 @@ export class CacheAgent {
     public async put(baseKey: string, content: string, data: any): Promise<void> {
         const key = this.generateCacheKey(baseKey, content);
         try {
+            // put method name did not change, this is correct
             await this.repository.put(key, data);
             console.log(`[CacheAgent] Cache put successful for key: ${key}`);
         } catch (error) {
@@ -93,6 +96,7 @@ export class CacheAgent {
       */
      public async putExact(key: string, data: any): Promise<void> {
          try {
+             // put method name did not change, this is correct
              await this.repository.put(key, data);
              console.log(`[CacheAgent] Exact cache put successful for key: ${key}`);
          } catch (error) {
@@ -108,6 +112,7 @@ export class CacheAgent {
     public async delete(baseKey: string, content: string): Promise<void> {
         const key = this.generateCacheKey(baseKey, content);
         try {
+            // delete method name did not change, this is correct
             await this.repository.delete(key);
             console.log(`[CacheAgent] Cache delete successful for key: ${key}`);
         } catch (error) {

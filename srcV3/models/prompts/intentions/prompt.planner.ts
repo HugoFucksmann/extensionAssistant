@@ -1,7 +1,7 @@
 // src/models/prompts/intentions/prompt.planner.ts
 
 import { BasePromptVariables, PlannerPromptVariables } from '../../../orchestrator/execution/types';
-import { MemoryItem } from '../../../store/repositories/MemoryRepository';
+import { MemoryItem } from '../../../store';
 import { ToolRunner } from '../../../tools';
 import { mapContextToBaseVariables, getPromptDefinitions } from '../../promptSystem';
 

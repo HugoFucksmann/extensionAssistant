@@ -9,7 +9,8 @@ import { executeModelInteraction, getPromptDefinitions } from "../../models/prom
 import { DatabaseManager } from "../../store/database/DatabaseManager";
 import { EventEmitter } from 'events';
 import { ConfigurationManager } from "../../config/ConfigurationManager";
-import { MemoryItem } from '../../store/repositories/MemoryRepository';
+import { MemoryItem } from '../../store';
+
 
 // Define the interface for the prompt system functions we need
 interface PromptSystemFunctions {

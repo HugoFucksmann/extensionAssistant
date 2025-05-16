@@ -1,161 +1,107 @@
 // src/store/repositories/CacheRepository.ts
 
-import * as sqlite3 from 'sqlite3';
-import { DatabaseManager } from '../database/DatabaseManager';
+import * as sqlite3 from 'sqlite3'; // Keep import if needed for types, though not directly used in methods now
 import * as vscode from 'vscode';
+import { ICacheRepository, CacheItem } from '../interfaces'; // Import from combined interfaces
+import { BaseRepository } from '../database/BaseRepository';
 
-// Define la interfaz para la estructura de datos en la tabla cache_items
-export interface CacheItem {
-    key: string;
-    data: any; // Campo para almacenar datos arbitrarios (como JSON)
-    timestamp: number; // Timestamp de creación o actualización
-}
-
-// Define la interfaz del repositorio para el caché
-export interface ICacheRepository {
-    /**
-     * Obtiene un item del caché por su clave.
-     * @param key La clave única del item.
-     * @returns El item del caché si se encuentra, o null si no.
-     */
-    get(key: string): Promise<CacheItem | null>;
-
-    /**
-     * Almacena o actualiza un item en el caché.
-     * @param key La clave única del item.
-     * @param data Los datos a almacenar (serán serializados a JSON).
-     * @returns Una promesa que se resuelve cuando la operación se completa.
-     */
-    put(key: string, data: any): Promise<void>;
-
-    /**
-     * Elimina un item del caché por su clave.
-     * @param key La clave única del item.
-     * @returns Una promesa que se resuelve cuando la operación se completa.
-     */
-    delete(key: string): Promise<void>;
-
-    // Métodos adicionales para limpieza (ej: eliminar items antiguos) podrían añadirse aquí.
-}
 
 /**
- * Implementación del repositorio para gestionar el caché en la base de datos SQLite.
+ * Implementation of the repository to manage cache in the SQLite database.
  */
-export class CacheRepository implements ICacheRepository {
-    private db: sqlite3.Database;
+export class CacheRepository extends BaseRepository implements ICacheRepository {
 
     constructor(context: vscode.ExtensionContext) {
-        const dbManager = DatabaseManager.getInstance(context);
-        this.db = dbManager.getDatabase();
-        // La creación de la tabla 'cache_items' se maneja en ChatRepository.initializeTables
-        // para simplificar la inicialización en una sola función por ahora.
+        super(context); // Initialize BaseRepository with DB connection promise
+        // Table initialization is handled by DatabaseManager
     }
 
     /**
-     * Obtiene un item del caché por su clave.
-     * @param key La clave única del item.
-     * @returns El item del caché si se encuentra, o null si no.
+     * Gets a cache item by its key.
+     * @param key The unique key of the item.
+     * @returns The cache item if found, or null if not.
+     * @throws Error if the database operation fails.
      */
-    public async get(key: string): Promise<CacheItem | null> {
-        return new Promise((resolve, reject) => {
-            // Especifica explícitamente los nombres de las columnas que esperas
-            this.db.get(
+    public async getItem(key: string): Promise<CacheItem | null> { // Renamed from get
+        try {
+            // Use super.get explicitly. Fetch the raw row data where 'data' is a string.
+            const row = await super.get<{ key: string, data: string, timestamp: number }>( // <-- Explicitly call super.get
                 'SELECT key, data, timestamp FROM cache_items WHERE key = ?',
-                [key],
-                (err: Error | null, row: any) => { // Usa 'any' para la fila cruda de SQLite
-                    if (err) {
-                        console.error('[CacheRepository] Error getting cache item:', err.message);
-                        reject(err);
-                    } else {
-                        if (row) {
-                            try {
-                                // Asegúrate de que las propiedades existen en la fila devuelta
-                                if (row.key !== undefined && row.data !== undefined && row.timestamp !== undefined) {
-                                     // Parse the JSON data before returning
-                                     resolve({
-                                         key: row.key,
-                                         data: JSON.parse(row.data), // Parsea el string JSON
-                                         timestamp: row.timestamp
-                                     });
-                                } else {
-                                     console.warn('[CacheRepository] Cached row missing expected properties for key:', key, row);
-                                     // Consider deleting corrupted row here if properties are missing
-                                     this.delete(key).catch(deleteErr => console.error('[CacheRepository] Error deleting incomplete cache item:', deleteErr));
-                                     resolve(null); // Return null if row structure is unexpected
-                                }
-                            } catch (parseErr) {
-                                console.error('[CacheRepository] Error parsing cached data for key:', key, parseErr);
-                                // Optionally delete corrupted cache item
-                                this.delete(key).catch(deleteErr => console.error('[CacheRepository] Error deleting corrupted cache item:', deleteErr));
-                                resolve(null); // Return null if data is corrupted JSON
-                            }
-                        } else {
-                            resolve(null); // Item not found
-                        }
-                    }
-                }
+                [key]
             );
-        });
+
+            if (!row) {
+                return null; // Item not found
+            }
+
+            // Manually parse the JSON data from the string column
+            try {
+                const cacheItem: CacheItem = {
+                    key: row.key,
+                    data: JSON.parse(row.data), // Parse the JSON string
+                    timestamp: row.timestamp
+                };
+                return cacheItem;
+            } catch (parseErr) {
+                console.error('[CacheRepository] Error parsing cached data for key:', key, parseErr);
+                // Optionally delete corrupted cache item
+                // Use super.delete implicitly via this.delete - NO, call delete directly
+                this.delete(key).catch(deleteErr => console.error('[CacheRepository] Error deleting corrupted cache item:', deleteErr));
+                return null; // Return null if data is corrupted JSON
+            }
+
+        } catch (err: any) {
+            // Catch errors from the database operation itself (e.g., SQL error, DB not ready)
+            console.error('[CacheRepository] Error getting cache item:', err.message);
+            throw new Error(`Failed to get cache item "${key}": ${err.message}`); // Re-throw standardized error
+        }
     }
 
     /**
-     * Almacena o actualiza un item en el caché.
-     * @param key La clave única del item.
-     * @param data Los datos a almacenar (serán serializados a JSON).
-     * @returns Una promesa que se resuelve cuando la operación se completa.
+     * Stores or updates a cache item.
+     * @param key The unique key of the item.
+     * @param data The data to store (will be serialized to JSON).
+     * @throws Error if the database operation fails.
      */
     public async put(key: string, data: any): Promise<void> {
-        const jsonData = JSON.stringify(data); // Serializa los datos a JSON string
-        const timestamp = Date.now();
+        try {
+            const jsonData = JSON.stringify(data); // Serialize the data to JSON string
+            const timestamp = Date.now();
 
-        return new Promise((resolve, reject) => {
-            // Usa INSERT OR REPLACE para actualizar si la clave ya existe
-            this.db.run(
+            // Use super.run explicitly
+            // Use INSERT OR REPLACE to update if the key already exists
+            await super.run( // <-- Explicitly call super.run
                 'INSERT OR REPLACE INTO cache_items (key, data, timestamp) VALUES (?, ?, ?)',
-                [key, jsonData, timestamp],
-                (err: Error | null) => {
-                    if (err) {
-                        console.error('[CacheRepository] Error putting cache item:', err.message);
-                        reject(err);
-                    } else {
-                        // this.lastID and this.changes are available here if needed,
-                        // but for put operation, just resolving is usually sufficient.
-                        resolve();
-                    }
-                }
+                [key, jsonData, timestamp]
             );
-        });
+        } catch (err: any) {
+            console.error('[CacheRepository] Error putting cache item:', err.message);
+            throw new Error(`Failed to put cache item "${key}": ${err.message}`);
+        }
     }
 
     /**
-     * Elimina un item del caché por su clave.
-     * @param key La clave única del item.
-     * @returns Una promesa que se resuelve cuando la operación se completa.
+     * Deletes a cache item by its key.
+     * @param key The unique key of the item.
+     * @throws Error if the database operation fails.
      */
     public async delete(key: string): Promise<void> {
-        return new Promise((resolve, reject) => {
-            this.db.run(
-                'DELETE FROM cache_items WHERE key = ?',
-                [key],
-                (err: Error | null) => {
-                    if (err) {
-                        console.error('[CacheRepository] Error deleting cache item:', err.message);
-                        reject(err);
-                    } else {
-                        // this.changes is available here if needed (number of rows deleted)
-                        resolve();
-                    }
-                }
-            );
-        });
+        try {
+            await super.run('DELETE FROM cache_items WHERE key = ?', [key]); // <-- Explicitly call super.run
+        } catch (err: any) {
+            console.error('[CacheRepository] Error deleting cache item:', err.message);
+            throw new Error(`Failed to delete cache item "${key}": ${err.message}`);
+        }
     }
 
-    /**
-     * Dispone de los recursos del repositorio (si los hubiera).
-     * En este caso, la conexión a la DB es gestionada por DatabaseManager.
-     */
-    dispose(): void {
-        console.log('[CacheRepository] Disposing.');
-        // No specific resources to clean up here as DBManager is singleton
-    }
+    // Optional: Prune old cache items
+    // public async prune(olderThanTimestamp: number): Promise<void> {
+    //     try {
+    //         await super.run('DELETE FROM cache_items WHERE timestamp < ?', [olderThanTimestamp]); // <-- Explicitly call super.run
+    //         console.log(`[CacheRepository] Pruned items older than ${new Date(olderThanTimestamp).toISOString()}`);
+    //     } catch (err: any) {
+    //         console.error('[CacheRepository] Error pruning cache items:', err.message);
+    //         throw new Error(`Failed to prune cache items: ${err.message}`);
+    //     }
+    // }
 }
