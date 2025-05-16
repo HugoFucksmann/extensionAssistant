@@ -2,12 +2,16 @@
 import { SessionContext } from './sessionContext';
 import { ChatMessage } from '../../store/interfaces/entities';
 import { FlowContext } from './flowContext';
+import { MemoryItem } from '../../store/repositories/MemoryRepository';
+
 
 interface ConversationContextState {
     chatId: string;
     messages: ChatMessage[];
     summary?: string;
     relevantFiles?: string[];
+    analyzedFileInsights?: any;
+    retrievedMemory?: MemoryItem[]; // <-- Add field for retrieved memory
     [key: string]: any;
 }
 
@@ -25,9 +29,13 @@ export class ConversationContext {
         this.state = {
             chatId: chatId,
             messages: initialMessages,
+            summary: undefined,
+            relevantFiles: undefined,
+            analyzedFileInsights: undefined,
+            retrievedMemory: undefined, // <-- Initialize here
         };
         this.sessionContext = sessionContext;
-        // console.log(`[ConversationContext:${chatId}] Initialized with ${initialMessages.length} messages.`); // Reduced logging
+        console.log(`[ConversationContext:${chatId}] Initialized with ${initialMessages.length} messages.`);
     }
 
     getState(): ConversationContextState {
@@ -47,7 +55,7 @@ export class ConversationContext {
 
     addMessage(message: ChatMessage): void {
         this.state.messages.push(message);
-        // console.log(`[ConversationContext:${this.state.chatId}] Added message. Total: ${this.state.messages.length}`); // Reduced logging
+        console.log(`[ConversationContext:${this.state.chatId}] Added message. Total: ${this.state.messages.length}`);
     }
 
     getHistory(limit?: number): ChatMessage[] {
@@ -69,8 +77,19 @@ export class ConversationContext {
      * Creates or gets the active FlowContext for the current turn.
      */
     createFlowContext(): FlowContext {
-        this.currentFlowContext = new FlowContext(this);
-        // console.log(`[ConversationContext:${this.state.chatId}] Created new FlowContext.`); // Reduced logging
+        if (this.currentFlowContext) {
+            this.currentFlowContext.dispose();
+        }
+        // Pass relevant state from ConversationContext to the new FlowContext's initial state
+        // FlowContext will read most state via getResolutionContext, but initial state can be useful
+        this.currentFlowContext = new FlowContext(this, {
+            // Pass state that FlowContext needs to start the turn
+            summary: this.state.summary,
+            relevantFiles: this.state.relevantFiles,
+            analyzedFileInsights: this.state.analyzedFileInsights, // Still pass for initial context
+            retrievedMemory: this.state.retrievedMemory, // Still pass for initial context
+        });
+        console.log(`[ConversationContext:${this.state.chatId}] Created new FlowContext.`);
         return this.currentFlowContext;
     }
 
@@ -79,10 +98,31 @@ export class ConversationContext {
     }
 
     getSummary(): string | undefined { return this.state.summary; }
-    setSummary(summary: string | undefined): void { this.state.summary = summary; }
+    setSummary(summary: string | undefined): void {
+        this.state.summary = summary;
+        console.log(`[ConversationContext:${this.state.chatId}] Summary updated.`);
+    }
 
     getRelevantFiles(): string[] | undefined { return this.state.relevantFiles; }
-    setRelevantFiles(files: string[] | undefined): void { this.state.relevantFiles = files; }
+    setRelevantFiles(files: string[] | undefined): void {
+        this.state.relevantFiles = files;
+        console.log(`[ConversationContext:${this.state.chatId}] Relevant files updated: ${files?.length || 0} files.`);
+    }
+
+    getAnalyzedFileInsights(): any | undefined { return this.state.analyzedFileInsights; }
+    setAnalyzedFileInsights(insights: any | undefined): void {
+        this.state.analyzedFileInsights = insights;
+        console.log(`[ConversationContext:${this.state.chatId}] Analyzed file insights updated.`);
+    }
+
+    // <-- Add getter and setter for retrievedMemory
+    getRetrievedMemory(): MemoryItem[] | undefined { return this.state.retrievedMemory; }
+    setRetrievedMemory(memory: MemoryItem[] | undefined): void {
+        this.state.retrievedMemory = memory;
+        console.log(`[ConversationContext:${this.state.chatId}] Retrieved memory updated: ${memory?.length || 0} items.`);
+    }
+    // --> End new getters/setters
+
 
     dispose(): void {
         if (this.currentFlowContext) {
@@ -90,6 +130,10 @@ export class ConversationContext {
         }
         this.currentFlowContext = null;
         this.state.messages = [];
-        // console.log(`[ConversationContext:${this.state.chatId}] Disposed.`); // Reduced logging
+        this.state.summary = undefined;
+        this.state.relevantFiles = undefined;
+        this.state.analyzedFileInsights = undefined;
+        this.state.retrievedMemory = undefined; // <-- Clear on dispose
+        console.log(`[ConversationContext:${this.state.chatId}] Disposed.`);
     }
 }

@@ -6,27 +6,25 @@ import { IChatRepository } from '../interfaces/IChatRepository';
 import { Chat, ChatMessage } from '../interfaces/entities';
 import { DatabaseManager } from '../database/DatabaseManager';
 
+
 export class ChatRepository implements IChatRepository {
   private db: sqlite3.Database;
 
   constructor(context: vscode.ExtensionContext) {
     const dbManager = DatabaseManager.getInstance(context);
     this.db = dbManager.getDatabase();
-    this.initializeTable();
+    this.initializeTables();
   }
 
   /**
-   * Initialize chat tables
-   * NOTE: This uses DROP TABLE for simplicity during development/reset.
-   * A production system would require schema migration logic.
+   * Initialize chat, message, cache, and memory tables if they do not exist.
+   * NOTE: This is a basic initialization. For schema changes, a proper migration system is required.
    */
-  private initializeTable(): void {
+  private initializeTables(): void {
     this.db.serialize(() => {
-      this.db.run('DROP TABLE IF EXISTS messages');
-      this.db.run('DROP TABLE IF EXISTS chats');
-
+      // Use CREATE TABLE IF NOT EXISTS instead of DROP TABLE
       this.db.run(`
-        CREATE TABLE chats (
+        CREATE TABLE IF NOT EXISTS chats (
           id TEXT PRIMARY KEY,
           title TEXT NOT NULL,
           timestamp INTEGER NOT NULL,
@@ -35,7 +33,7 @@ export class ChatRepository implements IChatRepository {
       `);
 
       this.db.run(`
-        CREATE TABLE messages (
+        CREATE TABLE IF NOT EXISTS messages (
           id TEXT PRIMARY KEY,
           chat_id TEXT NOT NULL,
           content TEXT NOT NULL,
@@ -44,6 +42,28 @@ export class ChatRepository implements IChatRepository {
           FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE
         )
       `);
+
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS cache_items (
+          key TEXT PRIMARY KEY,
+          data TEXT NOT NULL,
+          timestamp INTEGER NOT NULL
+        )
+      `);
+
+      this.db.run(`
+        CREATE TABLE IF NOT EXISTS memory_items (
+          id TEXT PRIMARY KEY,
+          user_id TEXT,
+          project_id TEXT,
+          type TEXT NOT NULL,
+          key_name TEXT,
+          content TEXT NOT NULL,
+          timestamp INTEGER NOT NULL,
+          UNIQUE(project_id, type, key_name) ON CONFLICT REPLACE
+        )
+      `);
+      console.log('[ChatRepository] Database tables initialized (if not existing).');
     });
   }
 

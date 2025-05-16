@@ -1,5 +1,5 @@
 import { PromptType, BasePromptVariables,  PromptVariables } from '../orchestrator';
-import { inputAnalyzerPrompt, buildInputAnalyzerVariables, codeValidatorPrompt, buildCodeValidatorVariables } from './prompts';
+import { inputAnalyzerPrompt, buildInputAnalyzerVariables, codeValidatorPrompt, buildCodeValidatorVariables, summarizerPrompt, buildSummarizerVariables, codeFragmenterPrompt, buildCodeFragmenterVariables, buildCodeAnalyzerVariables, codeAnalyzerPrompt, buildMemoryExtractorVariables, memoryExtractorPrompt, progressEvaluatorPrompt, buildProgressEvaluatorVariables } from './prompts';
 import {
   explainCodePrompt,
   fixCodePrompt,
@@ -14,17 +14,22 @@ import { ModelType } from './config/types'; // Assuming this exists
 import { parseModelResponse } from './config/modelUtils'; // Assuming this exists
 
 interface PromptDefinition<T extends BasePromptVariables = BasePromptVariables> {
-    template: string;
-    buildVariables: (resolutionContextData: Record<string, any>) => T;
+  template: string;
+  buildVariables: (resolutionContextData: Record<string, any>) => T;
 }
 
 const PROMPT_DEFINITIONS: Partial<Record<PromptType, PromptDefinition<any>>> = {
   inputAnalyzer: { template: inputAnalyzerPrompt, buildVariables: buildInputAnalyzerVariables },
   codeValidator: { template: codeValidatorPrompt, buildVariables: buildCodeValidatorVariables },
-  explainCodePrompt: { template: explainCodePrompt, buildVariables: mapContextToBaseVariables },
-  fixCodePrompt: { template: fixCodePrompt, buildVariables: mapContextToBaseVariables },
+  explainCodePrompt: { template: explainCodePrompt, buildVariables: mapContextToBaseVariables }, // Consider a dedicated builder later
+  fixCodePrompt: { template: fixCodePrompt, buildVariables: mapContextToBaseVariables }, // Consider a dedicated builder later
   conversationResponder: { template: conversationPrompt, buildVariables: buildConversationVariables },
-  planner: { template: plannerPrompt, buildVariables: buildPlannerVariables }
+  planner: { template: plannerPrompt, buildVariables: buildPlannerVariables },
+  summarizer: { template: summarizerPrompt, buildVariables: buildSummarizerVariables }, // <-- Add the new definition
+  codeFragmenter: { template: codeFragmenterPrompt, buildVariables: buildCodeFragmenterVariables },
+  codeAnalyzer: { template: codeAnalyzerPrompt, buildVariables: buildCodeAnalyzerVariables },
+  memoryExtractor: { template: memoryExtractorPrompt, buildVariables: buildMemoryExtractorVariables },
+  progressEvaluator: { template: progressEvaluatorPrompt, buildVariables: buildProgressEvaluatorVariables },
 };
 
 let _modelManager: ModelManager | null = null;
@@ -59,11 +64,12 @@ function buildPromptVariables(type: PromptType, resolutionContextData: Record<st
   if (!definition) {
     throw new Error(`No prompt definition found for type: ${type}`);
   }
+  // Pass the full resolutionContextData to the builder
   return definition.buildVariables(resolutionContextData);
 }
 
 export function getPromptDefinitions(): Partial<Record<PromptType, PromptDefinition<any>>> {
-    return PROMPT_DEFINITIONS;
+  return PROMPT_DEFINITIONS;
 }
 
 function fillPromptTemplate(template: string, variables: PromptVariables): string {

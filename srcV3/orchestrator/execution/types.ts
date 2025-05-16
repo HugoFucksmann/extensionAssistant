@@ -85,7 +85,12 @@ export type PromptType =
   | 'explainCodePrompt'
   | 'fixCodePrompt'
   | 'codeValidator'
-  | 'planner'; // Removed planningEngine alias
+  | 'planner'
+  | 'summarizer'
+  | 'codeFragmenter' // For breaking down code into manageable chunks
+  | 'codeAnalyzer'  // For analyzing code structure and content
+  | 'memoryExtractor'
+  | 'progressEvaluator'; // For evaluating progress and suggesting next steps  // For extracting and managing memories from conversations
 
 // --- Standardized Prompt Variable Interfaces ---
 

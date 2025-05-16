@@ -2,6 +2,7 @@
 import { InputAnalysisResult } from '../execution/types';
 import { ConversationContext } from './conversationContext';
 
+
 // Minimal ChatMessage definition for type hinting within this file
 interface ChatMessage {
     content: string;
@@ -12,6 +13,11 @@ interface FlowContextState {
     userMessage?: string;
     referencedFiles?: string[];
     analysisResult?: InputAnalysisResult;
+    // analyzedFileInsights is in ConversationContext
+    // retrievedMemory is in ConversationContext
+    isReplanning?: boolean; // <-- Add replanning flag
+    replanReason?: string; // <-- Add replanning reason
+    replanData?: any; // <-- Add data that triggered replan
     [key: string]: any; // For step results, temporary data, etc.
 }
 
@@ -29,7 +35,7 @@ export class FlowContext {
         this.state = {
             ...initialState
         };
-        // console.log(`[FlowContext:${this.getChatId()}] Initialized.`); // Reduced logging
+        console.log(`[FlowContext:${this.getChatId()}] Initialized.`);
     }
 
     getChatId(): string {
@@ -46,12 +52,12 @@ export class FlowContext {
      */
     setValue(key: string, value: any) {
         // Prevent overwriting critical parent context properties if keys overlap by accident
-         if (['chatId', 'messages', 'summary', 'relevantFiles'].includes(key)) {
+         if (['chatId', 'messages', 'summary', 'relevantFiles', 'analyzedFileInsights', 'retrievedMemory', 'isReplanning', 'replanReason', 'replanData'].includes(key)) { // <-- Add replanning keys
             console.warn(`[FlowContext:${this.getChatId()}] Attempted to overwrite potential ConversationContext key: ${key}`);
             return;
         }
         this.state[key] = value;
-        // console.log(`[FlowContext:${this.getChatId()}] Set value for key '${key}'.`); // Reduced logging
+        console.log(`[FlowContext:${this.getChatId()}] Set value for key '${key}'.`);
     }
 
     /**
@@ -91,7 +97,8 @@ export class FlowContext {
         // 2. Add ConversationContext state (excluding messages, handled by chatHistoryString)
         const convState = this.conversationContext.getState();
         for (const key in convState) {
-             if (key !== 'messages' && convState[key] !== undefined && resolutionContextData[key] === undefined) {
+             // Exclude messages and currentFlowContext
+             if (key !== 'messages' && key !== 'currentFlowContext' && convState[key] !== undefined && resolutionContextData[key] === undefined) {
                  resolutionContextData[key] = convState[key];
              }
         }
@@ -123,7 +130,9 @@ export class FlowContext {
              }
         }
 
-        
+        // analyzedFileInsights, relevantFiles, summary, retrievedMemory are included via the convState loop (step 2)
+        // isReplanning, replanReason, replanData are included via the state loop (step 1)
+
 
         return resolutionContextData;
     }
@@ -132,13 +141,12 @@ export class FlowContext {
      * Gets the full internal state.
      */
     getState(): FlowContextState {
-        return JSON.parse(JSON.stringify(this.state));
+        const stateCopy: any = { ...this.state };
+        return stateCopy as FlowContextState;
     }
 
-    // Removed restoreState as it's likely not needed for a per-turn context
-
     dispose(): void {
-         // console.log(`[FlowContext:${this.getChatId()}] Disposed.`); // Reduced logging
+         console.log(`[FlowContext:${this.getChatId()}] Disposed.`);
          this.state = {};
     }
 }

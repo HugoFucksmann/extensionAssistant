@@ -88,29 +88,39 @@ export class ToolRunner {
   ): Promise<any> {
     const tool = this.TOOLS[toolName];
     if (!tool) {
-      throw new Error(`Tool no registrada: ${toolName}`);
+      const error = new Error(`Tool no registrada: ${toolName}`);
+      console.error('[ToolRunner]', error.message);
+      // Show error message in VS Code UI
+      vscode.window.showErrorMessage(`Error ejecutando tool: Tool '${toolName}' no registrada.`);
+      throw error;
     }
 
     // Validación de parámetros (usando validateParams o requiredParams del tool)
     if (tool.validateParams) {
       const validationResult = tool.validateParams(params);
       if (typeof validationResult === 'string') {
-        throw new Error(`Error de validación en ${toolName}: ${validationResult}`);
+        const error = new Error(`Error de validación en ${toolName}: ${validationResult}`);
+        console.error('[ToolRunner]', error.message);
+        vscode.window.showErrorMessage(`Error ejecutando tool ${toolName}: ${validationResult}`);
+        throw error;
       }
     } else if (tool.requiredParams) {
       for (const param of tool.requiredParams) {
-        // Check if the parameter is missing OR explicitly null/undefined
         if (params[param] === undefined || params[param] === null) {
-          throw new Error(`Parámetro requerido faltante en ${toolName}: ${param}`);
+          const error = new Error(`Parámetro requerido faltante en ${toolName}: ${param}`);
+          console.error('[ToolRunner]', error.message);
+          vscode.window.showErrorMessage(`Error ejecutando tool ${toolName}: Parámetro '${param}' faltante.`);
+          throw error;
         }
       }
     }
 
     try {
-      // Pass the resolved parameters directly to the tool's execute function
-      return await tool.execute(params);
+      console.log(`[ToolRunner] Executing tool: ${toolName} with params:`, params);
+      const result = await tool.execute(params);
+      console.log(`[ToolRunner] Tool execution successful: ${toolName}`);
+      return result;
     } catch (error: any) {
-      // Log the error and re-throw
       console.error(`[ToolRunner] Error executing tool ${toolName}:`, error);
       // Show error message in VS Code UI for user feedback
       vscode.window.showErrorMessage(`Error ejecutando tool ${toolName}: ${error.message || String(error)}`);
@@ -138,27 +148,27 @@ export class ToolRunner {
               results[name] = await this.runTool(name, params);
           } catch (error) {
               errors[name] = error;
-              // Decide if a single tool failure should stop the parallel run
-              // For now, let's catch and continue, but record the error.
               console.error(`[ToolRunner] Error in parallel execution for tool '${name}':`, error);
           }
       }
 
-      // If any errors occurred, throw a combined error or return results + errors
       if (Object.keys(errors).length > 0) {
-           // You might want a more sophisticated error handling here,
-           // e.g., throwing a specific aggregate error.
+           // You might want a more sophisticated error handling here
            console.error("[ToolRunner] Parallel execution finished with errors:", errors);
            // Depending on desired behavior, you might throw here:
            // throw new Error(`Parallel tool execution failed for tools: ${Object.keys(errors).join(', ')}`);
       }
 
-      return results; // Return results (successful and undefined for failed)
+      return results;
   }
 
 
   /**
    * Lista todas las tools disponibles (nombres completos)
+   *
+   * EXTENSIBILITY: To add a new tool, create its implementation file,
+   * export the function, add it to the src/tools/index.ts barrel file,
+   * and register it in the TOOLS map here with validation/required params.
    */
   public static listTools(): string[] {
     return Object.keys(this.TOOLS);
