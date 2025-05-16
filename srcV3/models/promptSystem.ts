@@ -1,9 +1,13 @@
-import { PromptType, BasePromptVariables, PlannerResponse, PromptVariables } from '../orchestrator'; // Import PlannerResponse
+import { PromptType, BasePromptVariables,  PromptVariables } from '../orchestrator';
 import { inputAnalyzerPrompt, buildInputAnalyzerVariables, codeValidatorPrompt, buildCodeValidatorVariables } from './prompts';
-import { explainCodePrompt } from './prompts/intentions/prompt.explainCode'; // Assuming these exist
-import { fixCodePrompt } from './prompts/intentions/prompt.fixCode'; // Assuming these exist
-import { conversationPrompt, buildConversationVariables } from './prompts/intentions/prompt.conversation'; // Assuming these exist
-import { plannerPrompt, buildPlannerVariables } from './prompts/intentions/prompt.planner'; // Assuming these exist
+import {
+  explainCodePrompt,
+  fixCodePrompt,
+  conversationPrompt,
+  buildConversationVariables,
+  plannerPrompt,
+  buildPlannerVariables
+} from './prompts/index'; // Importar desde el índice centralizado
 
 import { ModelManager } from './config/ModelManager'; // Assuming this exists
 import { ModelType } from './config/types'; // Assuming this exists

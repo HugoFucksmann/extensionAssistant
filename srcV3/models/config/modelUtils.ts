@@ -1,6 +1,6 @@
 // src/models/config/modelUtils.ts
 
-// Import PromptType and InputAnalysisResult from types.ts
+
 import { PromptType, InputAnalysisResult } from '../../orchestrator/execution/types';
 
 /**
@@ -16,38 +16,27 @@ export function extractJsonFromText<T>(text: string, defaultValue: T): T {
     return defaultValue;
   }
 
-  const cleanedText = text.trim();
+  // Clean up the text by removing markdown formatting
+  const cleanedText = text
+    .trim()
+    .replace(/```json\s*([^]*?)\s*```/g, '$1') // Extract JSON from code blocks marked as json
+    .replace(/```[\s\S]*?```/g, '') // Remove all other code blocks
+    .replace(/`[^`]*`/g, '')        // Remove inline code
+    .replace(/\s+/g, ' ')          // Normalize whitespace
+    .trim();
 
   try {
     const parsed = JSON.parse(cleanedText);
     if (typeof parsed === 'object' && parsed !== null) {
       return parsed as T;
     }
-    console.warn("[extractJsonFromText] Direct parse resulted in a primitive, not an object/array.");
   } catch (e) {}
 
-  const tripleQuotesRegex = /```(?:json)?\s*([\s\S]*?)\s*```/;
-  const tripleQuotesMatch = cleanedText.match(tripleQuotesRegex);
-
-  if (tripleQuotesMatch && tripleQuotesMatch[1]) {
+  // Try to find JSON object in the text
+  const jsonMatch = cleanedText.match(/\{[^]*\}/);
+  if (jsonMatch) {
     try {
-      const parsed = JSON.parse(tripleQuotesMatch[1]);
-      if (typeof parsed === 'object' && parsed !== null) {
-        return parsed as T;
-      }
-      console.warn("[extractJsonFromText] JSON inside triple quotes parsed to a primitive.");
-    } catch (e) {
-      console.warn("[extractJsonFromText] Failed to parse JSON inside triple quotes:", e);
-    }
-  }
-
-  const jsonRegex = /(\{[\s\S]*?\})/g;
-  let match;
-  let lastAttemptedJson: string | undefined;
-  while ((match = jsonRegex.exec(cleanedText)) !== null) {
-    try {
-      lastAttemptedJson = match[1];
-      const parsed = JSON.parse(lastAttemptedJson);
+      const parsed = JSON.parse(jsonMatch[0]);
       if (typeof parsed === 'object' && parsed !== null) {
         console.warn("[extractJsonFromText] Successfully extracted JSON from text (not in markdown).");
         return parsed as T;
@@ -57,9 +46,6 @@ export function extractJsonFromText<T>(text: string, defaultValue: T): T {
   }
 
   console.warn("[extractJsonFromText] No valid JSON object found or extracted from text.");
-  if (lastAttemptedJson) {
-    console.warn("[extractJsonFromText] Last failed JSON parse attempt:", lastAttemptedJson);
-  }
   return defaultValue;
 }
 

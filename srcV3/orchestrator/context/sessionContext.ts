@@ -43,7 +43,7 @@ export class SessionContext {
                 } else {
                     this.state.activeEditorInfo = undefined;
                 }
-                 // console.log('[SessionContext] Active editor updated:', this.state.activeEditorInfo?.fileName); // Reduced logging
+                
             })
         );
 
@@ -55,7 +55,7 @@ export class SessionContext {
              };
         }
 
-        // console.log('[SessionContext] Initialized.', this.state); // Reduced logging
+        
     }
 
     getState(): SessionContextState {

@@ -19,8 +19,6 @@ export class PromptExecutor implements IExecutor {
       'fixCodePrompt',
       'codeValidator',
       'planner',
-       // Add other prompt types here as they are implemented and used
-       // 'editing', 'examination', 'projectManagement', 'projectSearch', 'resultEvaluator'
     ];
     this.validPromptTypes = new Set(allPromptTypes);
     // console.log('[PromptExecutor] Initialized with valid prompt types:', Array.from(this.validPromptTypes)); // Reduced logging

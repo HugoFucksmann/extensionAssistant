@@ -19,13 +19,13 @@ export interface GlobalContextState {
 export class GlobalContext {
     private state: GlobalContextState;
     private context: vscode.ExtensionContext;
-    private configManager: ConfigurationManager; // Assuming this exists
+
 
     constructor(context: vscode.ExtensionContext, configManager: ConfigurationManager) {
         this.context = context;
-        this.configManager = configManager;
+      
         this.state = this.loadState() || {};
-        // console.log('[GlobalContext] Initialized.', this.state); // Reduced logging
+         console.log('[GlobalContext] Initialized.', this.state); // Reduced logging
     }
 
     private loadState(): GlobalContextState | undefined {
@@ -34,7 +34,7 @@ export class GlobalContext {
 
     async saveState(): Promise<void> {
         await this.context.globalState.update('extensionAssistant.globalContext', this.state);
-        // console.log('[GlobalContext] State saved.'); // Reduced logging
+     
     }
 
     getState(): GlobalContextState {

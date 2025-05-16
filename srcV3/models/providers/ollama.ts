@@ -18,10 +18,10 @@ export class OllamaAPI implements ModelAPI {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "qwen2.5-coder:7b", //gemma3:4b
+          model: "gemma3:4b", //gemma3:4b
           prompt,
           stream: false,
-          temperature: 0.2,
+          temperature: 0.3,
         }),
         signal: this.abortController.signal,
       });
