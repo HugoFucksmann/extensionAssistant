@@ -1,144 +1,119 @@
 import * as vscode from 'vscode';
 // Import all tools from the new structured index
+// This imports the barrel file which re-exports individual functions
 import * as tools from '..';
 
-// Interfaz para definir la estructura de una herramienta (mantener)
-interface Tool {
-  execute: (...args: any[]) => Promise<any>;
+// Define a type for the tool function itself, including the attached properties
+type ToolFunction = ((params: Record<string, any>) => Promise<any>) & {
   validateParams?: (params: Record<string, any>) => boolean | string;
   requiredParams?: string[];
+};
+
+// Interface for the entry in the ToolRegistry
+interface ToolEntry {
+    execute: ToolFunction; // The tool function with potential validation properties
 }
 
-type ToolRegistry = Record<string, Tool>;
+type ToolRegistry = Record<string, ToolEntry>;
 
 export class ToolRunner {
 
-  // Update the TOOLS registry to use the imported tools with module prefixes
+  // The TOOLS registry maps tool names to the imported functions.
+  // We now rely on the imported function object having the validateParams/requiredParams properties.
   private static readonly TOOLS: ToolRegistry = {
     // Filesystem Tools
-    'filesystem.getWorkspaceFiles': {
-      execute: tools.getWorkspaceFiles,
-      validateParams: () => true // No requiere parámetros
-    },
-    'filesystem.getFileContents': {
-      execute: tools.getFileContents,
-      validateParams: (params) => {
-        if (!params.filePath || typeof params.filePath !== 'string') {
-          return 'Se requiere filePath como string';
-        }
-        return true;
-      },
-      requiredParams: ['filePath']
-    },
+    'filesystem.getWorkspaceFiles': { execute: tools.getWorkspaceFiles as ToolFunction },
+    'filesystem.getFileContents': { execute: tools.getFileContents as ToolFunction }, // getFileContents has validation props
 
     // Editor Tools
-    'editor.getActiveEditorContent': {
-      execute: tools.getActiveEditorContent,
-      validateParams: () => true,
-      requiredParams: []
-    },
+    'editor.getActiveEditorContent': { execute: tools.getActiveEditorContent as ToolFunction },
 
     // Project Tools
-    'project.getPackageDependencies': {
-      execute: tools.getPackageDependencies,
-      validateParams: (params) => {
-        if (!params.projectPath || typeof params.projectPath !== 'string') {
-          return 'Se requiere projectPath como string';
-        }
-        return true;
-      },
-      requiredParams: ['projectPath']
-    },
-    'project.getProjectInfo': {
-      execute: tools.getProjectInfo,
-      validateParams: () => true,
-      requiredParams: []
-    },
-    'project.searchWorkspace': {
-      execute: tools.searchWorkspace,
-      validateParams: (params) => {
-        if (!params.query || typeof params.query !== 'string') {
-          return 'Se requiere query como string';
-        }
-        return true;
-      },
-      requiredParams: ['query']
-    },
+    'project.getPackageDependencies': { execute: tools.getPackageDependencies as ToolFunction }, // getPackageDependencies has optional params, no requiredParams
+    'project.getProjectInfo': { execute: tools.getProjectInfo as ToolFunction }, // No params
+    'project.searchWorkspace': { execute: tools.searchWorkspace as ToolFunction }, // searchWorkspace has validation props
 
     // Code Manipulation Tools
-    'codeManipulation.applyWorkspaceEdit': {
-      execute: tools.applyWorkspaceEdit,
-      validateParams: (params) => {
-        if (!params.edits || !Array.isArray(params.edits)) {
-          return 'Se requiere edits como array';
-        }
-        return true;
-      },
-      requiredParams: ['edits']
-    }
+    'codeManipulation.applyWorkspaceEdit': { execute: tools.applyWorkspaceEdit as ToolFunction }, // applyWorkspaceEdit has validation props
   };
 
   /**
-   * Ejecuta una tool específica después de validar sus parámetros
-   * @param toolName El nombre completo de la tool (ej: 'filesystem.getFileContents')
+   * Executes a specific tool after validating its parameters.
+   * Standardizes error handling and user feedback.
+   * @param toolName The full name of the tool (e.g., 'filesystem.getFileContents')
+   * @param params Parameters object for the tool. Defaults to an empty object.
+   * @returns The result of the tool execution.
+   * @throws Error if the tool is not found, validation fails, or the tool execution fails.
    */
   public static async runTool(
     toolName: string,
     params: Record<string, any> = {}
   ): Promise<any> {
-    const tool = this.TOOLS[toolName];
-    if (!tool) {
-      const error = new Error(`Tool no registrada: ${toolName}`);
+    const toolEntry = this.TOOLS[toolName];
+    if (!toolEntry) {
+      const error = new Error(`Tool not registered: ${toolName}`);
       console.error('[ToolRunner]', error.message);
       // Show error message in VS Code UI
-      vscode.window.showErrorMessage(`Error ejecutando tool: Tool '${toolName}' no registrada.`);
+      vscode.window.showErrorMessage(`Error executing tool: Tool '${toolName}' not registered.`);
       throw error;
     }
 
-    // Validación de parámetros (usando validateParams o requiredParams del tool)
-    if (tool.validateParams) {
-      const validationResult = tool.validateParams(params);
+    const toolFunction = toolEntry.execute;
+
+    // --- Parameter Validation ---
+    // Check for validateParams property first
+    if (typeof toolFunction.validateParams === 'function') {
+      const validationResult = toolFunction.validateParams(params);
       if (typeof validationResult === 'string') {
-        const error = new Error(`Error de validación en ${toolName}: ${validationResult}`);
+        const error = new Error(`Validation Error for ${toolName}: ${validationResult}`);
         console.error('[ToolRunner]', error.message);
-        vscode.window.showErrorMessage(`Error ejecutando tool ${toolName}: ${validationResult}`);
+        vscode.window.showErrorMessage(`Error executing tool ${toolName}: ${validationResult}`);
         throw error;
       }
-    } else if (tool.requiredParams) {
-      for (const param of tool.requiredParams) {
+    }
+    // If no validateParams, check for requiredParams property
+    else if (Array.isArray(toolFunction.requiredParams)) {
+      for (const param of toolFunction.requiredParams) {
         if (params[param] === undefined || params[param] === null) {
-          const error = new Error(`Parámetro requerido faltante en ${toolName}: ${param}`);
+          const error = new Error(`Missing required parameter for ${toolName}: ${param}`);
           console.error('[ToolRunner]', error.message);
-          vscode.window.showErrorMessage(`Error ejecutando tool ${toolName}: Parámetro '${param}' faltante.`);
+          vscode.window.showErrorMessage(`Error executing tool ${toolName}: Parameter '${param}' is required.`);
           throw error;
         }
       }
     }
+    // --- End Validation ---
+
 
     try {
       console.log(`[ToolRunner] Executing tool: ${toolName} with params:`, params);
-      const result = await tool.execute(params);
+      // Pass the params object directly to the tool function
+      const result = await toolFunction(params);
       console.log(`[ToolRunner] Tool execution successful: ${toolName}`);
       return result;
     } catch (error: any) {
       console.error(`[ToolRunner] Error executing tool ${toolName}:`, error);
       // Show error message in VS Code UI for user feedback
-      vscode.window.showErrorMessage(`Error ejecutando tool ${toolName}: ${error.message || String(error)}`);
-      throw error; // Re-throw the error for the orchestrator/handler to catch
+      // Use a more user-friendly message, hiding internal details unless necessary
+      const userFacingMessage = `Error executing tool ${toolName}: ${error.message || 'An unknown error occurred.'}`;
+      vscode.window.showErrorMessage(userFacingMessage);
+      // Re-throw the error for the orchestrator/handler to catch and potentially log more detail
+      throw new Error(`Tool execution failed for ${toolName}: ${error.message || String(error)}`);
     }
   }
 
   /**
-   * Ejecuta múltiples tools en paralelo con control de concurrencia
-   * (Mantener esta función, aunque el planificador podría orquestar paso a paso)
-   * @param tools Array de herramientas a ejecutar (con nombre completo)
-   * @param concurrencyLimit Número máximo de herramientas a ejecutar simultáneamente (0 = sin límite)
+   * Executes multiple tools sequentially (concurrency limit is ignored in this version).
+   * This function structure is kept for potential future parallel implementation.
+   * @param toolsToRun Array of tools to execute (with full name and optional params).
+   * @param concurrencyLimit Number maximum of tools to execute simultaneously (ignored).
+   * @returns A record mapping tool names to their results and errors.
    */
   public static async runParallel(
     toolsToRun: Array<{ name: string; params?: Record<string, any> }>,
     concurrencyLimit: number = 0 // concurrencyLimit is ignored in this simplified implementation
-  ): Promise<Record<string, any>> {
-      console.warn("[ToolRunner] runParallel called. Note: Concurrency limit is not fully implemented in this version. Running sequentially.");
+  ): Promise<{ results: Record<string, any>, errors: Record<string, any> }> {
+      // console.warn("[ToolRunner] runParallel called. Note: Concurrency limit is not fully implemented in this version. Running sequentially.");
       const results: Record<string, any> = {};
       const errors: Record<string, any> = {};
 
@@ -146,29 +121,27 @@ export class ToolRunner {
       for (const { name, params } of toolsToRun) {
           try {
               results[name] = await this.runTool(name, params);
-          } catch (error) {
+          } catch (error: any) {
+              // runTool already logs and shows UI message, just store the error here
               errors[name] = error;
-              console.error(`[ToolRunner] Error in parallel execution for tool '${name}':`, error);
+              // console.error(`[ToolRunner] Error in parallel execution for tool '${name}':`, error); // runTool already logged
           }
       }
 
-      if (Object.keys(errors).length > 0) {
-           // You might want a more sophisticated error handling here
-           console.error("[ToolRunner] Parallel execution finished with errors:", errors);
-           // Depending on desired behavior, you might throw here:
-           // throw new Error(`Parallel tool execution failed for tools: ${Object.keys(errors).join(', ')}`);
-      }
-
-      return results;
+      // The caller can inspect the results and errors objects
+      // Returning the map allows the caller to handle partial success.
+      return { results, errors };
   }
 
 
   /**
-   * Lista todas las tools disponibles (nombres completos)
+   * Lists all available tools (full names).
    *
    * EXTENSIBILITY: To add a new tool, create its implementation file,
-   * export the function, add it to the src/tools/index.ts barrel file,
-   * and register it in the TOOLS map here with validation/required params.
+   * export the function, attach `validateParams`/`requiredParams` properties if needed,
+   * add it to the relevant src/tools/MODULE/index.ts barrel file,
+   * ensure it's re-exported in the root src/tools/index.ts,
+   * and register it in the TOOLS map here.
    */
   public static listTools(): string[] {
     return Object.keys(this.TOOLS);

@@ -1,18 +1,12 @@
 // src/tools/index.ts
 
-// Export all tools from their modules
-export * as filesystem from './filesystem';
-export * as editor from './editor';
-export * as project from './project';
-export * as codeManipulation from './codeManipulation';
+export * from './core/toolRunner'; // ToolRunner is definitely public
 
-// Export core tool utilities
-export * from './core/core';
-export * from './core/toolRunner';
-
-// Re-export individual tools for backward compatibility
-export { getWorkspaceFiles } from './filesystem';
-export { getFileContents } from './filesystem';
+// Re-export individual tools for easier access in ToolRunner and potentially elsewhere.
+// ToolRunner currently relies on these direct exports.
+export { getWorkspaceFiles } from './filesystem/getWorkspaceFiles';
+export { getFileContents } from './filesystem/getFileContents';
 export { getActiveEditorContent } from './editor';
 export { getPackageDependencies, getProjectInfo, searchWorkspace } from './project';
 export { applyWorkspaceEdit } from './codeManipulation';
+

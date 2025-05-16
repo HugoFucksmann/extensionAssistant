@@ -1,5 +1,9 @@
 import * as vscode from 'vscode';
 
+/**
+ * Tool to get the content, language ID, and file name of the currently active text editor.
+ * @returns An object containing content, languageId, and fileName, or null if no editor is active.
+ */
 export async function getActiveEditorContent(): Promise<{
   content: string;
   languageId: string;
@@ -7,7 +11,8 @@ export async function getActiveEditorContent(): Promise<{
 } | null> {
   const activeEditor = vscode.window.activeTextEditor;
   if (!activeEditor) {
-    return null; // Devuelve null en lugar de lanzar error
+    // Return null if no active editor, as this is a valid state.
+    return null;
   }
   return {
     content: activeEditor.document.getText(),
@@ -15,3 +20,5 @@ export async function getActiveEditorContent(): Promise<{
     fileName: activeEditor.document.fileName
   };
 }
+
+// This tool takes no parameters, so no validateParams/requiredParams properties are needed.

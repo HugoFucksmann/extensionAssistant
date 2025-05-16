@@ -3,21 +3,66 @@
 import * as vscode from 'vscode';
 
 /**
- * Tool to search for a query within the workspace or specific files.
- * This is a placeholder implementation.
+ * Tool to search for a query within the workspace.
+ * Uses VS Code's built-in search functionality.
+ * @param params - Parameters including the search query.
+ * @returns An array of vscode.Location objects representing search results.
+ * @throws Error if the search operation fails.
  */
 export async function searchWorkspace(params: { query: string }): Promise<vscode.Location[]> {
-    // Implementación simulada
-    const dummyUri = vscode.Uri.file('/fake/path/to/file.txt');
-    const dummyRange = new vscode.Range(0, 0, 0, 10);
-    const dummyLocation = new vscode.Location(dummyUri, dummyRange);
-    
-    const dummyResults = params.query.toLowerCase().includes('error') ? [dummyLocation] : [];
-    
-    console.log(`[Tool] searchWorkspace returning ${dummyResults.length} results.`);
-    return dummyResults;
+    const { query } = params;
+    console.log(`[Tool] searchWorkspace called with query: "${query}"`);
+
+    if (!query || typeof query !== 'string') {
+        // Basic validation (ToolRunner also validates)
+        throw new Error('Parameter "query" (string) is required.');
+    }
+
+    try {
+        const locations: vscode.Location[] = [];
+        
+        // First, find all relevant files (adjust the pattern as needed)
+        const files = await vscode.workspace.findFiles('**/*', '**/node_modules/**');
+        
+        // Search through each file
+        for (const file of files) {
+            try {
+                const document = await vscode.workspace.openTextDocument(file);
+                const text = document.getText();
+                const lines = text.split('\n');
+                
+                // Simple text search (case insensitive)
+                for (let i = 0; i < lines.length; i++) {
+                    const line = lines[i];
+                    const index = line.toLowerCase().indexOf(query.toLowerCase());
+                    if (index >= 0) {
+                        const startPos = new vscode.Position(i, index);
+                        const endPos = new vscode.Position(i, index + query.length);
+                        const range = new vscode.Range(startPos, endPos);
+                        locations.push(new vscode.Location(file, range));
+                    }
+                }
+            } catch (error) {
+                console.warn(`Could not read file ${file.fsPath}:`, error);
+            }
+        }
+        
+        console.log(`[Tool] searchWorkspace found ${locations.length} results for query "${query}".`);
+        return locations;
+    } catch (error) {
+        console.error(`[Tool] Error during searchWorkspace execution for query "${query}":`, error);
+        // Re-throw a standardized error for the ToolRunner to catch
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        throw new Error(`Workspace search failed for query "${query}": ${errorMessage}`);
+    }
 }
 
-// Interface requerida por ToolRunner
-searchWorkspace.validateParams = (params: any) => true;
+// Define validation rules as properties on the function for ToolRunner
+searchWorkspace.validateParams = function(params: Record<string, any>): boolean | string {
+    if (!params.query || typeof params.query !== 'string') {
+        return 'Parameter "query" (string) is required.';
+    }
+    return true;
+};
+
 searchWorkspace.requiredParams = ['query'];
