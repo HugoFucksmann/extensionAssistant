@@ -97,13 +97,7 @@ export class ConfigurationManager {
         return this.setValue('uiTheme', theme);
     }
 
-    // <-- Add specific getters for agent configurations
     getContextAgentSummaryThreshold(): number {
         return this.getSetting<number>('agent.context.summaryThreshold', 10);
     }
-
-    // Add getters for other agent settings as they are introduced
-    // getFileInsightAgentMaxFiles(): number { ... }
-    // getMemoryAgentRetrievalLimit(): number { ... }
-    // -->
 }
