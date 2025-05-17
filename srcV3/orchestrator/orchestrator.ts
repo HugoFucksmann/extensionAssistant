@@ -1,9 +1,12 @@
 // src/orchestrator/orchestrator.ts
 
-import { FlowContext, GlobalContext, SessionContext, ConversationContext } from './context';
-import { ExecutorFactory } from './execution/executorFactory';
-import { StepExecutor } from './execution/stepExecutor';
-import { ExecutionStep, PlannerResponse, StepResult } from './execution/types'; // Removed unused types
+import { IModelService } from '../models/interfaces';
+import { FlowContext,  ConversationContext } from './context';
+import { ExecutorFactory } from './execution/executorFactory'; 
+import { StepExecutor } from './execution/stepExecutor'; 
+import { ExecutionStep, PlannerResponse, StepResult } from './execution/types'; 
+import { IToolRunner } from '../tools';
+
 
 /**
  * Maximum number of planning iterations to prevent infinite loops.
@@ -14,30 +17,28 @@ const MAX_PLANNING_ITERATIONS = 15;
  * Main orchestrator that manages conversations and drives the incremental planning process.
  * Manages active ConversationContexts and executes steps based on planner prompt output.
  */
+
 export class Orchestrator {
-    private globalContext: GlobalContext;
-    private sessionContext: SessionContext;
+   
     private activeConversations: Map<string, ConversationContext> = new Map();
-
     private stepExecutor: StepExecutor;
-
-    constructor(globalContext: GlobalContext, sessionContext: SessionContext) {
-        this.globalContext = globalContext;
-        this.sessionContext = sessionContext;
-        const registry = ExecutorFactory.createExecutorRegistry();
-        this.stepExecutor = new StepExecutor(registry);
-        // console.log('[Orchestrator] Initialized'); // Reduced logging
+    constructor(
+        toolRunner: IToolRunner, 
+        modelService: IModelService 
+    ) {    
+        const registry = ExecutorFactory.createExecutorRegistry(modelService, toolRunner);     
+        this.stepExecutor = new StepExecutor(registry); 
     }
 
     addConversationContext(convContext: ConversationContext): void {
         this.activeConversations.set(convContext.getChatId(), convContext);
-        // console.log(`[Orchestrator] Added ConversationContext for chat ${convContext.getChatId()}`); // Reduced logging
+        console.log(`[Orchestrator] Added ConversationContext for chat ${convContext.getChatId()}`);
     }
 
     clearConversationContext(chatId: string): void {
         if (this.activeConversations.has(chatId)) {
             this.activeConversations.delete(chatId);
-            // console.log(`[Orchestrator] Cleared ConversationContext for chat ${chatId}`); // Reduced logging
+            console.log(`[Orchestrator] Cleared ConversationContext for chat ${chatId}`);
         }
     }
 
@@ -53,7 +54,7 @@ export class Orchestrator {
         const chatId = flowContext.getChatId();
         const userMessageText = flowContext.getValue<string>('userMessage') || '';
 
-        console.log(`[Orchestrator:${chatId}] Starting planning for: "${userMessageText.substring(0, 50)}..."`); // More concise log
+        console.log(`[Orchestrator:${chatId}] Starting planning for: "${userMessageText.substring(0, 50)}..."`);
 
         let finalResponse: string | any = "Sorry, I couldn't complete the task.";
         let planningIteration = 0;
@@ -62,12 +63,13 @@ export class Orchestrator {
         if (!flowContext.getValue('analysisResult')) {
              const analyzeStep: ExecutionStep = {
                  name: 'analyzeUserInput',
-                 type: 'prompt',
-                 execute: 'inputAnalyzer',
+                 type: 'prompt', 
+                 execute: 'inputAnalyzer', 
                  params: {},
                  storeAs: 'analysisResult'
              };
              console.log(`[Orchestrator:${chatId}] Running initial analysis...`);
+           
              const analysisResultStep = await this.stepExecutor.runStep(analyzeStep, flowContext);
 
              const currentHistory = flowContext.getValue<Array<any>>('planningHistory') || [];
@@ -80,7 +82,7 @@ export class Orchestrator {
              flowContext.setValue('planningHistory', currentHistory);
 
              if (!analysisResultStep.success || !analysisResultStep.result) {
-                 console.warn(`[Orchestrator:${chatId}] Initial analysis failed:`, analysisResultStep.error?.message); // More concise log
+                 console.warn(`[Orchestrator:${chatId}] Initial analysis failed:`, analysisResultStep.error?.message);
                  if (!flowContext.getAnalysisResult()) {
                       flowContext.setValue('analysisResult', { intent: 'unknown', objective: 'Analysis failed', extractedEntities: {}, confidence: 0.1, error: analysisResultStep.error?.message || 'Analysis step failed' });
                  }
@@ -92,7 +94,7 @@ export class Orchestrator {
         }
 
         const initialAnalysis = flowContext.getAnalysisResult();
-        console.log(`[Orchestrator:${chatId}] Analysis Intent: ${initialAnalysis?.intent}, Objective: ${initialAnalysis?.objective}`); // Concise log
+        console.log(`[Orchestrator:${chatId}] Analysis Intent: ${initialAnalysis?.intent}, Objective: ${initialAnalysis?.objective}`);
 
         // --- Step 2: The Planning Loop ---
         while (planningIteration < MAX_PLANNING_ITERATIONS) {
@@ -103,8 +105,8 @@ export class Orchestrator {
 
             const plannerStep: ExecutionStep = {
                 name: `plannerStep:${planningIteration}`,
-                type: 'prompt',
-                execute: 'planner',
+                type: 'prompt', 
+                execute: 'planner', 
                 params: {},
             };
 
@@ -112,6 +114,7 @@ export class Orchestrator {
             let nextAction: PlannerResponse | undefined;
 
             try {
+              
                 plannerResult = await this.stepExecutor.runStep(plannerStep, flowContext);
 
                 const currentHistory = flowContext.getValue<Array<any>>('planningHistory') || [];
@@ -175,7 +178,7 @@ export class Orchestrator {
                  flowContext.setValue('planningHistory', currentHistory);
                 break;
             } else if (nextAction.action === 'tool' || nextAction.action === 'prompt') {
-                const actionName = nextAction.toolName || nextAction.promptType;
+                const actionName = nextAction.toolName || nextAction.promptType; 
                 if (!actionName) {
                     console.error(`[Orchestrator:${chatId}] Planner decided '${nextAction.action}' but did not specify name.`);
                     finalResponse = `Sorry, the planner decided to execute a step but didn't specify which one at iteration ${planningIteration}.`;
@@ -193,12 +196,13 @@ export class Orchestrator {
                 const executionStep: ExecutionStep = {
                     name: `${nextAction.action}Step:${planningIteration}:${actionName}`,
                     type: nextAction.action,
-                    execute: actionName,
+                    execute: actionName, 
                     params: nextAction.params || {},
                     storeAs: nextAction.storeAs,
                 };
 
                 console.log(`[Orchestrator:${chatId}] Executing step: '${executionStep.name}'`);
+              
                 const executionResult = await this.stepExecutor.runStep(executionStep, flowContext);
 
                 const currentHistory = flowContext.getValue<Array<any>>('planningHistory') || [];
@@ -251,7 +255,9 @@ export class Orchestrator {
 
     dispose(): void {
         console.log('[Orchestrator] Disposing.');
+
         this.activeConversations.forEach(context => context.dispose());
         this.activeConversations.clear();
+       
     }
 }

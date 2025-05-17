@@ -1,7 +1,13 @@
+// src/tools/toolRunner.ts
+
 import * as vscode from 'vscode';
-// Import all tools from the new structured index
-// This imports the barrel file which re-exports individual functions
-import * as tools from '..';
+
+import { IToolRunner } from './interfaces';
+import { IWorkspaceService } from '../../workspace/interfaces';
+import { getActiveEditorContent } from '../editor';
+import { getPackageDependencies, getProjectInfo, searchWorkspace } from '../project';
+import { applyWorkspaceEdit } from '../codeManipulation';
+
 
 // Define a type for the tool function itself, including the attached properties
 type ToolFunction = ((params: Record<string, any>) => Promise<any>) & {
@@ -12,30 +18,57 @@ type ToolFunction = ((params: Record<string, any>) => Promise<any>) & {
 // Interface for the entry in the ToolRegistry
 interface ToolEntry {
     execute: ToolFunction; // The tool function with potential validation properties
-}
+    requiredParams?: string[];
+  }
 
 type ToolRegistry = Record<string, ToolEntry>;
 
-export class ToolRunner {
+// Implement the IToolRunner interface
+export class ToolRunner implements IToolRunner { // <-- Added implements
 
-  // The TOOLS registry maps tool names to the imported functions.
+  // The TOOLS registry maps tool names to the imported functions or internal methods.
   // We now rely on the imported function object having the validateParams/requiredParams properties.
-  private static readonly TOOLS: ToolRegistry = {
-    // Filesystem Tools
-    'filesystem.getWorkspaceFiles': { execute: tools.getWorkspaceFiles as ToolFunction },
-    'filesystem.getFileContents': { execute: tools.getFileContents as ToolFunction }, // getFileContents has validation props
+  // This is now an instance property to access the injected workspaceService.
+  private readonly TOOLS: ToolRegistry; // <-- Made instance property
 
-    // Editor Tools
-    'editor.getActiveEditorContent': { execute: tools.getActiveEditorContent as ToolFunction },
+  // Inject IWorkspaceService dependency
+  constructor(private workspaceService: IWorkspaceService) { // <-- Added constructor with dependency
+      // Initialize the TOOLS registry here to use the injected dependency
+      this.TOOLS = {
+          // Filesystem Tools - Now delegate to WorkspaceService
+          'filesystem.getWorkspaceFiles': {
+              execute: async (params: Record<string, any>) => {
+                   // Validation can be added here if needed, or rely on WorkspaceService
+                   return this.workspaceService.listWorkspaceFiles();
+              },
+              // No specific params validation needed here, WorkspaceService handles internal logic
+          },
+          'filesystem.getFileContents': {
+              execute: async (params: Record<string, any>) => {
+                  // Validate params before calling WorkspaceService
+                  if (params.filePath === undefined || params.filePath === null || typeof params.filePath !== 'string') {
+                      throw new Error("Parameter 'filePath' is required and must be a string.");
+                  }
+                  // WorkspaceService handles file not found/read errors
+                  return this.workspaceService.getFileContent(params.filePath);
+              },
+              requiredParams: ['filePath'] // Keep validation definition here for consistency
+          },
 
-    // Project Tools
-    'project.getPackageDependencies': { execute: tools.getPackageDependencies as ToolFunction }, // getPackageDependencies has optional params, no requiredParams
-    'project.getProjectInfo': { execute: tools.getProjectInfo as ToolFunction }, // No params
-    'project.searchWorkspace': { execute: tools.searchWorkspace as ToolFunction }, // searchWorkspace has validation props
+          // Editor Tools
+          'editor.getActiveEditorContent': { execute: getActiveEditorContent as ToolFunction },
 
-    // Code Manipulation Tools
-    'codeManipulation.applyWorkspaceEdit': { execute: tools.applyWorkspaceEdit as ToolFunction }, // applyWorkspaceEdit has validation props
-  };
+          // Project Tools
+          'project.getPackageDependencies': { execute: getPackageDependencies as ToolFunction },
+          'project.getProjectInfo': { execute: getProjectInfo as ToolFunction },
+          'project.searchWorkspace': { execute: searchWorkspace as ToolFunction },
+
+          // Code Manipulation Tools
+          'codeManipulation.applyWorkspaceEdit': { execute: applyWorkspaceEdit as ToolFunction },
+      };
+       console.log('[ToolRunner] Initialized with WorkspaceService.'); // Added log
+  }
+
 
   /**
    * Executes a specific tool after validating its parameters.
@@ -45,15 +78,18 @@ export class ToolRunner {
    * @returns The result of the tool execution.
    * @throws Error if the tool is not found, validation fails, or the tool execution fails.
    */
-  public static async runTool(
+  public async runTool( // <-- Removed static
     toolName: string,
     params: Record<string, any> = {}
   ): Promise<any> {
-    const toolEntry = this.TOOLS[toolName];
+    const toolEntry = this.TOOLS[toolName]; // Access instance property
     if (!toolEntry) {
       const error = new Error(`Tool not registered: ${toolName}`);
       console.error('[ToolRunner]', error.message);
       // Show error message in VS Code UI
+      // Note: Showing UI messages from a service might be questionable depending on architecture.
+      // Ideally, errors are returned/thrown and handled by the UI layer.
+      // For now, keeping it as it was.
       vscode.window.showErrorMessage(`Error executing tool: Tool '${toolName}' not registered.`);
       throw error;
     }
@@ -72,8 +108,8 @@ export class ToolRunner {
       }
     }
     // If no validateParams, check for requiredParams property
-    else if (Array.isArray(toolFunction.requiredParams)) {
-      for (const param of toolFunction.requiredParams) {
+    else if (Array.isArray(toolEntry.requiredParams)) { // <-- Check on toolEntry, not toolFunction
+      for (const param of toolEntry.requiredParams) { // <-- Check on toolEntry
         if (params[param] === undefined || params[param] === null) {
           const error = new Error(`Missing required parameter for ${toolName}: ${param}`);
           console.error('[ToolRunner]', error.message);
@@ -109,7 +145,7 @@ export class ToolRunner {
    * @param concurrencyLimit Number maximum of tools to execute simultaneously (ignored).
    * @returns A record mapping tool names to their results and errors.
    */
-  public static async runParallel(
+  public async runParallel( // <-- Removed static
     toolsToRun: Array<{ name: string; params?: Record<string, any> }>,
     concurrencyLimit: number = 0 // concurrencyLimit is ignored in this simplified implementation
   ): Promise<{ results: Record<string, any>, errors: Record<string, any> }> {
@@ -120,6 +156,7 @@ export class ToolRunner {
       // Simple sequential execution for now
       for (const { name, params } of toolsToRun) {
           try {
+              // Call instance method runTool
               results[name] = await this.runTool(name, params);
           } catch (error: any) {
               // runTool already logs and shows UI message, just store the error here
@@ -143,7 +180,10 @@ export class ToolRunner {
    * ensure it's re-exported in the root src/tools/index.ts,
    * and register it in the TOOLS map here.
    */
-  public static listTools(): string[] {
-    return Object.keys(this.TOOLS);
+  public listTools(): string[] { // <-- Removed static
+    return Object.keys(this.TOOLS); // Access instance property
   }
+
+  // Dispose method if needed (e.g., for listeners), but not strictly required for this version
+  // dispose(): void { ... }
 }

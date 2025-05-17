@@ -20,5 +20,3 @@ export async function getActiveEditorContent(): Promise<{
     fileName: activeEditor.document.fileName
   };
 }
-
-// This tool takes no parameters, so no validateParams/requiredParams properties are needed.

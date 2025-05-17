@@ -3,7 +3,7 @@ import { promisify } from 'util';
 import * as fs from 'fs';
 import * as vscode from 'vscode';
 
-// Export standard Node.js fs functions promisified
+
 export const stat = promisify(fs.stat);
 export const readdir = promisify(fs.readdir);
 export const readFile = promisify(fs.readFile);

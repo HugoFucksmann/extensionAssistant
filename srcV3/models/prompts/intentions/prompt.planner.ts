@@ -3,7 +3,8 @@
 import { BasePromptVariables, PlannerPromptVariables } from '../../../orchestrator/execution/types';
 import { MemoryItem } from '../../../store';
 import { ToolRunner } from '../../../tools';
-import { mapContextToBaseVariables, getPromptDefinitions } from '../../promptSystem';
+import { mapContextToBaseVariables, PROMPT_DEFINITIONS } from '../../promptSystem';
+import { IToolRunner } from '../../../tools/core/interfaces';
 
 // Define the prompt template for the planner
 export const plannerPrompt = `
@@ -88,11 +89,14 @@ export interface PlannerPromptVariablesWithReplan extends PlannerPromptVariables
     replanData?: any;
 }
 
-export function buildPlannerVariables(resolutionContextData: Record<string, any>): PlannerPromptVariablesWithReplan {
+export function buildPlannerVariables(
+    resolutionContextData: Record<string, any>,
+    toolRunner: IToolRunner
+): PlannerPromptVariablesWithReplan {
     const baseVariables = mapContextToBaseVariables(resolutionContextData);
 
-    const availableTools = ToolRunner.listTools().join(', ');
-    const availablePrompts = Object.keys(getPromptDefinitions()).filter(type => type !== 'planner').join(', ');
+    const availableTools = toolRunner.listTools().join(', ');
+    const availablePrompts = Object.keys(PROMPT_DEFINITIONS).filter(type => type !== 'planner').join(', ');
 
     const fullHistoryString = resolutionContextData.chatHistoryString || '';
     const historyLines = fullHistoryString.split('\n').filter((line: string) => line.trim() !== '');

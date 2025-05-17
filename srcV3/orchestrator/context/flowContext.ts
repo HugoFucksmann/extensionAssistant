@@ -2,23 +2,15 @@
 import { InputAnalysisResult } from '../execution/types';
 import { ConversationContext } from './conversationContext';
 
-
-// Minimal ChatMessage definition for type hinting within this file
-interface ChatMessage {
-    content: string;
-    sender: 'user' | 'assistant' | 'system';
-}
-
 interface FlowContextState {
     userMessage?: string;
     referencedFiles?: string[];
     analysisResult?: InputAnalysisResult;
-    // analyzedFileInsights is in ConversationContext
-    // retrievedMemory is in ConversationContext
-    isReplanning?: boolean; // <-- Add replanning flag
-    replanReason?: string; // <-- Add replanning reason
-    replanData?: any; // <-- Add data that triggered replan
-    [key: string]: any; // For step results, temporary data, etc.
+   
+    isReplanning?: boolean;
+    replanReason?: string; 
+    replanData?: any; 
+    [key: string]: any; 
 }
 
 /**
@@ -51,7 +43,7 @@ export class FlowContext {
      * Can be used for step results, temporary data, etc.
      */
     setValue(key: string, value: any) {
-        // Prevent overwriting critical parent context properties if keys overlap by accident
+       
          if (['chatId', 'messages', 'summary', 'relevantFiles', 'analyzedFileInsights', 'retrievedMemory', 'isReplanning', 'replanReason', 'replanData'].includes(key)) { // <-- Add replanning keys
             console.warn(`[FlowContext:${this.getChatId()}] Attempted to overwrite potential ConversationContext key: ${key}`);
             return;
@@ -129,11 +121,6 @@ export class FlowContext {
                   resolutionContextData.userMessage = '';
              }
         }
-
-        // analyzedFileInsights, relevantFiles, summary, retrievedMemory are included via the convState loop (step 2)
-        // isReplanning, replanReason, replanData are included via the state loop (step 1)
-
-
         return resolutionContextData;
     }
 

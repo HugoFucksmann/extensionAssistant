@@ -13,7 +13,7 @@ interface ConversationContextState {
     summary?: string;
     relevantFiles?: string[];
     analyzedFileInsights?: any;
-    retrievedMemory?: MemoryItem[]; // <-- Add field for retrieved memory
+    retrievedMemory?: MemoryItem[]; 
     [key: string]: any;
 }
 
@@ -34,7 +34,7 @@ export class ConversationContext {
             summary: undefined,
             relevantFiles: undefined,
             analyzedFileInsights: undefined,
-            retrievedMemory: undefined, // <-- Initialize here
+            retrievedMemory: undefined, 
         };
         this.sessionContext = sessionContext;
         console.log(`[ConversationContext:${chatId}] Initialized with ${initialMessages.length} messages.`);
@@ -82,14 +82,13 @@ export class ConversationContext {
         if (this.currentFlowContext) {
             this.currentFlowContext.dispose();
         }
-        // Pass relevant state from ConversationContext to the new FlowContext's initial state
-        // FlowContext will read most state via getResolutionContext, but initial state can be useful
+       
         this.currentFlowContext = new FlowContext(this, {
-            // Pass state that FlowContext needs to start the turn
+           
             summary: this.state.summary,
             relevantFiles: this.state.relevantFiles,
-            analyzedFileInsights: this.state.analyzedFileInsights, // Still pass for initial context
-            retrievedMemory: this.state.retrievedMemory, // Still pass for initial context
+            analyzedFileInsights: this.state.analyzedFileInsights, 
+            retrievedMemory: this.state.retrievedMemory,
         });
         console.log(`[ConversationContext:${this.state.chatId}] Created new FlowContext.`);
         return this.currentFlowContext;
@@ -117,13 +116,13 @@ export class ConversationContext {
         console.log(`[ConversationContext:${this.state.chatId}] Analyzed file insights updated.`);
     }
 
-    // <-- Add getter and setter for retrievedMemory
+    
     getRetrievedMemory(): MemoryItem[] | undefined { return this.state.retrievedMemory; }
     setRetrievedMemory(memory: MemoryItem[] | undefined): void {
         this.state.retrievedMemory = memory;
         console.log(`[ConversationContext:${this.state.chatId}] Retrieved memory updated: ${memory?.length || 0} items.`);
     }
-    // --> End new getters/setters
+  
 
 
     dispose(): void {
@@ -135,7 +134,7 @@ export class ConversationContext {
         this.state.summary = undefined;
         this.state.relevantFiles = undefined;
         this.state.analyzedFileInsights = undefined;
-        this.state.retrievedMemory = undefined; // <-- Clear on dispose
+        this.state.retrievedMemory = undefined; 
         console.log(`[ConversationContext:${this.state.chatId}] Disposed.`);
     }
 }

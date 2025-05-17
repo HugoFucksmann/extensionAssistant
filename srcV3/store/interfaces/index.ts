@@ -1,12 +1,10 @@
 // src/storage/interfaces/index.ts
 
-// --- Entities ---
-
 export interface Chat {
   id: string;
   title: string;
   timestamp: number;
-  preview?: string | null; // Allow null for preview
+  preview?: string | null; 
 }
 
 export interface ChatMessage {
@@ -14,32 +12,30 @@ id?: string;
 chatId: string;
 content: string;
 sender: 'user' | 'assistant' | 'system';
-role?: 'user' | 'assistant' | 'system'; // role is often redundant if sender is used
+role?: 'user' | 'assistant' | 'system';
 timestamp: number;
-files?: string[]; // Array of file paths (relative or absolute?)
+files?: string[];
 }
 
 // Define the interface for the structure of data in the memory_items table
 export interface MemoryItem {
-  id?: string; // Optional when creating, will be assigned by repo
-  userId?: string | null; // Optional, can be null in DB
-  projectId: string; // Associated workspace/project
-  type: string; // e.g., 'decision', 'convention', 'key_entity', 'code_snippet'
-  keyName: string; // Required short identifier, used for UNIQUE constraint
-  content: any; // The actual memory data (stored as JSON string in DB, parsed here)
-  timestamp: number; // Timestamp of creation/update
-  reason?: string | null; // Added based on the prompt.memoryExtractor structure & DB schema update. Can be null.
+  id?: string;
+  userId?: string | null; 
+  projectId: string; 
+  type: string; 
+  keyName: string; 
+  content: any;
+  timestamp: number;
+  reason?: string | null; 
 }
 
-// Define the interface for the structure of data in the cache_items table
+
 export interface CacheItem {
   key: string;
-  data: any; // Field to store arbitrary data (as JSON string in DB, parsed here)
-  timestamp: number; // Timestamp of creation or update
+  data: any;
+  timestamp: number;
 }
 
-
-// --- Generic Repository Interface ---
 
 /**
 * Generic interface for basic CRUD repository operations.
@@ -54,7 +50,7 @@ export interface IRepository<T> {
  * @returns The created item, potentially with generated ID/metadata.
  * @throws Error if creation fails.
  */
-create?(item: T): Promise<T>; // Made optional as not all repos might use it
+create?(item: T): Promise<T>;
 
 /**
  * Finds an item by its unique identifier.
@@ -62,14 +58,14 @@ create?(item: T): Promise<T>; // Made optional as not all repos might use it
  * @returns The item if found, or null.
  * @throws Error if the operation fails (excluding item not found).
  */
-findById?(id: string): Promise<T | null>; // Made optional
+findById?(id: string): Promise<T | null>;
 
 /**
  * Finds all items in the repository.
  * @returns An array of all items. Returns an empty array if none are found.
  * @throws Error if the operation fails.
  */
-findAll?(): Promise<T[]>; // Made optional
+findAll?(): Promise<T[]>; 
 
 /**
  * Updates an existing item by its ID with partial data.
@@ -77,24 +73,20 @@ findAll?(): Promise<T[]>; // Made optional
  * @param item Partial data to update.
  * @throws Error if the operation fails or item not found (implementation detail).
  */
-update?(id: string, item: Partial<T>): Promise<void>; // Made optional
+update?(id: string, item: Partial<T>): Promise<void>; 
 
 /**
  * Deletes an item by its ID.
  * @param id The ID of the item to delete.
  * @throws Error if the operation fails or item not found (implementation detail).
  */
-delete?(id: string): Promise<void>; // Made optional
+delete?(id: string): Promise<void>; 
 }
 
 
-// --- Specific Repository Interfaces ---
 
-/**
-* Chat repository specific operations, extending the generic IRepository.
-*/
 export interface IChatRepository extends IRepository<Chat> {
-  // These methods are specific to ChatRepository and are not optional from IRepository's perspective
+ 
   create(chat: Chat): Promise<Chat>;
   findById(id: string): Promise<Chat | null>;
   findAll(): Promise<Chat[]>;
@@ -171,14 +163,10 @@ export interface ICacheRepository {
    */
   delete(key: string): Promise<void>;
 
-  // Additional methods for cleanup (e.g., delete old items) could be added here.
-  // prune(olderThanTimestamp: number): Promise<void>;
+ 
 }
 
 
-/**
-* Interface for the Memory repository.
-*/
 export interface IMemoryRepository {
   /**
    * Stores or updates a memory item. Uses REPLACE based on unique constraint (projectId, type, keyName).
@@ -234,6 +222,5 @@ export interface IMemoryRepository {
    */
   deleteByKey(projectId: string, type: string, keyName: string): Promise<void>;
 
-  // Additional methods for cleanup could be added here.
-  // prune(projectId: string, olderThanTimestamp: number): Promise<void>;
+ 
 }

@@ -1,14 +1,23 @@
 // src/orchestrator/agents/CacheAgent.ts
 
-import { CacheRepository } from "../../store/repositories/CacheRepository";
+// Remove specific repository import
+// import { CacheRepository } from "../../store/repositories/CacheRepository";
+
 import * as crypto from 'crypto';
-import * as vscode from 'vscode'; // Needed for context to get repo
+// Remove vscode import if only used for repo instantiation
+// import * as vscode from 'vscode';
+
+// Import Storage Service interface and Cache Repository interface
+import { IStorageService, ICacheRepository } from '../../store'; // <-- Added import
 
 export class CacheAgent {
-    private repository: CacheRepository;
+    private repository: ICacheRepository; // <-- Use interface
 
-    constructor(context: vscode.ExtensionContext) {
-        this.repository = new CacheRepository(context);
+    // Accept IStorageService in the constructor
+    // Remove vscode.ExtensionContext if not used for other purposes
+    constructor(storageService: IStorageService) { // <-- Added dependency
+        // Get the specific repository from the Storage Service
+        this.repository = storageService.getCacheRepository(); // <-- Get repo from service
         console.log('[CacheAgent] Initialized.');
     }
 
@@ -21,7 +30,7 @@ export class CacheAgent {
     private generateCacheKey(baseKey: string, content: string): string {
         const hash = crypto.createHash('sha256').update(content).digest('hex');
         // Ensure baseKey is safe for use in a key (remove problematic characters if necessary)
-        const safeBaseKey = baseKey.replace(/[^a-zA-Z0-9_\-.\/]/g, '_');
+        const safeBaseKey = baseKey.replace(/[^a-zA-Z0-9_\-.\/]/g, '_'); // Keep this utility
         return `${safeBaseKey}:${hash}`;
     }
 
@@ -34,8 +43,8 @@ export class CacheAgent {
     public async get(baseKey: string, content: string): Promise<any | null> {
         const key = this.generateCacheKey(baseKey, content);
         try {
-            // *** FIX: Use the new method name getItem ***
-            const item = await this.repository.getItem(key);
+            // Use the injected repository's method
+            const item = await this.repository.getItem(key); // <-- Use this.repository
             if (item) {
                 console.log(`[CacheAgent] Cache hit for key: ${key}`);
                 return item.data;
@@ -56,8 +65,8 @@ export class CacheAgent {
       */
      public async getExact(key: string): Promise<any | null> {
          try {
-             // *** FIX: Use the new method name getItem ***
-             const item = await this.repository.getItem(key);
+             // Use the injected repository's method
+             const item = await this.repository.getItem(key); // <-- Use this.repository
              if (item) {
                  console.log(`[CacheAgent] Exact cache hit for key: ${key}`);
                  return item.data;
@@ -81,8 +90,8 @@ export class CacheAgent {
     public async put(baseKey: string, content: string, data: any): Promise<void> {
         const key = this.generateCacheKey(baseKey, content);
         try {
-            // put method name did not change, this is correct
-            await this.repository.put(key, data);
+             // Use the injected repository's method
+            await this.repository.put(key, data); // <-- Use this.repository
             console.log(`[CacheAgent] Cache put successful for key: ${key}`);
         } catch (error) {
             console.error(`[CacheAgent] Error putting cache item for key ${key}:`, error);
@@ -96,8 +105,8 @@ export class CacheAgent {
       */
      public async putExact(key: string, data: any): Promise<void> {
          try {
-             // put method name did not change, this is correct
-             await this.repository.put(key, data);
+             // Use the injected repository's method
+             await this.repository.put(key, data); // <-- Use this.repository
              console.log(`[CacheAgent] Exact cache put successful for key: ${key}`);
          } catch (error) {
              console.error(`[CacheAgent] Error putting exact cache item for key ${key}:`, error);
@@ -112,16 +121,17 @@ export class CacheAgent {
     public async delete(baseKey: string, content: string): Promise<void> {
         const key = this.generateCacheKey(baseKey, content);
         try {
-            // delete method name did not change, this is correct
-            await this.repository.delete(key);
+            // Use the injected repository's method
+            await this.repository.delete(key); // <-- Use this.repository
             console.log(`[CacheAgent] Cache delete successful for key: ${key}`);
         } catch (error) {
             console.error(`[CacheAgent] Error deleting cache item for key ${key}:`, error);
         }
     }
 
+    // CacheAgent itself likely doesn't need a dispose method if the repository is disposed by StorageService
     dispose(): void {
         console.log('[CacheAgent] Disposing.');
-        // Repository doesn't need explicit close here as DBManager is singleton
+        // The repository instance is owned and disposed by the StorageService
     }
 }

@@ -2,17 +2,18 @@
 
 import { FlowContext } from "../context";
 import { ExecutorRegistry } from "./ExecutorRegistry";
-import { ExecutionStep, StepResult } from "./types";
+import { ExecutionStep, StepResult } from "./types"; 
 
 /**
  * Responsible for executing a single ExecutionStep (tool or prompt).
  * Handles parameter resolution from context and storing results back into context.
  * Uses the ExecutorRegistry to determine the appropriate executor for each step.
+ * It does NOT hold references to IModelService or IToolRunner directly.
  */
 export class StepExecutor {
     private executorRegistry: ExecutorRegistry;
 
-    constructor(executorRegistry: ExecutorRegistry) {
+    constructor(executorRegistry: ExecutorRegistry) { 
         this.executorRegistry = executorRegistry;
     }
 
@@ -24,9 +25,9 @@ export class StepExecutor {
      * @param flowContext The FlowContext for the current turn.
      * @returns A Promise resolving to the result of the step execution.
      */
-    public async runStep(step: ExecutionStep, flowContext: FlowContext): Promise<StepResult> {
+    public async runStep(step: ExecutionStep, flowContext: FlowContext): Promise<StepResult> { 
         const chatId = flowContext.getChatId();
-        // console.log(`[StepExecutor:${chatId}] Running step '${step.name}' (Type: ${step.type}, Execute: ${step.execute})...`); // Reduced logging
+        console.log(`[StepExecutor:${chatId}] Running step '${step.name}' (Type: ${step.type}, Execute: ${step.execute})...`);
 
         const resolutionContextData = flowContext.getResolutionContext();
 
@@ -35,10 +36,11 @@ export class StepExecutor {
         try {
             if (step.type === 'tool') {
                  executionParams = this.resolveParameters(step.params || {}, resolutionContextData);
-                 // console.log(`[StepExecutor:${chatId}] Tool params resolved for '${step.name}':`, executionParams); // Reduced logging
+                 console.log(`[StepExecutor:${chatId}] Tool params resolved for '${step.name}':`, executionParams); 
             } else if (step.type === 'prompt') {
-                 executionParams = resolutionContextData; // Pass the flattened resolution context data
-                 // console.log(`[StepExecutor:${chatId}] Prompt step '${step.name}' will receive resolution context data.`); // Reduced logging
+                
+                 executionParams = resolutionContextData;
+                 console.log(`[StepExecutor:${chatId}] Prompt step '${step.name}' will receive resolution context data.`); 
             } else {
                  throw new Error(`Unknown step type: ${step.type}`);
             }
@@ -58,9 +60,10 @@ export class StepExecutor {
              try {
                 if (!step.condition(resolutionContextData)) {
                     console.log(`[StepExecutor:${chatId}] Skipping step '${step.name}' due to condition.`);
-                    if (step.storeAs) {
-                         flowContext.setValue(step.storeAs, { skipped: true, timestamp: Date.now(), stepName: step.name });
-                    }
+                  
+                     if (step.storeAs) {
+                         flowContext.setValue(step.storeAs, { __skipped: true, timestamp: Date.now(), stepName: step.name, stepType: step.type, stepExecute: step.execute });
+                     }
                     return { success: true, result: 'skipped', timestamp: Date.now(), step, skipped: true };
                 }
              } catch (conditionError: any) {
@@ -80,7 +83,7 @@ export class StepExecutor {
         let error: any;
 
         try {
-            // 3. Find appropriate executor
+            // 3. Find appropriate executor from the registry
             const executor = this.executorRegistry.getExecutorFor(step.execute);
 
             if (!executor) {
@@ -89,9 +92,11 @@ export class StepExecutor {
                 console.error(`[StepExecutor:${chatId}] ${error.message}`);
             } else {
                 try {
+                    // 4. Execute the step using the found executor
+                  
                     rawResult = await executor.execute(step.execute, executionParams);
                     success = true;
-                    // console.log(`[StepExecutor:${chatId}] Step execution succeeded for '${step.name}'.`); // Reduced logging
+                    console.log(`[StepExecutor:${chatId}] Step execution succeeded for '${step.name}'.`); // Log
                 } catch (executionError) {
                     success = false;
                     error = executionError;
@@ -104,23 +109,24 @@ export class StepExecutor {
             console.error(`[StepExecutor:${chatId}] UNEXPECTED ERROR during step execution for '${step.name}':`, error);
         }
 
-        // 4. Store result in FlowContext state if storeAs is specified and the step was successful
+        // 5. Store result in FlowContext state if storeAs is specified and the step was successful
         if (step.storeAs && success) {
              flowContext.setValue(step.storeAs, rawResult);
-             // console.log(`[StepExecutor:${chatId}] Stored successful result for '${step.name}' at '${step.storeAs}'.`); // Reduced logging
+             console.log(`[StepExecutor:${chatId}] Stored successful result for '${step.name}' at '${step.storeAs}'.`); 
         } else if (step.storeAs && !success) {
+            
              flowContext.setValue(`${step.storeAs}_error`, error?.message || 'Execution failed');
-             // console.warn(`[StepExecutor:${chatId}] Step '${step.name}' failed. Stored error indicator at '${step.storeAs}_error'.`); // Reduced logging
+             console.warn(`[StepExecutor:${chatId}] Step '${step.name}' failed. Stored error indicator at '${step.storeAs}_error'.`); 
         }
 
-        // 5. Return a structured StepResult
+        // 6. Return a structured StepResult
         return {
             success: success,
             result: rawResult,
             error: error,
             timestamp: Date.now(),
             step: step,
-            skipped: false
+            skipped: false 
         };
     }
 
@@ -143,6 +149,7 @@ export class StepExecutor {
         for (const [key, value] of Object.entries(params)) {
             if (typeof value === 'string' && value.startsWith('{{') && value.endsWith('}}')) {
                 const contextKey = value.substring(2, value.length - 2);
+                
                 const keys = contextKey.split('.');
                 let currentValue: any = resolutionContextData;
                 let found = true;
@@ -155,13 +162,20 @@ export class StepExecutor {
                         break;
                     }
                 }
+              
                 resolvedParams[key] = found ? currentValue : null;
 
-            } else {
+            } else if (typeof value === 'object' && value !== null) {
+                
                 resolvedParams[key] = this.resolveParameters(value, resolutionContextData);
+            } else {
+               
+                 resolvedParams[key] = value;
             }
         }
 
         return resolvedParams;
     }
+
+   
 }

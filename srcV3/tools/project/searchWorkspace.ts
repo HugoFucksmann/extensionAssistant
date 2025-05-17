@@ -14,17 +14,17 @@ export async function searchWorkspace(params: { query: string }): Promise<vscode
     console.log(`[Tool] searchWorkspace called with query: "${query}"`);
 
     if (!query || typeof query !== 'string') {
-        // Basic validation (ToolRunner also validates)
+       
         throw new Error('Parameter "query" (string) is required.');
     }
 
     try {
         const locations: vscode.Location[] = [];
         
-        // First, find all relevant files (adjust the pattern as needed)
+     
         const files = await vscode.workspace.findFiles('**/*', '**/node_modules/**');
         
-        // Search through each file
+     
         for (const file of files) {
             try {
                 const document = await vscode.workspace.openTextDocument(file);
@@ -51,7 +51,7 @@ export async function searchWorkspace(params: { query: string }): Promise<vscode
         return locations;
     } catch (error) {
         console.error(`[Tool] Error during searchWorkspace execution for query "${query}":`, error);
-        // Re-throw a standardized error for the ToolRunner to catch
+     
         const errorMessage = error instanceof Error ? error.message : String(error);
         throw new Error(`Workspace search failed for query "${query}": ${errorMessage}`);
     }

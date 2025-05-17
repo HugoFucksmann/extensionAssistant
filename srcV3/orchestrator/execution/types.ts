@@ -73,28 +73,28 @@ export interface IExecutor {
 }
 
 // --- Updated PromptType ---
-// Define types for prompt system
+
 export type PromptType =
   | 'inputAnalyzer'
-  | 'editing' // Not used in provided code, but kept if part of broader system
-  | 'examination' // Not used
-  | 'projectManagement' // Not used
-  | 'projectSearch' // Not used
-  | 'resultEvaluator' // Not used
+  | 'editing' // verify Not used in provided code, but kept if part of broader system
+  | 'examination' // verify Not used
+  | 'projectManagement' // verify Not used
+  | 'projectSearch' //verify Not used
+  | 'resultEvaluator' // verify Not used
   | 'conversationResponder'
   | 'explainCodePrompt'
   | 'fixCodePrompt'
   | 'codeValidator'
   | 'planner'
   | 'summarizer'
-  | 'codeFragmenter' // For breaking down code into manageable chunks
-  | 'codeAnalyzer'  // For analyzing code structure and content
+  | 'codeFragmenter'
+  | 'codeAnalyzer'  
   | 'memoryExtractor'
-  | 'progressEvaluator'; // For evaluating progress and suggesting next steps  // For extracting and managing memories from conversations
+  | 'progressEvaluator'; 
 
-// --- Standardized Prompt Variable Interfaces ---
 
-/** Base interface for common variables available to most prompts. */
+
+
 export interface BasePromptVariables {
   userMessage: string;
   chatHistory: string;
@@ -112,12 +112,10 @@ export interface BasePromptVariables {
  */
 export interface PromptDefinition<T extends BasePromptVariables = BasePromptVariables> {
   template: string;
-  buildVariables: (resolutionContextData: Record<string, any>) => T;
+  buildVariables: (resolutionContextData: Record<string, any>, ...args: any[]) => T;
 }
 
 // --- Tool Parameter Interfaces ---
-// Kept as is, assuming they are used by ToolRunner implementations
-
 export interface FilesystemGetFileContentsParams { filePath: string; }
 export interface FilesystemGetWorkspaceFilesParams { /* No parameters needed */ }
 export interface EditorGetActiveEditorContentParams { /* No parameters needed */ }
@@ -126,7 +124,6 @@ export interface ProjectGetProjectInfoParams { /* No parameters needed */ }
 export interface ProjectSearchWorkspaceParams { query: string; }
 export interface CodeManipulationApplyWorkspaceEditParams { edits: vscode.WorkspaceEdit[]; }
 
-// Union type for all tool parameters
 export type ToolParams =
   | FilesystemGetFileContentsParams
   | FilesystemGetWorkspaceFilesParams

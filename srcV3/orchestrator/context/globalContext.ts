@@ -21,7 +21,7 @@ export class GlobalContext {
     private context: vscode.ExtensionContext;
 
 
-    constructor(context: vscode.ExtensionContext, configManager: ConfigurationManager) {
+    constructor(context: vscode.ExtensionContext) {
         this.context = context;
       
         this.state = this.loadState() || {};

@@ -4,16 +4,16 @@ import * as path from 'path';
 import * as fs from 'fs';
 
 export class DatabaseManager {
-  private db: sqlite3.Database | null = null; // Initialize as null
+  private db: sqlite3.Database | null = null;
   private context: vscode.ExtensionContext;
   private static instance: DatabaseManager;
-  private isInitialized: boolean = false; // Track if tables have been initialized
-  private initPromise: Promise<void> | null = null; // Promise to track initialization status
-  private dbOpenPromise: Promise<sqlite3.Database>; // Promise for the database opening itself
+  private isInitialized: boolean = false; 
+  private initPromise: Promise<void> | null = null;
+  private dbOpenPromise: Promise<sqlite3.Database>; 
 
   private constructor(context: vscode.ExtensionContext) {
     this.context = context;
-    // Use globalStorageUri for persistent data specific to the extension
+ 
     const dbPath = path.join(context.globalStorageUri.fsPath, 'assistant.db');
 
     // Ensure directory exists
@@ -23,27 +23,27 @@ export class DatabaseManager {
         fs.mkdirSync(dbDir, { recursive: true });
       } catch (error: any) {
         console.error('[DatabaseManager] Failed to create database directory:', error.message);
-        // Handle error appropriately, maybe show a critical error message
+  
         vscode.window.showErrorMessage('Failed to create extension storage directory.');
-        // We cannot proceed if storage fails, throw error to potentially halt activation
+       
         throw error;
       }
     }
 
     // Create a promise for the database opening process
     this.dbOpenPromise = new Promise((resolve, reject) => {
-        // Open the database. sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE is the default.
+      
         const db = new sqlite3.Database(dbPath, (err) => {
           if (err) {
             console.error('[DatabaseManager] Error opening database:', err.message);
             // Show error message to the user
             vscode.window.showErrorMessage('Failed to open extension database.');
-            this.db = null; // Ensure db is null on error
-            reject(err); // Reject the promise
+            this.db = null;
+            reject(err);
           } else {
             console.log('[DatabaseManager] Database opened successfully:', dbPath);
-            this.db = db; // Store the opened db instance
-            resolve(db); // Resolve the promise with the db instance
+            this.db = db; 
+            resolve(db);
           }
         });
     });
@@ -52,13 +52,13 @@ export class DatabaseManager {
     // Chain initialization after the database is successfully opened
     this.initPromise = this.dbOpenPromise
         .then(db => {
-             // Enable foreign keys immediately after opening the database
+          
              return new Promise<void>((resolve, reject) => {
                  db.run('PRAGMA foreign_keys = ON', (err) => {
                      if (err) {
                           console.error('[DatabaseManager] Failed to enable foreign keys:', err.message);
                           vscode.window.showErrorMessage('Failed to enable database foreign key support.');
-                          reject(err); // Reject init if foreign keys fail
+                          reject(err); 
                      } else {
                          console.log('[DatabaseManager] Foreign keys enabled.');
                          resolve();
@@ -66,13 +66,12 @@ export class DatabaseManager {
                  });
              });
         })
-        .then(() => this.initializeTables()) // Then initialize tables
+        .then(() => this.initializeTables()) 
         .catch(initErr => {
              console.error('[DatabaseManager] Failed during database initialization sequence:', initErr);
              vscode.window.showErrorMessage('Failed during extension database initialization.');
-             this.isInitialized = false; // Mark as not initialized on any error
-             // The error is already logged and potentially shown to the user.
-             // The initPromise will remain rejected, causing subsequent getDatabase calls to fail.
+             this.isInitialized = false; 
+           
         });
   }
 
@@ -93,20 +92,18 @@ export class DatabaseManager {
    * @throws Error if the database connection or initialization failed.
    */
   public async getDatabase(): Promise<sqlite3.Database> {
-      // Wait for the entire initialization sequence (opening + tables)
+    
       if (this.initPromise) {
           await this.initPromise;
       } else if (!this.isInitialized) {
-           // Fallback/error state: initPromise should always be set in constructor.
-           // If not set and not initialized, something went wrong early.
+          
            console.error('[DatabaseManager] getDatabase called but initialization sequence was not started or completed successfully.');
            throw new Error("Database initialization sequence did not complete.");
       }
 
-      // Check if the database instance is actually available after waiting
+    
       if (!this.db) {
-          // This case should be covered by the initPromise rejecting,
-          // but as a final check, ensure db is not null.
+        
           throw new Error("Database connection is not available after initialization.");
       }
 
@@ -125,7 +122,7 @@ export class DatabaseManager {
       }
       console.log('[DatabaseManager] Initializing database tables...');
 
-      // Ensure db is available before running schema creation
+     
       const db = this.db;
       if (!db) {
           const error = new Error("Database connection not available for table initialization.");
@@ -134,7 +131,7 @@ export class DatabaseManager {
       }
 
       return new Promise((resolve, reject) => {
-          // Use serialize to ensure commands run in order
+         
           db.serialize(() => {
               db.run(`
                   CREATE TABLE IF NOT EXISTS chats (
@@ -164,7 +161,7 @@ export class DatabaseManager {
                   )
               `, function(err) { if (err) { console.error('[DatabaseManager] Cache table creation failed:', err.message); reject(err); } });
 
-              // Added 'reason' column to match MemoryItem interface and prompt structure
+   
               db.run(`
                   CREATE TABLE IF NOT EXISTS memory_items (
                       id TEXT PRIMARY KEY,
@@ -179,12 +176,11 @@ export class DatabaseManager {
                   )
               `, function(err) { if (err) { console.error('[DatabaseManager] Memory table creation failed:', err.message); reject(err); } });
 
-              // Use a final callback to know when all serialized commands are done
-              // A simple SELECT 1 is a good way to get a final callback after all runs
+      
               db.get("SELECT 1", (err) => {
                   if (err) {
                       console.error('[DatabaseManager] Final check after table initialization failed:', err.message);
-                      this.isInitialized = false; // Mark as not initialized if error occurred
+                      this.isInitialized = false; 
                       reject(err);
                   } else {
                       console.log('[DatabaseManager] Database tables initialized.');
@@ -208,13 +204,13 @@ export class DatabaseManager {
         } else {
             console.log('[DatabaseManager] Database closed.');
         }
-        this.db = null; // Clear the reference after closing
+        this.db = null;
       });
-      // Clear the instance reference so a new one can be created if needed (e.g., after reset)
-      DatabaseManager.instance = null as any; // Cast to any to allow setting null
-      this.isInitialized = false; // Reset initialization status
-      this.initPromise = null; // Clear the promise
-      // dbOpenPromise might still be pending or resolved, but subsequent getInstance will create a new one
+   
+      DatabaseManager.instance = null as any; 
+      this.isInitialized = false;
+      this.initPromise = null;
+    
     }
   }
 
@@ -228,11 +224,9 @@ export class DatabaseManager {
     return new Promise((resolve, reject) => {
       const dbPath = path.join(this.context.globalStorageUri.fsPath, 'assistant.db');
 
-      this.close(); // Close existing connection first
+      this.close();
 
-      // Wait a moment to ensure close is processed before unlinking, though fs.unlink should handle busy files.
-      // A more robust approach might involve checking if the file handle is released.
-      // For typical extension use, a small delay or relying on OS handling is often sufficient.
+    
       setTimeout(() => {
           fs.unlink(dbPath, (unlinkErr) => {
             if (unlinkErr && unlinkErr.code !== 'ENOENT') {
@@ -241,10 +235,10 @@ export class DatabaseManager {
               return;
             }
             console.log('[DatabaseManager] Database file unlinked.');
-            // The next call to getInstance will create a new DB and initialize tables
+          
             resolve();
           });
-      }, 100); // Small delay
+      }, 100); 
     });
   }
 
