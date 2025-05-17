@@ -5,20 +5,21 @@ import { ChatService } from '../../services/chatService';
 
 import { AgentOrchestratorService } from '../../orchestrator/agents/AgentOrchestratorService';
 
-import { IWorkspaceService } from '../../workspace/interfaces'; // <-- Added import
+// Removed import of IWorkspaceService
+import { IToolRunner } from '../../tools/core/interfaces'; // Import IToolRunner
 
 
 export class WebviewProvider implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView;
   private disposables: vscode.Disposable[] = [];
 
-  // Accept IWorkspaceService dependency
+  // Accept IToolRunner dependency instead of IWorkspaceService
   constructor(
     private readonly extensionUri: vscode.Uri,
     private readonly configManager: ConfigurationManager,
     private readonly chatService: ChatService,
     private readonly agentOrchestratorService: AgentOrchestratorService,
-    private readonly workspaceService: IWorkspaceService // <-- Added dependency
+    private readonly toolRunner: IToolRunner // <-- Changed dependency
   ) {}
 
   public resolveWebviewView(webviewView: vscode.WebviewView): void {
@@ -121,21 +122,21 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
             break;
           case 'switchModel':
             await this.configManager.setModelType(message.modelType);
-            
+
             this.updateModel(message.modelType);
             break;
           case 'showHistory':
             this.showChatHistory();
             break;
           case 'getProjectFiles':
-          
+            // Use ToolRunner instead of WorkspaceService
             await this.getProjectFiles();
             break;
           case 'getFileContents':
-        
+            // Use ToolRunner instead of WorkspaceService
             await this.getFileContents(message.filePath);
             break;
-   
+          // Add other commands here if needed
         }
     } catch (error) {
         this.handleError(error);
@@ -156,7 +157,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     try {
       const messages = await this.chatService.loadConversation(chatId);
       this.postMessage('chatLoaded', { messages });
- 
+
     } catch (error) {
       this.handleError(error);
     }
@@ -192,8 +193,8 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
 
   private async getProjectFiles(): Promise<void> {
     try {
-      
-        const files = await this.workspaceService.listWorkspaceFiles();
+        // Use ToolRunner to execute the filesystem.listWorkspaceFiles tool
+        const files = await this.toolRunner.runTool('filesystem.listWorkspaceFiles');
         this.postMessage('projectFiles', { files });
     } catch (error) {
         this.handleError(error);
@@ -203,8 +204,8 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
 
 private async getFileContents(filePath: string): Promise<void> {
     try {
-        // Use WorkspaceService instead of ToolRunner
-        const content = await this.workspaceService.getFileContent(filePath);
+        // Use ToolRunner to execute the filesystem.getFileContents tool
+        const content = await this.toolRunner.runTool('filesystem.getFileContents', { filePath });
         this.postMessage('fileContents', { filePath, content });
     } catch (error) {
         this.handleError(error);
@@ -255,7 +256,7 @@ private async getFileContents(filePath: string): Promise<void> {
   public dispose(): void {
     console.log('[WebviewProvider] Disposing.');
     this.disposables.forEach(disposable => disposable.dispose());
-    this.disposables = []; 
-    this.view = undefined; 
+    this.disposables = [];
+    this.view = undefined;
   }
 }

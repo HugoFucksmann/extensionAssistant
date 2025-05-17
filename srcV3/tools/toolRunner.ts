@@ -1,12 +1,13 @@
 // src/tools/toolRunner.ts
 
 import * as vscode from 'vscode';
+import { IToolRunner } from './core/interfaces';
+import { getFileContents, getMainWorkspacePath, listWorkspaceFiles } from './filesystem';
+import { getActiveEditorContent } from './editor';
+import { getPackageDependencies, getProjectInfo, searchWorkspace } from './project';
+import { applyWorkspaceEdit } from './codeManipulation';
 
-import { IToolRunner } from './interfaces';
-import { IWorkspaceService } from '../../workspace/interfaces';
-import { getActiveEditorContent } from '../editor';
-import { getPackageDependencies, getProjectInfo, searchWorkspace } from '../project';
-import { applyWorkspaceEdit } from '../codeManipulation';
+
 
 
 // Define a type for the tool function itself, including the attached properties
@@ -18,42 +19,26 @@ type ToolFunction = ((params: Record<string, any>) => Promise<any>) & {
 // Interface for the entry in the ToolRegistry
 interface ToolEntry {
     execute: ToolFunction; // The tool function with potential validation properties
-    requiredParams?: string[];
+    // requiredParams is now read from the function property, not the entry
   }
 
 type ToolRegistry = Record<string, ToolEntry>;
 
 // Implement the IToolRunner interface
-export class ToolRunner implements IToolRunner { // <-- Added implements
+export class ToolRunner implements IToolRunner {
 
-  // The TOOLS registry maps tool names to the imported functions or internal methods.
-  // We now rely on the imported function object having the validateParams/requiredParams properties.
-  // This is now an instance property to access the injected workspaceService.
-  private readonly TOOLS: ToolRegistry; // <-- Made instance property
+  // The TOOLS registry maps tool names to the imported functions.
+  // It's now an instance property, but doesn't need external dependencies for initialization.
+  private readonly TOOLS: ToolRegistry;
 
-  // Inject IWorkspaceService dependency
-  constructor(private workspaceService: IWorkspaceService) { // <-- Added constructor with dependency
-      // Initialize the TOOLS registry here to use the injected dependency
+  // No longer needs WorkspaceService dependency
+  constructor() {
+      // Initialize the TOOLS registry here, pointing directly to imported tool functions
       this.TOOLS = {
-          // Filesystem Tools - Now delegate to WorkspaceService
-          'filesystem.getWorkspaceFiles': {
-              execute: async (params: Record<string, any>) => {
-                   // Validation can be added here if needed, or rely on WorkspaceService
-                   return this.workspaceService.listWorkspaceFiles();
-              },
-              // No specific params validation needed here, WorkspaceService handles internal logic
-          },
-          'filesystem.getFileContents': {
-              execute: async (params: Record<string, any>) => {
-                  // Validate params before calling WorkspaceService
-                  if (params.filePath === undefined || params.filePath === null || typeof params.filePath !== 'string') {
-                      throw new Error("Parameter 'filePath' is required and must be a string.");
-                  }
-                  // WorkspaceService handles file not found/read errors
-                  return this.workspaceService.getFileContent(params.filePath);
-              },
-              requiredParams: ['filePath'] // Keep validation definition here for consistency
-          },
+          // Filesystem Tools - Now point to the dedicated tool functions
+          'filesystem.getMainWorkspacePath': { execute: getMainWorkspacePath as ToolFunction },
+          'filesystem.listWorkspaceFiles': { execute: listWorkspaceFiles as ToolFunction },
+          'filesystem.getFileContents': { execute: getFileContents as ToolFunction },
 
           // Editor Tools
           'editor.getActiveEditorContent': { execute: getActiveEditorContent as ToolFunction },
@@ -66,7 +51,7 @@ export class ToolRunner implements IToolRunner { // <-- Added implements
           // Code Manipulation Tools
           'codeManipulation.applyWorkspaceEdit': { execute: applyWorkspaceEdit as ToolFunction },
       };
-       console.log('[ToolRunner] Initialized with WorkspaceService.'); // Added log
+       console.log('[ToolRunner] Initialized.'); // Simplified log
   }
 
 
@@ -78,7 +63,7 @@ export class ToolRunner implements IToolRunner { // <-- Added implements
    * @returns The result of the tool execution.
    * @throws Error if the tool is not found, validation fails, or the tool execution fails.
    */
-  public async runTool( // <-- Removed static
+  public async runTool(
     toolName: string,
     params: Record<string, any> = {}
   ): Promise<any> {
@@ -87,9 +72,6 @@ export class ToolRunner implements IToolRunner { // <-- Added implements
       const error = new Error(`Tool not registered: ${toolName}`);
       console.error('[ToolRunner]', error.message);
       // Show error message in VS Code UI
-      // Note: Showing UI messages from a service might be questionable depending on architecture.
-      // Ideally, errors are returned/thrown and handled by the UI layer.
-      // For now, keeping it as it was.
       vscode.window.showErrorMessage(`Error executing tool: Tool '${toolName}' not registered.`);
       throw error;
     }
@@ -107,9 +89,9 @@ export class ToolRunner implements IToolRunner { // <-- Added implements
         throw error;
       }
     }
-    // If no validateParams, check for requiredParams property
-    else if (Array.isArray(toolEntry.requiredParams)) { // <-- Check on toolEntry, not toolFunction
-      for (const param of toolEntry.requiredParams) { // <-- Check on toolEntry
+    // If no validateParams, check for requiredParams property attached to the function
+    else if (Array.isArray(toolFunction.requiredParams)) { // <-- Check on toolFunction property
+      for (const param of toolFunction.requiredParams) { // <-- Check on toolFunction property
         if (params[param] === undefined || params[param] === null) {
           const error = new Error(`Missing required parameter for ${toolName}: ${param}`);
           console.error('[ToolRunner]', error.message);
@@ -124,13 +106,12 @@ export class ToolRunner implements IToolRunner { // <-- Added implements
     try {
       console.log(`[ToolRunner] Executing tool: ${toolName} with params:`, params);
       // Pass the params object directly to the tool function
-      const result = await toolFunction(params);
+      const result = await toolFunction(params); // Pass params here
       console.log(`[ToolRunner] Tool execution successful: ${toolName}`);
       return result;
     } catch (error: any) {
       console.error(`[ToolRunner] Error executing tool ${toolName}:`, error);
       // Show error message in VS Code UI for user feedback
-      // Use a more user-friendly message, hiding internal details unless necessary
       const userFacingMessage = `Error executing tool ${toolName}: ${error.message || 'An unknown error occurred.'}`;
       vscode.window.showErrorMessage(userFacingMessage);
       // Re-throw the error for the orchestrator/handler to catch and potentially log more detail
@@ -145,7 +126,7 @@ export class ToolRunner implements IToolRunner { // <-- Added implements
    * @param concurrencyLimit Number maximum of tools to execute simultaneously (ignored).
    * @returns A record mapping tool names to their results and errors.
    */
-  public async runParallel( // <-- Removed static
+  public async runParallel(
     toolsToRun: Array<{ name: string; params?: Record<string, any> }>,
     concurrencyLimit: number = 0 // concurrencyLimit is ignored in this simplified implementation
   ): Promise<{ results: Record<string, any>, errors: Record<string, any> }> {
@@ -180,7 +161,7 @@ export class ToolRunner implements IToolRunner { // <-- Added implements
    * ensure it's re-exported in the root src/tools/index.ts,
    * and register it in the TOOLS map here.
    */
-  public listTools(): string[] { // <-- Removed static
+  public listTools(): string[] {
     return Object.keys(this.TOOLS); // Access instance property
   }
 

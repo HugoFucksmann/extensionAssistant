@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { getWorkspaceFiles } from '../../workspace/getWorkspaceFiles';
+import { listWorkspaceFilesTool } from '../filesystem/listWorkspaceFilesTool';
 import { getPackageDependencies } from './getPackageDependencies';
 
 /**
@@ -37,10 +37,10 @@ async function detectProjectLanguages(): Promise<{
   secondaryLanguage?: string
 }> {
 
-  const files = await getWorkspaceFiles();
+  const files = await listWorkspaceFilesTool();
   const languageCount: Record<string, number> = {};
 
-  files.forEach(file => {
+  files.forEach((file: string) => {
     const ext = path.extname(file).toLowerCase();
     // Map extensions to common language names
     if (ext === '.ts') languageCount['TypeScript'] = (languageCount['TypeScript'] || 0) + 1;

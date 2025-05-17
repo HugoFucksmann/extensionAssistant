@@ -21,7 +21,7 @@ export function normalizePath(rawPath: string): string {
  * Safely reads a file's content using VS Code's API (`vscode.workspace.openTextDocument`).
  * This is preferred over Node's `fs.readFile` in an extension context as it respects
  * VS Code's file system providers, encoding, and open editors.
- * Throws an error if the file cannot be opened or read.
+ * Throws an error if the file does not exist or cannot be read.
  * @param filePath The absolute path to the file.
  * @returns The content of the file as a string.
  * @throws Error if the file does not exist or cannot be read.

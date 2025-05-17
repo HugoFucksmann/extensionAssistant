@@ -18,18 +18,21 @@ export async function getFileContents(params: { filePath: string }): Promise<str
     }
 
     try {
-  
+        // Use core utilities
         const workspacePath = getMainWorkspacePath();
-       
+        // Ensure the provided path is treated relative to the workspace root
         const fullPath = path.join(workspacePath, filePath);
 
-       
-        return await safeReadFile(fullPath);
+        console.log(`[Tool] filesystem.getFileContents called for: ${filePath} (full: ${fullPath})`);
+
+        // Use core utility for safe reading
+        const content = await safeReadFile(fullPath);
+        console.log(`[Tool] filesystem.getFileContents successfully read ${filePath}.`);
+        return content;
 
     } catch (error: any) {
-      
         console.error(`[Tool.getFileContents] Error accessing file ${filePath}:`, error.message);
-       
+        // Re-throw a standardized error
         throw new Error(`Failed to get file contents for ${filePath}: ${error.message}`);
     }
 }
@@ -40,11 +43,17 @@ getFileContents.validateParams = (params: Record<string, any>): boolean | string
         return 'Parameter "filePath" (string) is required.';
     }
     // Optional: Add more checks, e.g., if filePath looks like an absolute path
+    // The path.join handles this by making it relative to workspacePath anyway,
+    // but a warning might be useful.
     if (path.isAbsolute(params.filePath)) {
-        
-         console.warn(`[Tool.getFileContents] Received absolute path "${params.filePath}". Assuming it's relative to workspace root.`);
-     
+         console.warn(`[Tool.getFileContents] Received absolute path "${params.filePath}". Treating it relative to workspace root.`);
     }
+     // Prevent accessing files outside the workspace root using '..'
+     const normalizedRelativePath = normalizePath(params.filePath);
+     if (normalizedRelativePath.startsWith('../') || normalizedRelativePath.includes('/../')) {
+         return `File path "${params.filePath}" must be within the workspace root.`;
+     }
+
     return true;
 };
 
