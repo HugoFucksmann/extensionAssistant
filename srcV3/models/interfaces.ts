@@ -1,20 +1,10 @@
 // src/models/interfaces.ts
 
 import * as vscode from 'vscode';
-import { PromptType } from '../orchestrator/execution/types'; // Ensure correct import path for PromptType
+import { PromptType } from '../orchestrator/execution/types'; 
 
-import { PromptDefinition } from '../orchestrator/execution/types'; // Assuming PromptDefinition will be used elsewhere or moved here
+import { PromptDefinition } from '../orchestrator/execution/types'; 
 import { ModelType } from './config/types';
-
-// Define the PromptDefinition interface here if it's needed externally
-// Or keep it internal to the models module if only ModelService needs it
-
-// If PromptDefinition is internal to the models module:
-// interface PromptDefinition<T extends BasePromptVariables = BasePromptVariables> {
-//   template: string;
-//   buildVariables: (resolutionContextData: Record<string, any>) => T;
-// }
-
 
 /**
  * Interface for the service managing AI model interactions and prompt execution.

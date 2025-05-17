@@ -29,17 +29,16 @@ export class OllamaAPI implements ModelAPI {
       if (!response.ok) {
         throw new Error(`Error in response: ${response.statusText}`);
       }
-      
-      // Parse response as JSON to extract 'response' field
+
       const responseData = await response.json();
       
       console.log("[OllamaAPI] Response received");
       
-      // Check if response has expected Ollama format
+     
       if (responseData && typeof responseData.response === 'string') {
         return responseData.response;
       } else {
-        // If not in expected format, return stringified data
+      
         return JSON.stringify(responseData);
       }
     } catch (error) {
