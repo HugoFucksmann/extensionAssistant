@@ -1,26 +1,62 @@
 import * as path from 'path';
-import { listWorkspaceFilesTool } from '../filesystem/listWorkspaceFilesTool';
-import { getPackageDependencies } from './getPackageDependencies';
+// Removed import of getWorkspaceFiles and getPackageDependencies from their old locations
+import { IToolRunner } from '../core/interfaces'; // Import IToolRunner
+
+// Note: getPackageDependencies and listWorkspaceFiles are now tools executable via ToolRunner
+// getProjectInfo will need ToolRunner access.
 
 /**
  * Tool to gather basic information about the project in the workspace.
  * Includes main/secondary languages and production dependencies.
+ * This tool now requires a ToolRunner instance to call other tools.
+ *
+ * @param params - Parameters (none required for execution, but signature allows expansion).
+ * @param toolRunner - The ToolRunner instance injected by the caller.
  * @returns An object containing project information.
- * @throws Error if no workspace folder is open (due to getWorkspaceFiles or getPackageDependencies).
+ * @throws Error if no workspace folder is open (due to underlying tools failing).
  */
-export async function getProjectInfo(): Promise<{
+export async function getProjectInfo(
+    params: Record<string, any> = {}, // Keep params for consistency and future use
+    toolRunner: IToolRunner // <-- Accept ToolRunner as an argument
+): Promise<{
     mainLanguage: string,
     secondaryLanguage?: string,
     dependencies: string[]
   }> {
 
-   
-    const [languages, dependencies] = await Promise.all([
-      detectProjectLanguages(),
- 
-      getPackageDependencies({})
-    ]);
+    console.log('[Tool] project.getProjectInfo called.');
 
+    if (!toolRunner) {
+        // This check should ideally not be needed if ToolRunner calls correctly,
+        // but acts as a safeguard during refactoring.
+        throw new Error("ToolRunner instance not provided to getProjectInfo tool.");
+    }
+
+    // Use ToolRunner to call other tools
+    const { results, errors } = await toolRunner.runParallel([
+      { name: 'filesystem.listWorkspaceFiles' },
+      { name: 'project.getPackageDependencies' }
+  ]);
+
+
+  if (errors['filesystem.listWorkspaceFiles']) {
+    console.error('[Tool] Error getting workspace files in getProjectInfo:', errors['filesystem.listWorkspaceFiles']);
+    throw new Error(`Failed to get workspace files: ${errors['filesystem.listWorkspaceFiles'].message}`);
+}
+
+if (errors['project.getPackageDependencies']) {
+    console.warn('[Tool] Error getting package dependencies in getProjectInfo (may be OK if no package.json):', 
+                errors['project.getPackageDependencies']);
+    // Dependencies are not strictly necessary, log error but continue
+}
+
+const files = results['filesystem.listWorkspaceFiles'] || [];
+const dependencies = results['project.getPackageDependencies'] || [];
+
+
+    const languages = detectProjectLanguages(files); // Pass files to the helper
+
+    console.log('[Tool] project.getProjectInfo completed.');
     return {
       mainLanguage: languages.mainLanguage,
       secondaryLanguage: languages.secondaryLanguage,
@@ -30,17 +66,17 @@ export async function getProjectInfo(): Promise<{
 
 /**
  * Helper function to detect main and secondary programming languages based on file extensions.
+ * Now accepts the file list as an argument.
+ * @param files - An array of file paths relative to the workspace root.
  * @returns An object with mainLanguage and optional secondaryLanguage.
  */
-async function detectProjectLanguages(): Promise<{
-  mainLanguage: string,
-  secondaryLanguage?: string
-}> {
-
-  const files = await listWorkspaceFilesTool();
+function detectProjectLanguages(files: string[]): {
+  mainLanguage: string;
+  secondaryLanguage?: string;
+} {
   const languageCount: Record<string, number> = {};
 
-  files.forEach((file: string) => {
+  files.forEach(file => {
     const ext = path.extname(file).toLowerCase();
     // Map extensions to common language names
     if (ext === '.ts') languageCount['TypeScript'] = (languageCount['TypeScript'] || 0) + 1;
@@ -62,16 +98,23 @@ async function detectProjectLanguages(): Promise<{
     else if (ext === '.php') languageCount['PHP'] = (languageCount['PHP'] || 0) + 1;
     else if (ext === '.swift') languageCount['Swift'] = (languageCount['Swift'] || 0) + 1;
     else if (ext === '.kt') languageCount['Kotlin'] = (languageCount['Kotlin'] || 0) + 1;
-
+    // Add more languages as needed
   });
 
   const sortedLanguages = Object.entries(languageCount)
-    .sort((a, b) => b[1] - a[1]) 
-    .map(([lang]) => lang); 
+    .sort((a, b) => b[1] - a[1])
+    .map(([lang]) => lang);
 
   return {
     mainLanguage: sortedLanguages[0] || 'Unknown',
-    secondaryLanguage: sortedLanguages[1] 
+    secondaryLanguage: sortedLanguages[1]
   };
 }
 
+// Define validation rules (none needed for execution params, but signature allows expansion)
+getProjectInfo.validateParams = (_params: Record<string, any>): boolean | string => {
+    return true; // No parameters required or validated for execution
+};
+
+
+(getProjectInfo as any).requiredParams = [] as string[]; // No required parameters

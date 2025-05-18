@@ -1,4 +1,4 @@
-// src/tools/filesystem/listWorkspaceFilesTool.ts
+// src/tools/filesystem/listWorkspaceFiles.ts
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as ignore from 'ignore'; // Need the ignore library
@@ -34,7 +34,7 @@ const DEFAULT_EXCLUSIONS = {
  * @returns An array of file paths relative to the workspace root (using forward slashes).
  * @throws Error if no workspace folder is open.
  */
-export const listWorkspaceFilesTool: ToolFunction = async function listWorkspaceFilesTool(): Promise<string[]> {
+const listWorkspaceFiles: ToolFunction = async function listWorkspaceFiles(): Promise<string[]> {
     console.log('[Tool] filesystem.listWorkspaceFiles called.');
 
     const files: string[] = [];
@@ -112,8 +112,10 @@ export const listWorkspaceFilesTool: ToolFunction = async function listWorkspace
 }
 
 // Define validation rules (none needed for this tool)
-listWorkspaceFilesTool.validateParams = (_params: Record<string, any>): boolean | string => {
+listWorkspaceFiles.validateParams = function validateParams(_params: Record<string, any>): boolean | string {
     return true; // No parameters required or validated
 };
 
-listWorkspaceFilesTool.requiredParams = []; // No required parameters
+listWorkspaceFiles.requiredParams = []; // No required parameters
+
+export { listWorkspaceFiles };

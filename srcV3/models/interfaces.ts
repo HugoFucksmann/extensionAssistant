@@ -1,10 +1,20 @@
 // src/models/interfaces.ts
 
 import * as vscode from 'vscode';
-import { PromptType } from '../orchestrator/execution/types'; 
+import { PromptDefinition, PromptType } from '../orchestrator/execution/types';
+import { IToolRunner } from '../tools/core/interfaces'; // Import IToolRunner
 
-import { PromptDefinition } from '../orchestrator/execution/types'; 
+
 import { ModelType } from './config/types';
+
+
+// Update the PromptDefinition type to potentially include IToolRunner for buildVariables
+export interface getPromptDefinitions<T> {
+  template: string;
+  // Updated signature: buildVariables can optionally accept toolRunner
+  buildVariables: (contextData: Record<string, any>, toolRunner?: IToolRunner) => T;
+}
+
 
 /**
  * Interface for the service managing AI model interactions and prompt execution.
@@ -48,5 +58,5 @@ export interface IModelService extends vscode.Disposable {
      * Useful for components needing to understand available prompts or their variable requirements.
      * @returns A partial record of prompt definitions by type.
      */
-    getPromptDefinitions(): Partial<Record<PromptType, PromptDefinition<any>>>; // Add this if AgentOrchestratorService needs it
+    getPromptDefinitions(): Partial<Record<PromptType, PromptDefinition<any>>>;
 }

@@ -93,6 +93,7 @@ export class SessionContext {
         }
 
         if (!this.projectInfoPromise) {
+            // ACTUALIZAR
             this.projectInfoPromise = fetchProjectInfo().catch(err => {
                  console.error('[SessionContext] Error fetching project info:', err);
                  this.projectInfoPromise = null;

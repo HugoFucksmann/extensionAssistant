@@ -20,12 +20,11 @@ import { AgentOrchestratorService } from './orchestrator/agents/AgentOrchestrato
 // Removed import of WorkspaceService and IWorkspaceService
 
 
-import { ToolRunner } from './tools/toolRunner'; // Ensure this is the correct import path
-import { IToolRunner } from './tools/core/interfaces'; // Ensure this is the correct import path
+import { ToolRunner } from './tools/toolRunner';
+import { IToolRunner } from './tools/core/interfaces';
 import { DatabaseManager } from './store/database/DatabaseManager';
 import { ModelManager } from './models/config/ModelManager';
-import { ModelService } from './services/ModelService';
-
+import { ModelService } from './services/ModelService'; // Ensure this import is correct
 
 
 let globalContext: GlobalContext | null = null;
@@ -39,7 +38,7 @@ let orchestrator: Orchestrator | null = null;
 let webview: WebviewProvider | null = null;
 // Removed workspaceService variable
 let toolRunner: IToolRunner | null = null;
-let modelService: IModelService | null = null;
+let modelService: IModelService | null = null; // Changed type to IModelService
 
 
 let storageService: IStorageService | null = null;
@@ -53,40 +52,49 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Initialize Storage Service and Database Manager
   storageService = new StorageService(context);
-  dbManager = DatabaseManager.getInstance(context); // DatabaseManager is a singleton managed by StorageService
+  // DatabaseManager is a singleton managed by StorageService, no need to store it separately here unless needed for reset
+  dbManager = DatabaseManager.getInstance(context); // Keeping reference for reset command
+
 
   // Initialize Contexts
   globalContext = new GlobalContext(context);
-  // globalContext.getProjectInfo(); // Project info is now obtained via a tool call if needed
+  // Project info is now obtained via a tool call if needed by the planner/agents
+  // globalContext.getProjectInfo(); // This call is likely outdated now
+
 
   sessionContext = new SessionContext(context, globalContext);
 
 
-  // Initialize Model components
-  const modelManager = new ModelManager(configManager);
-  modelService = new ModelService(modelManager);
-
-  // Removed WorkspaceService initialization
-
   // Initialize ToolRunner - No longer needs WorkspaceService dependency
   toolRunner = new ToolRunner();
 
+
+  // Initialize Model components
+  const modelManager = new ModelManager(configManager);
+  // Pass toolRunner to ModelService constructor
+  modelService = new ModelService(modelManager, toolRunner); // <-- Pass toolRunner here
+
+
   // Initialize Agent Orchestrator Service
   agentOrchestratorService = new AgentOrchestratorService(
-      modelService,
-      storageService,
+      modelService, // Agent Orchestrator needs ModelService
+      storageService, // Agent Orchestrator needs StorageService (for memory/cache repos)
       toolRunner, // Agent Orchestrator needs ToolRunner
-      configManager
+      configManager // Agent Orchestrator needs ConfigManager
   );
+
 
   // Initialize Orchestrator
   orchestrator = new Orchestrator(toolRunner, modelService); // Orchestrator needs ToolRunner and ModelService
 
 
   // Initialize Chat Service
-  chatService = new ChatService(context, orchestrator, sessionContext, agentOrchestratorService); // ChatService needs Orchestrator, SessionContext, AgentOrchestrator
+  // ChatService needs Orchestrator, SessionContext, AgentOrchestrator
+  chatService = new ChatService(context, orchestrator, sessionContext, agentOrchestratorService);
+
 
   // Initialize Webview Provider - Now needs ToolRunner instead of WorkspaceService
+  // WebviewProvider needs ConfigManager, ChatService, AgentOrchestratorService, ToolRunner
   webview = new WebviewProvider(context.extensionUri, configManager, chatService, agentOrchestratorService, toolRunner); // <-- Pass toolRunner here
 
   webview.setThemeHandler(); // Setup theme listener early
@@ -125,11 +133,22 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand('extension.resetDatabase', async () => {
       try {
 
+        // IMPORTANT: Ensure services that might hold open DB connections or state
+        // dependent on DB entities are disposed BEFORE resetting the DB.
+        // AgentOrchestratorService -> Memory/Cache Repos
+        // ChatService -> Chat Repo, ConversationContexts holding messages
+        // SessionContext -> Might hold references to DB state (though less likely directly)
+        // GlobalContext -> Might hold references to DB state (less likely directly)
+        // Orchestrator -> Planning state might involve results from DB interaction
+        // ModelService -> Doesn't directly use DB, but depends on services that do? (No)
+        // WebviewProvider -> Doesn't directly use DB, but depends on ChatService
+        // StorageService -> MANAGES the DB connection, MUST be disposed before reset
+
         if (dbManager) {
            console.log('[Extension] Executing database reset command...');
 
-           // Dispose services that interact with the database or hold state
-           // Dispose in reverse order of creation/dependency where possible
+           // 1. Dispose services in order of dependency (roughly reverse creation/dependency)
+           // Services depending on data/state first
            if (agentOrchestratorService) {
                agentOrchestratorService.dispose();
                agentOrchestratorService = null;
@@ -143,7 +162,7 @@ export async function activate(context: vscode.ExtensionContext) {
                sessionContext = null;
            }
            if (globalContext) {
-               await globalContext.saveState(); // Optional: save non-DB state before disposing
+               await globalContext.saveState(); // Save non-DB state before disposing
                globalContext.dispose();
                globalContext = null;
            }
@@ -159,19 +178,21 @@ export async function activate(context: vscode.ExtensionContext) {
                webview.dispose();
                webview = null;
            }
-           // Dispose StorageService - This is crucial as it closes the DB connection
+           // 2. Dispose StorageService - This is crucial as it closes the DB connection
            if (storageService) {
                storageService.dispose();
                storageService = null;
            }
 
-           // Nullify other services that don't have explicit dispose methods or manage resources
-           // Removed workspaceService = null;
+           // 3. Nullify other services that don't have explicit dispose methods or manage resources
            toolRunner = null;
            configManager = null; // ConfigManager might have listeners, consider adding dispose if needed
 
-           // Now reset the database via the manager (which should be disconnected)
+           // 4. Now reset the database via the manager (which should be disconnected)
            await dbManager.resetDatabase();
+            // After reset, the DatabaseManager instance is no longer functional for the old DB.
+            // It will re-initialize on the next getInstance call, typically after a window reload.
+
 
            console.log('[Extension] Database reset successful.');
            vscode.window.showInformationMessage('Database reset successfully! Please reload the window to re-initialize.');
@@ -192,51 +213,36 @@ export async function activate(context: vscode.ExtensionContext) {
   );
 
 
-  // Add disposables in the order they should be disposed FIRST:
-  // The order here matters for clean shutdown. Services depending on others should be disposed first.
-  // AgentOrchestratorService depends on ModelService, StorageService, ToolRunner
-  if (agentOrchestratorService) {
-      context.subscriptions.push(agentOrchestratorService); // 1st
-  }
-  // ChatService depends on Orchestrator, SessionContext, AgentOrchestratorService
-  if (chatService) {
-      context.subscriptions.push(chatService); // 2nd
-  }
-  // Orchestrator depends on ToolRunner, ModelService
-   if (orchestrator) {
-       context.subscriptions.push(orchestrator); // 3rd
-   }
-  // ModelService depends on ModelManager (which might have ongoing requests)
-  if (modelService) {
-      context.subscriptions.push(modelService); // 4th
-  }
-   // SessionContext depends on GlobalContext
-   if (sessionContext) {
-       context.subscriptions.push(sessionContext); // 5th
-   }
-   // GlobalContext might have state to save
-   if (globalContext) {
-       context.subscriptions.push(globalContext); // 6th
-   }
-  // WebviewProvider depends on ChatService, AgentOrchestratorService, ToolRunner, ConfigManager
-  if (webview) {
-       context.subscriptions.push(webview); // 7th
-  }
-   // StorageService manages the DB connection - should be disposed last among services using DB
-   if (storageService) {
-       context.subscriptions.push(storageService); // 8th (LAST among services)
-   }
-   // ToolRunner and ConfigManager don't have explicit dispose methods in the provided code,
-   // so adding them to subscriptions isn't strictly necessary unless they acquire disposables internally later.
+  // Add disposables to context.subscriptions for VS Code to manage on deactivation
+  // Dispose order (from most dependent to least dependent):
+  // 1. AgentOrchestratorService (depends on ModelService, StorageService, ToolRunner, ConfigManager)
+  if (agentOrchestratorService) context.subscriptions.push(agentOrchestratorService);
+  // 2. ChatService (depends on Orchestrator, SessionContext, AgentOrchestratorService)
+  if (chatService) context.subscriptions.push(chatService);
+  // 3. Orchestrator (depends on ToolRunner, ModelService)
+  if (orchestrator) context.subscriptions.push(orchestrator);
+  // 4. ModelService (depends on ModelManager, ToolRunner)
+  if (modelService) context.subscriptions.push(modelService);
+   // 5. SessionContext (depends on GlobalContext)
+   if (sessionContext) context.subscriptions.push(sessionContext);
+   // 6. GlobalContext (might have state to save)
+   if (globalContext) context.subscriptions.push(globalContext);
+  // 7. WebviewProvider (depends on ChatService, AgentOrchestratorService, ToolRunner, ConfigManager)
+  if (webview) context.subscriptions.push(webview);
+   // 8. StorageService (MANAGES DB connection, dispose before DB reset, LAST in normal dispose)
+   // ToolRunner and ConfigManager don't have explicit dispose methods in this code,
+   // so adding them isn't necessary based on the provided code, although ConfigManager
+   // might acquire disposables internally that should be managed.
+   if (storageService) context.subscriptions.push(storageService); // StorageService needs dispose call
 
 
-  console.log('[Extension] Activated.'); // Simplified log
+  console.log('[Extension] Activated.');
 }
 
 export async function deactivate() {
   console.log('[Extension] Deactivating...');
 
-   // Explicitly dispose services in a safe order
+   // Explicitly dispose services in a safe order (reverse dependency)
    if (agentOrchestratorService) {
        agentOrchestratorService.dispose(); agentOrchestratorService = null;
    }
@@ -264,8 +270,7 @@ export async function deactivate() {
        storageService.dispose(); storageService = null;
    }
 
-   // Nullify other services
-   // Removed workspaceService = null;
+   // Nullify other services if they don't have explicit dispose
    toolRunner = null;
    configManager = null; // Consider adding dispose to ConfigManager if it has listeners
 

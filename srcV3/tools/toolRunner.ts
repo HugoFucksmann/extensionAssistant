@@ -1,17 +1,22 @@
 // src/tools/toolRunner.ts
 
 import * as vscode from 'vscode';
+
 import { IToolRunner } from './core/interfaces';
-import { getFileContents, getMainWorkspacePath, listWorkspaceFiles } from './filesystem';
+// Removed import of IWorkspaceService
+
+// Import all tool functions directly
 import { getActiveEditorContent } from './editor';
+// Import updated project tools
 import { getPackageDependencies, getProjectInfo, searchWorkspace } from './project';
 import { applyWorkspaceEdit } from './codeManipulation';
-
-
+// Import the new/adapted filesystem tool functions
+import { getFileContents, listWorkspaceFiles, getMainWorkspacePath } from './filesystem';
 
 
 // Define a type for the tool function itself, including the attached properties
-type ToolFunction = ((params: Record<string, any>) => Promise<any>) & {
+// Updated ToolFunction type to potentially accept toolRunner
+type ToolFunction = ((params: Record<string, any>, toolRunner?: IToolRunner) => Promise<any>) & {
   validateParams?: (params: Record<string, any>) => boolean | string;
   requiredParams?: string[];
 };
@@ -43,9 +48,9 @@ export class ToolRunner implements IToolRunner {
           // Editor Tools
           'editor.getActiveEditorContent': { execute: getActiveEditorContent as ToolFunction },
 
-          // Project Tools
+          // Project Tools - Updated to point to the modified getProjectInfo
           'project.getPackageDependencies': { execute: getPackageDependencies as ToolFunction },
-          'project.getProjectInfo': { execute: getProjectInfo as ToolFunction },
+          'project.getProjectInfo': { execute: getProjectInfo as ToolFunction }, // Use the updated getProjectInfo
           'project.searchWorkspace': { execute: searchWorkspace as ToolFunction },
 
           // Code Manipulation Tools
@@ -105,8 +110,9 @@ export class ToolRunner implements IToolRunner {
 
     try {
       console.log(`[ToolRunner] Executing tool: ${toolName} with params:`, params);
-      // Pass the params object directly to the tool function
-      const result = await toolFunction(params); // Pass params here
+      // Pass the params object AND the toolRunner instance to the tool function
+      // The tool function's signature must support the toolRunner parameter if needed
+      const result = await toolFunction(params, this); // <-- Pass 'this' (the toolRunner instance)
       console.log(`[ToolRunner] Tool execution successful: ${toolName}`);
       return result;
     } catch (error: any) {
@@ -137,8 +143,8 @@ export class ToolRunner implements IToolRunner {
       // Simple sequential execution for now
       for (const { name, params } of toolsToRun) {
           try {
-              // Call instance method runTool
-              results[name] = await this.runTool(name, params);
+              // Call instance method runTool, which now passes 'this'
+              results[name] = await this.runTool(name, params); // runTool passes 'this' internally
           } catch (error: any) {
               // runTool already logs and shows UI message, just store the error here
               errors[name] = error;
