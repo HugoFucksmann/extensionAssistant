@@ -106,17 +106,6 @@ export async function activate(context: vscode.ExtensionContext) {
 
            await dbManager.resetDatabase();
 
-           // Re-initialize necessary components after reset if needed immediately,
-           // or rely on user interacting again which will implicitly re-init.
-           // For simplicity, let activation handle re-init on next interaction/VS Code restart.
-           // Or explicitly re-init here:
-           // dbManager = DatabaseManager.getInstance(context); // Get new instance after reset
-           // orchestrator = new Orchestrator(globalContext, sessionContext);
-           // chatService = new ChatService(context, modelManager, orchestrator, globalContext, sessionContext);
-           // webview = new WebviewProvider(context.extensionUri, config, chatService, fileSystemService);
-           // context.subscriptions.push(vscode.window.registerWebviewViewProvider('aiChat.chatView', webview));
-           // webview.setThemeHandler(); // Re-add theme handler
-
            vscode.window.showInformationMessage('Database reset successfully! Please reload the window if any issues persist.');
         } else {
              throw new Error("DatabaseManager not initialized.");
