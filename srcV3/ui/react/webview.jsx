@@ -127,10 +127,11 @@ function renderApp() {
   } catch (error) {
     console.error('Error rendering React app:', error);
     // Fallback to show something in case of error
+    const safeError = error instanceof Error ? error.message : String(error);
     root.innerHTML = `
       <div style="padding: 20px; color: red;">
         <h2>Error loading UI</h2>
-        <pre>${error.message}</pre>
+        <pre>${safeError.replace(/[{}]/g, match => match === '{' ? '\{' : '\}')}</pre>
       </div>
     `;
   }

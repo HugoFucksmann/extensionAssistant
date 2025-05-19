@@ -1,7 +1,8 @@
-export { FlowContext } from './flowContext';
-export { GlobalContext } from './globalContext';
-export { SessionContext } from './sessionContext';
-export { ConversationContext } from './conversationContext';
+// srcV3/orchestrator/context/index.ts
+// Corrected: Exporting only the state interfaces with I prefix
+// MODIFIED: Removed re-export of execution types from here.
 
-
-export { InputAnalysisResult, ExecutionStep, StepResult, IExecutor, PromptType, PromptVariables, BasePromptVariables, PlannerResponse, PlannerPromptVariables } from '../execution/types';
+export { IFlowContextState } from './flowContext';
+export { IGlobalContextState } from './globalContext';
+export { ISessionContextState } from './sessionContext';
+export { IConversationContextState } from './conversationContext';

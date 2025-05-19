@@ -1,60 +1,60 @@
 // src/models/prompts/intentions/prompt.fixCode.ts
+// MODIFIED: Use ChatPromptTemplate
 
-import { BasePromptVariables } from '../../../orchestrator/execution/types';
-import { mapContextToBaseVariables } from '../../promptSystem';
+import { ChatPromptTemplate } from "@langchain/core/prompts";
+import { BasePromptVariables } from "../../../orchestrator/types";
+import { mapContextToBaseVariables } from "../builders/baseVariables";
 
-export interface FixCodePromptVariables extends BasePromptVariables {}
 
-export const fixCodePrompt = `
-You are an expert assistant at identifying and proposing solutions for code issues. Your task is to analyze the user's objective, the provided context (code, errors, search results) and propose code changes to solve the problem.
+// Keep interface for variable structure
+export interface FixCodePromptVariables extends BasePromptVariables {} // No specific vars beyond base
 
-User objective:
-"{{objective}}"
+// Define the prompt template using LangChain
+export const fixCodePrompt = ChatPromptTemplate.fromMessages([
+    ["system", `You are an expert assistant at identifying and proposing solutions for code issues. Your task is to analyze the user's objective, the provided context (code, errors, search results) and propose code changes to solve the problem. Respond in English.
 
-Original user message:
-"{{userMessage}}"
+    User objective:
+    "{{objective}}"
 
-Recent history:
-{{chatHistory}}
+    Original user message:
+    "{{userMessage}}"
 
-Key extracted entities:
-{{extractedEntities}}
+    Recent history:
+    {{chatHistory}}
 
-Project context:
-{{projectContext}}
+    Key extracted entities:
+    {{extractedEntities}}
 
-Relevant code:
-{{activeEditorContent}}
-{{fileContent:.*}}
+    Project context:
+    {{projectContext}}
 
-Search results (if applicable):
-{{searchResults:.*}}
+    Relevant code:
+    {{activeEditorContent}}
+    {{fileContent:.*}}
 
-Instructions:
-- Analyze the code in relation to the user's objective
-- Identify any potential issues or bugs
-- Propose specific code changes to fix the issues
-- Explain your reasoning for each proposed change
-- If you can't identify the problem or propose a solution, clearly state so
-- Respond in English
+    Search results (if applicable):
+    {{searchResults:.*}}
 
-Your response must be a JSON object with this structure:
-{
-  "messageToUser": string,
-  "proposedChanges": Array<{
-    "file": string,
-    "changes": string,
-    "reason": string
-  }>
-}
-`;
+    Instructions:
+    - Analyze the code in relation to the user's objective
+    - Identify any potential issues or bugs
+    - Propose specific code changes to fix the issues
+    - Explain your reasoning for each proposed change
+    - If you can't identify the problem or propose a solution, clearly state so
 
+    Your response must be a JSON object with this structure:
+    {
+      "messageToUser": string,
+      "proposedChanges": Array<{
+        "file": string,
+        "changes": string, // This should probably be diff format or explicit edits later
+        "reason": string
+      }>
+    }`],
+     ["human", "{{userMessage}}"] // User's actual message
+]);
+
+// Keep builder function
 export function buildFixCodeVariables(contextData: Record<string, any>): FixCodePromptVariables {
-    const baseVariables = mapContextToBaseVariables(contextData);
-
-    const fixCodeVariables: FixCodePromptVariables = {
-        ...baseVariables
-    };
-
-    return fixCodeVariables;
+     return mapContextToBaseVariables(contextData); // Base variables are sufficient
 }

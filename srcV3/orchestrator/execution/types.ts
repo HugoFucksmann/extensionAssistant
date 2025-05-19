@@ -1,7 +1,12 @@
-import * as vscode from 'vscode';
+// src/orchestrator/execution/types.ts
+// MODIFIED: Removed types related to manual StepExecutor and IExecutor pattern.
+// MODIFIED: Removed ExecutionStep, StepResult, IExecutor interfaces.
 
-export type PromptVariables = Record<string, any>;
+// import * as vscode from 'vscode'; // Keep if needed for types like vscode.WorkspaceEdit
 
+export type PromptVariables = Record<string, any>; // Keep - generic type for variables
+
+// Keep - Describes the output structure of the inputAnalyzer prompt
 export interface InputAnalysisResult {
   intent: 'conversation' | 'explainCode' | 'fixCode' | 'unknown';
   objective: string;
@@ -16,76 +21,29 @@ export interface InputAnalysisResult {
   [key: string]: any;
 }
 
-/**
- * Define a single step in an execution flow.
- * Can be a tool call or a model prompt interaction.
- */
-export interface ExecutionStep {
-  /** Unique name for this step within its context (useful for logging/debugging). */
-  name: string;
-  /** The type of execution: 'tool' or 'prompt'. */
-  type: 'tool' | 'prompt';
-  /** The specific tool name or prompt type to execute. */
-  execute: string; // e.g., 'filesystem.getFileContents' or 'inputAnalyzer'
-  /** Parameters for the tool or prompt. Can contain {{placeholder}} patterns for tool steps. For prompt steps, these are non-contextual config params. */
-  params?: Record<string, any>;
-  /** Optional condition function to determine if this step should run. Checks against the context data used for parameter resolution. */
-  condition?: (contextData: Record<string, any>) => boolean;
-  /** Key in the FlowContext to store the successful result of this step. */
-  storeAs?: string;
-  /** Optional: Timeout for the step in milliseconds. */
-  timeout?: number;
-}
+// REMOVED: ExecutionStep - This was for the manual planning loop
+// export interface ExecutionStep { ... }
 
-/**
- * Represents the outcome of executing a single step.
- */
-export interface StepResult<T = any> {
-    /** Indicates if the step completed successfully. */
-    success: boolean;
-    /** The actual result from the tool/prompt if successful. */
-    result?: T;
-    /** The error object if the step failed. */
-    error?: any;
-    /** Timestamp when the step finished. */
-    timestamp: number;
-    /** Reference to the step definition that was executed. */
-    step: ExecutionStep;
-    /** If the step was skipped due to a condition. */
-    skipped?: boolean;
-}
+// REMOVED: StepResult - This was for the manual step execution outcome
+// export interface StepResult<T = any> { ... }
 
-export interface IExecutor {
-  /**
-   * Executes the specified action with the provided parameters
-   * @param action The action identifier to execute
-   * @param params Parameters required by the action. For prompt executors, this is the full context data.
-   * @returns Promise resolving to the result of the execution
-   */
-  execute(action: string, params: Record<string, any>): Promise<any>;
+// REMOVED: IExecutor - This was for the manual executor registry
+// export interface IExecutor { ... }
 
-  /**
-   * Checks if this executor can handle the specified action
-   * @param action The action identifier to check
-   * @returns true if this executor can handle the action, false otherwise
-   */
-  canExecute(action: string): boolean;
-}
-
+// Keep - Defines types for prompt system (PromptType union)
 // --- Updated PromptType ---
-// Define types for prompt system
 export type PromptType =
   | 'inputAnalyzer'
-  | 'editing' // Not used in provided code, but kept if part of broader system
-  | 'examination' // Not used
-  | 'projectManagement' // Not used
-  | 'projectSearch' // Not used
-  | 'resultEvaluator' // Not used
+  | 'editing'
+  | 'examination'
+  | 'projectManagement'
+  | 'projectSearch'
+  | 'resultEvaluator'
   | 'conversationResponder'
   | 'explainCodePrompt'
   | 'fixCodePrompt'
   | 'codeValidator'
-  | 'planner'; // Removed planningEngine alias
+  | 'planner';
 
 // --- Standardized Prompt Variable Interfaces ---
 
@@ -95,51 +53,51 @@ export interface BasePromptVariables {
   chatHistory: string;
   objective?: string;
   extractedEntities?: InputAnalysisResult['extractedEntities'];
-  projectContext?: any;
-  activeEditorContent?: string;
+  projectContext?: any; // This will be the projectInfo from GlobalContextState
+  activeEditorContent?: string; // Content of the active editor
+  // Dynamic keys like fileContent:path/to/file, searchResults:query will be added by ContextResolver
   [key: `fileContent:${string}`]: string | undefined;
   [key: `searchResults:${string}`]: any | undefined;
-  [key: string]: any; // Allow other dynamic variables
+  [key: string]: any; // Allow other dynamic variables from state
 }
 
 /**
  * Defines the structure for registering prompt templates and their variable builders.
+ * REMOVED: This interface describes the PromptDefinition structure used *internally* by PromptService/metadata registry,
+ * not a type used frequently outside that module. Metadata registry classes/interfaces are better located within the models module.
+ * export interface PromptDefinition<T extends BasePromptVariables = BasePromptVariables> { ... }
  */
-export interface PromptDefinition<T extends BasePromptVariables = BasePromptVariables> {
-  template: string;
-  buildVariables: (resolutionContextData: Record<string, any>) => T;
-}
+
 
 // --- Tool Parameter Interfaces ---
-// Kept as is, assuming they are used by ToolRunner implementations
+// Keep these as they define the expected *input shapes* for our tool functions.
+// They are not directly used by LangChain/Zod in the same way, but useful for defining Zod schemas.
+// We can keep them here or move them closer to the tool definitions/schemas.
+// Let's move them closer to the tool schemas or definitions if this file is to be reduced.
+// Looking at the code, they seem primarily used for type hinting in the tool files themselves
+// and as a conceptual base for Zod schemas. Let's move them to `src/tools/core/types.ts`.
 
-export interface FilesystemGetFileContentsParams { filePath: string; }
-export interface FilesystemGetWorkspaceFilesParams { /* No parameters needed */ }
-export interface EditorGetActiveEditorContentParams { /* No parameters needed */ }
-export interface ProjectGetPackageDependenciesParams { projectPath: string; }
-export interface ProjectGetProjectInfoParams { /* No parameters needed */ }
-export interface ProjectSearchWorkspaceParams { query: string; }
-export interface CodeManipulationApplyWorkspaceEditParams { edits: vscode.WorkspaceEdit[]; }
+// REMOVED: Tool Parameter Interfaces (Move to src/tools/core/types.ts)
+// export interface FilesystemGetFileContentsParams { filePath: string; }
+// export interface FilesystemGetWorkspaceFilesParams { /* No parameters needed */ }
+// export interface EditorGetActiveEditorContentParams { /* No parameters needed */ }
+// export interface ProjectGetPackageDependenciesParams { projectPath: string; }
+// export interface ProjectGetProjectInfoParams { /* No parameters needed */ }
+// export interface ProjectSearchWorkspaceParams { query: string; }
+// export interface CodeManipulationApplyWorkspaceEditParams { edits: vscode.WorkspaceEdit[]; }
 
-// Union type for all tool parameters
-export type ToolParams =
-  | FilesystemGetFileContentsParams
-  | FilesystemGetWorkspaceFilesParams
-  | EditorGetActiveEditorContentParams
-  | ProjectGetPackageDependenciesParams
-  | ProjectGetProjectInfoParams
-  | ProjectSearchWorkspaceParams
-  | CodeManipulationApplyWorkspaceEditParams;
+// REMOVED: Union type for all tool parameters
+// export type ToolParams = ... ;
 
 /**
  * Defines the structure for variables specifically for the planner prompt.
  * Extends BasePromptVariables.
  */
 export interface PlannerPromptVariables extends BasePromptVariables {
-  currentFlowState: Record<string, any>;
-  availableTools: string;
-  availablePrompts: string;
-  planningHistory: Array<{ action: string; result: any; error?: any; stepName: string }>;
+  currentFlowState: Record<string, any>; // The entire resolution context snapshot
+  availableTools: string; // Formatted string of tool names
+  availablePrompts: string; // Formatted string of prompt types
+  planningHistory: Array<{ action: string; result: any; error?: any; stepName: string; status: string; timestamp: number }>; // Detailed step history
   planningIteration: number;
 }
 
@@ -149,9 +107,12 @@ export interface PlannerPromptVariables extends BasePromptVariables {
 */
 export interface PlannerResponse {
   action: 'tool' | 'prompt' | 'respond';
-  toolName?: string;
-  promptType?: PromptType;
-  params?: Record<string, any>;
-  storeAs?: string;
+  toolName?: string; // Required if action is 'tool'
+  promptType?: PromptType; // Required if action is 'prompt'
+  params?: Record<string, any>; // Parameters for the tool/prompt, or { messageToUser: string } for respond
+  storeAs?: string; // Recommended for tool/prompt actions to store results in state
   reasoning: string;
+  // Add optional error/feedback fields from the planner if it indicates a problem
+  error?: string;
+  feedbackToUser?: string;
 }

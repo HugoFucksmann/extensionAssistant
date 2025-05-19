@@ -1,8 +1,10 @@
 // src/tools/codeManipulation/applyWorkspaceEdit.ts
+// MODIFIED: Implemented actual application of vscode.WorkspaceEdit.
 
 import * as vscode from 'vscode';
+import * as path from 'path'; // Needed for path.join
 
-// Define interface for expected parameters
+// Define interface for expected parameters (matches ApplyWorkspaceEditInputSchema)
 interface ApplyWorkspaceEditParams {
     edits: Array<{
         file: string; // Path relative to workspace root
@@ -18,8 +20,7 @@ interface ApplyWorkspaceEditParams {
 
 /**
  * Tool to apply a set of text edits across multiple files in the workspace.
- * This is a placeholder implementation. Applying edits requires careful handling
- * and potentially user confirmation in a real scenario.
+ * Constructs and applies a vscode.WorkspaceEdit.
  */
 export async function applyWorkspaceEdit(params: ApplyWorkspaceEditParams): Promise<{ success: boolean, message: string }> {
     console.log(`[Tool] applyWorkspaceEdit called with ${params.edits.length} file edits.`);
@@ -29,43 +30,52 @@ export async function applyWorkspaceEdit(params: ApplyWorkspaceEditParams): Prom
         return { success: false, message: "No edits provided." };
     }
 
-    // --- Placeholder Implementation ---
-    // In a real implementation, you would construct a vscode.WorkspaceEdit
-    // and apply it using vscode.workspace.applyEdit().
-    // Example:
-    // const workspaceEdit = new vscode.WorkspaceEdit();
-    // for (const fileEdit of params.edits) {
-    //     const uri = vscode.Uri.file(vscode.workspace.workspaceFolders?.[0]?.uri.fsPath + '/' + fileEdit.file);
-    //     for (const change of fileEdit.changes) {
-    //         const range = new vscode.Range(
-    //             change.range.start.line, change.range.start.character,
-    //             change.range.end.line, change.range.end.character
-    //         );
-    //         workspaceEdit.replace(uri, range, change.newText);
-    //     }
-    // }
-    // const success = await vscode.workspace.applyEdit(workspaceEdit);
-    // return { success, message: success ? "Changes applied." : "Failed to apply changes." };
+     if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
+         console.error("[Tool] applyWorkspaceEdit: No workspace folder open. Cannot apply edits.");
+         throw new Error("Cannot apply edits: No workspace folder open.");
+     }
 
+    const workspaceRootUri = vscode.workspace.workspaceFolders[0].uri;
+    const workspaceEdit = new vscode.WorkspaceEdit();
 
-    // Simulate applying edits
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate delay
+    try {
+        for (const fileEdit of params.edits) {
+            // Construct the full file URI from the relative path
+            const fileUri = vscode.Uri.joinPath(workspaceRootUri, fileEdit.file);
 
-    console.log(`[Tool] applyWorkspaceEdit simulation complete.`);
-    return { success: true, message: "Simulation: Changes would have been applied." }; // Simulate success
+            for (const change of fileEdit.changes) {
+                // Convert the simplified range to vscode.Range
+                const range = new vscode.Range(
+                    change.range.start.line, change.range.start.character,
+                    change.range.end.line, change.range.end.character
+                );
 
-    // In a real scenario, you'd likely want user confirmation before applying edits.
-    // This tool might return the edit object for the UI to present, or trigger a confirmation flow.
+                // Add the edit to the workspace edit
+                workspaceEdit.replace(fileUri, range, change.newText);
+            }
+        }
+
+        console.log(`[Tool] Applying workspace edit with ${workspaceEdit.size} changes...`);
+        // Apply the workspace edit
+        const success = await vscode.workspace.applyEdit(workspaceEdit);
+
+        if (success) {
+            console.log(`[Tool] Workspace edit applied successfully.`);
+            return { success: true, message: "Changes applied successfully." };
+        } else {
+             // applyEdit can fail if the document changed unexpectedly (e.g., user edited it)
+            console.warn(`[Tool] Failed to apply workspace edit.`);
+            // VS Code might show a notification to the user about the failure
+            return { success: false, message: "Failed to apply changes. The file might have been modified externally." };
+        }
+
+    } catch (error: any) {
+        console.error(`[Tool] Error during applyWorkspaceEdit:`, error);
+         // Re-throw the error so the ToolAdapter/TraceService can catch and log it
+        throw new Error(`Failed to apply workspace edit: ${error.message || String(error)}`);
+    }
 }
 
-// Optional: Add validation function if needed
-applyWorkspaceEdit.validateParams = (params: Record<string, any>): boolean | string => {
-    if (!params.edits || !Array.isArray(params.edits)) {
-        return 'Parameter "edits" (array) is required.';
-    }
-    // Add more detailed validation for the structure of edits array
-    return true;
-};
-
-// Optional: Add requiredParams if using basic validation
-applyWorkspaceEdit.requiredParams = ['edits'];
+// REMOVED: Old manual validation properties - Zod schema handles this now
+// applyWorkspaceEdit.validateParams = (params: Record<string, any>): boolean | string => { ... };
+// applyWorkspaceEdit.requiredParams = ['edits'];

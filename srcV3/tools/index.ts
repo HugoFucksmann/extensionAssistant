@@ -8,7 +8,6 @@ export * as codeManipulation from './codeManipulation';
 
 // Export core tool utilities
 export * from './core/core';
-export * from './core/toolRunner';
 
 // Re-export individual tools for backward compatibility
 export { getWorkspaceFiles } from './filesystem';

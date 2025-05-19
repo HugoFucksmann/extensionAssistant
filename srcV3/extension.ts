@@ -1,159 +1,149 @@
+// src/extension.ts
+// MODIFIED: Uses ServiceFactory for initialization and lifecycle management
+
 import * as vscode from 'vscode';
-import { WebviewProvider } from './ui/webView/webviewProvider';
-import { ConfigurationManager } from './config/ConfigurationManager';
-import { initializePromptSystem, disposePromptSystem } from './models/promptSystem'; // Import dispose
-import { ModelManager } from './models/config/ModelManager';
-import { ChatService } from './services/chatService';
-import { Orchestrator } from './orchestrator/orchestrator';
-import { FileSystemService } from './services/fileSystemService'; // Keep for now, will refactor in Stage 2
-import { DatabaseManager } from './store/database/DatabaseManager';
+import { ServiceFactory } from './di'; // Import the ServiceFactory
 
-// Import new context classes
-import { GlobalContext, SessionContext, ConversationContext, FlowContext } from './orchestrator/context';
-
-
-// Declare context variables at the top level or in a state object if preferred
-let globalContext: GlobalContext | null = null;
-let sessionContext: SessionContext | null = null;
-let dbManager: DatabaseManager | null = null; // Keep DB Manager reference
+// Declare factory variable at the top level for deactivate access
+let serviceFactory: ServiceFactory | null = null;
+// Keep reference to GlobalContextService for explicit state saving in deactivate
+let globalContextService: any | null = null; // Use 'any' for now, or import the type
 
 
 export async function activate(context: vscode.ExtensionContext) {
   console.log('[Extension] Activating...');
 
-  // Initialize ConfigurationManager (already uses context)
-  const config = new ConfigurationManager(context);
+  try {
+      // 1. Initialize the ServiceFactory
+      serviceFactory = new ServiceFactory(context);
+      console.log('[Extension] ServiceFactory initialized.');
 
-  // Initialize DatabaseManager (Singleton)
-  dbManager = DatabaseManager.getInstance(context);
-  // The ChatRepository constructor will get the DB instance from the Singleton
+      // 2. Get top-level components from the factory that need direct interaction or registration
+      const webviewProvider = serviceFactory.getWebviewProvider();
+      // Get GlobalContextService specifically for explicit state saving in deactivate
+      globalContextService = serviceFactory.get('globalContextService');
 
-  // Initialize GlobalContext (Loads from globalState)
-  globalContext = new GlobalContext(context, config);
-  // Consider triggering initial project info fetch here or in SessionContext constructor
-  globalContext.getProjectInfo(); // Start fetching if not loaded
+      // 3. Register components and disposables with VS Code subscriptions
+      // The factory itself is a disposable and knows how to dispose its services
+      // Other components like WebviewProvider might have VS Code specific listeners to dispose
+      context.subscriptions.push(serviceFactory); // Register the factory for disposal
 
-  // Initialize SessionContext (Does not persist for now)
-  // Need a reference to GlobalContext for SessionContext
-  sessionContext = new SessionContext(context, globalContext);
+      // Register the Webview View Provider
+      context.subscriptions.push(
+          vscode.window.registerWebviewViewProvider('aiChat.chatView', webviewProvider)
+      );
 
-  // Initialize ModelManager (requires config)
-  const modelManager = new ModelManager(config);
-  initializePromptSystem(modelManager); // Prompt system needs ModelManager
+       // Add the webview provider itself to subscriptions as it manages internal disposables
+       context.subscriptions.push(webviewProvider);
 
-  // FileSystemService - Keep for now, refactor in Stage 2
-  const fileSystemService = new FileSystemService();
 
-  // Initialize Orchestrator with context references
-  const orchestrator = new Orchestrator(globalContext, sessionContext); // Pass contexts
+      // 4. Register Commands
+      // Get services needed by commands from the factory
+      const chatInteractor = serviceFactory.get('chatInteractor');
+      const configManager = serviceFactory.get('configurationManager');
+      const modelManager = serviceFactory.get('modelManager'); // Needed for switchModel command logic
+      const uiBridge = serviceFactory.get('uiBridge'); // Needed for openSettings command
 
-  // Initialize ChatService with context references
-  const chatService = new ChatService(context, modelManager, orchestrator, globalContext, sessionContext); // Pass contexts
+      context.subscriptions.push(
+          vscode.commands.registerCommand('extensionAssistant.newChat', () => {
+              // Delegate command logic to the appropriate service
+              chatInteractor.prepareNewConversation();
+               // UIBridge listener will send 'newChat' message to webview
+          }),
 
-  // Initialize WebviewProvider (requires ChatService and FileSystemService)
-  const webview = new WebviewProvider(context.extensionUri, config, chatService);
+          vscode.commands.registerCommand('extensionAssistant.settings', async () => {
+               // Delegate to UIBridge or call VS Code command directly
+              // uiBridge.handleWebviewMessage({ type: 'command', payload: { command: 'openSettings' } }); // If routing through UIBridge
+              await vscode.commands.executeCommand('workbench.action.openSettings', '@ext:user.extensionassistant'); // Direct call
+          }),
 
-  // Initialize theme handler (logic remains in WebviewProvider)
-  webview.setThemeHandler();
+          // Keep switchModel command here for now, or move to UIBridge command handling
+          // If keeping here, it needs access to configManager and modelManager
+          vscode.commands.registerCommand('extensionAssistant.switchModel', async () => {
+              const current = configManager.getModelType();
+              const newModel = current === 'ollama' ? 'gemini' : 'ollama';
+              // Use ModelManager to set the model (which uses ConfigManager internally)
+              await modelManager.setModel(newModel as any); // Cast to ModelType if needed
+               // UIBridge listens to modelChanged event or we can trigger UI update here
+               // Let's rely on UIBridge listening to events
+          }),
 
-  // Register Webview Provider
-  context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider('aiChat.chatView', webview)
-  );
+          // This command now delegates to UIBridge
+          vscode.commands.registerCommand('extensionAssistant.chat.history', () => {
+              uiBridge.postMessageToWebview('historyRequested', {}); // Signal UI to show history
+          }),
 
-  // Register Commands
-  context.subscriptions.push(
-    vscode.commands.registerCommand('extensionAssistant.newChat', () => {
-      // This should trigger ChatService to prepare/create a new chat,
-      // which will manage the new ConversationContext
-      chatService.prepareNewConversation(); // Service prepares state
-      webview.createNewChat(); // Webview UI updates
-    }),
+          // Remove the duplicate switchModel command 'extensionAssistant.model.change'
+          // Assuming 'extensionAssistant.switchModel' is the desired command
 
-    vscode.commands.registerCommand('extensionAssistant.settings', async () => {
-      await vscode.commands.executeCommand('workbench.action.openSettings', '@ext:user.extensionassistant');
-    }),
 
-    vscode.commands.registerCommand('extensionAssistant.switchModel', async () => {
-      const current = config.getModelType();
-      // Example of getting config via configManager
-      const newModel = current === 'ollama' ? 'gemini' : 'ollama';
-      await modelManager.setModel(newModel);
-      webview.updateModel(newModel);
-    }),
+          // Keep the resetDatabase command, it needs DatabaseManager access
+           vscode.commands.registerCommand('extension.resetDatabase', async () => {
+               try {
+                   const dbManager = serviceFactory?.get('databaseManager');
+                   if (dbManager) {
+                       // Before resetting DB, dispose services that might hold connections/state
+                       // Dispose the factory first to clean up most services
+                       if (serviceFactory) {
+                            serviceFactory.dispose(); // This closes the DB connection
+                            serviceFactory = null; // Clear reference
+                       }
 
-    vscode.commands.registerCommand('extensionAssistant.chat.history', () => {
-      webview.showChatHistory();
-    }),
+                       // Now reset the database file
+                       await dbManager.resetDatabase(); // This re-opens the DB and initializes tables
 
-    // This command seems like a duplicate of switchModel? Keep one or clarify intent.
-    // Assuming it's a duplicate for now, but leaving the logic.
-    vscode.commands.registerCommand('extensionAssistant.model.change', async () => {
-      const current = config.getModelType();
-      const newModel = current === 'ollama' ? 'gemini' : 'ollama';
-      await modelManager.setModel(newModel);
-      webview.updateModel(newModel);
-    }),
+                       vscode.window.showInformationMessage('Database reset successfully! Please reload the window.');
 
-    vscode.commands.registerCommand('extension.resetDatabase', async () => {
-      try {
-        // Use the stored dbManager instance
-        if (dbManager) {
-           // Dispose components that might hold DB connections or context state
-           webview.dispose(); // Dispose webview and its handlers
-           modelManager.dispose(); // Dispose model connections if any
-           orchestrator.dispose(); // Dispose orchestrator state (context map)
+                       // Prompt for window reload as state is fundamentally changed
+                       vscode.commands.executeCommand('workbench.action.reloadWindow');
 
-           await dbManager.resetDatabase();
+                   } else {
+                       throw new Error("DatabaseManager not available.");
+                   }
 
-           vscode.window.showInformationMessage('Database reset successfully! Please reload the window if any issues persist.');
-        } else {
-             throw new Error("DatabaseManager not initialized.");
-        }
+               } catch (error) {
+                   console.error('[Database Reset Error]', error);
+                   vscode.window.showErrorMessage(
+                       `Database reset failed: ${error instanceof Error ? error.message : String(error)}`
+                   );
+               }
+           })
+      );
 
-      } catch (error) {
-        console.error('[Database Reset Error]', error);
-        vscode.window.showErrorMessage(
-          `Database reset failed: ${error instanceof Error ? error.message : String(error)}`
-        );
+      console.log('[Extension] Activated with ServiceFactory.');
+
+  } catch (error) {
+      console.error('[Extension] Failed to activate:', error);
+      vscode.window.showErrorMessage(`Extension Assistant failed to activate: ${error instanceof Error ? error.message : String(error)}`);
+      // Clean up any partially created factory if activation failed mid-way
+      if (serviceFactory) {
+          serviceFactory.dispose();
+          serviceFactory = null;
       }
-    })
-  );
-
-  // Add the webview to the subscriptions for disposal
-  context.subscriptions.push(webview);
-  // Add other disposable components
-  context.subscriptions.push(modelManager);
-  context.subscriptions.push(orchestrator);
-  context.subscriptions.push(globalContext);
-  context.subscriptions.push(sessionContext); // SessionContext might not need explicit dispose if no listeners
-
-  console.log('[Extension] Activated with hierarchical context support.');
+  }
 }
 
 export async function deactivate() {
   console.log('[Extension] Deactivating...');
 
-  // Save global context state before deactivating
-  if (globalContext) {
-      await globalContext.saveState();
-      globalContext.dispose();
-      globalContext = null;
+  // Explicitly save global context state before disposing the factory
+  // This is done here because dispose is not async, but saveState is.
+  if (globalContextService) {
+      try {
+          await globalContextService.saveState();
+          console.log('[Extension] Global context state saved.');
+      } catch (error) {
+          console.error('[Extension] Error saving global context state:', error);
+      }
+       // The service itself is disposed by the factory.dispose()
+       globalContextService = null;
   }
 
-  // Dispose session context (if it had resources to clean up)
-  if (sessionContext) {
-       sessionContext.dispose();
-       sessionContext = null;
-  }
 
-  // Dispose model manager (aborts pending requests)
-  disposePromptSystem(); // Disposes ModelManager internally
-
-  // DatabaseManager is singleton, close it if needed on full deactivation
-  if (dbManager) {
-      dbManager.close();
-      dbManager = null;
+  // Dispose the ServiceFactory, which in turn disposes all managed services.
+  if (serviceFactory) {
+      serviceFactory.dispose();
+      serviceFactory = null;
   }
 
   console.log('[Extension] Deactivated.');

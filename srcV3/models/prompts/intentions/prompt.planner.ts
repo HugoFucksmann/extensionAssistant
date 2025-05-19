@@ -1,75 +1,80 @@
 // src/models/prompts/intentions/prompt.planner.ts
+// MODIFIED: Use ChatPromptTemplate
 
-import { BasePromptVariables, PlannerPromptVariables } from '../../../orchestrator/execution/types';
-import { ToolRunner } from '../../../tools'; // Assuming ToolRunner is in this path
+import { ChatPromptTemplate } from '@langchain/core/prompts';
+import { PlannerPromptVariables } from '../../../orchestrator/types';
+import { mapContextToBaseVariables } from '../builders/baseVariables';
+import { listTools } from '../../../tools/core';
+// Add this import at the top of prompt.planner.ts
+import { getPromptDefinitions } from '../definitions';  // Adjust the path as needed
+// Define the prompt template using LangChain
+export const plannerPrompt = ChatPromptTemplate.fromMessages([
+    ["system", `You are an AI assistant responsible for planning and executing tasks based on user requests within a VS Code extension. Your goal is to determine the single best next action to take to fulfill the user's objective, given the current context and the results of previous steps. Respond in English.
 
-import { mapContextToBaseVariables, getPromptDefinitions } from '../../promptSystem';
+    User Objective: "{{objective}}"
+    User Message: "{{userMessage}}"
 
-// Define the prompt template for the planner
-export const plannerPrompt = `
-You are an AI assistant responsible for planning and executing tasks based on user requests within a VS Code extension. Your goal is to determine the single best next action to take to fulfill the user's objective, given the current context and the results of previous steps.
+    Recent Conversation History:
+    {{chatHistory}}
 
-User Objective: "{{objective}}"
-User Message: "{{userMessage}}"
+    Key Extracted Entities:
+    {{extractedEntities}}
 
-Recent Conversation History:
-{{chatHistory}}
+    Project Context:
+    {{projectContext}}
 
-Key Extracted Entities:
-{{extractedEntities}}
+    Current Flow State (Results of previous steps in this turn, keyed by 'storeAs' name):
+    {{currentFlowState}}
 
-Project Context:
-{{projectContext}}
+    Available Tools (Use these to interact with the VS Code environment):
+    {{availableTools}}
 
-Current Flow State (Results of previous steps in this turn, keyed by 'storeAs' name):
-{{currentFlowState}}
+    Available Prompts (Use these for AI reasoning, generation, or analysis):
+    {{availablePrompts}}
 
-Available Tools (Use these to interact with the VS Code environment):
-{{availableTools}}
+    Planning History for this turn (Sequence of actions taken and their outcomes):
+    {{planningHistory}}
 
-Available Prompts (Use these for AI reasoning, generation, or analysis):
-{{availablePrompts}}
+    Current Planning Iteration: {{planningIteration}}
 
-Planning History for this turn (Sequence of actions taken and their outcomes):
-{{planningHistory}}
+    Instructions:
+    1. Analyze the User Objective, User Message, History, Context, and especially the **Current Flow State** to understand what has been done and what is needed.
+    2. Consider the **Available Tools** and **Available Prompts**.
+    3. Decide the **single best next action** to move closer to the objective.
+    4. Your action must be one of:
+        - \`tool\`: Execute one of the Available Tools. Use this to gather information (read files, search) or perform actions (apply edits - future).
+        - \`prompt\`: Execute one of the Available Prompts (excluding the planner itself). Use this for AI analysis, generation, or validation.
+        - \`respond\`: You have sufficient information or have completed the task. Provide the final message to the user.
+    5. Provide a brief \`reasoning\` for your choice.
+    6. If the action is \`tool\` or \`prompt\`, specify the \`toolName\` or \`promptType\` and any necessary \`params\`. Parameters should reference data available in the **Current Flow State** using placeholder syntax (e.g., \`"filePath": "{{extractedEntities.filesMentioned.[0]}}"\`) or provide literal values. Ensure parameters match the expected input of the tool/prompt.
+    7. If the action is \`tool\` or \`prompt\`, provide a \`storeAs\` key to save the result in the Flow Context for future steps. Choose a descriptive key (e.g., \`activeEditorContent\`, \`fileContent:path/to/file\`, \`proposedFixResult\`, \`validationResult\`).
+    8. If the action is \`respond\`, the \`params\` should include a \`messageToUser\` string containing your final response. You can reference results from the **Current Flow State** using placeholders (e.g., \`"messageToUser": "{{explanationResult.explanation}}"\`).
 
-Current Planning Iteration: {{planningIteration}}
+    Consider these common task patterns:
+    - **Explain Code:** Often involves: \`editor.getActiveEditorContent\` or \`filesystem.getFileContents\` -> \`explainCodePrompt\` -> \`respond\`.
+    - **Fix Code:** Often involves: \`editor.getActiveEditorContent\` or \`filesystem.getFileContents\` -> \`project.search\` (for errors) -> \`fixCodePrompt\` -> \`codeValidator\` -> \`codeManipulation.applyWorkspaceEdit\` (future) -> \`respond\`.
+    - **General Conversation:** Often involves: \`conversationResponder\` -> \`respond\`.
+    - **If a step fails:** Analyze the error in **Planning History** and **Current Flow State**. Decide if you can retry, try a different approach, or if you need to \`respond\` asking the user for clarification or stating the failure.
 
-Instructions:
-1. Analyze the User Objective, User Message, History, Context, and especially the **Current Flow State** to understand what has been done and what is needed.
-2. Consider the **Available Tools** and **Available Prompts**.
-3. Decide the **single best next action** to move closer to the objective.
-4. Your action must be one of:
-    - \`tool\`: Execute one of the Available Tools. Use this to gather information (read files, search) or perform actions (apply edits - future).
-    - \`prompt\`: Execute one of the Available Prompts (excluding the planner itself). Use this for AI analysis, generation, or validation.
-    - \`respond\`: You have sufficient information or have completed the task. Provide the final message to the user.
-5. Provide a brief \`reasoning\` for your choice.
-6. If the action is \`tool\` or \`prompt\`, specify the \`toolName\` or \`promptType\` and any necessary \`params\`. Parameters should reference data available in the **Current Flow State** using placeholder syntax (e.g., \`"filePath": "{{extractedEntities.filesMentioned.[0]}}"\`) or provide literal values. Ensure parameters match the expected input of the tool/prompt.
-7. If the action is \`tool\` or \`prompt\`, provide a \`storeAs\` key to save the result in the Flow Context for future steps. Choose a descriptive key (e.g., \`activeEditorContent\`, \`fileContent:path/to/file\`, \`proposedFixResult\`, \`validationResult\`).
-8. If the action is \`respond\`, the \`params\` should include a \`messageToUser\` string containing your final response. You can reference results from the **Current Flow State** using placeholders (e.g., \`"messageToUser": "{{explanationResult.explanation}}"\`).
+    Your response must be a JSON object matching the \`PlannerResponse\` structure.
 
-Consider these common task patterns:
-- **Explain Code:** Often involves: \`editor.getActiveEditorContent\` or \`filesystem.getFileContents\` -> \`explainCodePrompt\` -> \`respond\`.
-- **Fix Code:** Often involves: \`editor.getActiveEditorContent\` or \`filesystem.getFileContents\` -> \`project.search\` (for errors) -> \`fixCodePrompt\` -> \`codeValidator\` -> \`codeManipulation.applyWorkspaceEdit\` (future) -> \`respond\`.
-- **General Conversation:** Often involves: \`conversationResponder\` -> \`respond\`.
-- **If a step fails:** Analyze the error in **Planning History** and **Current Flow State**. Decide if you can retry, try a different approach, or if you need to \`respond\` asking the user for clarification or stating the failure.
+    Now, based on the current context, what is the single best next action?
+    `],
+     ["human", "{{userMessage}}"] // User's actual message
+]);
 
-Your response must be a JSON object matching the \`PlannerResponse\` structure.
-
-Now, based on the current context, what is the single best next action?
-`;
-
-// Function to build variables for the planner prompt
+// Keep builder function
 export function buildPlannerVariables(resolutionContextData: Record<string, any>): PlannerPromptVariables {
     const baseVariables = mapContextToBaseVariables(resolutionContextData);
 
-    const availableTools = ToolRunner.listTools().join(', ');
-    const availablePrompts = Object.keys(getPromptDefinitions()).filter(type => type !== 'planner').join(', ');
+    // Get available tools and prompts dynamically from the registry
+    const availableTools = listTools().join(', '); // Use the listTools from the new toolMetadata
+    const availablePrompts = Object.keys(getPromptDefinitions()).filter(type => type !== 'planner').join(', '); // Use getPromptDefinitions helper
 
     const planningHistory = resolutionContextData.planningHistory || [];
     const planningIteration = resolutionContextData.planningIteration || 1;
 
-    const currentFlowState = resolutionContextData;
+    const currentFlowState = resolutionContextData; // The entire resolution context is the flow state for the planner
 
     const plannerVariables: PlannerPromptVariables = {
         ...baseVariables,

@@ -1,4 +1,7 @@
-// src/storage/repositories/ChatRepository.ts
+// src/store/repositories/ChatRepository.ts
+// MODIFIED: Removed high-level logic like updating preview/timestamp in addMessage.
+// This logic moves to ChatPersistenceService.
+
 import * as vscode from 'vscode';
 import * as sqlite3 from 'sqlite3';
 import { randomUUID } from 'crypto';
@@ -9,43 +12,13 @@ import { DatabaseManager } from '../database/DatabaseManager';
 export class ChatRepository implements IChatRepository {
   private db: sqlite3.Database;
 
-  constructor(context: vscode.ExtensionContext) {
-    const dbManager = DatabaseManager.getInstance(context);
-    this.db = dbManager.getDatabase();
-    this.initializeTable();
+  constructor(db: sqlite3.Database) { // Depend directly on the DB instance
+    this.db = db;
+    // Table initialization/schema updates are now handled by DatabaseManager
+    // this.initializeTable(); // Removed, handled by DB Manager
   }
 
-  /**
-   * Initialize chat tables
-   * NOTE: This uses DROP TABLE for simplicity during development/reset.
-   * A production system would require schema migration logic.
-   */
-  private initializeTable(): void {
-    this.db.serialize(() => {
-      this.db.run('DROP TABLE IF EXISTS messages');
-      this.db.run('DROP TABLE IF EXISTS chats');
-
-      this.db.run(`
-        CREATE TABLE chats (
-          id TEXT PRIMARY KEY,
-          title TEXT NOT NULL,
-          timestamp INTEGER NOT NULL,
-          preview TEXT
-        )
-      `);
-
-      this.db.run(`
-        CREATE TABLE messages (
-          id TEXT PRIMARY KEY,
-          chat_id TEXT NOT NULL,
-          content TEXT NOT NULL,
-          sender TEXT NOT NULL,
-          timestamp INTEGER NOT NULL,
-          FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE
-        )
-      `);
-    });
-  }
+  // initializeTable method is removed from repositories and centralized in DatabaseManager
 
   public async create(chat: Chat): Promise<Chat> {
     return new Promise((resolve, reject) => {
@@ -79,6 +52,7 @@ export class ChatRepository implements IChatRepository {
             console.error('[ChatRepository] Error finding chat:', err.message);
             reject(err);
           } else {
+            // Ensure the row matches Chat structure or cast carefully
             resolve(row ? row as Chat : null);
           }
         }
@@ -93,6 +67,7 @@ export class ChatRepository implements IChatRepository {
           console.error('[ChatRepository] Error finding all chats:', err.message);
           reject(err);
         } else {
+           // Ensure rows match Chat structure
           resolve(rows as Chat[]);
         }
       });
@@ -112,11 +87,15 @@ export class ChatRepository implements IChatRepository {
       this.db.run(
         `UPDATE chats SET ${setClause} WHERE id = ?`,
         [...values, id],
-        (err) => {
+        function(err) { // Use function() to access 'this.changes'
           if (err) {
             console.error('[ChatRepository] Error updating chat:', err.message);
             reject(err);
           } else {
+             if (this.changes === 0) {
+                  console.warn(`[ChatRepository] No chat found with ID ${id} to update.`);
+                  // Optional: reject(new Error(`Chat with ID ${id} not found.`));
+             }
             resolve();
           }
         }
@@ -124,26 +103,32 @@ export class ChatRepository implements IChatRepository {
     });
   }
 
-  public async updateTitle(chatId: string, title: string): Promise<void> {
-    return this.update(chatId, { title });
-  }
+  // updateTitle, updateTimestamp, updatePreview methods might move to PersistenceService
+  // keeping updateTitle as it's a common repository operation, others move for business logic reasons
+   public async updateTitle(chatId: string, title: string): Promise<void> {
+       return this.update(chatId, { title });
+   }
 
-  public async updateTimestamp(chatId: string): Promise<void> {
-    return this.update(chatId, { timestamp: Date.now() });
-  }
+   // Implement the missing methods required by IChatRepository
+   public async updateTimestamp(chatId: string): Promise<void> {
+       return this.update(chatId, { timestamp: Date.now() });
+   }
 
-  public async updatePreview(chatId: string, preview: string): Promise<void> {
-    const trimmedPreview = preview.length > 100 ? `${preview.substring(0, 97)}...` : preview;
-    return this.update(chatId, { preview: trimmedPreview });
-  }
+   public async updatePreview(chatId: string, preview: string): Promise<void> {
+       return this.update(chatId, { preview });
+   }
 
   public async delete(id: string): Promise<void> {
     return new Promise((resolve, reject) => {
-      this.db.run('DELETE FROM chats WHERE id = ?', [id], (err) => {
+      this.db.run('DELETE FROM chats WHERE id = ?', [id], function(err) { // Use function() to access 'this.changes'
         if (err) {
           console.error('[ChatRepository] Error deleting chat:', err.message);
           reject(err);
         } else {
+           if (this.changes === 0) {
+                console.warn(`[ChatRepository] No chat found with ID ${id} to delete.`);
+                // Optional: reject(new Error(`Chat with ID ${id} not found.`));
+           }
           resolve();
         }
       });
@@ -154,27 +139,19 @@ export class ChatRepository implements IChatRepository {
     return new Promise((resolve, reject) => {
       const messageWithId = {
         ...message,
-        id: message.id || randomUUID()
+        id: message.id || randomUUID() // Ensure ID is generated if not provided
       };
 
       this.db.run(
         'INSERT INTO messages (id, chat_id, content, sender, timestamp) VALUES (?, ?, ?, ?, ?)',
         [messageWithId.id, messageWithId.chatId, messageWithId.content, messageWithId.sender, messageWithId.timestamp],
-        async (err) => {
+        (err) => {
           if (err) {
             console.error('[ChatRepository] Error adding message:', err.message);
             reject(err);
           } else {
-            try {
-              if (message.sender === 'user') {
-                await this.updatePreview(message.chatId, message.content);
-              }
-              await this.updateTimestamp(message.chatId);
-              resolve(messageWithId);
-            } catch (err) {
-              console.error('[ChatRepository] Error updating chat after message:', err);
-              resolve(messageWithId);
-            }
+             // Do NOT update preview or timestamp here. That's PersistenceService's job.
+            resolve(messageWithId);
           }
         }
       );
@@ -191,10 +168,14 @@ export class ChatRepository implements IChatRepository {
             console.error('[ChatRepository] Error getting chat messages:', err.message);
             reject(err);
           } else {
+            // Ensure rows match ChatMessage structure
             resolve(rows as ChatMessage[]);
           }
         }
       );
     });
   }
+
+    // Method to get the latest message for preview, moved from here to PersistenceService
+    // Method to update chat timestamp, moved from here to PersistenceService
 }

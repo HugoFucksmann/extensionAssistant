@@ -1,53 +1,53 @@
 // src/models/prompts/intentions/prompt.explainCode.ts
+// MODIFIED: Use ChatPromptTemplate
 
-import { BasePromptVariables } from '../../../orchestrator/execution/types';
-import { mapContextToBaseVariables } from '../../promptSystem';
+import { ChatPromptTemplate } from "@langchain/core/prompts";
+import { BasePromptVariables } from "../../../orchestrator/types";
+import { mapContextToBaseVariables } from "../builders/baseVariables";
 
-export interface ExplainCodePromptVariables extends BasePromptVariables {}
 
-export const explainCodePrompt = `
-Eres un asistente experto en explicar código. Tu tarea es proporcionar una explicación clara y concisa del código relevante basado en el objetivo del usuario y el contexto proporcionado.
+// Keep interface for variable structure
+export interface ExplainCodePromptVariables extends BasePromptVariables {} // No specific vars beyond base
 
-Objetivo del usuario:
-"{{objective}}"
+// Define the prompt template using LangChain
+export const explainCodePrompt = ChatPromptTemplate.fromMessages([
+    ["system", `Eres un asistente experto en explicar código. Tu tarea es proporcionar una explicación clara y concisa del código relevante basado en el objetivo del usuario y el contexto proporcionado. Responde en español.
 
-Mensaje original del usuario:
-"{{userMessage}}"
+    Objetivo del usuario:
+    "{{objective}}"
 
-Historial reciente:
-{{chatHistory}}
+    Mensaje original del usuario:
+    "{{userMessage}}"
 
-Entidades clave extraídas:
-{{extractedEntities}}
+    Historial reciente:
+    {{chatHistory}}
 
-Contexto del proyecto:
-{{projectContext}}
+    Entidades clave extraídas:
+    {{extractedEntities}}
 
-Código relevante:
-{{activeEditorContent}}
-{{fileContent:.*}}
+    Contexto del proyecto:
+    {{projectContext}}
 
-Instrucciones:
-- Explica el código en relación con el objetivo del usuario.
-- Sé conciso pero completo.
-- Usa ejemplos si es útil.
-- Si no hay código relevante o no puedes entenderlo, indícalo.
-- Responde en español.
+    Código relevante:
+    {{activeEditorContent}}
+    {{fileContent:.*}}
 
-Salida:
-{
-  "explanation": string,
-  "relevantCodeSnippet"?: string,
-  "error"?: string
-}
-`;
+    Instrucciones:
+    - Explica el código en relación con el objetivo del usuario.
+    - Sé conciso pero completo.
+    - Usa ejemplos si es útil.
+    - Si no hay código relevante o no puedes entenderlo, indícalo.
 
+    Salida esperada (JSON):
+    {
+      "explanation": string,
+      "relevantCodeSnippet"?: string,
+      "error"?: string
+    }`],
+    ["human", "{{userMessage}}"] // User's actual message
+]);
+
+// Keep builder function
 export function buildExplainCodeVariables(contextData: Record<string, any>): ExplainCodePromptVariables {
-    const baseVariables = mapContextToBaseVariables(contextData);
-
-    const explainCodeVariables: ExplainCodePromptVariables = {
-        ...baseVariables
-    };
-
-    return explainCodeVariables;
+     return mapContextToBaseVariables(contextData); // Base variables are sufficient
 }

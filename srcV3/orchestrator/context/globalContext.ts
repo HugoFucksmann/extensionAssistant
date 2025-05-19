@@ -1,6 +1,5 @@
 // src/orchestrator/context/globalContext.ts
-import * as vscode from 'vscode';
-import { ConfigurationManager } from '../../config/ConfigurationManager'; // Assuming this exists
+// Corrected: Exporting only the interface with I prefix and removing the class export.
 
 export interface GlobalContextState {
     [key: string]: any;
@@ -9,55 +8,28 @@ export interface GlobalContextState {
         secondaryLanguage?: string;
         dependencies: string[];
     };
+    _version?: number;
 }
 
-/**
- * Manages context that persists across VS Code sessions and workspaces.
- * Stores global project information, user preferences not tied to specific settings, etc.
- * Persisted using VS Code's globalState.
- */
-export class GlobalContext {
-    private state: GlobalContextState;
-    private context: vscode.ExtensionContext;
+// Remove the export of the class with the same name as the interface
+/*
+export class GlobalContextState { // Use a different name for the implementation class if needed internally
+     [key: string]: any; // Need index signature if using [key: string]: any in interface
+     projectInfo?: { mainLanguage: string; secondaryLanguage?: string; dependencies: string[]; };
+     _version?: number;
 
-
-    constructor(context: vscode.ExtensionContext, configManager: ConfigurationManager) {
-        this.context = context;
-      
-        this.state = this.loadState() || {};
-         console.log('[GlobalContext] Initialized.', this.state); // Reduced logging
-    }
-
-    private loadState(): GlobalContextState | undefined {
-        return this.context.globalState.get<GlobalContextState>('extensionAssistant.globalContext');
-    }
-
-    async saveState(): Promise<void> {
-        await this.context.globalState.update('extensionAssistant.globalContext', this.state);
-     
-    }
-
-    getState(): GlobalContextState {
-        return JSON.parse(JSON.stringify(this.state));
-    }
-
-    setValue<K extends keyof GlobalContextState>(key: K, value: GlobalContextState[K]): void {
-        this.state[key] = value;
-    }
-
-    getValue<K extends keyof GlobalContextState>(key: K): GlobalContextState[K] | undefined {
-        return this.state[key];
-    }
-
-    getProjectInfo(): GlobalContextState['projectInfo'] {
-        return this.state.projectInfo;
-    }
-
-    setProjectInfo(info: GlobalContextState['projectInfo']): void {
-        this.setValue('projectInfo', info);
-    }
-
-    dispose(): void {
-        // No specific disposal needed beyond saving state on deactivate (handled externally)
-    }
+     constructor(initialState: Partial<GlobalContextState> = {}) {
+         Object.assign(this, {
+             _version: 1,
+             projectInfo: undefined,
+             ...initialState
+         });
+     }
 }
+*/
+
+// Option 1 (Simplest): Only export the interface with I prefix.
+// Services will work with plain objects conforming to this interface.
+export { GlobalContextState as IGlobalContextState }; // Export interface
+
+// Remove: export { GlobalContextState }; // REMOVED EXPORT OF CLASS WITH SAME NAME
