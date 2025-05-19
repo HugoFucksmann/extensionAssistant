@@ -210,11 +210,29 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
   private async getFileContents(filePath: string): Promise<void> {
     try {
       // Use the ToolRunner to execute the 'filesystem.getFileContents' tool
-      const content = await ToolRunner.runTool('filesystem.getFileContents', { filePath });
-      this.postMessage('fileContents', { filePath, content });
+      const result = await ToolRunner.runTool('filesystem.getFileContents', { filePath });
+      
+      // Log the result for debugging
+      console.log(`[WebviewProvider] File content result:`, result);
+      
+      // Handle the new response format with success and content properties
+      if (result && result.success) {
+        this.postMessage('fileContents', { 
+          filePath, 
+          content: result.content,
+          path: result.path
+        });
+      } else {
+        // This should not happen with the new implementation, but just in case
+        throw new Error('File content retrieval failed without throwing an error');
+      }
     } catch (error) {
       this.handleError(error);
-      this.postMessage('fileContents', { filePath, content: `Error loading file: ${error instanceof Error ? error.message : String(error)}`, error: error instanceof Error ? error.message : String(error) }); // Send error back to UI
+      this.postMessage('fileContents', { 
+        filePath, 
+        content: `Error loading file: ${error instanceof Error ? error.message : String(error)}`, 
+        error: error instanceof Error ? error.message : String(error) 
+      }); // Send error back to UI
     }
   }
 

@@ -95,16 +95,14 @@ function Chat() {
  *   setState: (state: object) => void
  * }} 
  */
-let vscode;
-try {
-  vscode = acquireVsCodeApi();
-} catch (error) {
-  console.error('Error acquiring vscode API:', error);
-  vscode = {
-      postMessage: (msg) => console.log('[Mock] postMessage:', msg),
-      getState: () => ({ modelType: 'gemini' }),
-      setState: (state) => console.log('[Mock] setState:', state)
-  };
+// Use the vscode API that was already initialized in the HTML template
+const vscode = window.vscode;
+
+// Log the VS Code API status for debugging
+if (vscode) {
+  console.log('VS Code API is available');
+} else {
+  console.error('VS Code API is not available');
 }
 
 // Function to render the application with improved error handling

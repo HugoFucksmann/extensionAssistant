@@ -133,6 +133,7 @@
     "prismjs": "^1.29.0",
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
+    "react-virtualized-auto-sizer": "^1.0.26",
     "react-window": "^1.8.11",
     "sqlite3": "^5.1.7",
     "tree-sitter-javascript": "^0.23.1",

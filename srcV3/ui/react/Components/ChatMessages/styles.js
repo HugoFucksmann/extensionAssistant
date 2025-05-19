@@ -1,9 +1,26 @@
 // ui/Components/ChatMessages/styles.js
 export const styles = {
   container: {
+    display: "flex",
     flexDirection: "column",
     height: "100%",
     padding: "10px",
+    overflow: "hidden", // Prevent container from scrolling
+  },
+  virtualListContainer: {
+    height: "100%",
+    width: "100%",
+    flex: 1,
+    overflow: "auto", // Enable scrolling
+  },
+  scrollableContainer: {
+    display: "flex",
+    flexDirection: "column",
+    height: "100%",
+    width: "100%",
+    flex: 1,
+    overflow: "auto", // Enable scrolling
+    paddingRight: "5px", // Add some padding for the scrollbar
   },
   chatContainer: {
     flex: 1,
