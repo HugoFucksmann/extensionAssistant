@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { ToolResult } from '../types';
+import * as path from 'path';
 
 /**
  * Resultado de búsqueda
@@ -13,9 +14,9 @@ export interface SearchResult {
 }
 
 /**
- * Herramienta para buscar en el workspace
- * @param params Parámetros de la herramienta
- * @returns Resultado con las coincidencias encontradas
+ * Search for text in workspace files
+ * @param params Search parameters
+ * @returns Search results
  */
 export async function searchWorkspace(params: {
   query: string;
@@ -29,7 +30,7 @@ export async function searchWorkspace(params: {
   try {
     const {
       query,
-      includePattern,
+      includePattern = '**/*',
       excludePattern,
       maxResults = 100,
       isCaseSensitive = false,
@@ -40,57 +41,66 @@ export async function searchWorkspace(params: {
     if (!query || typeof query !== 'string') {
       throw new Error(`Invalid query parameter: ${JSON.stringify(query)}. Expected a string.`);
     }
-    
-    // Crear opciones de búsqueda
-    const options: vscode.FindInFilesOptions = {
-      maxResults,
-      useDefaultExcludeSettingAndIgnoreFiles: true
-    };
-    
-    if (includePattern) {
-      options.include = includePattern;
-    }
-    
-    if (excludePattern) {
-      options.exclude = excludePattern;
-    }
-    
-    // Configurar flags de búsqueda
-    let flags = '';
-    if (!isCaseSensitive) flags += 'i';
-    if (isRegExp) flags += 'g';
-    
-    // Realizar la búsqueda
-    const searchResults = await vscode.workspace.findTextInFiles(
-      { pattern: query, flags, isWordMatch: isWholeWord },
-      options
+
+    // Get all matching files
+    const files = await vscode.workspace.findFiles(
+      includePattern,
+      excludePattern ? excludePattern : undefined,
+      maxResults
     );
-    
-    // Procesar los resultados
+
     const results: SearchResult[] = [];
-    
-    searchResults.forEach(fileResult => {
-      fileResult.matches.forEach(match => {
-        const uri = fileResult.uri.toString();
-        const fileName = uri.split('/').pop() || '';
+    let resultCount = 0;
+
+    // Search in each file
+    for (const file of files) {
+      if (resultCount >= maxResults) break;
+
+      try {
+        const document = await vscode.workspace.openTextDocument(file);
+        const text = document.getText();
         
-        match.ranges.forEach(range => {
-          results.push({
-            uri,
-            fileName,
-            lineNumber: match.lineNumber,
-            lineText: match.preview.text,
-            matchText: match.preview.text.substring(range.start, range.end)
-          });
-        });
-      });
-    });
+        // Create regex pattern based on parameters
+        let pattern = isRegExp ? query : 
+          query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // Escape special regex chars
+        
+        if (isWholeWord) {
+          pattern = `\\b${pattern}\\b`;
+        }
+        
+        const flags = isCaseSensitive ? 'g' : 'gi';
+        const regex = new RegExp(pattern, flags);
+        
+        // Search in each line
+        const lines = text.split('\n');
+        for (let i = 0; i < lines.length && resultCount < maxResults; i++) {
+          const line = lines[i];
+          let match: RegExpExecArray | null;
+          
+          while ((match = regex.exec(line)) !== null && resultCount < maxResults) {
+            results.push({
+              uri: file.toString(),
+              fileName: path.basename(file.fsPath),
+              lineNumber: i + 1,
+              lineText: line,
+              matchText: match[0]
+            });
+            resultCount++;
+            
+            // Avoid infinite loop for zero-length matches
+            if (match.index === regex.lastIndex) {
+              regex.lastIndex++;
+            }
+          }
+        }
+      } catch (error) {
+        console.warn(`Error processing file ${file.fsPath}:`, error);
+      }
+    }
     
     return {
       success: true,
-      data: {
-        results
-      }
+      data: { results }
     };
   } catch (error: any) {
     console.error(`[searchWorkspace] Error:`, error.message);

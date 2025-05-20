@@ -3,7 +3,8 @@
  * Genera una respuesta final para el usuario
  */
 
-import { PromptTemplate } from 'langchain/prompts';
+import { PromptTemplate } from '@langchain/core/prompts';
+
 
 export const responsePrompt = new PromptTemplate({
   template: `

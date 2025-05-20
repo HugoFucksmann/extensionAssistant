@@ -3,12 +3,7 @@
  * Define el flujo de trabajo Reasoning → Action → Reflection → Correction
  */
 
-import { 
-  defineGraph, 
-  step, 
-  StateGraph, 
-  END 
-} from "langgraph/graph";
+
 import { 
   WindsurfState, 
   ReasoningResult, 
@@ -16,9 +11,12 @@ import {
   ReflectionResult, 
   CorrectionResult 
 } from '../core/types';
+
 import { ToolRegistry } from '../tools/toolRegistry';
 import { PromptManager } from '../prompts/promptManager';
 import { ModelManager } from '../models/modelManager';
+import { StateGraph } from '@langchain/langgraph';
+import { END } from '@langchain/langgraph/dist/constants';
 
 /**
  * Implementa el grafo de estados para el ciclo ReAct de Windsurf
@@ -69,47 +67,84 @@ export class WindsurfGraph {
     };
     
     // Crear el grafo
-    const graph = defineGraph<WindsurfState>({ states });
+    const graph = new StateGraph<WindsurfState>({
+      channels: {}
+    });
+    
+    // Añadir los nodos al grafo
+    graph.addNode("initialAnalysis", this.initialAnalysisNode());
+    graph.addNode("reasoning", this.reasoningNode());
+    graph.addNode("action", this.actionNode());
+    graph.addNode("reflection", this.reflectionNode());
+    graph.addNode("correction", this.correctionNode());
     
     // Definir las transiciones entre estados
-    graph.addEdge("initialAnalysis", "reasoning");
+    graph.addEdge({
+      from: "__start__",
+      to: "initialAnalysis"
+    });
+    
+    graph.addEdge({
+      from: "initialAnalysis",
+      to: "reasoning"
+    });
     
     // Del razonamiento siempre vamos a la acción
-    graph.addEdge("reasoning", "action");
+    graph.addEdge({
+      from: "reasoning",
+      to: "action"
+    });
     
     // De la acción siempre vamos a la reflexión
-    graph.addEdge("action", "reflection");
+    graph.addEdge({
+      from: "action",
+      to: "reflection"
+    });
     
     // De la reflexión podemos ir a la corrección o volver al razonamiento
-    graph.addConditionalEdges(
-      "reflection",
-      (state) => {
-        // Si necesitamos corrección, ir al nodo de corrección
-        if (state.reflectionResult?.needsCorrection) {
-          return "correction";
-        }
-        
-        // Si la acción fue "respond" y fue exitosa, terminar
-        if (
+    graph.addEdge({
+      from: "reflection",
+      to: "correction",
+      condition: (state: WindsurfState) => state.reflectionResult?.needsCorrection === true
+    });
+    
+    graph.addEdge({
+      from: "reflection",
+      to: END,
+      condition: (state: WindsurfState) => {
+        return (
           state.actionResult?.toolName === "respond" && 
-          state.actionResult?.success &&
-          state.reflectionResult?.isSuccessful
-        ) {
-          return END;
-        }
-        
-        // Si alcanzamos el máximo de iteraciones, terminar
-        if (state.iterationCount >= state.maxIterations) {
-          return END;
-        }
-        
-        // Por defecto, volver al razonamiento
-        return "reasoning";
+          state.actionResult?.success === true &&
+          state.reflectionResult?.isSuccessful === true
+        );
       }
-    );
+    });
+    
+    graph.addEdge({
+      from: "reflection",
+      to: END,
+      condition: (state: WindsurfState) => state.iterationCount >= state.maxIterations
+    });
+    
+    graph.addEdge({
+      from: "reflection",
+      to: "reasoning",
+      condition: (state: WindsurfState) => {
+        return (
+          !state.reflectionResult?.needsCorrection &&
+          !(state.actionResult?.toolName === "respond" && 
+            state.actionResult?.success &&
+            state.reflectionResult?.isSuccessful) &&
+          !(state.iterationCount >= state.maxIterations)
+        );
+      }
+    });
     
     // De la corrección siempre volvemos al razonamiento
-    graph.addEdge("correction", "reasoning");
+    graph.addEdge({
+      from: "correction",
+      to: "reasoning"
+    });
     
     return graph;
   }

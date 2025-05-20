@@ -3,7 +3,7 @@
  * Este prompt se utiliza para planificar los pasos a seguir para resolver la tarea del usuario
  */
 
-import { PromptTemplate } from 'langchain/prompts';
+import { PromptTemplate } from '@langchain/core/prompts';
 
 export const reasoningPrompt = new PromptTemplate({
   template: `
@@ -51,16 +51,13 @@ Devuelve tu plan en formato JSON con la siguiente estructura:
     "expectedOutcome": "Lo que esperas obtener de esta acción"
   }
 }
-`});
-
-export const reasoningPrompt = new PromptTemplate({
-  template,
+`,
   inputVariables: [
-    'objective', 
-    'userMessage', 
-    'iterationCount', 
-    'maxIterations', 
-    'history',
+    'userMessage',
+    'initialAnalysis',
     'availableTools'
   ]
 });
+
+
+ 

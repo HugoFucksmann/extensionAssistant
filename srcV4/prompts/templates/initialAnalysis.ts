@@ -3,7 +3,7 @@
  * Extrae la intención, objetivo y entidades relevantes
  */
 
-import { PromptTemplate } from 'langchain/prompts';
+import { PromptTemplate } from '@langchain/core/prompts';
 
 /**
  * Prompt para el análisis inicial

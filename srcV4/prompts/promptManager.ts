@@ -3,7 +3,7 @@
  * Centraliza la definición y gestión de todos los prompts utilizados en el sistema
  */
 
-import { PromptTemplate } from 'langchain/prompts';
+import { PromptTemplate } from '@langchain/core/prompts';
 import { initialAnalysisPrompt } from './templates/initialAnalysis';
 import { reasoningPrompt } from './templates/reasoning';
 import { reflectionPrompt } from './templates/reflection';

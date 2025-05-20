@@ -3,7 +3,8 @@
  * Se utiliza cuando el ciclo ReAct decide que es momento de responder
  */
 
-import { PromptTemplate } from 'langchain/prompts';
+import { PromptTemplate } from '@langchain/core/prompts';
+
 
 const template = `
 Eres un asistente de programación experto en VS Code que está generando una respuesta final para el usuario.

@@ -1,4 +1,4 @@
-import { PromptTemplate } from 'langchain/prompts';
+import { PromptTemplate } from '@langchain/core/prompts';
 
 /**
  * Prompt para la fase de reflexión
@@ -42,6 +42,13 @@ Responde en formato JSON:
     {"type": "observation/learning/warning", "content": "Descripción del insight"}
   ]
 }
-`}) ;
+`,
+  inputVariables: [
+    'userMessage',
+    'initialAnalysis',
+    'reasoning',
+    'reasoningResult'
+  ]
+}) ;
 
 

@@ -1,23 +1,13 @@
-/**
- * Gestor de modelos para la arquitectura Windsurf
- * Maneja la interacción con diferentes proveedores de modelos de lenguaje
- */
+// srcV4/models/modelManager.ts
+import { ChatOpenAI } from '@langchain/openai';
+import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
+import { ChatOllama } from '@langchain/ollama';
+import { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import { HumanMessage, SystemMessage, BaseMessage, AIMessage } from '@langchain/core/messages';
+import { PromptTemplate as CorePromptTemplate, ChatPromptTemplate } from '@langchain/core/prompts';
 
-import { ChatOpenAI } from 'langchain/chat_models/openai';
-import { ChatGoogleGenerativeAI } from 'langchain/chat_models/googleai';
-import { ChatOllama } from 'langchain/chat_models/ollama';
-import { BaseChatModel } from 'langchain/chat_models/base';
-import { HumanMessage, SystemMessage } from 'langchain/schema';
-import { PromptTemplate } from 'langchain/prompts';
-
-/**
- * Tipo de proveedor de modelo
- */
 export type ModelProvider = 'openai' | 'gemini' | 'ollama' | 'anthropic';
 
-/**
- * Configuración para un modelo
- */
 export interface ModelConfig {
   provider: ModelProvider;
   modelName: string;
@@ -27,219 +17,195 @@ export interface ModelConfig {
   baseUrl?: string;
 }
 
-/**
- * Gestor centralizado de modelos
- * Proporciona una interfaz unificada para interactuar con diferentes modelos de lenguaje
- */
 export class ModelManager {
   private models: Map<ModelProvider, BaseChatModel>;
   private activeProvider: ModelProvider;
   private config: Record<ModelProvider, ModelConfig>;
-  
-  constructor() {
+
+  constructor(defaultProvider: ModelProvider = 'gemini') {
     this.models = new Map();
-    this.config = {
+    this.config = { // Initialize config here or ensure it's passed
       openai: {
         provider: 'openai',
-        modelName: 'gpt-3.5-turbo',
-        temperature: 0.2
+        modelName: process.env.OPENAI_MODEL_NAME || 'gpt-3.5-turbo',
+        temperature: 0.2,
+        maxTokens: 4096,
+        apiKey: process.env.OPENAI_API_KEY,
       },
       gemini: {
         provider: 'gemini',
-        modelName: 'gemini-pro',
-        temperature: 0.2
+        modelName: process.env.GEMINI_MODEL_NAME || 'gemini-pro',
+        temperature: 0.2,
+        maxTokens: 4096,
+        apiKey: process.env.GOOGLE_API_KEY,
       },
       ollama: {
         provider: 'ollama',
         modelName: 'llama3',
         temperature: 0.2,
-        baseUrl: 'http://localhost:11434'
+        baseUrl: 'http://localhost:11434',
+        maxTokens: 4096,
       },
       anthropic: {
         provider: 'anthropic',
-        modelName: 'claude-3-opus',
-        temperature: 0.2
+        modelName: 'claude-3-opus-20240229', // Example, ensure correct model name
+        temperature: 0.2,
+        maxTokens: 4096,
+        apiKey: process.env.ANTHROPIC_API_KEY, // Assuming env var for Anthropic
       }
     };
-    
-    // Por defecto, usar Gemini (como en la implementación actual)
-    this.activeProvider = 'gemini';
-    
+    this.activeProvider = defaultProvider;
     this.initializeModels();
     console.log(`[ModelManager] Initialized with active provider: ${this.activeProvider}`);
   }
-  
-  /**
-   * Inicializa los modelos configurados
-   */
+
   private initializeModels(): void {
     try {
-      // Inicializar OpenAI si hay una API key
-      if (process.env.OPENAI_API_KEY) {
+      if (this.config.openai.apiKey) {
         this.models.set('openai', new ChatOpenAI({
           modelName: this.config.openai.modelName,
           temperature: this.config.openai.temperature,
-          maxTokens: this.config.openai.maxTokens
+          maxTokens: this.config.openai.maxTokens,
+          openAIApiKey: this.config.openai.apiKey,
         }));
+      } else {
+        console.warn("[ModelManager] OpenAI API Key not provided. OpenAI models disabled.");
       }
-      
-      // Inicializar Gemini si hay una API key
-      if (process.env.GOOGLE_API_KEY) {
+
+      if (this.config.gemini.apiKey) {
         this.models.set('gemini', new ChatGoogleGenerativeAI({
-          modelName: this.config.gemini.modelName,
+          model: this.config.gemini.modelName,
           temperature: this.config.gemini.temperature,
           maxOutputTokens: this.config.gemini.maxTokens,
-          apiKey: process.env.GOOGLE_API_KEY
+          apiKey: this.config.gemini.apiKey,
         }));
+      } else {
+        console.warn("[ModelManager] Google API Key not provided. Gemini models disabled.");
       }
-      
-      // Inicializar Ollama (local, no requiere API key)
+
       try {
         this.models.set('ollama', new ChatOllama({
           model: this.config.ollama.modelName,
           temperature: this.config.ollama.temperature,
-          baseUrl: this.config.ollama.baseUrl
+          baseUrl: this.config.ollama.baseUrl,
+          // numPredict: this.config.ollama.maxTokens, // Check Ollama docs for max tokens equivalent
         }));
-      } catch (error) {
-        console.warn('[ModelManager] Failed to initialize Ollama:', error.message);
+      } catch (error: any) {
+        console.warn('[ModelManager] Failed to initialize Ollama (is it running?):', error.message);
       }
       
-      // Verificar que al menos un modelo está disponible
+      // Placeholder for Anthropic if you implement it
+      // if (this.config.anthropic.apiKey) { ... }
+
       if (this.models.size === 0) {
-        throw new Error('No models available. Please configure at least one model provider.');
+        console.error('[ModelManager] No models available. Please configure API keys or ensure Ollama is running.');
       }
-      
-      // Establecer el proveedor activo basado en disponibilidad
-      if (!this.models.has(this.activeProvider)) {
+
+      if (!this.models.has(this.activeProvider) && this.models.size > 0) {
         this.activeProvider = Array.from(this.models.keys())[0];
+        console.warn(`[ModelManager] Default provider ${this.config.gemini.provider} not available or not configured. Switched to ${this.activeProvider}`);
+      } else if (this.models.size === 0 && this.activeProvider) {
+         // If activeProvider was set but no models initialized, log it.
+         console.error(`[ModelManager] Active provider ${this.activeProvider} could not be initialized.`);
       }
-    } catch (error) {
+
+    } catch (error: any) {
       console.error('[ModelManager] Error initializing models:', error);
-      throw error;
     }
   }
-  
-  /**
-   * Obtiene el modelo activo
-   */
+
   private getActiveModel(): BaseChatModel {
     const model = this.models.get(this.activeProvider);
     if (!model) {
-      throw new Error(`Active model provider '${this.activeProvider}' not available`);
+      if (this.models.size > 0) {
+        const fallbackProvider = Array.from(this.models.keys())[0];
+        console.warn(`[ModelManager] Active model provider '${this.activeProvider}' not available. Falling back to '${fallbackProvider}'.`);
+        this.activeProvider = fallbackProvider;
+        return this.models.get(fallbackProvider)!;
+      }
+      throw new Error(`No models available. Active provider '${this.activeProvider}' not found.`);
     }
     return model;
   }
-  
-  /**
-   * Cambia el proveedor de modelo activo
-   * @param provider Nuevo proveedor a utilizar
-   */
+
   public setActiveProvider(provider: ModelProvider): void {
+    if (!this.config[provider]) { // Check against config, not just initialized models
+        console.warn(`[ModelManager] Provider '${provider}' is not configured.`);
+        return;
+    }
     if (!this.models.has(provider)) {
-      throw new Error(`Model provider '${provider}' not available`);
+      console.warn(`[ModelManager] Model for provider '${provider}' not initialized (e.g. missing API key). Cannot set as active.`);
+      return;
     }
     this.activeProvider = provider;
     console.log(`[ModelManager] Active provider changed to: ${provider}`);
   }
-  
-  /**
-   * Configura un proveedor de modelo
-   * @param provider Proveedor a configurar
-   * @param config Nueva configuración
-   */
+
   public configureProvider(provider: ModelProvider, config: Partial<ModelConfig>): void {
-    this.config[provider] = { ...this.config[provider], ...config };
-    
-    // Reinicializar el modelo con la nueva configuración
-    this.initializeModels();
-    console.log(`[ModelManager] Provider '${provider}' reconfigured`);
+    if (!this.config[provider]) {
+        this.config[provider] = { provider, ...config } as ModelConfig;
+    } else {
+        this.config[provider] = { ...this.config[provider], ...config };
+    }
+    this.initializeModels(); // Re-initialize all models with new config
+    console.log(`[ModelManager] Provider '${provider}' reconfigured.`);
   }
-  
-  /**
-   * Genera una respuesta utilizando el modelo activo
-   * @param prompt Plantilla de prompt o texto del prompt
-   * @param values Valores para formatear el prompt (si es una plantilla)
-   * @returns Respuesta generada por el modelo
-   */
+
   public async generateResponse(
-    prompt: string | PromptTemplate,
+    prompt: string | CorePromptTemplate | ChatPromptTemplate,
     values?: Record<string, any>
   ): Promise<string> {
     try {
       const model = this.getActiveModel();
-      
-      // Formatear el prompt si es una plantilla
-      let formattedPrompt: string;
+      let messages: BaseMessage[];
+
       if (typeof prompt === 'string') {
-        formattedPrompt = prompt;
+        messages = [new SystemMessage(prompt)];
+      } else if (prompt instanceof CorePromptTemplate) {
+        const formattedPrompt = await prompt.format(values || {});
+        messages = [new SystemMessage(formattedPrompt)];
+      } else if (prompt instanceof ChatPromptTemplate) {
+        const formattedMessages = await prompt.formatMessages(values || {});
+        messages = formattedMessages; // This should already be BaseMessage[]
       } else {
-        formattedPrompt = await prompt.format(values || {});
+        throw new Error("Invalid prompt type. Must be string, CorePromptTemplate, or ChatPromptTemplate.");
       }
       
-      // Crear los mensajes para el modelo
-      const messages = [
-        new SystemMessage(formattedPrompt)
-      ];
-      
-      // Invocar el modelo
       const response = await model.invoke(messages);
-      
       return response.content as string;
-    } catch (error) {
+    } catch (error: any) {
       console.error('[ModelManager] Error generating response:', error);
       throw error;
     }
   }
-  
-  /**
-   * Genera texto para LangGraph utilizando el modelo especificado
-   * @param promptText Texto del prompt ya formateado
-   * @param modelName Nombre del modelo a utilizar (opcional, usa el activo por defecto)
-   * @returns Respuesta generada por el modelo
-   */
+
   public async generateText(promptText: string, modelName?: string): Promise<string> {
     try {
-      // Si se especifica un modelo diferente, intentar usarlo temporalmente
-      let originalProvider: ModelProvider | null = null;
+      let modelToUse = this.getActiveModel(); // Default to active model
+
       if (modelName) {
-        // Buscar el proveedor que tiene este modelo
-        for (const [provider, config] of Object.entries(this.config)) {
-          if (config.modelName === modelName && this.models.has(provider as ModelProvider)) {
-            originalProvider = this.activeProvider;
-            this.activeProvider = provider as ModelProvider;
-            break;
+        const providerEntry = Object.entries(this.config).find(([, conf]) => conf.modelName === modelName);
+        if (providerEntry) {
+          const providerKey = providerEntry[0] as ModelProvider;
+          if (this.models.has(providerKey)) {
+            modelToUse = this.models.get(providerKey)!;
+          } else {
+            console.warn(`[ModelManager] Model ${modelName} (provider ${providerKey}) not initialized. Using active model.`);
           }
+        } else {
+            console.warn(`[ModelManager] Model ${modelName} not found in config. Using active model.`);
         }
       }
       
-      // Crear los mensajes para el modelo
-      const messages = [
-        new SystemMessage(promptText)
-      ];
-      
-      // Invocar el modelo
-      const model = this.getActiveModel();
-      const response = await model.invoke(messages);
-      
-      // Restaurar el proveedor original si fue cambiado
-      if (originalProvider) {
-        this.activeProvider = originalProvider;
-      }
-      
+      const messages = [new SystemMessage(promptText)];
+      const response = await modelToUse.invoke(messages);
       return response.content as string;
-    } catch (error) {
-      console.error('[ModelManager] Error generating text for LangGraph:', error);
+    } catch (error: any) {
+      console.error('[ModelManager] Error generating text:', error);
       throw error;
     }
   }
-  
-  /**
-   * Genera una respuesta en formato de chat
-   * @param systemPrompt Instrucción del sistema
-   * @param userMessage Mensaje del usuario
-   * @param chatHistory Historial de chat previo (opcional)
-   * @returns Respuesta generada por el modelo
-   */
+
   public async generateChatResponse(
     systemPrompt: string,
     userMessage: string,
@@ -247,27 +213,22 @@ export class ModelManager {
   ): Promise<string> {
     try {
       const model = this.getActiveModel();
+      const messages: BaseMessage[] = [new SystemMessage(systemPrompt)];
+
+      chatHistory.forEach(msg => {
+        if (msg.role === 'user') {
+          messages.push(new HumanMessage(msg.content));
+        } else if (msg.role === 'assistant') {
+          messages.push(new AIMessage(msg.content)); // Use AIMessage for assistant
+        } else { // system
+          messages.push(new SystemMessage(msg.content));
+        }
+      });
+      messages.push(new HumanMessage(userMessage));
       
-      // Convertir el historial de chat al formato de LangChain
-      const messages = [
-        new SystemMessage(systemPrompt),
-        ...chatHistory.map(msg => {
-          if (msg.role === 'user') {
-            return new HumanMessage(msg.content);
-          } else if (msg.role === 'assistant') {
-            return new SystemMessage(msg.content);
-          } else {
-            return new SystemMessage(msg.content);
-          }
-        }),
-        new HumanMessage(userMessage)
-      ];
-      
-      // Invocar el modelo
       const response = await model.invoke(messages);
-      
       return response.content as string;
-    } catch (error) {
+    } catch (error: any) {
       console.error('[ModelManager] Error generating chat response:', error);
       throw error;
     }

@@ -1,8 +1,11 @@
 import { ReActNodeType } from '../core/config';
-import { ReActState, ReActNodeFunction } from './types';
+import { createInitialReActState, ReActState, ReActNodeFunction } from './types';
 import { PromptManager } from '../prompts/promptManager';
 import { ModelManager } from '../models/modelManager';
 import { ToolRegistry } from '../tools/toolRegistry';
+import { RunnableLambda } from '@langchain/core/runnables';
+import { EventType, NodeEventPayload, ToolExecutionPayload } from '../core/events';
+import { eventBus } from '../core/eventBus';
 
 /**
  * Clase que implementa los nodos del grafo ReAct
@@ -23,67 +26,105 @@ export class ReActNodes {
   }
 
   /**
-   * Nodo de análisis inicial
-   * Analiza el mensaje del usuario para determinar la intención y objetivos
+   * Nodo para el análisis inicial del mensaje del usuario
    */
-  initialAnalysis: ReActNodeFunction = async (state: ReActState): Promise<ReActState> => {
-    console.log(`[ReActNodes] Executing initialAnalysis node`);
-    
-    try {
-      // Obtener el prompt para el análisis inicial
-      const prompt = this.promptManager.getPrompt(ReActNodeType.INITIAL_ANALYSIS);
+  initialAnalysisNode(): RunnableLambda<ReActState, ReActState> {
+    return new RunnableLambda<ReActState, ReActState>(async (state: ReActState): Promise<ReActState> => {
+      const startTime = Date.now();
       
-      // Preparar variables para el prompt
-      const variables = {
-        userMessage: state.userMessage,
-        context: state.context,
-        availableTools: this.toolRegistry.getToolNames().join(', ')
-      };
-      
-      // Generar el análisis inicial con el modelo
-      const response = await this.modelManager.generateText(
-        prompt.formatPrompt(variables),
-        state.metadata.modelName
-      );
-      
-      // Parsear la respuesta
-      // Nota: Aquí asumimos que el modelo devuelve un JSON estructurado
-      // En una implementación real, se debería validar y manejar errores de parseo
-      const analysis = JSON.parse(response);
-      
-      // Actualizar el estado
-      return {
-        ...state,
-        initialAnalysis: {
-          intent: analysis.intent,
-          objectives: analysis.objectives,
-          requiredTools: analysis.requiredTools,
-          relevantContext: analysis.relevantContext
-        },
-        currentNode: ReActNodeType.REASONING
-      };
+      try {
+        // Emitir evento de inicio del nodo
+        eventBus.emitEvent<NodeEventPayload>(EventType.NODE_START, {
+          type: ReActNodeType.INITIAL_ANALYSIS,
+          state
+        }, 'ReActNodes.initialAnalysisNode');
+        
+        // Obtener el prompt para el análisis inicial
+        const prompt = this.promptManager.getPrompt(ReActNodeType.INITIAL_ANALYSIS);
+        
+        // Preparar las variables para el prompt
+        const variables = {
+          userMessage: state.userMessage,
+          context: state.context || state.metadata.contextData || {}
+        };
+        
+        // Generar el análisis inicial
+        const response = await this.modelManager.generateText(
+          prompt.formatPrompt(variables),
+          state.metadata.modelName
+        );
+        
+        // Procesar la respuesta
+        const analysis = JSON.parse(response);
+        
+        // Actualizar el estado con el análisis
+        const updatedState: ReActState = {
+          ...state,
+          initialAnalysis: {
+            intent: analysis.intent,
+            objectives: analysis.objectives,
+            requiredTools: analysis.requiredTools || [],
+            relevantContext: analysis.relevantContext || ''
+          },
+          currentNode: ReActNodeType.REASONING
+        };
+        
+        const duration = Date.now() - startTime;
+        
+        // Emitir evento de finalización del nodo
+        eventBus.emitEvent<NodeEventPayload>(EventType.NODE_COMPLETE, {
+          type: ReActNodeType.INITIAL_ANALYSIS,
+          state: updatedState,
+          duration
+        }, 'ReActNodes.initialAnalysisNode');
+        
+        return updatedState;
+      } catch (error) {
+        const duration = Date.now() - startTime;
+        
+        // Emitir evento de error del nodo
+        eventBus.emitEvent<NodeEventPayload>(EventType.NODE_ERROR, {
+          type: ReActNodeType.INITIAL_ANALYSIS,
+          state,
+          error: error as Error,
+          duration
+        }, 'ReActNodes.initialAnalysisNode');
+        
+        throw error;
+      }
+    });
+  }
+      return newState;
     } catch (error: any) {
       console.error(`[ReActNodes] Error in initialAnalysis:`, error);
       
       // En caso de error, pasar directamente a la generación de respuesta
-      return {
+      self.emit('node:error', { type: ReActNodeType.INITIAL_ANALYSIS, error });
+      const errorState = {
         ...state,
         currentNode: ReActNodeType.RESPONSE_GENERATION,
         finalResponse: `Lo siento, ocurrió un error al analizar tu mensaje. Por favor, intenta de nuevo o reformula tu pregunta. Error: ${error.message}`
       };
+      
+      self.emit('node:complete', { type: ReActNodeType.INITIAL_ANALYSIS, state: errorState });
+      return errorState;
     }
-  };
+  });
 
   /**
    * Nodo de razonamiento
    * Planifica los pasos a seguir para resolver la tarea del usuario
    */
-  reasoning: ReActNodeFunction = async (state: ReActState): Promise<ReActState> => {
+  reasoning(): RunnableLambda {
+    const self = this;
+    
+    return new RunnableLambda(async (state: ReActState): Promise<ReActState> => {
     console.log(`[ReActNodes] Executing reasoning node`);
+    self.emit('node:start', { type: ReActNodeType.REASONING, state });
     
     try {
       // Obtener el prompt para el razonamiento
-      const prompt = this.promptManager.getPrompt(ReActNodeType.REASONING);
+      const prompt = self.promptManager.getPrompt(ReActNodeType.REASONING);
       
       // Preparar variables para el prompt
       const variables = {
@@ -95,7 +136,7 @@ export class ReActNodes {
       };
       
       // Generar el razonamiento con el modelo
-      const response = await this.modelManager.generateText(
+      const response = await self.modelManager.generateText(
         prompt.formatPrompt(variables),
         state.metadata.modelName
       );
@@ -104,7 +145,7 @@ export class ReActNodes {
       const reasoning = JSON.parse(response);
       
       // Actualizar el estado
-      return {
+      const newState = {
         ...state,
         reasoning: {
           plan: reasoning.plan,
@@ -118,23 +159,35 @@ export class ReActNodes {
         },
         currentNode: ReActNodeType.ACTION
       };
+      
+      self.emit('node:complete', { type: ReActNodeType.REASONING, state: newState });
+      return newState;
     } catch (error: any) {
       console.error(`[ReActNodes] Error in reasoning:`, error);
       
       // En caso de error, pasar directamente a la generación de respuesta
-      return {
+      self.emit('node:error', { type: ReActNodeType.REASONING, error });
+      const errorState = {
         ...state,
         currentNode: ReActNodeType.RESPONSE_GENERATION,
         finalResponse: `Lo siento, ocurrió un error al planificar cómo resolver tu tarea. Por favor, intenta de nuevo o reformula tu pregunta. Error: ${error.message}`
       };
+      
+      self.emit('node:complete', { type: ReActNodeType.REASONING, state: errorState });
+      return errorState;
     }
-  };
+  });
 
   /**
    * Nodo de acción
-   * Ejecuta una herramienta basada en el razonamiento
+   * Ejecuta herramientas o genera respuestas basadas en el razonamiento
    */
-  action: ReActNodeFunction = async (state: ReActState): Promise<ReActState> => {
+  action(): RunnableLambda<ReActState, ReActState> {
+    const promptManager = this.promptManager;
+    const modelManager = this.modelManager;
+    const toolRegistry = this.toolRegistry;
+    
+    return new RunnableLambda(async (state: ReActState): Promise<ReActState> => {
     console.log(`[ReActNodes] Executing action node`);
     
     try {
@@ -157,18 +210,19 @@ export class ReActNodes {
       
       // Determinar qué herramienta usar para este paso
       // Esto podría requerir otro llamado al modelo para determinar la herramienta y parámetros
-      const toolSelectionPrompt = this.promptManager.getPrompt('toolSelection');
+      const toolSelectionPrompt = promptManager.getPrompt('toolSelection');
       const toolSelectionVars = {
         step: currentStep,
-        availableTools: this.toolRegistry.getToolNames().join(', '),
-        toolDescriptions: JSON.stringify(this.toolRegistry.getAllTools().map(t => ({
+        availableTools: toolRegistry.getToolNames().join(', '),
+        toolDescriptions: JSON.stringify(toolRegistry.getAllTools().map(t => ({
           name: t.name,
           description: t.description,
           parameters: t.schema.parameters
         })))
       };
       
-      const toolSelectionResponse = await this.modelManager.generateText(
+      // Generar la selección de herramienta con el modelo
+      const toolSelectionResponse = await modelManager.generateText(
         toolSelectionPrompt.formatPrompt(toolSelectionVars),
         state.metadata.modelName
       );
@@ -178,12 +232,12 @@ export class ReActNodes {
       const { toolName, toolInput } = toolSelection;
       
       // Verificar si la herramienta existe
-      if (!this.toolRegistry.hasTool(toolName)) {
+      if (!toolRegistry.hasTool(toolName)) {
         throw new Error(`La herramienta "${toolName}" no existe`);
       }
       
       // Ejecutar la herramienta
-      const toolResult = await this.toolRegistry.executeTool(toolName, toolInput);
+      const toolResult = await toolRegistry.executeTool(toolName, toolInput);
       
       // Registrar la acción en el historial
       const newAction = {
@@ -194,7 +248,7 @@ export class ReActNodes {
       };
       
       // Actualizar el estado
-      return {
+      const newState = {
         ...state,
         action: {
           toolName,
@@ -209,6 +263,8 @@ export class ReActNodes {
         },
         currentNode: ReActNodeType.REFLECTION
       };
+      
+      return newState;
     } catch (error: any) {
       console.error(`[ReActNodes] Error in action:`, error);
       
@@ -224,18 +280,22 @@ export class ReActNodes {
         currentNode: ReActNodeType.REFLECTION
       };
     }
-  };
+  });
 
   /**
    * Nodo de reflexión
-   * Evalúa el resultado de la acción y decide si se necesita una corrección
+   * Evalúa los resultados de la acción y decide los siguientes pasos
    */
-  reflection: ReActNodeFunction = async (state: ReActState): Promise<ReActState> => {
+  reflection(): RunnableLambda<ReActState, ReActState> {
+    const promptManager = this.promptManager;
+    const modelManager = this.modelManager;
+    
+    return new RunnableLambda(async (state: ReActState): Promise<ReActState> => {
     console.log(`[ReActNodes] Executing reflection node`);
     
     try {
       // Obtener el prompt para la reflexión
-      const prompt = this.promptManager.getPrompt(ReActNodeType.REFLECTION);
+      const prompt = promptManager.getPrompt(ReActNodeType.REFLECTION);
       
       // Preparar variables para el prompt
       const variables = {
@@ -247,7 +307,7 @@ export class ReActNodes {
       };
       
       // Generar la reflexión con el modelo
-      const response = await this.modelManager.generateText(
+      const response = await modelManager.generateText(
         prompt.formatPrompt(variables),
         state.metadata.modelName
       );
@@ -293,19 +353,25 @@ export class ReActNodes {
       console.error(`[ReActNodes] Error in reflection:`, error);
       
       // En caso de error, pasar directamente a la generación de respuesta
-      return {
+      const errorState = {
         ...state,
         currentNode: ReActNodeType.RESPONSE_GENERATION,
         finalResponse: `Lo siento, ocurrió un error al evaluar los resultados. Por favor, intenta de nuevo. Error: ${error.message}`
       };
+      
+      return errorState;
     }
-  };
+  });
 
   /**
    * Nodo de corrección
-   * Corrige el plan basado en la reflexión
+   * Corrige el plan o la estrategia si es necesario
    */
-  correction: ReActNodeFunction = async (state: ReActState): Promise<ReActState> => {
+  correction(): RunnableLambda<ReActState, ReActState> {
+    const promptManager = this.promptManager;
+    const modelManager = this.modelManager;
+    
+    return new RunnableLambda(async (state: ReActState): Promise<ReActState> => {
     console.log(`[ReActNodes] Executing correction node`);
     
     try {
@@ -315,7 +381,7 @@ export class ReActNodes {
       }
       
       // Obtener el prompt para la corrección
-      const prompt = this.promptManager.getPrompt(ReActNodeType.CORRECTION);
+      const prompt = promptManager.getPrompt(ReActNodeType.CORRECTION);
       
       // Preparar variables para el prompt
       const variables = {
@@ -328,7 +394,7 @@ export class ReActNodes {
       };
       
       // Generar la corrección con el modelo
-      const response = await this.modelManager.generateText(
+      const response = await modelManager.generateText(
         prompt.formatPrompt(variables),
         state.metadata.modelName
       );
@@ -362,19 +428,25 @@ export class ReActNodes {
       console.error(`[ReActNodes] Error in correction:`, error);
       
       // En caso de error, pasar directamente a la generación de respuesta
-      return {
+      const errorState = {
         ...state,
         currentNode: ReActNodeType.RESPONSE_GENERATION,
         finalResponse: `Lo siento, ocurrió un error al corregir el plan. Por favor, intenta de nuevo. Error: ${error.message}`
       };
+      
+      return errorState;
     }
-  };
+  });
 
   /**
    * Nodo de generación de respuesta
    * Genera la respuesta final para el usuario
    */
-  responseGeneration: ReActNodeFunction = async (state: ReActState): Promise<ReActState> => {
+  responseGeneration(): RunnableLambda<ReActState, ReActState> {
+    const promptManager = this.promptManager;
+    const modelManager = this.modelManager;
+    
+    return new RunnableLambda(async (state: ReActState): Promise<ReActState> => {
     console.log(`[ReActNodes] Executing responseGeneration node`);
     
     try {
@@ -390,7 +462,7 @@ export class ReActNodes {
       }
       
       // Obtener el prompt para la generación de respuesta
-      const prompt = this.promptManager.getPrompt(ReActNodeType.RESPONSE_GENERATION);
+      const prompt = promptManager.getPrompt(ReActNodeType.RESPONSE_GENERATION);
       
       // Preparar variables para el prompt
       const variables = {
@@ -403,13 +475,13 @@ export class ReActNodes {
       };
       
       // Generar la respuesta con el modelo
-      const response = await this.modelManager.generateText(
+      const response = await modelManager.generateText(
         prompt.formatPrompt(variables),
         state.metadata.modelName
       );
       
       // Actualizar el estado
-      return {
+      const newState = {
         ...state,
         finalResponse: response,
         metadata: {
@@ -417,6 +489,9 @@ export class ReActNodes {
           endTime: Date.now()
         }
       };
+      
+      self.emit('node:complete', { type: ReActNodeType.INITIAL_ANALYSIS, state: newState });
+      return newState;
     } catch (error: any) {
       console.error(`[ReActNodes] Error in responseGeneration:`, error);
       
@@ -429,6 +504,9 @@ export class ReActNodes {
           endTime: Date.now()
         }
       };
+      
+      self.emit('node:complete', { type: ReActNodeType.INITIAL_ANALYSIS, state: newState });
+      return newState;
     }
   };
 }

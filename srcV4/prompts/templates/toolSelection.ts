@@ -1,4 +1,5 @@
-import { PromptTemplate } from 'langchain/prompts';
+import { PromptTemplate } from '@langchain/core/prompts';
+
 
 /**
  * Prompt para la selección de herramientas

@@ -159,7 +159,7 @@ export class EventManager {
       const listenersToRemove = Array.from(listeners).filter(l => (l as any).listenerId === listenerId);
       
       listenersToRemove.forEach(listener => {
-        this.emitter.removeListener(type, listener);
+        this.emitter.removeListener(type, listener as (...args: any[]) => void);
         listeners.delete(listener);
       });
       

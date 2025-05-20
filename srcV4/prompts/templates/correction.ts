@@ -3,7 +3,7 @@
  * Corrige el plan cuando la reflexión determina que es necesario
  */
 
-import { PromptTemplate } from 'langchain/prompts';
+import { PromptTemplate } from '@langchain/core/prompts';
 
 export const correctionPrompt = new PromptTemplate({
   template: `
