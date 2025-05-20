@@ -198,7 +198,9 @@ export class MemoryManagerAdapter implements IMemoryManager {
       history,
       extractedEntities: state.context.entities || {},
       completionStatus: 'completed',
-      metadata: state.metadata || {}
+      metadata: state.metadata || {},
+      iterationCount: state.metadata?.iterationCount || 1,
+      maxIterations: state.metadata?.maxIterations || 15
     };
   }
   
@@ -215,7 +217,7 @@ export class MemoryManagerAdapter implements IMemoryManager {
     // Añadir mensaje del usuario
     if (state.userMessage) {
       messages.push({
-        role: 'user',
+        role: 'user' as 'user',
         content: state.userMessage,
         timestamp: state.metadata.startTime || Date.now() - 60000
       });
@@ -224,7 +226,7 @@ export class MemoryManagerAdapter implements IMemoryManager {
     // Añadir respuesta del asistente
     if (state.response) {
       messages.push({
-        role: 'assistant',
+        role: 'assistant' as 'assistant',
         content: state.response,
         timestamp: state.metadata.endTime || Date.now()
       });

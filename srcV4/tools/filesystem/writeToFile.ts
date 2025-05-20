@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
-import * as path from 'path';
 import { ToolResult } from '../types';
+import { normalizePath, fileExists, getDirectory } from '../../utils/pathUtils';
 
 /**
  * Herramienta para escribir contenido en un archivo
@@ -28,26 +28,25 @@ export async function writeToFile(params: {
     
     let fullPath: string;
     
-    if (relativeTo === 'workspace') {
-      const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-      if (!workspaceFolder) {
-        throw new Error(`No workspace folder found`);
+    try {
+      // Normalize the path
+      fullPath = normalizePath(filePath);
+      
+      // Create directories if they don't exist
+      const dirPath = getDirectory(fullPath);
+      if (!fs.existsSync(dirPath)) {
+        fs.mkdirSync(dirPath, { recursive: true });
       }
-      fullPath = path.join(workspaceFolder, filePath);
-    } else {
-      fullPath = filePath;
-    }
-    
-    // Crear directorios si no existen
-    const dirPath = path.dirname(fullPath);
-    if (!fs.existsSync(dirPath)) {
-      fs.mkdirSync(dirPath, { recursive: true });
-    }
-    
-    // Verificar si el archivo existe
-    const fileExists = fs.existsSync(fullPath);
-    if (!fileExists && !createIfNotExists) {
-      throw new Error(`File does not exist: ${filePath}`);
+      
+      // Check if file exists if we're not supposed to create it
+      if (!createIfNotExists && !(await fileExists(fullPath))) {
+        throw new Error(`File does not exist: ${filePath}`);
+      }
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`Failed to prepare file path '${filePath}': ${error.message}`);
+      }
+      throw error;
     }
     
     // Escribir el contenido en el archivo

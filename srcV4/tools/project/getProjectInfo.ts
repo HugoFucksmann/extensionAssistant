@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { ToolResult } from '../types';
+import { getFileName } from '../../utils/pathUtils';
 
 /**
  * Información del proyecto
@@ -44,7 +45,7 @@ export async function getProjectInfo(): Promise<ToolResult<ProjectInfo>> {
     const workspaceFolderPaths = workspaceFolders.map(folder => folder.uri.fsPath);
     
     // Obtener nombre del proyecto (del package.json o del nombre de la carpeta)
-    let projectName = path.basename(rootPath);
+    let projectName = getFileName(rootPath);
     let packageJson: any = undefined;
     
     // Intentar leer el package.json
@@ -125,16 +126,18 @@ async function getFileStats(dirPath: string): Promise<{
   };
   
   // Usar la API de VS Code para buscar archivos
-  const files = await vscode.workspace.findFiles('**/*', '**/node_modules/**');
+  const files = await vscode.workspace.findFiles('**/*', '**/node_modules/**, **/.git/**');
   
   stats.totalFiles = files.length;
   
   // Contar archivos por extensión
   for (const file of files) {
-    const ext = path.extname(file.fsPath).toLowerCase();
-    if (ext) {
-      const extName = ext.slice(1); // Eliminar el punto inicial
+    const ext = path.extname(file.fsPath).toLowerCase() || '.none';
+    const extName = ext.startsWith('.') ? ext.slice(1) : ext; // Remove leading dot
+    if (extName) {
       stats.byExtension[extName] = (stats.byExtension[extName] || 0) + 1;
+    } else {
+      stats.byExtension['none'] = (stats.byExtension['none'] || 0) + 1;
     }
   }
   

@@ -15,9 +15,13 @@ import { IModelManager } from '../interfaces/model-manager.interface';
 import { IReActGraph } from '../interfaces/react-graph.interface';
 import { IToolRegistry } from '../interfaces/tool-registry.interface';
 import { MemoryManager } from '../../memory/memoryManager';
+import { MemoryManagerAdapter } from '../../memory/memoryManagerAdapter';
 import { ModelManager } from '../../models/modelManager';
+import { ModelManagerAdapter } from '../../models/modelManagerAdapter';
 import { ReActGraph, createReActGraph } from '../../langgraph/reactGraph';
+import { ReActGraphAdapter } from '../../langgraph/reactGraphAdapter';
 import { ToolRegistry } from '../../tools/toolRegistry';
+import { ToolRegistryAdapter } from '../../tools/toolRegistryAdapter';
 
 /**
  * Controlador principal para la arquitectura Windsurf
@@ -45,17 +49,25 @@ export class WindsurfController {
     // Inicializar el bus de eventos usando el adaptador
     this.eventBus = EventBusAdapter.getInstance();
     
-    // Inicializar componentes
-    this.memoryManager = new MemoryManager();
-    this.modelManager = new ModelManager();
-    this.toolRegistry = new ToolRegistry();
+    // Inicializar componentes base
+    const memoryManagerBase = new MemoryManager();
+    const modelManagerBase = new ModelManager();
+    const toolRegistryBase = new ToolRegistry();
+    
+    // Crear adaptadores que implementan las interfaces requeridas
+    this.memoryManager = new MemoryManagerAdapter(memoryManagerBase, this.eventBus);
+    this.modelManager = new ModelManagerAdapter(modelManagerBase, this.eventBus);
+    this.toolRegistry = new ToolRegistryAdapter(toolRegistryBase, this.eventBus);
     
     // Inicializar el grafo ReAct
     // Nota: Temporalmente usamos el EventBus original hasta que se refactorice completamente el grafo ReAct
     const defaultModel = 'gemini-pro';
     // Usamos require para obtener el EventBus original sin importarlo directamente
     const originalEventBus = require('../../events/eventBus').EventBus.getInstance();
-    this.reactGraph = createReActGraph(defaultModel, originalEventBus);
+    const reactGraphBase = createReActGraph(defaultModel, originalEventBus);
+    
+    // Crear el adaptador para el grafo ReAct
+    this.reactGraph = new ReActGraphAdapter(reactGraphBase, this.eventBus);
     
     // Pasar el toolRegistry al grafo ReAct
     // Usamos casting explícito a unknown primero para evitar errores de tipo

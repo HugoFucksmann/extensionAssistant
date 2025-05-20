@@ -6,14 +6,17 @@
 import * as vscode from 'vscode';
 import { VSCodeContext } from './types';
 import { WindsurfConfig, ReActNodeType } from './config';
-import { MemoryManager } from '../memory/memoryManager';
-import { PromptManager } from '../prompts/promptManager';
-import { ModelManager } from '../models/modelManager';
-import { createReActGraph, ReActGraph } from '../langgraph/reactGraph';
 import { ReActState, ReActGraphResult } from '../langgraph/types';
-import { ToolRegistry } from '../tools/toolRegistry';
 import { EventBus, EventType } from '../events';
 import EventEmitter from 'eventemitter3';
+
+// Importar interfaces y factory
+import { IMemoryManager } from './interfaces/memory-manager.interface';
+import { IModelManager } from './interfaces/model-manager.interface';
+import { IToolRegistry } from './interfaces/tool-registry.interface';
+import { IReActGraph } from './interfaces/react-graph.interface';
+import { ComponentFactory } from './factory/componentFactory';
+import { FeatureFlags, Feature } from './featureFlags';
 
 // Nota: Los eventos ahora se definen en el módulo events/eventTypes.ts
 // Mantenemos esta enumeración para compatibilidad con código existente
@@ -65,11 +68,10 @@ export class WindsurfController extends EventEmitter {
   private static instance: WindsurfController;
   
   private vscodeContext: VSCodeContext;
-  private memoryManager: MemoryManager;
-  private promptManager: PromptManager;
-  private modelManager: ModelManager;
-  private reactGraph: ReActGraph;
-  private toolRegistry: ToolRegistry; 
+  private memoryManager!: IMemoryManager;
+  private modelManager!: IModelManager;
+  private reactGraph!: IReActGraph;
+  private toolRegistry!: IToolRegistry; 
   private activeConversations: Map<string, ReActState> = new Map();
   
   // Bus de eventos centralizado para comunicación entre capas (legacy)
@@ -77,6 +79,12 @@ export class WindsurfController extends EventEmitter {
   
   // Bus de eventos avanzado
   private eventBus: EventBus;
+  
+  // Factory de componentes
+  private componentFactory: ComponentFactory;
+  
+  // Feature flags
+  private featureFlags: FeatureFlags;
   
   /**
    * Constructor privado para implementar el patrón singleton
@@ -90,29 +98,20 @@ export class WindsurfController extends EventEmitter {
     // Inicializar el bus de eventos centralizado (legacy)
     this.events = new EventEmitter();
     
+    // Obtener la factory de componentes
+    this.componentFactory = ComponentFactory.getInstance();
+    
+    // Obtener feature flags
+    this.featureFlags = FeatureFlags.getInstance();
+    
     // Inicializar el bus de eventos avanzado
-    this.eventBus = EventBus.getInstance();
+    this.eventBus = this.componentFactory.getEventBus() as EventBus;
     
     // Configurar el puente entre los dos sistemas de eventos
     this.setupEventBridge();
     
-    // Inicializar componentes
-    this.memoryManager = new MemoryManager();
-    this.promptManager = new PromptManager();
-    this.modelManager = new ModelManager();
-    this.toolRegistry = new ToolRegistry();
-    
-    // Inicializar el grafo ReAct con el modelo predeterminado y el bus de eventos
-    const defaultModel = 'gemini-pro';
-    this.reactGraph = createReActGraph(defaultModel, this.events);
-    
-    // Pasar el toolRegistry al grafo ReAct
-    if (this.reactGraph.setToolRegistry) {
-      this.reactGraph.setToolRegistry(this.toolRegistry);
-    }
-    
-    console.log('[WindsurfController] Initialized with ReAct architecture and advanced event handling');
-    this.eventBus.debug('[WindsurfController] Initialized controller with advanced event handling');
+    // Inicializar componentes usando la factory
+    this.initializeComponents();
   }
   
   /**
@@ -131,16 +130,49 @@ export class WindsurfController extends EventEmitter {
   }
   
   /**
+   * Inicializa los componentes usando la factory
+   */
+  private initializeComponents(): void {
+    // Obtener componentes de la factory
+    this.memoryManager = this.componentFactory.getMemoryManager();
+    this.modelManager = this.componentFactory.getModelManager();
+    this.toolRegistry = this.componentFactory.getToolRegistry();
+    this.reactGraph = this.componentFactory.getReActGraph();
+    
+    // Registrar el controlador en la factory para que otros componentes puedan acceder a él
+    this.componentFactory.register('windsurfController', this);
+  }
+  
+  /**
    * Obtiene la instancia única del controlador
    */
   public static getInstance(context?: VSCodeContext): WindsurfController {
     if (!WindsurfController.instance) {
       if (!context) {
-        throw new Error('VSCodeContext is required for initialization');
+        throw new Error('Context is required when creating WindsurfController instance');
       }
+      
       WindsurfController.instance = new WindsurfController(context);
     }
+    
     return WindsurfController.instance;
+  }
+  
+  /**
+   * Reinicia el controlador con nuevas configuraciones
+   * Útil cuando cambian los feature flags
+   */
+  public reset(): void {
+    // Reiniciar la factory
+    this.componentFactory.reset();
+    
+    // Reinicializar componentes
+    this.initializeComponents();
+    
+    // Limpiar conversaciones activas
+    this.activeConversations.clear();
+    
+    this.eventBus.debug('[WindsurfController] Reset completed');
   }
   
   /**
@@ -243,13 +275,20 @@ export class WindsurfController extends EventEmitter {
       
       // Guardar en memoria
       await this.memoryManager.storeConversation(chatId, {
-        objective: `Responder a: ${userMessage.substring(0, 50)}...`,
-        userMessage,
         chatId,
-        iterationCount: result.executionInfo?.iterations || 1,
-        maxIterations: 10,
-        completionStatus: 'completed',
-        history: updatedState.intermediateSteps.map(step => {
+        messages: [
+          { role: 'user', content: userMessage, timestamp: Date.now() - 1000 },
+          { role: 'assistant', content: finalResponse, timestamp: Date.now() }
+        ],
+        currentStep: 'completed',
+        context: {
+          objective: `Responder a: ${userMessage.substring(0, 50)}...`
+        },
+        userMessage,
+        finalResponse,
+        startTime: result.executionInfo?.startTime,
+        lastUpdateTime: Date.now(),
+        toolExecutions: updatedState.intermediateSteps.map(step => {
           // Convertir el tipo de fase a uno de los valores aceptados
           const toolName = step.action.tool || '';
           let phase: 'reasoning' | 'action' | 'reflection' | 'correction' = 'action';
@@ -265,13 +304,11 @@ export class WindsurfController extends EventEmitter {
           }
           
           return {
-            phase,
+            toolName: step.action.tool || '',
+            input: step.action.toolInput || {},
+            output: step.observation,
             timestamp: step.timestamp || Date.now(),
-            data: {
-              input: step.action.toolInput || {},
-              output: step.observation
-            },
-            iteration: 1
+            success: true
           };
         }),
         metadata: result.metadata || {}
@@ -341,7 +378,7 @@ export class WindsurfController extends EventEmitter {
    */
   public clearConversation(chatId: string): void {
     this.activeConversations.delete(chatId);
-    this.memoryManager.clearConversationMemory(chatId);
+    this.memoryManager.clearConversation(chatId);
     
     // Emitir evento de fin de conversación
     this.events.emit(WindsurfEvents.CONVERSATION_ENDED, { 
@@ -360,12 +397,15 @@ export class WindsurfController extends EventEmitter {
     this.activeConversations.clear();
     
     // Liberar recursos del gestor de memoria
-    this.memoryManager.dispose();
+    if ('dispose' in this.memoryManager) {
+      (this.memoryManager as any).dispose();
+    }
     
     // Eliminar todos los listeners de eventos
     this.events.removeAllListeners();
     this.removeAllListeners();
     
-    console.log('[WindsurfController] Disposed');
+    // Registrar en el bus de eventos
+    this.eventBus.debug('[WindsurfController] Disposed');
   }
 }

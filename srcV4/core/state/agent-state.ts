@@ -89,7 +89,7 @@ export function createInitialAgentState(
       }
     ],
     currentStep: 'initialAnalysis',
-    currentNode: ReActNodeType.ANALYSIS,
+    currentNode: ReActNodeType.INITIAL_ANALYSIS,
     context: contextData,
     userMessage,
     intermediateSteps: [],

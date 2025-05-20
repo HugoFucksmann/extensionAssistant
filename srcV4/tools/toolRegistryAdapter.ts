@@ -3,10 +3,34 @@
  * Permite utilizar el ToolRegistry existente a través de la interfaz definida
  */
 
-import { IToolRegistry, ToolDefinition, ToolExecutionResult, ToolParameters } from '../core/interfaces/tool-registry.interface';
+import { IToolRegistry } from '../core/interfaces/tool-registry.interface';
+import { EventType } from '../events/eventTypes';
+import { Tool, ToolResult } from '../core/types';
 import { ToolRegistry } from './toolRegistry';
 import { IEventBus } from '../core/interfaces/event-bus.interface';
-import { Tool, ToolResult } from '../core/types';
+// Definiciones internas para el adaptador
+interface ToolDefinition {
+  name: string;
+  description: string;
+  execute: Function;
+  parameters: Record<string, any>;
+  returns: Record<string, any>;
+}
+
+interface ToolParameters {
+  [key: string]: any;
+}
+
+interface ToolExecutionResult {
+  success: boolean;
+  data?: any;
+  error?: string;
+  metadata: {
+    toolName: string;
+    executionTime: number;
+    timestamp: number;
+  };
+}
 
 /**
  * Adaptador para el ToolRegistry que implementa la interfaz IToolRegistry
@@ -30,27 +54,22 @@ export class ToolRegistryAdapter implements IToolRegistry {
    * @param definition Definición de la herramienta
    * @returns true si se registró correctamente, false si ya existía
    */
-  public registerTool(definition: ToolDefinition): boolean {
-    if (this.toolRegistry.hasTool(definition.name)) {
-      this.eventBus.debug(`[ToolRegistryAdapter] Tool already exists: ${definition.name}`);
-      return false;
+  public registerTool(tool: Tool): void {
+    if (this.toolRegistry.hasTool(tool.name)) {
+      this.eventBus.debug(`[ToolRegistryAdapter] Tool already exists: ${tool.name}`);
+      return;
     }
     
-    // Convertir la definición al formato esperado por el ToolRegistry
+    // Registrar la herramienta directamente
     this.toolRegistry.registerTool(
-      definition.name,
-      definition.execute,
-      definition.description,
-      {
-        parameters: definition.parameters,
-        returns: definition.returns
-      }
+      tool.name,
+      tool.execute,
+      tool.description,
+      tool.schema
     );
     
-    this.eventBus.debug(`[ToolRegistryAdapter] Registered tool: ${definition.name}`);
-    this.eventBus.emit('tool:registered', { toolName: definition.name });
-    
-    return true;
+    this.eventBus.debug(`[ToolRegistryAdapter] Registered tool: ${tool.name}`);
+    this.eventBus.emit(EventType.DEBUG_LOG, { message: `Tool registered: ${tool.name}` });
   }
   
   /**
@@ -58,14 +77,14 @@ export class ToolRegistryAdapter implements IToolRegistry {
    * @param toolName Nombre de la herramienta a desregistrar
    * @returns true si se desregistró correctamente, false si no existía
    */
-  public unregisterTool(toolName: string): boolean {
-    if (!this.toolRegistry.hasTool(toolName)) {
+  public removeTool(name: string): boolean {
+    if (!this.toolRegistry.hasTool(name)) {
       return false;
     }
     
     // Como el ToolRegistry actual no tiene un método para desregistrar herramientas,
     // tendríamos que extenderlo. Por ahora, emitimos un evento de error.
-    this.eventBus.debug(`[ToolRegistryAdapter] Cannot unregister tool: ${toolName} (not supported by current implementation)`);
+    this.eventBus.debug(`[ToolRegistryAdapter] Cannot remove tool: ${name} (not supported by current implementation)`);
     return false;
   }
   
@@ -75,49 +94,35 @@ export class ToolRegistryAdapter implements IToolRegistry {
    * @param parameters Parámetros para la ejecución
    * @returns Resultado de la ejecución
    */
-  public async executeTool(toolName: string, parameters: ToolParameters): Promise<ToolExecutionResult> {
+  public async executeTool(name: string, params: Record<string, any>): Promise<ToolResult> {
     try {
-      this.eventBus.debug(`[ToolRegistryAdapter] Executing tool: ${toolName}`);
-      this.eventBus.emit('tool:executing', { toolName, parameters });
+      this.eventBus.debug(`[ToolRegistryAdapter] Executing tool: ${name}`);
+      this.eventBus.emit(EventType.TOOL_EXECUTION_STARTED, { tool: name, parameters: params });
       
       const startTime = Date.now();
-      const result = await this.toolRegistry.executeTool(toolName, parameters);
+      const result = await this.toolRegistry.executeTool(name, params);
       const duration = Date.now() - startTime;
       
-      // Convertir el resultado al formato esperado por la interfaz
-      const adaptedResult: ToolExecutionResult = {
-        success: result.success,
-        data: result.success ? result : undefined,
-        error: result.success ? undefined : result.error,
-        metadata: {
-          toolName,
-          executionTime: duration,
-          timestamp: Date.now()
-        }
-      };
+      // El resultado ya está en el formato esperado por la interfaz
+      // No necesitamos adaptarlo
       
       if (result.success) {
-        this.eventBus.debug(`[ToolRegistryAdapter] Tool executed successfully: ${toolName} (${duration}ms)`);
-        this.eventBus.emit('tool:executed', { toolName, success: true, duration });
+        this.eventBus.debug(`[ToolRegistryAdapter] Tool executed successfully: ${name} (${duration}ms)`);
+        this.eventBus.emit(EventType.TOOL_EXECUTION_COMPLETED, { tool: name, success: true, duration });
       } else {
-        this.eventBus.debug(`[ToolRegistryAdapter] Tool execution failed: ${toolName} - ${result.error}`);
-        this.eventBus.emit('tool:executed', { toolName, success: false, error: result.error });
+        this.eventBus.debug(`[ToolRegistryAdapter] Tool execution failed: ${name} - ${result.error}`);
+        this.eventBus.emit(EventType.TOOL_EXECUTION_ERROR, { tool: name, error: result.error });
       }
       
-      return adaptedResult;
+      return result;
     } catch (error: any) {
-      const errorMessage = error.message || `Unknown error executing tool: ${toolName}`;
-      this.eventBus.debug(`[ToolRegistryAdapter] Error executing tool: ${toolName} - ${errorMessage}`);
-      this.eventBus.emit('tool:executed', { toolName, success: false, error: errorMessage });
+      const errorMessage = error.message || `Unknown error executing tool: ${name}`;
+      this.eventBus.debug(`[ToolRegistryAdapter] Error executing tool: ${name} - ${errorMessage}`);
+      this.eventBus.emit(EventType.TOOL_EXECUTION_ERROR, { tool: name, error: errorMessage });
       
       return {
         success: false,
-        error: errorMessage,
-        metadata: {
-          toolName,
-          executionTime: 0,
-          timestamp: Date.now()
-        }
+        error: errorMessage
       };
     }
   }
@@ -126,11 +131,9 @@ export class ToolRegistryAdapter implements IToolRegistry {
    * Obtiene la lista de todas las herramientas disponibles
    * @returns Array con las definiciones de todas las herramientas
    */
-  public getAvailableTools(): ToolDefinition[] {
-    const tools = this.toolRegistry.getAllTools();
-    
-    // Convertir las herramientas al formato esperado por la interfaz
-    return tools.map(tool => this.convertToolToToolDefinition(tool));
+  public getAllTools(): Tool[] {
+    // Las herramientas ya están en el formato esperado por la interfaz
+    return this.toolRegistry.getAllTools();
   }
   
   /**
@@ -138,14 +141,9 @@ export class ToolRegistryAdapter implements IToolRegistry {
    * @param toolName Nombre de la herramienta
    * @returns Definición de la herramienta o undefined si no existe
    */
-  public getToolByName(toolName: string): ToolDefinition | undefined {
-    const tool = this.toolRegistry.getTool(toolName);
-    
-    if (!tool) {
-      return undefined;
-    }
-    
-    return this.convertToolToToolDefinition(tool);
+  public getTool(name: string): Tool | undefined {
+    // La herramienta ya está en el formato esperado por la interfaz
+    return this.toolRegistry.getTool(name);
   }
   
   /**
@@ -153,22 +151,9 @@ export class ToolRegistryAdapter implements IToolRegistry {
    * @param toolName Nombre de la herramienta
    * @returns true si la herramienta existe, false en caso contrario
    */
-  public hasToolByName(toolName: string): boolean {
-    return this.toolRegistry.hasTool(toolName);
+  public hasTool(name: string): boolean {
+    return this.toolRegistry.hasTool(name);
   }
   
-  /**
-   * Convierte una herramienta del formato antiguo al nuevo formato
-   * @param tool Herramienta en formato antiguo
-   * @returns Definición de la herramienta en el nuevo formato
-   */
-  private convertToolToToolDefinition(tool: Tool): ToolDefinition {
-    return {
-      name: tool.name,
-      description: tool.description,
-      execute: tool.execute,
-      parameters: tool.schema.parameters,
-      returns: tool.schema.returns
-    };
-  }
+  // Ya no necesitamos este método de conversión
 }

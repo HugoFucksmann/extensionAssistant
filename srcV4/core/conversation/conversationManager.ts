@@ -126,7 +126,8 @@ export class ConversationManager implements IConversationManager {
     
     // Si no existe en memoria activa, intentar cargar desde memoria persistente
     if (!state) {
-      state = await this.memoryManager.loadConversation(chatId);
+      const loadedState = await this.memoryManager.loadConversation(chatId);
+      state = loadedState || undefined;
     }
     
     return state || null;
@@ -161,7 +162,8 @@ export class ConversationManager implements IConversationManager {
     this.eventBus.emit(EventType.CONVERSATION_ENDED, { 
       chatId, 
       success: false,
-      canceled: true
+      // Usar metadata para almacenar información adicional
+      metadata: { canceled: true }
     });
     
     this.eventBus.debug(`[ConversationManager:${chatId}] Execution canceled`);

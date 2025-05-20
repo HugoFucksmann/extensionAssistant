@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { ToolResult } from '../types';
+import { normalizePath } from '../../utils/pathUtils';
 
 /**
  * Información de un archivo o directorio
@@ -39,16 +40,15 @@ export async function listFiles(params: {
       throw new Error(`Invalid dirPath parameter: ${JSON.stringify(dirPath)}. Expected a string.`);
     }
     
+    // Normalize the path
     let fullPath: string;
-    
-    if (relativeTo === 'workspace') {
-      const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-      if (!workspaceFolder) {
-        throw new Error(`No workspace folder found`);
+    try {
+      fullPath = normalizePath(dirPath);
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`Invalid directory path '${dirPath}': ${error.message}`);
       }
-      fullPath = path.join(workspaceFolder, dirPath);
-    } else {
-      fullPath = dirPath;
+      throw error;
     }
     
     if (!fs.existsSync(fullPath)) {

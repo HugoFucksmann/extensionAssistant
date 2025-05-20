@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { ToolResult } from '../types';
-import * as path from 'path';
+import { getFileName } from '../../utils/pathUtils';
 
 /**
  * Resultado de búsqueda
@@ -80,7 +80,7 @@ export async function searchWorkspace(params: {
           while ((match = regex.exec(line)) !== null && resultCount < maxResults) {
             results.push({
               uri: file.toString(),
-              fileName: path.basename(file.fsPath),
+fileName: getFileName(file.fsPath), // Use our utility function
               lineNumber: i + 1,
               lineText: line,
               matchText: match[0]

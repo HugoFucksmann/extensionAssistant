@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
-import * as path from 'path';
 import { ToolResult } from '../types';
+import { normalizePath, fileExists } from '../../utils/pathUtils';
 
 /**
  * Herramienta para obtener el contenido de un archivo
@@ -21,18 +21,20 @@ export async function getFileContents(params: {
     
     let fullPath: string;
     
-    if (relativeTo === 'workspace') {
-      const workspaceFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-      if (!workspaceFolder) {
-        throw new Error(`No workspace folder found`);
+    // Normalize and validate the path
+    try {
+      fullPath = normalizePath(filePath);
+      
+      // Check if file exists
+      if (!await fileExists(fullPath)) {
+        throw new Error(`File not found: ${filePath}`);
       }
-      fullPath = path.join(workspaceFolder, filePath);
-    } else {
-      fullPath = filePath;
-    }
-    
-    if (!fs.existsSync(fullPath)) {
-      throw new Error(`File not found: ${filePath}`);
+    } catch (error) {
+      // Re-throw with more context if needed
+      if (error instanceof Error) {
+        throw new Error(`Failed to access file '${filePath}': ${error.message}`);
+      }
+      throw error;
     }
     
     const content = fs.readFileSync(fullPath, 'utf-8');
