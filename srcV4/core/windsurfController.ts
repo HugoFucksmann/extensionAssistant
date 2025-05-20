@@ -5,6 +5,7 @@
 
 import * as vscode from 'vscode';
 import { VSCodeContext } from './types';
+import { WindsurfConfig, ReActNodeType } from './config';
 import { MemoryManager } from '../memory/memoryManager';
 import { PromptManager } from '../prompts/promptManager';
 import { ModelManager } from '../models/modelManager';
@@ -179,8 +180,8 @@ export class WindsurfController extends EventEmitter {
       this.activeConversations.set(chatId, state);
     } else {
       // Actualizar el estado con el nuevo mensaje
-      state.input = userMessage;
-      state.output = null; // Resetear la salida anterior
+      state.userMessage = userMessage;
+      state.finalResponse = undefined; // Resetear la salida anterior
       state.intermediateSteps = []; // Resetear los pasos intermedios
       state.metadata = {
         ...state.metadata,
@@ -310,9 +311,16 @@ export class WindsurfController extends EventEmitter {
     contextData: Record<string, any>
   ): ReActState {
     return {
-      input: userMessage,
-      output: null,
+      userMessage: userMessage,
+      finalResponse: undefined,
       intermediateSteps: [],
+      history: {
+        reasoning: [],
+        actions: [],
+        reflections: [],
+        corrections: []
+      },
+      currentNode: ReActNodeType.INITIAL_ANALYSIS,
       metadata: {
         chatId,
         userId: contextData.userId || 'anonymous',

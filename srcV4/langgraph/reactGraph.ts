@@ -39,7 +39,7 @@ export class ReActGraph {
    * @returns Resultado de la ejecución del grafo
    */
   async runGraph(initialState: ReActState): Promise<ReActGraphResult> {
-    console.log(`[ReActGraph] Starting graph execution with input: "${initialState.input.substring(0, 50)}..."`);
+    console.log(`[ReActGraph] Starting graph execution with input: "${initialState.userMessage.substring(0, 50)}..."`);
     
     // Extraer el chatId de los metadatos para los eventos
     const chatId = initialState.metadata.chatId || 'unknown';
@@ -89,7 +89,7 @@ export class ReActGraph {
       
     } catch (error: any) {
       console.error('[ReActGraph] Error during graph execution:', error);
-      state.output = `Lo siento, ocurrió un error durante el procesamiento: ${error.message}`;
+      state.finalResponse = `Lo siento, ocurrió un error durante el procesamiento: ${error.message}`;
       
       // Emitir evento de error
       this.eventEmitter.emit(WindsurfEvents.ERROR_OCCURRED, { 
@@ -109,10 +109,10 @@ export class ReActGraph {
     console.log(`[ReActGraph] Graph execution completed in ${duration}ms, nodes visited: ${nodeVisits.join(' -> ')}`);
     
     // Emitir evento de respuesta generada
-    if (state.output) {
+    if (state.finalResponse) {
       this.eventEmitter.emit(WindsurfEvents.RESPONSE_GENERATED, {
         chatId,
-        response: state.output,
+        response: state.finalResponse,
         metadata: {
           duration,
           nodeVisits,
@@ -123,8 +123,8 @@ export class ReActGraph {
     
     // Devolver el resultado
     return {
-      input: state.input,
-      output: state.output,
+      input: state.userMessage,
+      output: state.finalResponse || null,
       intermediateSteps: state.intermediateSteps,
       metadata: state.metadata,
       executionInfo: {
@@ -154,7 +154,7 @@ export class ReActGraph {
       // Preparar el prompt para el análisis
       const prompt = `Analiza el siguiente mensaje del usuario y determina su intención:
       
-      Mensaje: ${state.input}
+      Mensaje: ${state.userMessage}
       
       Contexto del editor: ${JSON.stringify(editorContext)}
       Contexto del proyecto: ${JSON.stringify(projectContext)}
@@ -183,7 +183,7 @@ export class ReActGraph {
       return addIntermediateStep(
         state,
         'analyze',
-        { input: state.input },
+        { input: state.userMessage },
         analysis
       );
     } catch (error: any) {
@@ -193,7 +193,7 @@ export class ReActGraph {
       return addIntermediateStep(
         state,
         'analyze',
-        { input: state.input },
+        { input: state.userMessage },
         { error: error.message }
       );
     }
@@ -219,7 +219,7 @@ export class ReActGraph {
       // Preparar el prompt para la planificación
       const prompt = `Basado en el análisis previo, genera un plan detallado para resolver la solicitud del usuario:
       
-      Mensaje del usuario: ${state.input}
+      Mensaje del usuario: ${state.userMessage}
       
       Análisis: ${JSON.stringify(analysis)}
       
@@ -256,7 +256,7 @@ export class ReActGraph {
       return addIntermediateStep(
         state,
         'reason',
-        { input: state.input, analysis },
+        { input: state.userMessage, analysis },
         reasoning
       );
     } catch (error: any) {
@@ -266,7 +266,7 @@ export class ReActGraph {
       return addIntermediateStep(
         state,
         'reason',
-        { input: state.input },
+        { input: state.userMessage },
         { error: error.message }
       );
     }
@@ -400,7 +400,7 @@ export class ReActGraph {
       // Preparar el prompt para la reflexión
       const prompt = `Reflexiona sobre los resultados de las acciones ejecutadas:
       
-      Mensaje del usuario: ${state.input}
+      Mensaje del usuario: ${state.userMessage}
       
       Plan original: ${JSON.stringify(reasoning)}
       
@@ -499,7 +499,7 @@ export class ReActGraph {
       // Preparar el prompt para la generación de la respuesta
       const prompt = `Genera una respuesta clara y concisa para el usuario basada en los siguientes resultados:
       
-      Mensaje del usuario: ${state.input}
+      Mensaje del usuario: ${state.userMessage}
       
       Análisis: ${JSON.stringify(analysis)}
       
@@ -540,7 +540,7 @@ export class ReActGraph {
       // Retornar el estado actualizado con la respuesta final
       return {
         ...state,
-        output: finalResponse
+        finalResponse: finalResponse
       };
     } catch (error: any) {
       console.error('[ReActGraph] Error generating response:', error);
@@ -550,7 +550,7 @@ export class ReActGraph {
       
       return {
         ...state,
-        output: errorResponse
+        finalResponse: errorResponse
       };
     }
   }

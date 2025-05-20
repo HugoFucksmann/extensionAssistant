@@ -15,15 +15,17 @@ import {
 import { ToolRegistry } from '../tools/toolRegistry';
 import { PromptManager } from '../prompts/promptManager';
 import { ModelManager } from '../models/modelManager';
-import { StateGraph } from '@langchain/langgraph';
-import { END } from '@langchain/langgraph/dist/constants';
+// Importar desde @langchain/langgraph usando require para evitar errores de tipado
+const { StateGraph } = require('@langchain/langgraph');
+const { END } = require('@langchain/langgraph/dist/constants');
+import { RunnableLambda } from '@langchain/core/runnables';
 
 /**
  * Implementa el grafo de estados para el ciclo ReAct de Windsurf
  * Utiliza LangGraph para definir los nodos y transiciones del grafo
  */
 export class WindsurfGraph {
-  private graph: StateGraph<WindsurfState>;
+  private graph: any; // Usar any para evitar errores de tipado con StateGraph
   private modelManager: ModelManager;
   private toolRegistry: ToolRegistry;
   private promptManager: PromptManager;
@@ -47,7 +49,7 @@ export class WindsurfGraph {
    * Construye el grafo de estados para el ciclo ReAct
    * Define los nodos y las transiciones entre ellos
    */
-  private buildGraph(): StateGraph<WindsurfState> {
+  private buildGraph(): any { // Usar any para evitar errores de tipado con StateGraph
     // Definir los nodos del grafo (estados)
     const states = {
       // Nodo de análisis inicial - solo se ejecuta una vez al principio
@@ -67,8 +69,16 @@ export class WindsurfGraph {
     };
     
     // Crear el grafo
-    const graph = new StateGraph<WindsurfState>({
-      channels: {}
+    const graph = new StateGraph({
+      channels: {
+        objective: (state: WindsurfState) => state.objective,
+        userMessage: (state: WindsurfState) => state.userMessage,
+        chatId: (state: WindsurfState) => state.chatId,
+        iterationCount: (state: WindsurfState) => state.iterationCount,
+        completionStatus: (state: WindsurfState) => state.completionStatus,
+        history: (state: WindsurfState) => state.history,
+        maxIterations: (state: WindsurfState) => state.maxIterations
+      }
     });
     
     // Añadir los nodos al grafo
@@ -79,72 +89,62 @@ export class WindsurfGraph {
     graph.addNode("correction", this.correctionNode());
     
     // Definir las transiciones entre estados
-    graph.addEdge({
-      from: "__start__",
-      to: "initialAnalysis"
-    });
+    // Usar el método addEdge con el formato correcto según la API de LangGraph
     
-    graph.addEdge({
-      from: "initialAnalysis",
-      to: "reasoning"
-    });
+    // Del inicio al análisis inicial
+    graph.setEntryPoint("initialAnalysis");
     
-    // Del razonamiento siempre vamos a la acción
-    graph.addEdge({
-      from: "reasoning",
-      to: "action"
-    });
+    // Del análisis inicial al razonamiento
+    graph.addEdge([
+      {
+        source: "initialAnalysis",
+        target: "reasoning",
+      }
+    ]);
     
-    // De la acción siempre vamos a la reflexión
-    graph.addEdge({
-      from: "action",
-      to: "reflection"
-    });
+    // Del razonamiento a la acción
+    graph.addEdge([
+      {
+        source: "reasoning",
+        target: "action",
+      }
+    ]);
     
-    // De la reflexión podemos ir a la corrección o volver al razonamiento
-    graph.addEdge({
-      from: "reflection",
-      to: "correction",
-      condition: (state: WindsurfState) => state.reflectionResult?.needsCorrection === true
-    });
+    // De la acción a la reflexión
+    graph.addEdge([
+      {
+        source: "action",
+        target: "reflection",
+      }
+    ]);
     
-    graph.addEdge({
-      from: "reflection",
-      to: END,
-      condition: (state: WindsurfState) => {
-        return (
+    // De la reflexión a la corrección (condicional)
+    graph.addConditionalEdges(
+      "reflection",
+      (state: WindsurfState) => {
+        if (state.reflectionResult?.needsCorrection === true) {
+          return "correction";
+        } else if (
           state.actionResult?.toolName === "respond" && 
           state.actionResult?.success === true &&
           state.reflectionResult?.isSuccessful === true
-        );
+        ) {
+          return "__end__";
+        } else if (state.iterationCount >= state.maxIterations) {
+          return "__end__";
+        } else {
+          return "reasoning";
+        }
       }
-    });
+    );
     
-    graph.addEdge({
-      from: "reflection",
-      to: END,
-      condition: (state: WindsurfState) => state.iterationCount >= state.maxIterations
-    });
-    
-    graph.addEdge({
-      from: "reflection",
-      to: "reasoning",
-      condition: (state: WindsurfState) => {
-        return (
-          !state.reflectionResult?.needsCorrection &&
-          !(state.actionResult?.toolName === "respond" && 
-            state.actionResult?.success &&
-            state.reflectionResult?.isSuccessful) &&
-          !(state.iterationCount >= state.maxIterations)
-        );
+    // De la corrección al razonamiento
+    graph.addEdge([
+      {
+        source: "correction",
+        target: "reasoning",
       }
-    });
-    
-    // De la corrección siempre volvemos al razonamiento
-    graph.addEdge({
-      from: "correction",
-      to: "reasoning"
-    });
+    ]);
     
     return graph;
   }
@@ -154,39 +154,37 @@ export class WindsurfGraph {
    * Analiza el mensaje del usuario para determinar el objetivo y entidades relevantes
    */
   private initialAnalysisNode() {
-    return step<WindsurfState>(async (state) => {
+    return new RunnableLambda({
+      func: async (state: WindsurfState) => {
       console.log(`[WindsurfGraph:${state.chatId}] Initial analysis`);
       
       // Obtener el prompt para el análisis inicial
       const prompt = this.promptManager.getPrompt('initialAnalysis');
       
-      // Invocar el modelo con el prompt y el mensaje del usuario
-      const response = await this.modelManager.generateResponse(prompt, {
-        userMessage: state.userMessage,
-        chatId: state.chatId,
-        projectContext: state.projectContext
-      });
+      // Invocar el modelo con el prompt y el estado actual
+      const response = await this.modelManager.generateResponse(prompt, state);
       
-      // Parsear la respuesta
+      // Parsear la respuesta como InitialAnalysisResult
       const analysisResult = JSON.parse(response);
       
       // Actualizar el estado con el resultado del análisis
       return {
         ...state,
-        objective: analysisResult.objective,
-        extractedEntities: analysisResult.extractedEntities,
-        intent: analysisResult.intent,
+        objective: analysisResult.objective || state.objective,
+        entities: analysisResult.entities || [],
+        context: analysisResult.context || {},
         history: [
           ...state.history,
           {
-            phase: 'initialAnalysis',
+            phase: 'analysis',
             timestamp: Date.now(),
             data: analysisResult,
-            iteration: 0
+            iteration: state.iterationCount
           }
         ]
       };
-    });
+    }
+  });
   }
   
   /**
@@ -194,7 +192,8 @@ export class WindsurfGraph {
    * Analiza el estado actual y planifica los próximos pasos
    */
   private reasoningNode() {
-    return step<WindsurfState>(async (state) => {
+    return new RunnableLambda({
+      func: async (state: WindsurfState) => {
       console.log(`[WindsurfGraph:${state.chatId}] Reasoning (iteration ${state.iterationCount})`);
       
       // Incrementar el contador de iteraciones
@@ -226,7 +225,8 @@ export class WindsurfGraph {
           }
         ]
       };
-    });
+    }
+  });
   }
   
   /**
@@ -234,25 +234,34 @@ export class WindsurfGraph {
    * Ejecuta la herramienta seleccionada en la fase de razonamiento
    */
   private actionNode() {
-    return step<WindsurfState>(async (state) => {
+    return new RunnableLambda({
+      func: async (state: WindsurfState) => {
       if (!state.reasoningResult?.nextAction) {
         throw new Error('No next action specified in reasoning result');
       }
       
-      const { toolName, params } = state.reasoningResult.nextAction;
-      console.log(`[WindsurfGraph:${state.chatId}] Action: ${toolName}`);
+      console.log(`[WindsurfGraph:${state.chatId}] Action: ${state.reasoningResult.nextAction.toolName}`);
       
+      // Extraer la herramienta y los parámetros
+      const { toolName, params } = state.reasoningResult.nextAction;
+      
+      // Verificar si la herramienta existe
+      if (!this.toolRegistry.hasTool(toolName)) {
+        throw new Error(`Tool not found: ${toolName}`);
+      }
+      
+      // Ejecutar la herramienta
       let actionResult: ActionResult;
       
       try {
-        // Obtener la herramienta del registro
+        // Obtener la herramienta
         const tool = this.toolRegistry.getTool(toolName);
         
         if (!tool) {
           throw new Error(`Tool not found: ${toolName}`);
         }
         
-        // Ejecutar la herramienta
+        // Ejecutar la herramienta con los parámetros
         const result = await tool.execute(params);
         
         // Crear el resultado exitoso
@@ -263,13 +272,13 @@ export class WindsurfGraph {
           result,
           timestamp: Date.now()
         };
-      } catch (error) {
+      } catch (error: unknown) {
         // Crear el resultado fallido
         actionResult = {
           toolName,
           params,
           success: false,
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
           timestamp: Date.now()
         };
         
@@ -290,7 +299,8 @@ export class WindsurfGraph {
           }
         ]
       };
-    });
+    }
+  });
   }
   
   /**
@@ -298,7 +308,8 @@ export class WindsurfGraph {
    * Evalúa el resultado de la acción y determina si fue exitoso
    */
   private reflectionNode() {
-    return step<WindsurfState>(async (state) => {
+    return new RunnableLambda({
+      func: async (state: WindsurfState) => {
       console.log(`[WindsurfGraph:${state.chatId}] Reflection`);
       
       // Obtener el prompt para la reflexión
@@ -328,7 +339,8 @@ export class WindsurfGraph {
           }
         ]
       };
-    });
+    }
+  });
   }
   
   /**
@@ -336,7 +348,8 @@ export class WindsurfGraph {
    * Corrige el plan si la reflexión determinó que es necesario
    */
   private correctionNode() {
-    return step<WindsurfState>(async (state) => {
+    return new RunnableLambda({
+      func: async (state: WindsurfState) => {
       console.log(`[WindsurfGraph:${state.chatId}] Correction`);
       
       // Si no necesita corrección, simplemente devolver el estado actual
@@ -370,7 +383,8 @@ export class WindsurfGraph {
           }
         ]
       };
-    });
+    }
+  });
   }
   
   /**
@@ -382,17 +396,18 @@ export class WindsurfGraph {
       const compiledGraph = this.graph.compile();
       
       // Ejecutar el grafo con el estado inicial
-      const result = await compiledGraph.invoke(initialState);
+      // Usar el método invoke con un objeto que cumpla con la estructura esperada
+      const result = await compiledGraph.invoke(initialState) as WindsurfState;
       
       return result;
-    } catch (error) {
+    } catch (error: unknown) {
       console.error(`[WindsurfGraph:${initialState.chatId}] Error running graph:`, error);
       
       // Devolver el estado inicial con un estado de error
       return {
         ...initialState,
         completionStatus: 'failed',
-        error: error.message
+        error: error instanceof Error ? error.message : String(error)
       };
     }
   }
