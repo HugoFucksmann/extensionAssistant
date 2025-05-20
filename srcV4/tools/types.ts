@@ -1,25 +1,32 @@
 /**
  * Tipos básicos para las herramientas de Windsurf
+ * Importados desde core/types.ts para mantener una definición centralizada
  */
 
+import { Tool, ToolResult, ParameterDefinition } from '../core/types';
+
+// Re-exportar los tipos para mantener compatibilidad con código existente
+export { Tool, ToolResult, ParameterDefinition };
+
+// Tipos adicionales específicos para herramientas
+
 /**
- * Resultado genérico de una herramienta
+ * Tipo para los parámetros de las herramientas de sistema de archivos
  */
-export interface ToolResult<T = any> {
-  success: boolean;
-  data?: T;
-  error?: string;
+export interface FileSystemParams {
+  filePath: string;
+  relativeTo?: 'workspace' | 'absolute';
+  content?: string;
+  createIfNotExists?: boolean;
 }
 
 /**
- * Definición de una herramienta
+ * Tipo para los parámetros de las herramientas de editor
  */
-export interface Tool<P = any, R = any> {
-  name: string;
-  description: string;
-  execute: (params: P) => Promise<ToolResult<R>>;
-  schema: {
-    parameters: Record<string, any>;
-    returns: Record<string, any>;
-  };
+export interface EditorParams {
+  documentUri?: string;
+  edits?: Array<{
+    range: { start: { line: number, character: number }, end: { line: number, character: number } };
+    text: string;
+  }>;
 }

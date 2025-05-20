@@ -87,7 +87,7 @@ const webviewConfig = {
   ...baseConfig,
   target: "web",
   entry: {
-    webview: "./srcV3/ui/react/webview.jsx",
+    webview: "./srcV4/ui/react/webview.jsx",
   },
   output: {
     path: path.resolve(__dirname, "out"),

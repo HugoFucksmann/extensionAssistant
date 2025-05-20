@@ -42,13 +42,6 @@ Responde en formato JSON:
     {"type": "observation/learning/warning", "content": "Descripción del insight"}
   ]
 }
-`;
+`}) ;
 
-export const reflectionPrompt = new PromptTemplate({
-  template,
-  inputVariables: [
-    'actionResult', 
-    'objective', 
-    'reasoningResult'
-  ]
-});
+

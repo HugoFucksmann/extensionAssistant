@@ -1,8 +1,27 @@
 // src/ui/context/VSCodeContext.tsx
-import React, { createContext, useState, useEffect, useContext, useMemo } from 'react';
-import { Chat, ChatMessage } from '../../../store/interfaces/entities';
+import React, { createContext, useState, useContext, useEffect, useMemo } from 'react';
+import { ChatMessage, PerformanceMetrics } from '../../../store/interfaces/entities';
 import { ThemeType } from '../theme/theme';
 import { getTheme } from '../theme/theme';
+
+// Interfaz para chat
+export interface Chat {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+// Importamos las interfaces desde entities.ts pero renombramos para evitar conflictos
+import { 
+  ToolExecution as ToolExecutionEntity, 
+  ProcessingStatus as ProcessingStatusEntity 
+} from '../../../store/interfaces/entities';
+
+// Usamos los tipos importados
+export type ToolExecution = ToolExecutionEntity;
+export type ProcessingStatus = ProcessingStatusEntity;
 
 interface VSCodeContextType {
   messages: ChatMessage[];
@@ -16,6 +35,11 @@ interface VSCodeContextType {
   theme: ThemeType;
   isDarkMode: boolean;
   toggleTheme: () => void;
+  // Estado de procesamiento para mostrar pasos intermedios
+  processingStatus: ProcessingStatus;
+  // Métodos para interactuar con herramientas
+  executeToolManually: (toolName: string, parameters: Record<string, any>) => void;
+  cancelToolExecution: (toolName: string) => void;
 }
 
 declare global {
@@ -43,6 +67,12 @@ export const VSCodeProvider = ({ children }: { children: React.ReactNode }) => {
   const [isLoading, setLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  // Estado de procesamiento para mostrar pasos intermedios
+  const [processingStatus, setProcessingStatus] = useState<ProcessingStatus>({
+    phase: '',
+    status: 'inactive',
+    tools: []
+  });
 
   const theme = useMemo(() => getTheme(isDarkMode), [isDarkMode]);
 
@@ -74,6 +104,23 @@ export const VSCodeProvider = ({ children }: { children: React.ReactNode }) => {
     setIsDarkMode(newMode);
     window.vscode.postMessage({ type: 'setThemePreference', isDarkMode: newMode });
   };
+  
+  // Método para ejecutar una herramienta manualmente
+  const executeToolManually = (toolName: string, parameters: Record<string, any>) => {
+    postMessage('command', {
+      command: 'executeTool',
+      tool: toolName,
+      parameters
+    });
+  };
+  
+  // Método para cancelar la ejecución de una herramienta
+  const cancelToolExecution = (toolName: string) => {
+    postMessage('command', {
+      command: 'cancelToolExecution',
+      tool: toolName
+    });
+  };
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent<any>) => {
@@ -88,6 +135,12 @@ export const VSCodeProvider = ({ children }: { children: React.ReactNode }) => {
             timestamp: Date.now()
           }]);
           setLoading(false);
+          // Resetear el estado de procesamiento
+          setProcessingStatus({
+            phase: '',
+            status: 'inactive',
+            tools: []
+          });
           break;
           
         case 'modelChanged':
@@ -118,10 +171,68 @@ export const VSCodeProvider = ({ children }: { children: React.ReactNode }) => {
             timestamp: Date.now()
           }]);
           setLoading(false);
+          // Actualizar el estado de procesamiento para mostrar el error
+          setProcessingStatus(prev => ({
+            ...prev,
+            status: 'inactive',
+            phase: 'error'
+          }));
           break;
 
         case 'themeChanged':
           setIsDarkMode(payload.isDarkMode);
+          break;
+          
+        // Nuevos tipos de mensajes para el seguimiento de progreso
+        case 'processingUpdate':
+          setProcessingStatus(prev => ({
+            ...prev,
+            phase: payload.phase || prev.phase,
+            status: payload.status === 'started' ? 'active' : 
+                   payload.status === 'completed' ? 'completed' : prev.status
+          }));
+          break;
+          
+        case 'toolExecutionUpdate':
+          setProcessingStatus(prev => {
+            // Buscar si la herramienta ya existe en el array
+            const toolIndex = prev.tools.findIndex(t => t.name === payload.tool);
+            const updatedTools = [...prev.tools];
+            
+            if (toolIndex >= 0) {
+              // Actualizar herramienta existente
+              updatedTools[toolIndex] = {
+                ...updatedTools[toolIndex],
+                status: payload.status,
+                ...(payload.status === 'completed' && { endTime: Date.now(), result: payload.result }),
+                ...(payload.status === 'error' && { endTime: Date.now(), error: payload.error })
+              };
+            } else if (payload.status === 'started') {
+              // Añadir nueva herramienta
+              updatedTools.push({
+                name: payload.tool,
+                status: 'started',
+                startTime: Date.now(),
+                parameters: payload.parameters
+              });
+            }
+            
+            return {
+              ...prev,
+              tools: updatedTools
+            };
+          });
+          break;
+          
+        case 'processingFinished':
+          // No resetear inmediatamente para permitir ver el estado final
+          setTimeout(() => {
+            setProcessingStatus({
+              phase: '',
+              status: 'inactive',
+              tools: []
+            });
+          }, 2000);
           break;
       }
     };
@@ -148,7 +259,10 @@ export const VSCodeProvider = ({ children }: { children: React.ReactNode }) => {
       loadChat,
       theme,
       isDarkMode,
-      toggleTheme
+      toggleTheme,
+      processingStatus,
+      executeToolManually,
+      cancelToolExecution
     }}>
       {children}
     </VSCodeContext.Provider>

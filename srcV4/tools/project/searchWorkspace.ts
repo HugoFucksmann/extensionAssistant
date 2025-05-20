@@ -42,7 +42,7 @@ export async function searchWorkspace(params: {
     }
     
     // Crear opciones de búsqueda
-    const options: vscode.FindTextInFilesOptions = {
+    const options: vscode.FindInFilesOptions = {
       maxResults,
       useDefaultExcludeSettingAndIgnoreFiles: true
     };

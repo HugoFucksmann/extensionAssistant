@@ -42,7 +42,7 @@ Corrige el plan para abordar el problema detectado:
 # FORMATO DE RESPUESTA
 Devuelve tu corrección en formato JSON con la siguiente estructura:
 
-```json
+
 {
   "rootCause": "Análisis detallado de la causa raíz del problema",
   "solution": "Descripción clara de la solución propuesta",
@@ -59,7 +59,7 @@ Devuelve tu corrección en formato JSON con la siguiente estructura:
     "expectedOutcome": "Lo que esperas obtener de esta acción"
   }
 }
-```
+
 
 Asegúrate de que tu solución aborde directamente la causa raíz del problema y que la siguiente acción sea específica y ejecutable.
 `,

@@ -1,11 +1,47 @@
 // ui/Components/ChatMessages/styles.js
 export const styles = {
   container: {
-    display: "flex",
-    flexDirection: "column",
-    height: "100%",
-    padding: "10px",
-    overflow: "hidden", // Prevent container from scrolling
+    display: 'flex',
+    flexDirection: 'column',
+    flex: 1,
+    overflow: 'hidden',
+    height: '100%',
+  },
+  
+  // Estilos para la información de herramientas ejecutadas
+  toolsInfoContainer: {
+    marginTop: '12px',
+    padding: '8px',
+    backgroundColor: 'var(--vscode-editor-inactiveSelectionBackground)',
+    borderRadius: '4px',
+    border: '1px solid var(--vscode-panel-border)',
+  },
+  
+  toolsInfoHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    cursor: 'pointer',
+    padding: '4px 0',
+  },
+  
+  toolsInfoTitle: {
+    fontSize: '12px',
+    fontWeight: '500',
+    color: 'var(--vscode-descriptionForeground)',
+  },
+  
+  toolsInfoToggle: {
+    fontSize: '11px',
+    color: 'var(--vscode-button-foreground)',
+  },
+  
+  toolsInfoContent: {
+    marginTop: '8px',
+    padding: '8px',
+    backgroundColor: 'var(--vscode-editor-background)',
+    borderRadius: '4px',
+    border: '1px solid var(--vscode-panel-border)',
   },
   virtualListContainer: {
     height: "100%",

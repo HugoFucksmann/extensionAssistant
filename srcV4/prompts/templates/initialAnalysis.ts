@@ -42,7 +42,7 @@ Analiza el mensaje del usuario y extrae:
 # FORMATO DE RESPUESTA
 Devuelve tu análisis en formato JSON con la siguiente estructura:
 
-```json
+
 {
   "intent": "Descripción clara de la intención principal del usuario",
   "objectives": [
@@ -61,7 +61,7 @@ Devuelve tu análisis en formato JSON con la siguiente estructura:
   },
   "confidence": 0.9
 }
-`;
+
 
 Asegúrate de que tu análisis sea completo, preciso y útil para planificar cómo ayudar al usuario.
 `,

@@ -1,0 +1,329 @@
+/* Estilos generales */
+:root {
+  --primary-color: #0078d4;
+  --secondary-color: #2b88d8;
+  --background-color: #f5f5f5;
+  --text-color: #333;
+  --border-color: #ddd;
+  --success-color: #107c10;
+  --error-color: #d13438;
+  --warning-color: #ffb900;
+  --info-color: #0078d4;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: var(--background-color);
+  color: var(--text-color);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Contenedor principal */
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* Contenedor del chat */
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+/* Mensajes */
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.message {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  max-width: 80%;
+  word-break: break-word;
+}
+
+.message.user {
+  align-self: flex-end;
+  background-color: var(--primary-color);
+  color: white;
+}
+
+.message.assistant {
+  align-self: flex-start;
+  background-color: white;
+  border: 1px solid var(--border-color);
+}
+
+/* Contenedor de entrada */
+.input-container {
+  display: flex;
+  padding: 1rem;
+  border-top: 1px solid var(--border-color);
+  background-color: white;
+}
+
+#userInput {
+  flex: 1;
+  padding: 0.75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  resize: none;
+  font-family: inherit;
+  font-size: 14px;
+  min-height: 40px;
+  max-height: 120px;
+}
+
+#sendButton {
+  margin-left: 0.5rem;
+  padding: 0.5rem 1rem;
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+#sendButton:hover {
+  background-color: var(--secondary-color);
+}
+
+#sendButton:disabled {
+  background-color: var(--border-color);
+  cursor: not-allowed;
+}
+
+/* Contenedor de procesamiento */
+.processing-container {
+  background-color: white;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  margin: 0.5rem 1rem;
+  padding: 1rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.processing-container.hidden {
+  display: none;
+}
+
+.processing-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.processing-title {
+  font-weight: 600;
+  font-size: 16px;
+}
+
+.processing-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(0, 120, 212, 0.2);
+  border-top-color: var(--primary-color);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Fases del ciclo ReAct */
+.processing-phases {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.phase {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  padding: 0.5rem;
+  border-radius: 4px;
+  background-color: #f9f9f9;
+  margin: 0 0.25rem;
+  position: relative;
+}
+
+.phase.active {
+  background-color: rgba(0, 120, 212, 0.1);
+}
+
+.phase.completed {
+  background-color: rgba(16, 124, 16, 0.1);
+}
+
+.phase-icon {
+  font-size: 24px;
+  margin-bottom: 0.25rem;
+}
+
+.phase-name {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.phase-status {
+  font-size: 10px;
+  color: #666;
+  margin-top: 0.25rem;
+}
+
+.phase.active .phase-status::after {
+  content: "En progreso";
+  color: var(--primary-color);
+}
+
+.phase.completed .phase-status::after {
+  content: "Completado";
+  color: var(--success-color);
+}
+
+/* Herramientas en ejecución */
+.tool-execution {
+  margin-top: 1rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.tool-execution h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.tools-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.tool-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem;
+  border-radius: 4px;
+  background-color: #f9f9f9;
+  border-left: 3px solid var(--primary-color);
+}
+
+.tool-item.completed {
+  border-left-color: var(--success-color);
+}
+
+.tool-item.error {
+  border-left-color: var(--error-color);
+}
+
+.tool-name {
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.tool-status {
+  font-size: 12px;
+  color: #666;
+}
+
+.tool-details {
+  margin-top: 0.5rem;
+  font-size: 12px;
+  background-color: #f0f0f0;
+  padding: 0.5rem;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  max-height: 100px;
+  overflow-y: auto;
+}
+
+/* Mensajes de error */
+.error-message {
+  background-color: rgba(209, 52, 56, 0.1);
+  border-left: 3px solid var(--error-color);
+  color: var(--error-color);
+  padding: 0.75rem;
+  margin: 0.5rem 0;
+  border-radius: 4px;
+}
+
+/* Estilos para código */
+pre {
+  background-color: #f0f0f0;
+  padding: 0.75rem;
+  border-radius: 4px;
+  overflow-x: auto;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 13px;
+}
+
+code {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  background-color: #f0f0f0;
+  padding: 0.2rem 0.4rem;
+  border-radius: 3px;
+  font-size: 13px;
+}
+
+/* Adaptaciones para tema oscuro */
+.vscode-dark {
+  --background-color: #1e1e1e;
+  --text-color: #e0e0e0;
+  --border-color: #3e3e3e;
+}
+
+.vscode-dark .message.assistant {
+  background-color: #2d2d2d;
+  border-color: #3e3e3e;
+}
+
+.vscode-dark .processing-container,
+.vscode-dark .input-container {
+  background-color: #252525;
+  border-color: #3e3e3e;
+}
+
+.vscode-dark .phase,
+.vscode-dark .tool-item {
+  background-color: #333;
+}
+
+.vscode-dark .phase.active {
+  background-color: rgba(0, 120, 212, 0.2);
+}
+
+.vscode-dark .phase.completed {
+  background-color: rgba(16, 124, 16, 0.2);
+}
+
+.vscode-dark pre,
+.vscode-dark code {
+  background-color: #1a1a1a;
+}
+
+.vscode-dark .tool-details {
+  background-color: #2a2a2a;
+}

@@ -33,7 +33,7 @@ Desarrolla un plan detallado para resolver la tarea del usuario:
 # FORMATO DE RESPUESTA
 Devuelve tu plan en formato JSON con la siguiente estructura:
 
-```json
+
 {
   "plan": "Descripción general del enfoque que tomarás para resolver la tarea",
   "steps": [
@@ -51,7 +51,7 @@ Devuelve tu plan en formato JSON con la siguiente estructura:
     "expectedOutcome": "Lo que esperas obtener de esta acción"
   }
 }
-`;
+`});
 
 export const reasoningPrompt = new PromptTemplate({
   template,

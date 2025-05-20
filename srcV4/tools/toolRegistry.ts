@@ -4,7 +4,7 @@
  */
 
 import * as vscode from 'vscode';
-import { Tool, ToolResult } from './types';
+import { Tool, ToolResult, ParameterDefinition } from '../core/types';
 
 // Importar herramientas de sistema de archivos
 import { getFileContents } from './filesystem/getFileContents';
@@ -21,6 +21,9 @@ import { getProjectInfo } from './project/getProjectInfo';
 
 // Importar herramienta de respuesta
 import { respond } from './core/respond';
+
+// Importar EventEmitter3 para el bus de eventos
+import EventEmitter from 'eventemitter3';
 
 /**
  * Registro central de herramientas para el agente Windsurf
@@ -145,12 +148,37 @@ export class ToolRegistry {
    * @param schema Esquema de la herramienta
    */
   registerTool(name: string, tool: any, description: string, schema: any): void {
+    // Convertir el esquema al nuevo formato si es necesario
+    const formattedSchema = {
+      parameters: this.formatSchemaParameters(schema.parameters || {}),
+      returns: schema.returns || {}
+    };
+    
     this.tools.set(name, {
       name,
       description,
       execute: tool,
-      schema
+      schema: formattedSchema
     });
+  }
+  
+  /**
+   * Convierte los parámetros del esquema al nuevo formato
+   * @param params Parámetros en formato antiguo
+   * @returns Parámetros en formato ParameterDefinition
+   */
+  private formatSchemaParameters(params: Record<string, string>): Record<string, ParameterDefinition> {
+    const result: Record<string, ParameterDefinition> = {};
+    
+    for (const [key, description] of Object.entries(params)) {
+      result[key] = {
+        type: 'string', // Por defecto, asumimos string
+        description,
+        required: !key.endsWith('?') // Si el nombre termina con ?, no es requerido
+      };
+    }
+    
+    return result;
   }
 
   /**
@@ -203,6 +231,146 @@ export class ToolRegistry {
       };
     }
     
-    return description;
+    try {
+      // Validar los parámetros requeridos
+      this.validateToolParameters(tool, params);
+      
+      // Ejecutar la herramienta
+      const result = await tool.execute(params);
+      return result;
+    } catch (error: any) {
+      console.error(`[ToolRegistry] Error executing tool ${name}:`, error);
+      return {
+        success: false,
+        error: error.message || `Error executing tool: ${name}`
+      };
+    }
+  }
+  
+  /**
+   * Valida que los parámetros cumplan con el esquema definido
+   * @param tool Herramienta a validar
+   * @param params Parámetros proporcionados
+   */
+  private validateToolParameters(tool: Tool, params: any): void {
+    // Validar que todos los parámetros requeridos estén presentes
+    const requiredParams = Object.entries(tool.schema.parameters)
+      .filter(([_, def]) => def.required)
+      .map(([name]) => name);
+    
+    const missingParams = requiredParams.filter(param => !(param in params));
+    
+    if (missingParams.length > 0) {
+      throw new Error(`Missing required parameters for tool ${tool.name}: ${missingParams.join(', ')}`);
+    }
+    
+    // Validar el tipo y formato de cada parámetro proporcionado
+    const validationErrors: string[] = [];
+    
+    for (const [paramName, paramValue] of Object.entries(params)) {
+      // Verificar si el parámetro está definido en el esquema
+      const paramDef = tool.schema.parameters[paramName];
+      if (!paramDef) {
+        validationErrors.push(`Unknown parameter: ${paramName}`);
+        continue;
+      }
+      
+      // Validar el tipo de dato
+      if (paramValue !== null && paramValue !== undefined) {
+        const validationError = this.validateParameterType(paramName, paramValue, paramDef);
+        if (validationError) {
+          validationErrors.push(validationError);
+        }
+      }
+    }
+    
+    // Si hay errores de validación, lanzar una excepción con todos los errores
+    if (validationErrors.length > 0) {
+      throw new Error(`Parameter validation failed for tool ${tool.name}:\n${validationErrors.join('\n')}`);
+    }
+  }
+  
+  /**
+   * Valida el tipo de un parámetro según su definición
+   * @param paramName Nombre del parámetro
+   * @param paramValue Valor del parámetro
+   * @param paramDef Definición del parámetro
+   * @returns Mensaje de error o null si es válido
+   */
+  private validateParameterType(paramName: string, paramValue: any, paramDef: ParameterDefinition): string | null {
+    const { type, enum: enumValues } = paramDef;
+    
+    // Validar tipo básico
+    switch (type) {
+      case 'string':
+        if (typeof paramValue !== 'string') {
+          return `Parameter ${paramName} must be a string, got ${typeof paramValue}`;
+        }
+        break;
+        
+      case 'number':
+        if (typeof paramValue !== 'number' || isNaN(paramValue)) {
+          return `Parameter ${paramName} must be a number, got ${typeof paramValue}`;
+        }
+        break;
+        
+      case 'boolean':
+        if (typeof paramValue !== 'boolean') {
+          return `Parameter ${paramName} must be a boolean, got ${typeof paramValue}`;
+        }
+        break;
+        
+      case 'array':
+        if (!Array.isArray(paramValue)) {
+          return `Parameter ${paramName} must be an array, got ${typeof paramValue}`;
+        }
+        break;
+        
+      case 'object':
+        if (typeof paramValue !== 'object' || paramValue === null || Array.isArray(paramValue)) {
+          return `Parameter ${paramName} must be an object, got ${Array.isArray(paramValue) ? 'array' : typeof paramValue}`;
+        }
+        break;
+    }
+    
+    // Validar valores enuméricos si están definidos
+    if (enumValues && Array.isArray(enumValues) && enumValues.length > 0) {
+      if (!enumValues.includes(paramValue)) {
+        return `Parameter ${paramName} must be one of: ${enumValues.join(', ')}, got: ${paramValue}`;
+      }
+    }
+    
+    // Validar mínimo y máximo para números
+    if (type === 'number') {
+      if (paramDef.minimum !== undefined && paramValue < paramDef.minimum) {
+        return `Parameter ${paramName} must be at least ${paramDef.minimum}, got ${paramValue}`;
+      }
+      if (paramDef.maximum !== undefined && paramValue > paramDef.maximum) {
+        return `Parameter ${paramName} must be at most ${paramDef.maximum}, got ${paramValue}`;
+      }
+    }
+    
+    // Validar longitud mínima y máxima para strings y arrays
+    if ((type === 'string' || type === 'array') && paramDef.minLength !== undefined) {
+      if (paramValue.length < paramDef.minLength) {
+        return `Parameter ${paramName} must have at least ${paramDef.minLength} ${type === 'string' ? 'characters' : 'items'}, got ${paramValue.length}`;
+      }
+    }
+    
+    if ((type === 'string' || type === 'array') && paramDef.maxLength !== undefined) {
+      if (paramValue.length > paramDef.maxLength) {
+        return `Parameter ${paramName} must have at most ${paramDef.maxLength} ${type === 'string' ? 'characters' : 'items'}, got ${paramValue.length}`;
+      }
+    }
+    
+    // Validar patrón para strings
+    if (type === 'string' && paramDef.pattern) {
+      const regex = new RegExp(paramDef.pattern);
+      if (!regex.test(paramValue)) {
+        return `Parameter ${paramName} does not match required pattern: ${paramDef.pattern}`;
+      }
+    }
+    
+    return null; // Sin errores de validación
   }
 }

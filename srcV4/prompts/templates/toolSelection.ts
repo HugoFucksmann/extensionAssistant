@@ -30,7 +30,7 @@ Aquí están los detalles de cada herramienta:
 # FORMATO DE RESPUESTA
 Tu respuesta debe seguir este formato JSON:
 
-```json
+
 {
   "toolName": "nombreDeLaHerramienta",
   "toolInput": {
@@ -39,7 +39,7 @@ Tu respuesta debe seguir este formato JSON:
   },
   "reasoning": "Explica brevemente por qué elegiste esta herramienta y estos parámetros"
 }
-```
+
 
 Asegúrate de que:
 - El "toolName" sea exactamente uno de los nombres de herramientas disponibles.

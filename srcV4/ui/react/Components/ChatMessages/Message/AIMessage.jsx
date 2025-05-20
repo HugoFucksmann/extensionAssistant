@@ -4,6 +4,7 @@ import MarkdownContent from "../MessageContent/MarkdownContent";
 import { styles } from "../styles";
 import AttachedFiles from "../AttachedFiles";
 import { useVSCodeContext } from "../../../context/VSCodeContext";
+import { ToolExecutionList } from "../../ProcessingStatus";
 
 const parseMessage = (message) => {
   if (!message) return [{ type: "markdown", content: "" }];
@@ -65,10 +66,15 @@ const confirmationStyles = {
 };
 
 export const AIMessage = ({ message }) => {
-  const { postMessage } = useVSCodeContext();
+  const { postMessage, processingStatus } = useVSCodeContext();
   const [showConfirmButtons, setShowConfirmButtons] = useState(false);
+  const [showToolDetails, setShowToolDetails] = useState(false);
   const parts = parseMessage(message?.text);
   const files = message?.files || [];
+
+  // Determinar si este mensaje tiene herramientas ejecutadas asociadas
+  const hasToolExecutions = message.metadata?.tools?.length > 0 || 
+                           (message.metadata?.processingTime && message.metadata?.processingTime > 0);
 
   // Detectar si el mensaje contiene una solicitud de confirmación para aplicar cambios
   useEffect(() => {
@@ -124,6 +130,31 @@ export const AIMessage = ({ message }) => {
           >
             Rechazar cambios
           </button>
+        </div>
+      )}
+      
+      {/* Información de herramientas ejecutadas */}
+      {hasToolExecutions && (
+        <div style={styles.toolsInfoContainer}>
+          <div 
+            style={styles.toolsInfoHeader}
+            onClick={() => setShowToolDetails(!showToolDetails)}
+          >
+            <span style={styles.toolsInfoTitle}>
+              {message.metadata?.processingTime ? 
+                `Procesado en ${Math.round(message.metadata.processingTime / 100) / 10}s` : 
+                'Herramientas ejecutadas'}
+            </span>
+            <span style={styles.toolsInfoToggle}>
+              {showToolDetails ? '▼ Ocultar detalles' : '▶ Mostrar detalles'}
+            </span>
+          </div>
+          
+          {showToolDetails && message.metadata?.tools && (
+            <div style={styles.toolsInfoContent}>
+              <ToolExecutionList tools={message.metadata.tools} />
+            </div>
+          )}
         </div>
       )}
     </div>

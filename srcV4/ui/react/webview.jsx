@@ -1,4 +1,4 @@
-import React, { useContext } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import ReactDOM from "react-dom";
 import ChatInput from "./Components/InputChat/ChatInput";
 
@@ -6,6 +6,7 @@ import ChatInput from "./Components/InputChat/ChatInput";
 import ChatHistory from "./historical/ChatHistory";
 import RecentChats from "./historical/RecentChats";
 import ChatMessages from "./Components/ChatMessages/ChatMessages";
+import { ProcessingStatus, PerformanceMetrics } from "./Components/ProcessingStatus";
 
 import { VSCodeProvider, useVSCodeContext } from "./context/VSCodeContext";
 
@@ -77,6 +78,8 @@ function Chat() {
             <ChatMessages>
               <RecentChats />
             </ChatMessages>
+            <ProcessingStatus />
+            <PerformanceMetrics chatId={messages.length > 0 ? messages[0].chatId : null} />
           </div>
           <div style={{display: 'flex', justifyContent: 'center', padding: '0 12px', backgroundColor: 'var(--vscode-sideBar-background)'}}>
             <ChatInput />
