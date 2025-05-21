@@ -15,18 +15,18 @@ export class ReadFileTool extends BaseTool<FileSystemParams, string> {
   
   readonly parameters = {
     path: {
-      type: 'string',
+      type: "string" as "string",
       description: 'Ruta del archivo a leer',
       required: true
     },
     relativeTo: {
-      type: 'string',
+      type: "string" as "string",
       description: 'Si la ruta es relativa al workspace o absoluta',
       enum: ['workspace', 'absolute'],
       default: 'workspace'
     },
     encoding: {
-      type: 'string',
+      type: "string" as "string",
       description: 'Codificación del archivo',
       default: 'utf-8'
     }

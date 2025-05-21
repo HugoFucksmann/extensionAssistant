@@ -24,12 +24,12 @@ export class ListFilesTool extends BaseTool<FileSystemParams, ListFilesResult> {
   
   readonly parameters = {
     path: {
-      type: 'string',
+      type: "string" as "string",
       description: 'Ruta del directorio a listar',
       default: '.'
     },
     relativeTo: {
-      type: 'string',
+      type: "string" as "string",
       description: 'Si la ruta es relativa al workspace o absoluta',
       enum: ['workspace', 'absolute'],
       default: 'workspace'

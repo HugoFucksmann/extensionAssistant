@@ -1,4 +1,4 @@
-import { writeToFileTool } from '../../../../features/tools/filesystem/writeToFile';
+import { writeToFileTool } from '../../../../modules/tools/filesystem/writeToFile';
 import { createTempFile, cleanupTempFile, setupVSCodeMock } from '../../testUtils';
 
 // Mock de vscode

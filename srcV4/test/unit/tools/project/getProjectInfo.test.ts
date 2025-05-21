@@ -1,4 +1,4 @@
-import { getProjectInfoTool } from '../../../../features/tools/project/getProjectInfo';
+import { getProjectInfoTool } from '../../../../modules/tools/project/getProjectInfo';
 import { setupVSCodeMock } from '../../testUtils';
 import * as vscode from 'vscode';
 import * as fs from 'fs/promises';

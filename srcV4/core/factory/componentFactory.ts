@@ -11,11 +11,11 @@ import { IModelManager } from '../interfaces/model-manager.interface';
 import { IReActGraph } from '../interfaces/react-graph.interface';
 import { IEventBus } from '../interfaces/event-bus.interface';
 
-import { ToolRegistry } from '../../tools/toolRegistry';
-import { ToolRegistryAdapter } from '../../tools/toolRegistryAdapter';
+import { ToolRegistry } from '../../modules/tools';
+import { ToolRegistryAdapter } from '../../modules/tools';
 
-import { IMemoryManager, MemoryManagerAdapter } from '../../features/memory';
-import { MemoryManager } from '../../features/memory/core';
+import { IMemoryManager, MemoryManagerAdapter } from '../../modules/memory';
+import { MemoryManager } from '../../modules/memory/core';
 
 import { ModelManager } from '../../models/modelManager';
 import { ModelManagerAdapter } from '../../models/modelManagerAdapter';

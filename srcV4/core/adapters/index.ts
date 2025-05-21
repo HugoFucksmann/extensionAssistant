@@ -7,7 +7,7 @@
 
 //export { MemoryManagerAdapter } from '../../memory/memoryManagerAdapter';
 export { ModelManagerAdapter } from '../../models/modelManagerAdapter';
-export { ToolRegistryAdapter } from '../../tools/toolRegistryAdapter';
+export { ToolRegistryAdapter } from '../../modules/tools';
 export { ReActGraphAdapter } from '../../langgraph/reactGraphAdapter';
 
 // Exportar interfaces

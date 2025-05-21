@@ -1,9 +1,9 @@
+import { Tool, ToolResult } from '../../modules/tools/types';
+
 /**
  * Interfaz para el registro de herramientas de la arquitectura Windsurf
  * Define el contrato que debe implementar cualquier registro de herramientas
  */
-
-import { Tool, ToolResult } from '../../tools/types';
 
 export interface IToolRegistry {
   /**

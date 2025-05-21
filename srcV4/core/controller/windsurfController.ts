@@ -11,8 +11,8 @@ import { IConversationManager } from '../interfaces/conversation-manager.interfa
 import { ConversationManager } from '../conversation/conversationManager';
 import { EventEmitter } from 'events';
 
-import { IMemoryManager, MemoryManagerAdapter } from '../../features/memory';
-import { MemoryManager } from '../../features/memory/core';
+import { IMemoryManager, MemoryManagerAdapter } from '../../modules/memory';
+import { MemoryManager } from '../../modules/memory/core';
 
 import { IModelManager } from '../interfaces/model-manager.interface';
 import { ModelManager } from '../../models/modelManager';
@@ -23,8 +23,8 @@ import { createReActGraph } from '../../langgraph/reactGraph';
 import { ReActGraphAdapter } from '../../langgraph/reactGraphAdapter';
 
 import { IToolRegistry } from '../interfaces/tool-registry.interface';
-import { ToolRegistry } from '../../tools/toolRegistry';
-import { ToolRegistryAdapter } from '../../tools/toolRegistryAdapter';
+import { ToolRegistry } from '../../modules/tools';
+import { ToolRegistryAdapter } from '../../modules/tools';
 import { ComponentFactory } from '../factory/componentFactory';
 import { EventType } from '../../shared/events';
 

@@ -89,31 +89,31 @@ export class SearchWorkspaceTool extends BaseTool<SearchParams, SearchResult[]> 
   
   readonly parameters = {
     pattern: {
-      type: 'string',
+      type: "string" as "string",
       description: 'Patrón de búsqueda (puede incluir comodines)',
       required: true
     },
     baseDir: {
-      type: 'string',
+      type: "string" as "string",
       description: 'Directorio base para la búsqueda (relativo al workspace)',
       default: '.'
     },
     caseSensitive: {
-      type: 'boolean',
+      type: "boolean" as "boolean",
       description: 'Si la búsqueda debe ser sensible a mayúsculas/minúsculas',
       default: false
     },
     exclude: {
-      type: 'string',
+      type: "string" as "string",
       description: 'Patrón de exclusión (opcional)'
     },
     maxResults: {
-      type: 'number',
+      type: "number" as "number",
       description: 'Número máximo de resultados a devolver',
       default: 100
     },
     includeHidden: {
-      type: 'boolean',
+      type: "boolean" as "boolean",
       description: 'Si se debe buscar en archivos ocultos',
       default: false
     }

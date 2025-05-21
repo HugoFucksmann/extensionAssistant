@@ -1,4 +1,4 @@
-import { readFileTool } from '../../../../features/tools/filesystem/readFile';
+import { readFileTool } from '../../../../modules/tools/filesystem/readFile';
 import { createTempFile, cleanupTempFile, setupVSCodeMock } from '../../testUtils';
 
 // Mock de vscode

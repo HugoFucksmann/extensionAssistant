@@ -1,8 +1,9 @@
 import { ReActState, ReActGraphResult, IntermediateStep, createInitialReActState, addIntermediateStep } from './types';
 import { ModelManager } from '../models/modelManager';
-import { ToolRegistry } from '../tools/toolRegistry';
+
 import EventEmitter from 'eventemitter3';
 import { EventType } from '../shared/events/types/eventTypes';
+import { ToolRegistry } from '../modules/tools';
 
 
 /**

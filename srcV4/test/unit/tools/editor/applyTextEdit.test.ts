@@ -1,4 +1,4 @@
-import { applyTextEditTool } from '../../../../features/tools/editor/applyTextEdit';
+import { applyTextEditTool } from '../../../../modules/tools/editor/applyTextEdit';
 import { setupActiveEditorMock, setupVSCodeMock } from '../../testUtils';
 import * as vscode from 'vscode';
 

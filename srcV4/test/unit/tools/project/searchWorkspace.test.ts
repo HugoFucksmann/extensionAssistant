@@ -1,4 +1,4 @@
-import { searchWorkspaceTool } from '../../../../features/tools/project/searchWorkspace';
+import { searchWorkspaceTool } from '../../../../modules/tools/project/searchWorkspace';
 import { setupVSCodeMock } from '../../testUtils';
 import * as vscode from 'vscode';
 import * as path from 'path';

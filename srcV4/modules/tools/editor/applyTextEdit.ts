@@ -52,50 +52,50 @@ export class ApplyTextEditTool extends BaseTool<TextEditParams, void> {
   
   readonly parameters = {
     documentUri: {
-      type: 'string',
+      type: "string" as "string",
       description: 'URI del documento a editar (opcional, usa el documento activo si no se especifica)'
     },
     edits: {
-      type: 'array',
+      type: "array" as "array",
       description: 'Array de ediciones a aplicar',
       items: {
-        type: 'object',
+        type: "object" as "object",
         properties: {
           range: {
-            type: 'object',
+            type: "object" as "object",
             properties: {
               start: {
-                type: 'object',
+                type: "object" as "object",
                 properties: {
-                  line: { type: 'number' },
-                  character: { type: 'number' }
+                  line: { type: "number" as "number" },
+                  character: { type: "number" as "number" }
                 },
                 required: ['line', 'character']
               },
               end: {
-                type: 'object',
+                type: "object" as "object",
                 properties: {
-                  line: { type: 'number' },
-                  character: { type: 'number' }
+                  line: { type: "number" as "number" },
+                  character: { type: "number" as "number" }
                 },
                 required: ['line', 'character']
               }
             },
             required: ['start', 'end']
           },
-          text: { type: 'string' }
+          text: { type: "string" as "string" }
         },
         required: ['range', 'text']
       },
       required: true
     },
     showConfirmation: {
-      type: 'boolean',
+      type: "boolean" as "boolean",
       description: 'Si se debe mostrar un mensaje de confirmación antes de aplicar los cambios',
       default: false
     },
     confirmationMessage: {
-      type: 'string',
+      type: "string" as "string",
       description: 'Mensaje de confirmación a mostrar (solo si showConfirmation es true)'
     }
   };

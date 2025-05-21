@@ -11,7 +11,7 @@ import { IEventBus } from '../interfaces/event-bus.interface';
 import { IReActGraph } from '../interfaces/react-graph.interface';
 import { IToolRegistry } from '../interfaces/tool-registry.interface';
 import { AgentState, createInitialAgentState, updateAgentState, addMessage } from '../state/agent-state';
-import { IMemoryManager } from '../../features/memory';
+import { IMemoryManager } from '../../modules/memory';
 import { EventType } from '../../shared/events';
 
 

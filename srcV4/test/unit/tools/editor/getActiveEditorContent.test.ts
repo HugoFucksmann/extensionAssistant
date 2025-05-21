@@ -1,4 +1,4 @@
-import { getActiveEditorContentTool } from '../../../../features/tools/editor/getActiveEditorContent';
+import { getActiveEditorContentTool } from '../../../../modules/tools/editor/getActiveEditorContent';
 import { setupActiveEditorMock, setupVSCodeMock } from '../../testUtils';
 
 // Mock de vscode

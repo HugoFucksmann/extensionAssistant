@@ -8,40 +8,41 @@
 // Tipos y utilidades
 export * from './types';
 export * from './baseTool';
+export * from './toolRegistry';
+export * from './toolRegistryAdapter';
 
 // Módulos de herramientas
 export * from './filesystem';
 export * from './editor';
 export * from './project';
 
-// Colección de todas las herramientas disponibles
+// Importaciones de herramientas
 import { readFileTool, writeToFileTool, listFilesTool } from './filesystem';
 import { getActiveEditorContentTool, applyTextEditTool } from './editor';
 import { searchWorkspaceTool, getProjectInfoTool } from './project';
+import { Tool } from './types';
 
-/**
- * Todas las herramientas disponibles en el sistema
- */
-export const allTools = [
+// Colección de todas las herramientas disponibles
+const allTools: Tool[] = [
   // Herramientas del sistema de archivos
-  readFileTool,
-  writeToFileTool,
-  listFilesTool,
+  readFileTool as unknown as Tool,
+  writeToFileTool as unknown as Tool,
+  listFilesTool as unknown as Tool,
   
   // Herramientas del editor
-  getActiveEditorContentTool,
-  applyTextEditTool,
+  getActiveEditorContentTool as unknown as Tool,
+  applyTextEditTool as unknown as Tool,
   
   // Herramientas de proyecto
-  searchWorkspaceTool,
-  getProjectInfoTool,
+  searchWorkspaceTool as unknown as Tool,
+  getProjectInfoTool as unknown as Tool,
 ];
 
 /**
  * Registra todas las herramientas en un registro de herramientas
  * @param toolRegistry Instancia del registro de herramientas
  */
-export function registerAllTools(toolRegistry: any): void {
+export function registerAllTools(toolRegistry: { register: (tool: any) => void }): void {
   for (const tool of allTools) {
     try {
       toolRegistry.register(tool);
@@ -57,7 +58,7 @@ export function registerAllTools(toolRegistry: any): void {
  * @param name Nombre de la herramienta a buscar
  * @returns La herramienta encontrada o undefined si no existe
  */
-export function getToolByName(name: string): any | undefined {
+export function getToolByName(name: string): Tool | undefined {
   return allTools.find(tool => tool.name === name);
 }
 
@@ -66,6 +67,6 @@ export function getToolByName(name: string): any | undefined {
  * @param names Nombres de las herramientas a buscar
  * @returns Array con las herramientas encontradas
  */
-export function getToolsByNames(names: string[]): any[] {
+export function getToolsByNames(names: string[]): Tool[] {
   return allTools.filter(tool => names.includes(tool.name));
 }

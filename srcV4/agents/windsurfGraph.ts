@@ -6,14 +6,14 @@
 
 
 
-import { ToolRegistry } from '../tools/toolRegistry';
+import { ToolRegistry } from '../modules/tools';
 import { PromptManager } from '../prompts/promptManager';
 import { ModelManager } from '../models/modelManager';
 // Importar desde @langchain/langgraph usando require para evitar errores de tipado
 const { StateGraph } = require('@langchain/langgraph');
 const { END } = require('@langchain/langgraph/dist/constants');
 import { RunnableLambda } from '@langchain/core/runnables';
-import { ActionResult, CorrectionResult, ReasoningResult, ReflectionResult, WindsurfState } from '../features/memory/types';
+import { ActionResult, CorrectionResult, ReasoningResult, ReflectionResult, WindsurfState } from '../modules/memory/types';
 
 /**
  * Implementa el grafo de estados para el ciclo ReAct de Windsurf

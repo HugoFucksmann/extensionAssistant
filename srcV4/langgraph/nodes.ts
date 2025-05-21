@@ -4,7 +4,7 @@ import { ReActNodeType } from '../core/config';
 import { createInitialReActState, ReActState, ReActNodeFunction } from './types';
 import { PromptManager } from '../prompts/promptManager';
 import { ModelManager } from '../models/modelManager';
-import { ToolRegistry } from '../tools/toolRegistry';
+import { ToolRegistry } from '../modules/tools';
 import { RunnableLambda } from '@langchain/core/runnables';
 // RUTAS AJUSTADAS: Importar tipos y la instancia de eventBus desde la nueva ubicación en shared/events
 import { EventType, NodeEventPayload, ToolExecutionEventPayload } from '../shared/events/types/eventTypes';

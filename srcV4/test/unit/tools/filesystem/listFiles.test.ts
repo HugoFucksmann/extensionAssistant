@@ -1,4 +1,4 @@
-import { listFilesTool } from '../../../../features/tools/filesystem/listFiles';
+import { listFilesTool } from '../../../../modules/tools/filesystem/listFiles';
 import { createTempDir, cleanupTempDir, createTempFile, setupVSCodeMock } from '../../testUtils';
 
 // Mock de vscode

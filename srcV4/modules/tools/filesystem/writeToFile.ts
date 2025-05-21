@@ -15,28 +15,28 @@ export class WriteToFileTool extends BaseTool<FileSystemParams, void> {
   
   readonly parameters = {
     path: {
-      type: 'string',
+      type: "string" as "string",
       description: 'Ruta del archivo a escribir',
       required: true
     },
     content: {
-      type: 'string',
+      type: "string" as "string",
       description: 'Contenido a escribir en el archivo',
       required: true
     },
     relativeTo: {
-      type: 'string',
+      type: "string" as "string",
       description: 'Si la ruta es relativa al workspace o absoluta',
       enum: ['workspace', 'absolute'],
       default: 'workspace'
     },
     createIfNotExists: {
-      type: 'boolean',
+      type: "boolean" as "boolean",
       description: 'Crear el archivo si no existe',
       default: true
     },
     encoding: {
-      type: 'string',
+      type: "string" as "string",
       description: 'Codificación del archivo',
       default: 'utf-8'
     }

@@ -1,4 +1,4 @@
-import { Tool, ToolResult } from './types';
+import { Tool, ToolResult, ParameterDefinition } from './types';
 
 /**
  * Clase base abstracta para todas las herramientas
@@ -12,7 +12,7 @@ export abstract class BaseTool<T = any, R = any> implements Tool<T, ToolResult<R
   abstract readonly description: string;
   
   /** Parámetros que acepta la herramienta */
-  abstract readonly parameters?: Record<string, any>;
+  abstract readonly parameters?: Record<string, ParameterDefinition>;
   
   /**
    * Ejecuta la herramienta con los parámetros proporcionados
