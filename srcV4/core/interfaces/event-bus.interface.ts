@@ -15,6 +15,18 @@ export interface IEventBus {
   emit(type: EventType, payload?: EventPayload): WindsurfEvent;
 
   /**
+   * Habilita o deshabilita el modo de depuración
+   * @param enabled Indica si el modo de depuración debe estar activado
+   */
+  setDebugMode(enabled: boolean): void;
+  
+  /**
+   * Registra un mensaje de depuración
+   * @param args Argumentos a registrar
+   */
+  debug(...args: any[]): void;
+
+  /**
    * Registra un listener para un tipo de evento específico
    * @param type Tipo de evento o array de tipos
    * @param listener Función callback para manejar el evento

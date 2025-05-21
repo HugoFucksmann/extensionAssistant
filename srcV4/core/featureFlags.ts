@@ -23,6 +23,7 @@ export enum Feature {
   // Características de logging y debugging
   ENABLE_ADVANCED_LOGGING = 'enable_advanced_logging',
   ENABLE_EVENT_HISTORY = 'enable_event_history',
+  ENABLE_EVENT_DEBUGGING = 'enable_event_debugging',
   
   // Otras características
   ENABLE_PERFORMANCE_METRICS = 'enable_performance_metrics'
@@ -49,6 +50,7 @@ export class FeatureFlags implements IFeatureFlags {
    */
   private initializeDefaults(): void {
     // Por defecto, habilitamos los adaptadores pero no la arquitectura completa
+    this.enable(Feature.ENABLE_EVENT_DEBUGGING); // Habilitar depuración de eventos por defecto
     this.enabledFeatures.add(Feature.USE_TOOL_REGISTRY_ADAPTER);
     this.enabledFeatures.add(Feature.USE_MEMORY_MANAGER_ADAPTER);
     this.enabledFeatures.add(Feature.USE_MODEL_MANAGER_ADAPTER);

@@ -1,29 +1,32 @@
+// src/core/windsurfController.ts
 /**
  * Controlador principal de la arquitectura Windsurf (Refactorizado)
  * Implementa el patrón singleton y delega en el ConversationManager
  */
 
-import * as vscode from 'vscode';
+
 import { VSCodeContext } from '../types';
 import { IEventBus } from '../interfaces/event-bus.interface';
 import { IConversationManager } from '../interfaces/conversation-manager.interface';
-import { EventType } from '../../events/eventTypes';
-import { EventBusAdapter } from '../../events/eventBusAdapter';
 import { ConversationManager } from '../conversation/conversationManager';
+import { EventEmitter } from 'events';
+import { EventType } from '../../events/eventTypes';
 
-import { IModelManager } from '../interfaces/model-manager.interface';
-import { IReActGraph } from '../interfaces/react-graph.interface';
-import { IToolRegistry } from '../interfaces/tool-registry.interface';
-
-
-import { ModelManager } from '../../models/modelManager';
-import { ModelManagerAdapter } from '../../models/modelManagerAdapter';
-import { ReActGraph, createReActGraph } from '../../langgraph/reactGraph';
-import { ReActGraphAdapter } from '../../langgraph/reactGraphAdapter';
-import { ToolRegistry } from '../../tools/toolRegistry';
-import { ToolRegistryAdapter } from '../../tools/toolRegistryAdapter';
 import { IMemoryManager, MemoryManagerAdapter } from '../../features/memory';
 import { MemoryManager } from '../../features/memory/core';
+
+import { IModelManager } from '../interfaces/model-manager.interface';
+import { ModelManager } from '../../models/modelManager';
+import { ModelManagerAdapter } from '../../models/modelManagerAdapter';
+
+import { IReActGraph } from '../interfaces/react-graph.interface';
+import {  createReActGraph } from '../../langgraph/reactGraph';
+import { ReActGraphAdapter } from '../../langgraph/reactGraphAdapter';
+
+import { IToolRegistry } from '../interfaces/tool-registry.interface';
+import { ToolRegistry } from '../../tools/toolRegistry';
+import { ToolRegistryAdapter } from '../../tools/toolRegistryAdapter';
+import { ComponentFactory } from '../factory/componentFactory';
 
 
 /**
@@ -32,52 +35,66 @@ import { MemoryManager } from '../../features/memory/core';
  */
 export class WindsurfController {
   private static instance: WindsurfController;
-  
+
   private vscodeContext: VSCodeContext;
   private eventBus: IEventBus;
   private conversationManager: IConversationManager;
-  
+
+  /**
+   * Expone el eventBus como 'events' para compatibilidad con código existente
+   */
+  public get events(): EventEmitter {
+    return this.eventBus as unknown as EventEmitter;
+  }
+
   // Componentes subyacentes (mantenidos para compatibilidad)
   private memoryManager: IMemoryManager;
   private modelManager: IModelManager;
   private reactGraph: IReActGraph;
   private toolRegistry: IToolRegistry;
-  
+
+  // Añadir una referencia a la ComponentFactory
+  private componentFactory: ComponentFactory; // <--- NUEVO: Para acceder a la factory
+
   /**
    * Constructor privado para implementar el patrón singleton
    */
   private constructor(context: VSCodeContext) {
     this.vscodeContext = context;
-    
-    // Inicializar el bus de eventos usando el adaptador
-    this.eventBus = EventBusAdapter.getInstance();
-    
+
+    // Obtener la instancia de ComponentFactory
+    this.componentFactory = ComponentFactory.getInstance(); // <--- Obtiene la factory aquí
+
+    // Inicializar el bus de eventos usando la factory
+    this.eventBus = this.componentFactory.getEventBus(); // <--- CAMBIO: Obtiene el EventBus de la factory
+
     // Inicializar componentes base
     const memoryManagerBase = new MemoryManager();
     const modelManagerBase = new ModelManager();
     const toolRegistryBase = new ToolRegistry();
-    
+
     // Crear adaptadores que implementan las interfaces requeridas
     this.memoryManager = new MemoryManagerAdapter(memoryManagerBase, this.eventBus);
     this.modelManager = new ModelManagerAdapter(modelManagerBase, this.eventBus);
     this.toolRegistry = new ToolRegistryAdapter(toolRegistryBase, this.eventBus);
-    
+
     // Inicializar el grafo ReAct
     // Nota: Temporalmente usamos el EventBus original hasta que se refactorice completamente el grafo ReAct
     const defaultModel = 'gemini-pro';
     // Usamos require para obtener el EventBus original sin importarlo directamente
+    // Considera si este 'originalEventBus' sigue siendo necesario o si reactGraph puede usar this.eventBus directamente
     const originalEventBus = require('../../events/eventBus').EventBus.getInstance();
     const reactGraphBase = createReActGraph(defaultModel, originalEventBus);
-    
+
     // Crear el adaptador para el grafo ReAct
     this.reactGraph = new ReActGraphAdapter(reactGraphBase, this.eventBus);
-    
+
     // Pasar el toolRegistry al grafo ReAct
     // Usamos casting explícito a unknown primero para evitar errores de tipo
     if ('setToolRegistry' in this.reactGraph) {
       (this.reactGraph as any).setToolRegistry(this.toolRegistry);
     }
-    
+
     // Inicializar el gestor de conversaciones
     this.conversationManager = new ConversationManager(
       this.memoryManager,
@@ -85,10 +102,10 @@ export class WindsurfController {
       this.eventBus,
       this.toolRegistry
     );
-    
+
     this.eventBus.debug('[WindsurfController] Initialized with refactored architecture');
   }
-  
+
   /**
    * Obtiene la instancia única del controlador
    */
@@ -101,7 +118,7 @@ export class WindsurfController {
     }
     return WindsurfController.instance;
   }
-  
+
   /**
    * Procesa un mensaje del usuario
    * @param chatId Identificador único de la conversación
@@ -125,11 +142,11 @@ export class WindsurfController {
         stack: error.stack,
         source: 'WindsurfController'
       });
-      
+
       return 'Lo siento, ha ocurrido un error inesperado. Por favor, inténtalo de nuevo.';
     }
   }
-  
+
   /**
    * Finaliza una conversación y libera recursos
    * @param chatId Identificador único de la conversación
@@ -137,7 +154,7 @@ export class WindsurfController {
   public async clearConversation(chatId: string): Promise<void> {
     await this.conversationManager.endConversation(chatId);
   }
-  
+
   /**
    * Cancela la ejecución actual de una conversación
    * @param chatId Identificador único de la conversación
@@ -145,7 +162,7 @@ export class WindsurfController {
   public async cancelExecution(chatId: string): Promise<void> {
     await this.conversationManager.cancelExecution(chatId);
   }
-  
+
   /**
    * Libera todos los recursos al desactivar la extensión
    */
@@ -153,7 +170,7 @@ export class WindsurfController {
     // Liberar recursos
     this.eventBus.debug('[WindsurfController] Disposing resources');
   }
-  
+
   /**
    * Obtiene el bus de eventos
    * @returns Bus de eventos
@@ -161,7 +178,7 @@ export class WindsurfController {
   public getEventBus(): IEventBus {
     return this.eventBus;
   }
-  
+
   /**
    * Obtiene el gestor de conversaciones
    * @returns Gestor de conversaciones

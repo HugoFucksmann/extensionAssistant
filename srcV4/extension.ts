@@ -4,7 +4,7 @@
  */
 
 import * as vscode from 'vscode';
-import { WindsurfController } from './core/windsurfController';
+import { WindsurfController } from './core/windsurfController_OLD';
 import { WindsurfPanel } from './ui/windsurfPanel';
 import { VSCodeContext } from './core/types';
 

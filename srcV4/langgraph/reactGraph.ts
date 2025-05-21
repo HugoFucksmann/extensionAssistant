@@ -2,7 +2,7 @@ import { ReActState, ReActGraphResult, IntermediateStep, createInitialReActState
 import { ModelManager } from '../models/modelManager';
 import { ToolRegistry } from '../tools/toolRegistry';
 import EventEmitter from 'eventemitter3';
-import { WindsurfEvents } from '../core/windsurfController';
+import { WindsurfEvents } from '../core/windsurfController_OLD';
 
 /**
  * Clase que implementa el grafo ReAct utilizando LangGraph

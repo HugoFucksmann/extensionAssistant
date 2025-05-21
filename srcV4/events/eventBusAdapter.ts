@@ -12,6 +12,7 @@ import { EventBus as OriginalEventBus } from './eventBus';
  */
 export class EventBusAdapter implements IEventBus {
   private eventBus: OriginalEventBus;
+  private debugMode: boolean = false;
   
   /**
    * Constructor del adaptador
@@ -29,6 +30,17 @@ export class EventBusAdapter implements IEventBus {
     return new EventBusAdapter(OriginalEventBus.getInstance());
   }
   
+  /**
+   * Habilita o deshabilita el modo de depuración
+   * @param enabled Indica si el modo de depuración debe estar activado
+   */
+  public setDebugMode(enabled: boolean): void {
+    this.debugMode = enabled;
+    console.log(`[EventBusAdapter] Debug mode ${enabled ? 'enabled' : 'disabled'}`);
+  }
+
+
+
   /**
    * Emite un evento con el tipo y payload especificados
    * @param type Tipo de evento
@@ -95,10 +107,19 @@ export class EventBusAdapter implements IEventBus {
   
   /**
    * Registra un mensaje de depuración
-   * @param message Mensaje de depuración
-   * @param data Datos adicionales
+   * @param message Mensaje de depuración o argumentos a registrar
+   * @param data Datos adicionales (opcional)
    */
-  public debug(message: string, data?: any): void {
+  public debug(message: string | any, data?: any): void {
+    // Si se llama con múltiples argumentos (console.debug style)
+    if (arguments.length > 1 || typeof message !== 'string') {
+      if (this.debugMode) {
+        console.debug('[EventBusAdapter]', ...arguments);
+      }
+      return;
+    }
+    
+    // Si se llama con la firma original (message, data?)
     this.eventBus.debug(message, data);
   }
   

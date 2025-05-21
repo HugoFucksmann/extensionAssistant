@@ -1,6 +1,9 @@
 /**
  * Interfaz para la gestión de feature flags
  * Define el contrato para habilitar/deshabilitar características de la aplicación
+ * 
+ * Características disponibles:
+ * - ENABLE_EVENT_DEBUGGING: Habilita el modo de depuración detallado para el sistema de eventos
  */
 
 /**

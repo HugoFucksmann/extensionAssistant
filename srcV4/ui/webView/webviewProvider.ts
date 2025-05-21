@@ -4,19 +4,20 @@
  */
 
 import * as vscode from 'vscode';
-import { WindsurfController, WindsurfEvents } from '../../core/windsurfController';
+// Asegurarse de que htmlTemplate exporta correctamente la función getHtmlContent
+import * as htmlTemplate from './htmlTemplate';
+import { WindsurfController } from '../../core/controller/windsurfController';
+import { EventBus } from '../../events/eventBus';
 import { 
-  EventBus, 
   EventType, 
   WindsurfEvent, 
   ConversationEventPayload, 
   ReasoningEventPayload, 
   ToolExecutionEventPayload, 
   ResponseEventPayload, 
-  ErrorEventPayload 
-} from '../../events';
-// Asegurarse de que htmlTemplate exporta correctamente la función getHtmlContent
-import * as htmlTemplate from './htmlTemplate';
+  ErrorEventPayload
+} from '../../events/eventTypes';
+import { WindsurfEvents } from '../../events/windsurfEvents';
 
 /**
  * Proveedor de webview para la extensión
@@ -150,7 +151,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
    */
   private subscribeToControllerEvents(): void {
     // Suscribirse a eventos de respuesta generada
-    this.controller.events.on(WindsurfEvents.RESPONSE_GENERATED, (data) => {
+    this.controller.events.on(WindsurfEvents.RESPONSE_GENERATED, (data: any) => {
       if (data.chatId === this.currentChatId) {
         // Actualizar la UI con la respuesta generada
         this.postMessage('messageAdded', {
@@ -162,7 +163,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     });
     
     // Suscribirse a eventos de error
-    this.controller.events.on(WindsurfEvents.ERROR_OCCURRED, (data) => {
+    this.controller.events.on(WindsurfEvents.ERROR_OCCURRED, (data: any) => {
       if (data.chatId === this.currentChatId) {
         // Mostrar error en la UI
         this.postMessage('error', {
@@ -175,19 +176,19 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     });
     
     // Eventos del ciclo ReAct para mostrar progreso
-    this.controller.events.on(WindsurfEvents.REASONING_STARTED, (data) => {
+    this.controller.events.on(WindsurfEvents.REASONING_STARTED, (data: any) => {
       if (data.chatId === this.currentChatId) {
         this.postMessage('processingUpdate', { phase: 'reasoning', status: 'started' });
       }
     });
     
-    this.controller.events.on(WindsurfEvents.ACTION_STARTED, (data) => {
+    this.controller.events.on(WindsurfEvents.ACTION_STARTED, (data: any) => {
       if (data.chatId === this.currentChatId) {
         this.postMessage('processingUpdate', { phase: 'action', status: 'started' });
       }
     });
     
-    this.controller.events.on(WindsurfEvents.REFLECTION_STARTED, (data) => {
+    this.controller.events.on(WindsurfEvents.REFLECTION_STARTED, (data: any) => {
       if (data.chatId === this.currentChatId) {
         this.postMessage('processingUpdate', { phase: 'reflection', status: 'started' });
       }

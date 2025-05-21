@@ -6,24 +6,22 @@
 
 import { IContainer } from '../interfaces/container.interface';
 import { IToolRegistry } from '../interfaces/tool-registry.interface';
-// import { IMemoryManager } from '../interfaces/memory-manager.interface'; // <--- ELIMINADO
 import { IModelManager } from '../interfaces/model-manager.interface';
 import { IReActGraph } from '../interfaces/react-graph.interface';
-import { IEventBus } from '../interfaces/event-bus.interface';
+import { IEventBus } from '../interfaces/event-bus.interface'; // Asegúrate de que esta interfaz se importe
 
 import { ToolRegistry } from '../../tools/toolRegistry';
 import { ToolRegistryAdapter } from '../../tools/toolRegistryAdapter';
 
-// --- CAMBIOS PARA MEMORY MODULE ---
-import { IMemoryManager, MemoryManagerAdapter } from '../../features/memory'; // <--- NUEVA IMPORTACIÓN
-import { MemoryManager } from '../../features/memory/core'; // <--- NUEVA IMPORTACIÓN para la clase base
-// --- FIN CAMBIOS PARA MEMORY MODULE ---
+import { IMemoryManager, MemoryManagerAdapter } from '../../features/memory';
+import { MemoryManager } // Importa MemoryManager desde su nueva ubicación
+  from '../../features/memory/core';
 
 import { ModelManager } from '../../models/modelManager';
 import { ModelManagerAdapter } from '../../models/modelManagerAdapter';
 import { ReActGraph } from '../../langgraph/reactGraph';
 import { ReActGraphAdapter } from '../../langgraph/reactGraphAdapter';
-import { EventBus } from '../../events/eventBus';
+import { EventBus } from '../../events/eventBus'; // <--- Importa la clase concreta EventBus para poder llamar a setDebugMode
 
 import { FeatureFlags, Feature } from '../featureFlags';
 
@@ -90,12 +88,12 @@ export class ComponentFactory implements IContainer {
     if (!this.memoryManager) {
       // Verificar si debemos usar el adaptador
       if (this.featureFlags.isEnabled(Feature.USE_MEMORY_MANAGER_ADAPTER)) {
-        const originalManager = new MemoryManager(); // <--- Instancia desde la nueva ruta
+        const originalManager = new MemoryManager();
         const eventBus = this.getEventBus();
-        this.memoryManager = new MemoryManagerAdapter(originalManager, eventBus); // <--- Instancia desde la nueva ruta
+        this.memoryManager = new MemoryManagerAdapter(originalManager, eventBus);
       } else {
         // Crear una instancia directa (requeriría que MemoryManager implemente IMemoryManager)
-        this.memoryManager = new MemoryManager() as unknown as IMemoryManager; // <--- Instancia desde la nueva ruta
+        this.memoryManager = new MemoryManager() as unknown as IMemoryManager;
       }
     }
 
@@ -162,8 +160,16 @@ export class ComponentFactory implements IContainer {
    */
   public getEventBus(): IEventBus {
     if (!this.eventBus) {
-      // EventBus ya implementa IEventBus, no necesitamos adaptador
+      // Crear una instancia del EventBus
       this.eventBus = EventBus.getInstance();
+
+      // Configuración adicional basada en feature flags
+      if (this.featureFlags.isEnabled(Feature.ENABLE_EVENT_DEBUGGING)) {
+        // Configurar el modo de depuración
+        (this.eventBus as any).setDebugMode(true);
+        // Registrar un evento de depuración
+        this.eventBus.debug('[ComponentFactory] EventBus debug mode enabled');
+      }
     }
 
     return this.eventBus;

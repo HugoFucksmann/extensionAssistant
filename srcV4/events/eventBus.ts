@@ -13,6 +13,7 @@ import { EventType, EventPayload, WindsurfEvent, BaseEventPayload } from './even
 export class EventBus {
   private static instance: EventBus;
   private eventManager: EventManager;
+  private debugMode: boolean = false;
   
   /**
    * Constructor privado para implementar el patrón singleton
@@ -38,6 +39,17 @@ export class EventBus {
     return EventBus.instance;
   }
   
+  /**
+   * Habilita o deshabilita el modo de depuración
+   * @param enabled Indica si el modo de depuración debe estar activado
+   */
+  setDebugMode(enabled: boolean): void {
+    this.debugMode = enabled;
+    console.log(`[EventBus] Debug mode ${enabled ? 'enabled' : 'disabled'}`);
+  }
+
+
+
   /**
    * Emite un evento con el tipo y payload especificados
    * @param type Tipo de evento
@@ -120,14 +132,24 @@ export class EventBus {
   
   /**
    * Crea un evento de depuración de nivel log
-   * @param message Mensaje de depuración
-   * @param data Datos adicionales
+   * @param message Mensaje de depuración o argumentos a registrar
+   * @param data Datos adicionales (opcional)
    */
-  debug(message: string, data?: any): void {
+  debug(message: string | any, data?: any): void {
+    // Si se llama con múltiples argumentos (console.debug style)
+    if (arguments.length > 1 || typeof message !== 'string') {
+      if (this.debugMode) {
+        console.debug('[EventBus]', ...arguments);
+      }
+      return;
+    }
+    
+    // Si se llama con la firma original (message, data?)
     this.emit(EventType.DEBUG_LOG, {
       message,
       data,
-      level: 'log'
+      level: 'log',
+      timestamp: Date.now()
     });
   }
   

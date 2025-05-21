@@ -189,6 +189,36 @@ export class LongTermStorage {
   }
   
   /**
+   * Elimina todas las memorias asociadas a un chat específico
+   * @param chatId ID del chat cuyas memorias se quieren eliminar
+   */
+  public async clearByChatId(chatId: string): Promise<void> {
+    let deletedCount = 0;
+    
+    // Iterar sobre todas las categorías
+    for (const [category, items] of this.memories.entries()) {
+      if (Array.isArray(items)) {
+        // Filtrar los elementos que no pertenecen al chat
+        const filteredItems = items.filter(item => item.chatId !== chatId);
+        
+        // Si hay cambios, actualizar la categoría
+        if (filteredItems.length !== items.length) {
+          this.memories.set(category, filteredItems);
+          deletedCount += (items.length - filteredItems.length);
+        }
+      }
+    }
+    
+    // Guardar los cambios si hubo eliminaciones
+    if (deletedCount > 0) {
+      this.saveMemories();
+      console.log(`[LongTermStorage] Deleted ${deletedCount} items for chat ${chatId}`);
+    } else {
+      console.log(`[LongTermStorage] No items found for chat ${chatId}`);
+    }
+  }
+  
+  /**
    * Libera recursos al desactivar la extensión
    */
   public dispose(): void {
