@@ -1,4 +1,5 @@
 // src/core/factory/componentFactory.ts
+
 /**
  * Factory centralizada para la creación de componentes
  * Implementa el patrón singleton y facilita la inyección de dependencias
@@ -8,20 +9,19 @@ import { IContainer } from '../interfaces/container.interface';
 import { IToolRegistry } from '../interfaces/tool-registry.interface';
 import { IModelManager } from '../interfaces/model-manager.interface';
 import { IReActGraph } from '../interfaces/react-graph.interface';
-import { IEventBus } from '../interfaces/event-bus.interface'; // Asegúrate de que esta interfaz se importe
+import { IEventBus } from '../interfaces/event-bus.interface';
 
 import { ToolRegistry } from '../../tools/toolRegistry';
 import { ToolRegistryAdapter } from '../../tools/toolRegistryAdapter';
 
 import { IMemoryManager, MemoryManagerAdapter } from '../../features/memory';
-import { MemoryManager } // Importa MemoryManager desde su nueva ubicación
-  from '../../features/memory/core';
+import { MemoryManager } from '../../features/memory/core';
 
 import { ModelManager } from '../../models/modelManager';
 import { ModelManagerAdapter } from '../../models/modelManagerAdapter';
-import { ReActGraph } from '../../langgraph/reactGraph';
+import { ReActGraph } from '../../langgraph/reactGraph'; // Importación directa del grafo, si no usa adaptador
 import { ReActGraphAdapter } from '../../langgraph/reactGraphAdapter';
-import { EventBus } from '../../events/eventBus'; // <--- Importa la clase concreta EventBus para poder llamar a setDebugMode
+import { EventBus } from '../../shared/events/core/eventBus'; // RUTA AJUSTADA: Importa la clase concreta EventBus
 
 import { FeatureFlags, Feature } from '../featureFlags';
 
@@ -69,7 +69,6 @@ export class ComponentFactory implements IContainer {
       if (this.featureFlags.isEnabled(Feature.USE_TOOL_REGISTRY_ADAPTER)) {
         const originalRegistry = new ToolRegistry();
         const eventBus = this.getEventBus();
-        // Conversión segura a través de unknown
         this.toolRegistry = new ToolRegistryAdapter(originalRegistry, eventBus) as unknown as IToolRegistry;
       } else {
         // Crear una instancia directa (requeriría que ToolRegistry implemente IToolRegistry)
@@ -126,28 +125,23 @@ export class ComponentFactory implements IContainer {
    */
   public getReActGraph(): IReActGraph {
     if (!this.reactGraph) {
+      // Para crear ReActGraph necesitamos otras dependencias
+      // Estas instancias deben ser las "reales" o adaptadas, no nuevas instancias genéricas
+      const modelManager = this.getModelManager(); // Obtener de la factory
+      const toolRegistry = this.getToolRegistry(); // Obtener de la factory
+      const promptManager = this.resolve('promptManager') || this.createPromptManager();
+
+      // Importar la función createReActGraph para crear el grafo correctamente
+      // CAMBIO CRÍTICO: La ruta a reactGraph.ts se ajusta
+      const { createReActGraph } = require('../../langgraph/reactGraph'); // RUTA AJUSTADA
+      const originalGraph = createReActGraph(promptManager, modelManager, toolRegistry);
+      const eventBus = this.getEventBus();
+
       // Verificar si debemos usar el adaptador
       if (this.featureFlags.isEnabled(Feature.USE_REACT_GRAPH_ADAPTER)) {
-        // Para crear ReActGraph necesitamos otras dependencias
-        const modelManager = new ModelManager();
-        const toolRegistry = new ToolRegistry();
-        const promptManager = this.resolve('promptManager') || this.createPromptManager();
-
-        // Importar la función createReActGraph para crear el grafo correctamente
-        const { createReActGraph } = require('../../langgraph/reactGraph');
-        const originalGraph = createReActGraph(promptManager, modelManager, toolRegistry);
-        const eventBus = this.getEventBus();
-
         this.reactGraph = new ReActGraphAdapter(originalGraph, eventBus) as unknown as IReActGraph;
       } else {
-        // Crear una instancia directa (requeriría que ReActGraph implemente IReActGraph)
-        const modelManager = new ModelManager();
-        const toolRegistry = new ToolRegistry();
-        const promptManager = this.resolve('promptManager') || this.createPromptManager();
-
-        // Importar la función createReActGraph para crear el grafo correctamente
-        const { createReActGraph } = require('../../langgraph/reactGraph');
-        this.reactGraph = createReActGraph(promptManager, modelManager, toolRegistry) as IReActGraph;
+        this.reactGraph = originalGraph as IReActGraph; // Directamente la implementación sin adaptador
       }
     }
 
@@ -160,16 +154,15 @@ export class ComponentFactory implements IContainer {
    */
   public getEventBus(): IEventBus {
     if (!this.eventBus) {
-      // Crear una instancia del EventBus
-      this.eventBus = EventBus.getInstance();
-
-      // Configuración adicional basada en feature flags
-      if (this.featureFlags.isEnabled(Feature.ENABLE_EVENT_DEBUGGING)) {
-        // Configurar el modo de depuración
-        (this.eventBus as any).setDebugMode(true);
-        // Registrar un evento de depuración
-        this.eventBus.debug('[ComponentFactory] EventBus debug mode enabled');
+      // EventBus ya implementa IEventBus, no necesitamos adaptador para este punto
+      const concreteEventBus = EventBus.getInstance();
+      // Aplicar debug mode basado en feature flag
+      if (this.featureFlags.isEnabled(Feature.ENABLE_ADVANCED_LOGGING)) {
+        concreteEventBus.setDebugMode(true);
+      } else {
+        concreteEventBus.setDebugMode(false);
       }
+      this.eventBus = concreteEventBus;
     }
 
     return this.eventBus;
@@ -199,7 +192,7 @@ export class ComponentFactory implements IContainer {
    */
   private createPromptManager() {
     // Importación dinámica para evitar dependencias circulares
-    const { PromptManager } = require('../../prompts/promptManager');
+    const { PromptManager } = require('../../prompts/promptManager'); // Asumiendo que prompts está en la raíz o nivel similar a core/
     return new PromptManager();
   }
 

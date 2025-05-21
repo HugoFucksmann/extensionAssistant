@@ -1,11 +1,13 @@
+// shared/events/core/eventBusAdapter.ts
+
 /**
  * Adaptador para el EventBus que implementa la interfaz IEventBus
  * Permite utilizar el EventBus existente a través de la interfaz definida
  */
 
-import { IEventBus } from '../core/interfaces/event-bus.interface';
-import { EventType, EventPayload, WindsurfEvent } from './eventTypes';
-import { EventBus as OriginalEventBus } from './eventBus';
+import { IEventBus } from '../../../core/interfaces/event-bus.interface'; // RUTA AJUSTADA
+import { EventType, EventPayload, WindsurfEvent } from '../types/eventTypes'; // RUTA AJUSTADA
+import { EventBus as OriginalEventBus } from './eventBus'; // RUTA AJUSTADA (importa desde la misma carpeta)
 
 /**
  * Adaptador para el EventBus que implementa la interfaz IEventBus
@@ -38,8 +40,6 @@ export class EventBusAdapter implements IEventBus {
     this.debugMode = enabled;
     console.log(`[EventBusAdapter] Debug mode ${enabled ? 'enabled' : 'disabled'}`);
   }
-
-
 
   /**
    * Emite un evento con el tipo y payload especificados
@@ -110,17 +110,17 @@ export class EventBusAdapter implements IEventBus {
    * @param message Mensaje de depuración o argumentos a registrar
    * @param data Datos adicionales (opcional)
    */
-  public debug(message: string | any, data?: any): void {
-    // Si se llama con múltiples argumentos (console.debug style)
-    if (arguments.length > 1 || typeof message !== 'string') {
+  // Implementación de ambas firmas de debug para IEventBus
+  public debug(message: string | any, data?: any): void;
+  public debug(...args: any[]): void {
+    if (args.length > 1 || typeof args[0] !== 'string') {
       if (this.debugMode) {
-        console.debug('[EventBusAdapter]', ...arguments);
+        console.debug('[EventBusAdapter]', ...args);
       }
       return;
     }
-    
     // Si se llama con la firma original (message, data?)
-    this.eventBus.debug(message, data);
+    this.eventBus.debug(args[0], args[1]);
   }
   
   /**

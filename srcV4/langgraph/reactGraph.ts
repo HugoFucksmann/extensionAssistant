@@ -2,7 +2,8 @@ import { ReActState, ReActGraphResult, IntermediateStep, createInitialReActState
 import { ModelManager } from '../models/modelManager';
 import { ToolRegistry } from '../tools/toolRegistry';
 import EventEmitter from 'eventemitter3';
-import { WindsurfEvents } from '../core/windsurfController_OLD';
+import { EventType } from '../shared/events/types/eventTypes';
+
 
 /**
  * Clase que implementa el grafo ReAct utilizando LangGraph
@@ -61,27 +62,27 @@ export class ReActGraph {
     try {
       // Paso 1: Análisis inicial del mensaje del usuario
       nodeVisits.push('analysis');
-      this.eventEmitter.emit(WindsurfEvents.REASONING_STARTED, { chatId, phase: 'analysis' });
+      this.eventEmitter.emit(EventType.REASONING_STARTED, { chatId, phase: 'analysis' });
       state = await this.analyzeUserMessage(state);
-      this.eventEmitter.emit(WindsurfEvents.REASONING_COMPLETED, { chatId, phase: 'analysis', result: state.intermediateSteps[state.intermediateSteps.length - 1] });
+      this.eventEmitter.emit(EventType.REASONING_COMPLETED, { chatId, phase: 'analysis', result: state.intermediateSteps[state.intermediateSteps.length - 1] });
       
       // Paso 2: Planificación y razonamiento
       nodeVisits.push('reasoning');
-      this.eventEmitter.emit(WindsurfEvents.REASONING_STARTED, { chatId, phase: 'reasoning' });
+      this.eventEmitter.emit(EventType.REASONING_STARTED, { chatId, phase: 'reasoning' });
       state = await this.planAndReason(state);
-      this.eventEmitter.emit(WindsurfEvents.REASONING_COMPLETED, { chatId, phase: 'reasoning', result: state.intermediateSteps[state.intermediateSteps.length - 1] });
+      this.eventEmitter.emit(EventType.REASONING_COMPLETED, { chatId, phase: 'reasoning', result: state.intermediateSteps[state.intermediateSteps.length - 1] });
       
       // Paso 3: Ejecutar acciones basadas en el razonamiento
       nodeVisits.push('action');
-      this.eventEmitter.emit(WindsurfEvents.ACTION_STARTED, { chatId, phase: 'action' });
+      this.eventEmitter.emit(EventType.ACTION_STARTED, { chatId, phase: 'action' });
       state = await this.executeActions(state);
-      this.eventEmitter.emit(WindsurfEvents.ACTION_COMPLETED, { chatId, phase: 'action', result: state.intermediateSteps[state.intermediateSteps.length - 1] });
+      this.eventEmitter.emit(EventType.ACTION_COMPLETED, { chatId, phase: 'action', result: state.intermediateSteps[state.intermediateSteps.length - 1] });
       
       // Paso 4: Reflexionar sobre los resultados
       nodeVisits.push('reflection');
-      this.eventEmitter.emit(WindsurfEvents.REFLECTION_STARTED, { chatId, phase: 'reflection' });
+      this.eventEmitter.emit(EventType.REACT_REFLECTION_STARTED, { chatId, phase: 'reflection' });
       state = await this.reflectOnResults(state);
-      this.eventEmitter.emit(WindsurfEvents.REFLECTION_COMPLETED, { chatId, phase: 'reflection', result: state.intermediateSteps[state.intermediateSteps.length - 1] });
+      this.eventEmitter.emit(EventType.REACT_REFLECTION_COMPLETED, { chatId, phase: 'reflection', result: state.intermediateSteps[state.intermediateSteps.length - 1] });
       
       // Paso 5: Generar respuesta final
       nodeVisits.push('response');
@@ -92,7 +93,7 @@ export class ReActGraph {
       state.finalResponse = `Lo siento, ocurrió un error durante el procesamiento: ${error.message}`;
       
       // Emitir evento de error
-      this.eventEmitter.emit(WindsurfEvents.ERROR_OCCURRED, { 
+      this.eventEmitter.emit(EventType.ERROR_OCCURRED, { 
         chatId, 
         error: error.message, 
         stack: error.stack 
@@ -110,7 +111,7 @@ export class ReActGraph {
     
     // Emitir evento de respuesta generada
     if (state.finalResponse) {
-      this.eventEmitter.emit(WindsurfEvents.RESPONSE_GENERATED, {
+      this.eventEmitter.emit(EventType.RESPONSE_GENERATED, {
         chatId,
         response: state.finalResponse,
         metadata: {

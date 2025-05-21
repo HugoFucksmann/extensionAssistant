@@ -4,8 +4,9 @@
  */
 
 import * as vscode from 'vscode';
-import { WindsurfController } from '../core/windsurfController_OLD';
+
 import { getHtmlContent } from './webView/htmlTemplate';
+import { WindsurfController } from '../core/controller/windsurfController';
 
 /**
  * Panel principal de la extensión

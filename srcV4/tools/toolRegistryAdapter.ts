@@ -4,7 +4,7 @@
  */
 
 import { IToolRegistry } from '../core/interfaces/tool-registry.interface';
-import { EventType } from '../events/eventTypes';
+import { EventType } from '../shared/events/types/eventTypes';
 import { Tool, ToolResult } from '../core/types';
 import { ToolRegistry } from './toolRegistry';
 import { IEventBus } from '../core/interfaces/event-bus.interface';

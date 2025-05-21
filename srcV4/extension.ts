@@ -1,12 +1,15 @@
+// extension.ts
+
 /**
  * Punto de entrada principal para la extensión VS Code
  * Integra la arquitectura Windsurf con VS Code
  */
 
 import * as vscode from 'vscode';
-import { WindsurfController } from './core/windsurfController_OLD';
 import { WindsurfPanel } from './ui/windsurfPanel';
 import { VSCodeContext } from './core/types';
+import { WindsurfController } from './core/controller/windsurfController';
+
 
 /**
  * Función de activación de la extensión

@@ -1,9 +1,11 @@
+// events/components/eventLogger.ts
+
 /**
  * Sistema de logging para eventos de la arquitectura Windsurf
  */
 
-import { EventBus } from './eventBus';
-import { EventType, WindsurfEvent } from './eventTypes';
+import { EventBus } from '../core/eventBus'; // RUTA AJUSTADA
+import { EventType, WindsurfEvent } from '../types/eventTypes'; // RUTA AJUSTADA
 
 /**
  * Opciones de configuración para el EventLogger

@@ -1,3 +1,5 @@
+// conversation/conversationManager.ts
+
 /**
  * Gestor de conversaciones para la arquitectura Windsurf
  * Implementa la lógica de gestión de conversaciones y delega en los componentes especializados
@@ -9,8 +11,9 @@ import { IEventBus } from '../interfaces/event-bus.interface';
 import { IReActGraph } from '../interfaces/react-graph.interface';
 import { IToolRegistry } from '../interfaces/tool-registry.interface';
 import { AgentState, createInitialAgentState, updateAgentState, addMessage } from '../state/agent-state';
-import { EventType } from '../../events/eventTypes';
 import { IMemoryManager } from '../../features/memory';
+import { EventType } from '../../shared/events';
+
 
 /**
  * Implementación del gestor de conversaciones

@@ -1,10 +1,12 @@
+// shared/events/core/eventBus.ts
+
 /**
  * Bus de eventos centralizado para la arquitectura Windsurf
  * Implementa el patrón singleton para asegurar una única instancia
  */
 
-import { EventManager } from './eventManager';
-import { EventType, EventPayload, WindsurfEvent, BaseEventPayload } from './eventTypes';
+import { EventManager } from '../components/eventManager'; // RUTA AJUSTADA
+import { EventType, EventPayload, WindsurfEvent, BaseEventPayload } from '../types/eventTypes'; // RUTA AJUSTADA
 
 /**
  * Bus de eventos centralizado para la arquitectura Windsurf
@@ -47,8 +49,6 @@ export class EventBus {
     this.debugMode = enabled;
     console.log(`[EventBus] Debug mode ${enabled ? 'enabled' : 'disabled'}`);
   }
-
-
 
   /**
    * Emite un evento con el tipo y payload especificados
@@ -135,19 +135,21 @@ export class EventBus {
    * @param message Mensaje de depuración o argumentos a registrar
    * @param data Datos adicionales (opcional)
    */
-  debug(message: string | any, data?: any): void {
+  // Implementación de ambas firmas de debug para IEventBus
+  public debug(message: string | any, data?: any): void;
+  public debug(...args: any[]): void {
     // Si se llama con múltiples argumentos (console.debug style)
-    if (arguments.length > 1 || typeof message !== 'string') {
+    if (args.length > 1 || typeof args[0] !== 'string') {
       if (this.debugMode) {
-        console.debug('[EventBus]', ...arguments);
+        console.debug('[EventBus]', ...args);
       }
       return;
     }
     
     // Si se llama con la firma original (message, data?)
     this.emit(EventType.DEBUG_LOG, {
-      message,
-      data,
+      message: args[0],
+      data: args[1],
       level: 'log',
       timestamp: Date.now()
     });
@@ -158,7 +160,7 @@ export class EventBus {
    * @param message Mensaje de advertencia
    * @param data Datos adicionales
    */
-  warn(message: string, data?: any): void {
+  public warn(message: string, data?: any): void {
     this.emit(EventType.DEBUG_WARNING, {
       message,
       data,

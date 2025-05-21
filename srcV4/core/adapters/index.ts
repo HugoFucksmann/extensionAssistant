@@ -4,7 +4,7 @@
  */
 
 // Exportar adaptadores
-export { EventBusAdapter } from '../../events/eventBusAdapter';
+
 //export { MemoryManagerAdapter } from '../../memory/memoryManagerAdapter';
 export { ModelManagerAdapter } from '../../models/modelManagerAdapter';
 export { ToolRegistryAdapter } from '../../tools/toolRegistryAdapter';

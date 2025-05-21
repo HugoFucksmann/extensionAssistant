@@ -1,9 +1,11 @@
+// core/interfaces/event-bus.interface.ts
+
 /**
  * Interfaz para el sistema de eventos de la arquitectura Windsurf
  * Define el contrato que debe implementar cualquier bus de eventos
  */
 
-import { EventType, EventPayload, WindsurfEvent } from '../../events/eventTypes';
+import { EventType, EventPayload, WindsurfEvent } from '../../shared/events/types/eventTypes'; // RUTA AJUSTADA
 
 export interface IEventBus {
   /**
@@ -21,10 +23,14 @@ export interface IEventBus {
   setDebugMode(enabled: boolean): void;
   
   /**
-   * Registra un mensaje de depuración
-   * @param args Argumentos a registrar
+   * Registra un mensaje de depuración. Soporta firmas flexibles.
+   * @param message Mensaje de depuración (puede ser el primer argumento de un console.debug)
+   * @param data Datos adicionales (puede ser el segundo argumento de un console.debug)
+   * O bien, puede aceptar múltiples argumentos como un console.debug.
    */
-  debug(...args: any[]): void;
+  // Ajusta la firma para ser compatible con la implementación de EventBus y EventBusAdapter
+  debug(message: string | any, data?: any): void; // Firme 1
+  debug(...args: any[]): void; // Firme 2 (para compatibilidad con console.debug-like calls)
 
   /**
    * Registra un listener para un tipo de evento específico
@@ -67,13 +73,6 @@ export interface IEventBus {
    * Limpia el historial de eventos
    */
   clearEventHistory(): void;
-
-  /**
-   * Registra un mensaje de depuración
-   * @param message Mensaje de depuración
-   * @param data Datos adicionales
-   */
-  debug(message: string, data?: any): void;
 
   /**
    * Crea un evento de depuración de nivel warning

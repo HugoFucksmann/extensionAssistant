@@ -1,10 +1,12 @@
+// events/components/eventManager.ts
+
 /**
  * Sistema avanzado de gestión de eventos para la arquitectura Windsurf
  */
 
 import EventEmitter from 'eventemitter3';
 import { v4 as uuidv4 } from 'uuid';
-import { EventType, EventPayload, WindsurfEvent } from './eventTypes';
+import { EventType, EventPayload, WindsurfEvent } from '../types/eventTypes'; // RUTA AJUSTADA
 
 /**
  * Opciones para la configuración del EventManager
@@ -29,8 +31,6 @@ export interface EventFilter {
   custom?: (event: WindsurfEvent) => boolean;
 }
 
-
-
 /**
  * Gestor avanzado de eventos para la arquitectura Windsurf
  */
@@ -39,7 +39,6 @@ export class EventManager {
   private eventHistory: WindsurfEvent[] = [];
   private options: EventManagerOptions;
   private eventListeners: Map<string, Set<Function>> = new Map();
-  
   
   /**
    * Constructor del gestor de eventos

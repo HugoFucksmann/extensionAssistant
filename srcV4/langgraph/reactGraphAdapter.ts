@@ -8,7 +8,7 @@ import { IToolRegistry } from '../core/interfaces/tool-registry.interface';
 import { AgentState, updateAgentState } from '../core/state/agent-state';
 import { ReActGraph } from './reactGraph';
 import { IEventBus } from '../core/interfaces/event-bus.interface';
-import { EventType } from '../events/eventTypes';
+import { EventType } from '../shared/events/types/eventTypes';
 import { ReActState, ReActGraphResult, IntermediateStep, createInitialReActState } from './types';
 
 // Definición interna para los resultados de ejecución

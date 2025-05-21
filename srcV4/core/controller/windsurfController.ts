@@ -1,16 +1,15 @@
 // src/core/windsurfController.ts
+
 /**
  * Controlador principal de la arquitectura Windsurf (Refactorizado)
  * Implementa el patrón singleton y delega en el ConversationManager
  */
-
 
 import { VSCodeContext } from '../types';
 import { IEventBus } from '../interfaces/event-bus.interface';
 import { IConversationManager } from '../interfaces/conversation-manager.interface';
 import { ConversationManager } from '../conversation/conversationManager';
 import { EventEmitter } from 'events';
-import { EventType } from '../../events/eventTypes';
 
 import { IMemoryManager, MemoryManagerAdapter } from '../../features/memory';
 import { MemoryManager } from '../../features/memory/core';
@@ -20,13 +19,14 @@ import { ModelManager } from '../../models/modelManager';
 import { ModelManagerAdapter } from '../../models/modelManagerAdapter';
 
 import { IReActGraph } from '../interfaces/react-graph.interface';
-import {  createReActGraph } from '../../langgraph/reactGraph';
+import { createReActGraph } from '../../langgraph/reactGraph';
 import { ReActGraphAdapter } from '../../langgraph/reactGraphAdapter';
 
 import { IToolRegistry } from '../interfaces/tool-registry.interface';
 import { ToolRegistry } from '../../tools/toolRegistry';
 import { ToolRegistryAdapter } from '../../tools/toolRegistryAdapter';
 import { ComponentFactory } from '../factory/componentFactory';
+import { EventType } from '../../shared/events';
 
 
 /**
@@ -54,7 +54,7 @@ export class WindsurfController {
   private toolRegistry: IToolRegistry;
 
   // Añadir una referencia a la ComponentFactory
-  private componentFactory: ComponentFactory; // <--- NUEVO: Para acceder a la factory
+  private componentFactory: ComponentFactory;
 
   /**
    * Constructor privado para implementar el patrón singleton
@@ -63,34 +63,34 @@ export class WindsurfController {
     this.vscodeContext = context;
 
     // Obtener la instancia de ComponentFactory
-    this.componentFactory = ComponentFactory.getInstance(); // <--- Obtiene la factory aquí
+    this.componentFactory = ComponentFactory.getInstance();
 
     // Inicializar el bus de eventos usando la factory
-    this.eventBus = this.componentFactory.getEventBus(); // <--- CAMBIO: Obtiene el EventBus de la factory
+    this.eventBus = this.componentFactory.getEventBus();
 
-    // Inicializar componentes base
+    // Inicializar componentes base con el eventBus
     const memoryManagerBase = new MemoryManager();
     const modelManagerBase = new ModelManager();
     const toolRegistryBase = new ToolRegistry();
 
     // Crear adaptadores que implementan las interfaces requeridas
+    // Si la factory se encarga completamente de inyectar los ADAPTADORES, esta parte podría cambiar.
+    // Pero para asegurar que el controlador tenga instancias válidas, los inicializamos aquí.
     this.memoryManager = new MemoryManagerAdapter(memoryManagerBase, this.eventBus);
     this.modelManager = new ModelManagerAdapter(modelManagerBase, this.eventBus);
     this.toolRegistry = new ToolRegistryAdapter(toolRegistryBase, this.eventBus);
 
     // Inicializar el grafo ReAct
-    // Nota: Temporalmente usamos el EventBus original hasta que se refactorice completamente el grafo ReAct
     const defaultModel = 'gemini-pro';
     // Usamos require para obtener el EventBus original sin importarlo directamente
-    // Considera si este 'originalEventBus' sigue siendo necesario o si reactGraph puede usar this.eventBus directamente
-    const originalEventBus = require('../../events/eventBus').EventBus.getInstance();
+    // CAMBIO CRÍTICO: La ruta a eventBus.ts se ajusta para Shared/events/core/
+    const originalEventBus = require('../../shared/events/core/eventBus').EventBus.getInstance(); // RUTA AJUSTADA
     const reactGraphBase = createReActGraph(defaultModel, originalEventBus);
 
     // Crear el adaptador para el grafo ReAct
     this.reactGraph = new ReActGraphAdapter(reactGraphBase, this.eventBus);
 
     // Pasar el toolRegistry al grafo ReAct
-    // Usamos casting explícito a unknown primero para evitar errores de tipo
     if ('setToolRegistry' in this.reactGraph) {
       (this.reactGraph as any).setToolRegistry(this.toolRegistry);
     }

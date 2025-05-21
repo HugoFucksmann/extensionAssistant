@@ -1,11 +1,14 @@
+// langgraph/nodes.ts
+
 import { ReActNodeType } from '../core/config';
 import { createInitialReActState, ReActState, ReActNodeFunction } from './types';
 import { PromptManager } from '../prompts/promptManager';
 import { ModelManager } from '../models/modelManager';
 import { ToolRegistry } from '../tools/toolRegistry';
 import { RunnableLambda } from '@langchain/core/runnables';
-import { EventType, NodeEventPayload, ToolExecutionPayload } from '../core/events';
-import { eventBus } from '../core/eventBus';
+// RUTAS AJUSTADAS: Importar tipos y la instancia de eventBus desde la nueva ubicación en shared/events
+import { EventType, NodeEventPayload, ToolExecutionEventPayload } from '../shared/events/types/eventTypes';
+import { eventBus } from '../shared/events/core/eventBus';
 
 /**
  * Clase que implementa los nodos del grafo ReAct
@@ -35,10 +38,10 @@ export class ReActNodes {
         
         try {
           // Emitir evento de inicio del nodo
-          eventBus.emitEvent<NodeEventPayload>(EventType.NODE_START, {
-            type: ReActNodeType.INITIAL_ANALYSIS,
-            state
-          }, 'ReActNodes.initialAnalysisNode');
+          eventBus.emit(EventType.NODE_START, { // USANDO EL EVENTBUS CANÓNICO
+            nodeType: ReActNodeType.INITIAL_ANALYSIS,
+            stateSnapshot: state // Usando el nuevo nombre de payload para el estado
+          } as NodeEventPayload); // Casting explícito para asegurar compatibilidad con el payload unido
           
           // Obtener el prompt para el análisis inicial
           const prompt = this.promptManager.getPrompt(ReActNodeType.INITIAL_ANALYSIS);
@@ -75,23 +78,23 @@ export class ReActNodes {
           const duration = Date.now() - startTime;
           
           // Emitir evento de finalización del nodo
-          eventBus.emitEvent<NodeEventPayload>(EventType.NODE_COMPLETE, {
-            type: ReActNodeType.INITIAL_ANALYSIS,
-            state: updatedState,
+          eventBus.emit(EventType.NODE_COMPLETE, { // USANDO EL EVENTBUS CANÓNICO
+            nodeType: ReActNodeType.INITIAL_ANALYSIS, // Changed from type to nodeType
+            stateSnapshot: updatedState, // Usando el nuevo nombre de payload para el estado
             duration
-          }, 'ReActNodes.initialAnalysisNode');
+          } as NodeEventPayload);
           
           return updatedState;
         } catch (error) {
           const duration = Date.now() - startTime;
           
           // Emitir evento de error del nodo
-          eventBus.emitEvent<NodeEventPayload>(EventType.NODE_ERROR, {
-            type: ReActNodeType.INITIAL_ANALYSIS,
-            state,
+          eventBus.emit(EventType.NODE_ERROR, { // USANDO EL EVENTBUS CANÓNICO
+            nodeType: ReActNodeType.INITIAL_ANALYSIS, // Changed from type to nodeType
+            stateSnapshot: state, // Usando el nuevo nombre de payload para el estado
             error: error as Error,
             duration
-          }, 'ReActNodes.initialAnalysisNode');
+          } as NodeEventPayload);
           
           throw error;
         }
@@ -109,10 +112,10 @@ export class ReActNodes {
         
         try {
           // Emitir evento de inicio del nodo
-          eventBus.emitEvent<NodeEventPayload>(EventType.NODE_START, {
-            type: ReActNodeType.REASONING,
-            state
-          }, 'ReActNodes.reasoningNode');
+          eventBus.emit(EventType.NODE_START, { // USANDO EL EVENTBUS CANÓNICO
+            nodeType: ReActNodeType.REASONING, // Changed from type to nodeType
+            stateSnapshot: state
+          } as NodeEventPayload);
           
           // Obtener el prompt para el razonamiento
           const prompt = this.promptManager.getPrompt(ReActNodeType.REASONING);
@@ -156,23 +159,23 @@ export class ReActNodes {
           const duration = Date.now() - startTime;
           
           // Emitir evento de finalización del nodo
-          eventBus.emitEvent<NodeEventPayload>(EventType.NODE_COMPLETE, {
-            type: ReActNodeType.REASONING,
-            state: updatedState,
+          eventBus.emit(EventType.NODE_COMPLETE, { // USANDO EL EVENTBUS CANÓNICO
+            nodeType: ReActNodeType.REASONING, // Changed from type to nodeType
+            stateSnapshot: updatedState,
             duration
-          }, 'ReActNodes.reasoningNode');
+          } as NodeEventPayload);
           
           return updatedState;
         } catch (error) {
           const duration = Date.now() - startTime;
           
           // Emitir evento de error del nodo
-          eventBus.emitEvent<NodeEventPayload>(EventType.NODE_ERROR, {
-            type: ReActNodeType.REASONING,
-            state,
+          eventBus.emit(EventType.NODE_ERROR, { // USANDO EL EVENTBUS CANÓNICO
+            nodeType: ReActNodeType.REASONING, // Changed from type to nodeType
+            stateSnapshot: state,
             error: error as Error,
             duration
-          }, 'ReActNodes.reasoningNode');
+          } as NodeEventPayload);
           
           throw error;
         }
@@ -190,10 +193,10 @@ export class ReActNodes {
         
         try {
           // Emitir evento de inicio del nodo
-          eventBus.emitEvent<NodeEventPayload>(EventType.NODE_START, {
-            type: ReActNodeType.ACTION,
-            state
-          }, 'ReActNodes.actionNode');
+          eventBus.emit(EventType.NODE_START, { // USANDO EL EVENTBUS CANÓNICO
+            nodeType: ReActNodeType.ACTION, // Changed from type to nodeType
+            stateSnapshot: state
+          } as NodeEventPayload);
           
           // Verificar si hay un plan de razonamiento
           if (!state.reasoning || !state.reasoning.steps || state.reasoning.steps.length === 0) {
@@ -226,10 +229,11 @@ export class ReActNodes {
           };
           
           // Emitir evento de inicio de ejecución de herramienta
-          eventBus.emitEvent<ToolExecutionPayload>(EventType.TOOL_EXECUTION_START, {
+          eventBus.emit(EventType.TOOL_EXECUTION_STARTED, { // USANDO EL EVENTBUS CANÓNICO
             toolName: action.toolName,
-            params: action.toolInput
-          }, 'ReActNodes.actionNode');
+            parameters: action.toolInput,
+            chatId: state.metadata.chatId // Añadir chatId al payload de la herramienta
+          } as ToolExecutionEventPayload); // Casting explícito para el payload unido
           
           // Ejecutar la herramienta
           const toolStartTime = Date.now();
@@ -248,12 +252,13 @@ export class ReActNodes {
           };
           
           // Emitir evento de finalización de ejecución de herramienta
-          eventBus.emitEvent<ToolExecutionPayload>(EventType.TOOL_EXECUTION_COMPLETE, {
+          eventBus.emit(EventType.TOOL_EXECUTION_COMPLETED, { // USANDO EL EVENTBUS CANÓNICO
             toolName: updatedAction.toolName,
-            params: updatedAction.toolInput,
+            parameters: updatedAction.toolInput,
             result: toolResult,
-            duration: toolDuration
-          }, 'ReActNodes.actionNode');
+            duration: toolDuration,
+            chatId: state.metadata.chatId
+          } as ToolExecutionEventPayload);
           
           // Actualizar el estado con la acción
           const updatedState: ReActState = {
@@ -283,29 +288,9 @@ export class ReActNodes {
             timestamp: Date.now()
           });
           
-          const duration = Date.now() - startTime;
-          
-          // Emitir evento de finalización del nodo
-          eventBus.emitEvent<NodeEventPayload>(EventType.NODE_COMPLETE, {
-            type: ReActNodeType.ACTION,
-            state: updatedState,
-            duration
-          }, 'ReActNodes.actionNode');
-          
           return updatedState;
         } catch (error) {
-          const duration = Date.now() - startTime;
-          
-          // Emitir evento de error del nodo
-          eventBus.emitEvent<NodeEventPayload>(EventType.NODE_ERROR, {
-            type: ReActNodeType.ACTION,
-            state,
-            error: error as Error,
-            duration
-          }, 'ReActNodes.actionNode');
-          
-          // Actualizar el estado con el error
-          const updatedState: ReActState = {
+          const errorState: ReActState = {
             ...state,
             action: {
               ...(state.action || { toolName: '', toolInput: {}, isComplete: false }),
@@ -314,7 +299,15 @@ export class ReActNodes {
             currentNode: ReActNodeType.REFLECTION
           };
           
-          return updatedState;
+          // Emitir evento de error
+          eventBus.emit(EventType.NODE_ERROR, {
+            nodeType: ReActNodeType.ACTION,
+            stateSnapshot: errorState,
+            error: error as Error,
+            duration: Date.now() - startTime
+          } as NodeEventPayload);
+          
+          return errorState;
         }
       }
     });
@@ -330,10 +323,10 @@ export class ReActNodes {
         
         try {
           // Emitir evento de inicio del nodo
-          eventBus.emitEvent<NodeEventPayload>(EventType.NODE_START, {
-            type: ReActNodeType.REFLECTION,
-            state
-          }, 'ReActNodes.reflectionNode');
+          eventBus.emit(EventType.NODE_START, { // USANDO EL EVENTBUS CANÓNICO
+            nodeType: ReActNodeType.REFLECTION, // Changed from type to nodeType
+            stateSnapshot: state
+          } as NodeEventPayload);
           
           // Obtener el prompt para la reflexión
           const prompt = this.promptManager.getPrompt(ReActNodeType.REFLECTION);
@@ -394,23 +387,23 @@ export class ReActNodes {
           const duration = Date.now() - startTime;
           
           // Emitir evento de finalización del nodo
-          eventBus.emitEvent<NodeEventPayload>(EventType.NODE_COMPLETE, {
-            type: ReActNodeType.REFLECTION,
-            state: updatedState,
+          eventBus.emit(EventType.NODE_COMPLETE, { // USANDO EL EVENTBUS CANÓNICO
+            nodeType: ReActNodeType.REFLECTION, // Changed from type to nodeType
+            stateSnapshot: updatedState,
             duration
-          }, 'ReActNodes.reflectionNode');
+          } as NodeEventPayload);
           
           return updatedState;
         } catch (error) {
           const duration = Date.now() - startTime;
           
           // Emitir evento de error del nodo
-          eventBus.emitEvent<NodeEventPayload>(EventType.NODE_ERROR, {
-            type: ReActNodeType.REFLECTION,
-            state,
+          eventBus.emit(EventType.NODE_ERROR, { // USANDO EL EVENTBUS CANÓNICO
+            nodeType: ReActNodeType.REFLECTION, // Changed from type to nodeType
+            stateSnapshot: state,
             error: error as Error,
             duration
-          }, 'ReActNodes.reflectionNode');
+          } as NodeEventPayload);
           
           throw error;
         }
@@ -428,10 +421,10 @@ export class ReActNodes {
         
         try {
           // Emitir evento de inicio del nodo
-          eventBus.emitEvent<NodeEventPayload>(EventType.NODE_START, {
-            type: ReActNodeType.CORRECTION,
-            state
-          }, 'ReActNodes.correctionNode');
+          eventBus.emit(EventType.NODE_START, { // USANDO EL EVENTBUS CANÓNICO
+            nodeType: ReActNodeType.CORRECTION, // Changed from type to nodeType
+            stateSnapshot: state
+          } as NodeEventPayload);
           
           // Obtener el prompt para la corrección
           const prompt = this.promptManager.getPrompt(ReActNodeType.CORRECTION);
@@ -487,23 +480,23 @@ export class ReActNodes {
           const duration = Date.now() - startTime;
           
           // Emitir evento de finalización del nodo
-          eventBus.emitEvent<NodeEventPayload>(EventType.NODE_COMPLETE, {
-            type: ReActNodeType.CORRECTION,
-            state: updatedState,
+          eventBus.emit(EventType.NODE_COMPLETE, { // USANDO EL EVENTBUS CANÓNICO
+            nodeType: ReActNodeType.CORRECTION, // Changed from type to nodeType
+            stateSnapshot: updatedState,
             duration
-          }, 'ReActNodes.correctionNode');
+          } as NodeEventPayload);
           
           return updatedState;
         } catch (error) {
           const duration = Date.now() - startTime;
           
           // Emitir evento de error del nodo
-          eventBus.emitEvent<NodeEventPayload>(EventType.NODE_ERROR, {
-            type: ReActNodeType.CORRECTION,
-            state,
+          eventBus.emit(EventType.NODE_ERROR, { // USANDO EL EVENTBUS CANÓNICO
+            nodeType: ReActNodeType.CORRECTION, // Changed from type to nodeType
+            stateSnapshot: state,
             error: error as Error,
             duration
-          }, 'ReActNodes.correctionNode');
+          } as NodeEventPayload);
           
           throw error;
         }
@@ -521,10 +514,10 @@ export class ReActNodes {
         
         try {
           // Emitir evento de inicio del nodo
-          eventBus.emitEvent<NodeEventPayload>(EventType.NODE_START, {
-            type: ReActNodeType.RESPONSE_GENERATION,
-            state
-          }, 'ReActNodes.responseNode');
+          eventBus.emit(EventType.NODE_START, { // USANDO EL EVENTBUS CANÓNICO
+            nodeType: ReActNodeType.RESPONSE_GENERATION, // Changed from type to nodeType
+            stateSnapshot: state
+          } as NodeEventPayload);
           
           // Obtener el prompt para la respuesta
           const prompt = this.promptManager.getPrompt(ReActNodeType.RESPONSE_GENERATION);
@@ -549,7 +542,7 @@ export class ReActNodes {
           const updatedState: ReActState = {
             ...state,
             finalResponse: response,
-            currentNode: ReActNodeType.RESPONSE_GENERATION,
+            // currentNode no se cambia a RESPONSE_GENERATION aquí ya que es un estado final implícito
             metadata: {
               ...state.metadata,
               endTime: Date.now()
@@ -559,23 +552,41 @@ export class ReActNodes {
           const duration = Date.now() - startTime;
           
           // Emitir evento de finalización del nodo
-          eventBus.emitEvent<NodeEventPayload>(EventType.NODE_COMPLETE, {
-            type: ReActNodeType.RESPONSE_GENERATION,
-            state: updatedState,
+          eventBus.emit(EventType.NODE_COMPLETE, { // USANDO EL EVENTBUS CANÓNICO
+            nodeType: ReActNodeType.RESPONSE_GENERATION, // Changed from type to nodeType
+            stateSnapshot: updatedState,
             duration
-          }, 'ReActNodes.responseNode');
+          } as NodeEventPayload);
+
+          // Emitir el evento de respuesta generada (que ya existía en reactGraph.ts)
+          // Esto puede ser un duplicado si reactGraph.ts también lo emite.
+          // Decide si quieres que el nodo lo emita o el grafo después de la ejecución.
+          eventBus.emit(EventType.RESPONSE_GENERATED, {
+              chatId: updatedState.metadata.chatId,
+              response: updatedState.finalResponse,
+              success: true, // Asumiendo éxito si la respuesta se generó
+              duration: duration
+          });
           
           return updatedState;
         } catch (error) {
           const duration = Date.now() - startTime;
           
           // Emitir evento de error del nodo
-          eventBus.emitEvent<NodeEventPayload>(EventType.NODE_ERROR, {
-            type: ReActNodeType.RESPONSE_GENERATION,
-            state,
+          eventBus.emit(EventType.NODE_ERROR, { // USANDO EL EVENTBUS CANÓNICO
+            nodeType: ReActNodeType.RESPONSE_GENERATION, // Changed from type to nodeType
+            stateSnapshot: state,
             error: error as Error,
             duration
-          }, 'ReActNodes.responseNode');
+          } as NodeEventPayload);
+
+          // Emitir un evento de error más general si falla la generación de respuesta
+          eventBus.emit(EventType.ERROR_OCCURRED, {
+            chatId: state.metadata.chatId,
+            error: (error as Error).message,
+            stack: (error as Error).stack,
+            source: 'ReActNodes.responseNode'
+          });
           
           throw error;
         }

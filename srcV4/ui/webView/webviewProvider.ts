@@ -7,7 +7,7 @@ import * as vscode from 'vscode';
 // Asegurarse de que htmlTemplate exporta correctamente la función getHtmlContent
 import * as htmlTemplate from './htmlTemplate';
 import { WindsurfController } from '../../core/controller/windsurfController';
-import { EventBus } from '../../events/eventBus';
+import { EventBus } from '../../shared/events/core/eventBus';
 import { 
   EventType, 
   WindsurfEvent, 
@@ -16,8 +16,9 @@ import {
   ToolExecutionEventPayload, 
   ResponseEventPayload, 
   ErrorEventPayload
-} from '../../events/eventTypes';
-import { WindsurfEvents } from '../../events/windsurfEvents';
+} from '../../shared/events/types/eventTypes';
+import { WindsurfEvents } from '../../shared/events';
+
 
 /**
  * Proveedor de webview para la extensión
