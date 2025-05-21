@@ -5,7 +5,8 @@
 
 import { ReActNodeType } from './config';
 import { ReActState } from '../langgraph/types';
-import { WindsurfState } from './types';
+import { WindsurfState } from '../features/memory/types';
+
 
 /**
  * Tipos de eventos en el sistema

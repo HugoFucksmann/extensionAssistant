@@ -1,13 +1,15 @@
+// features/memory/adapters/memoryManagerAdapter.ts
 /**
  * Adaptador para el MemoryManager que implementa la interfaz IMemoryManager
  * Permite utilizar el MemoryManager existente a través de la interfaz definida
  */
 
-import { IMemoryManager, ConversationSummary } from '../core/interfaces/memory-manager.interface';
-import { AgentState } from '../core/state/agent-state';
-import { MemoryManager } from './memoryManager';
-import { WindsurfState } from '../core/types';
-import { IEventBus } from '../core/interfaces/event-bus.interface';
+import { IMemoryManager, ConversationSummary, WindsurfState, HistoryEntry } from '../types'; // <--- CAMBIO: Importar desde tipos del módulo
+
+import { MemoryManager } from '../core/memoryManager'; // <--- CAMBIO: Ruta de importación para MemoryManager
+import { IEventBus } from '../../../core/adapters';
+import { AgentState } from '../../../core/state/agent-state';
+
 
 /**
  * Adaptador para el MemoryManager que implementa la interfaz IMemoryManager
@@ -15,7 +17,7 @@ import { IEventBus } from '../core/interfaces/event-bus.interface';
 export class MemoryManagerAdapter implements IMemoryManager {
   private memoryManager: MemoryManager;
   private eventBus: IEventBus;
-  
+
   /**
    * Constructor del adaptador
    * @param memoryManager Instancia del MemoryManager original
@@ -25,7 +27,7 @@ export class MemoryManagerAdapter implements IMemoryManager {
     this.memoryManager = memoryManager;
     this.eventBus = eventBus;
   }
-  
+
   /**
    * Almacena un valor en la memoria a corto plazo
    * @param key Clave para almacenar el valor
@@ -35,7 +37,7 @@ export class MemoryManagerAdapter implements IMemoryManager {
   public storeShortTerm(key: string, value: any, chatId: string): void {
     this.memoryManager.storeShortTerm(key, value, chatId);
   }
-  
+
   /**
    * Recupera un valor de la memoria a corto plazo
    * @param key Clave del valor a recuperar
@@ -45,7 +47,7 @@ export class MemoryManagerAdapter implements IMemoryManager {
   public getShortTerm<T = any>(key: string, chatId: string): T | undefined {
     return this.memoryManager.getShortTerm<T>(key, chatId);
   }
-  
+
   /**
    * Almacena un valor en la memoria a medio plazo
    * @param key Clave para almacenar el valor
@@ -57,7 +59,7 @@ export class MemoryManagerAdapter implements IMemoryManager {
     this.memoryManager.storeMediumTerm(key, value, chatId);
     // Nota: El MemoryManager actual no soporta TTL, se podría implementar en el futuro
   }
-  
+
   /**
    * Recupera un valor de la memoria a medio plazo
    * @param key Clave del valor a recuperar
@@ -67,7 +69,7 @@ export class MemoryManagerAdapter implements IMemoryManager {
   public getMediumTerm<T = any>(key: string, chatId: string): T | undefined {
     return this.memoryManager.getMediumTerm<T>(key, chatId);
   }
-  
+
   /**
    * Almacena una conversación completa
    * @param chatId ID de la conversación
@@ -76,13 +78,13 @@ export class MemoryManagerAdapter implements IMemoryManager {
   public async storeConversation(chatId: string, state: AgentState): Promise<void> {
     // Convertir el AgentState al formato WindsurfState que espera el MemoryManager actual
     const windsurfState: WindsurfState = this.convertToWindsurfState(state);
-    
+
     // Almacenar usando el MemoryManager original
     await this.memoryManager.storeConversation(chatId, windsurfState);
-    
+
     this.eventBus.debug(`[MemoryManagerAdapter] Stored conversation for chat ${chatId}`);
   }
-  
+
   /**
    * Recupera una conversación completa
    * @param chatId ID de la conversación
@@ -91,15 +93,15 @@ export class MemoryManagerAdapter implements IMemoryManager {
   public async loadConversation(chatId: string): Promise<AgentState | null> {
     // Intentar recuperar el estado de la conversación de la memoria a corto plazo
     const windsurfState = this.memoryManager.getShortTerm<WindsurfState>('lastState', chatId);
-    
+
     if (!windsurfState) {
       return null;
     }
-    
+
     // Convertir el WindsurfState al formato AgentState
     return this.convertToAgentState(windsurfState, chatId);
   }
-  
+
   /**
    * Genera un resumen de la conversación
    * @param chatId ID de la conversación
@@ -108,7 +110,7 @@ export class MemoryManagerAdapter implements IMemoryManager {
   public async summarizeConversation(chatId: string): Promise<ConversationSummary> {
     // Recuperar el estado de la conversación
     const windsurfState = this.memoryManager.getShortTerm<WindsurfState>('lastState', chatId);
-    
+
     if (!windsurfState) {
       return {
         objective: '',
@@ -117,10 +119,10 @@ export class MemoryManagerAdapter implements IMemoryManager {
         timestamp: Date.now()
       };
     }
-    
+
     // Extraer insights del estado
     const insights = this.extractInsightsFromState(windsurfState);
-    
+
     return {
       objective: windsurfState.objective || '',
       keyPoints: insights,
@@ -128,7 +130,7 @@ export class MemoryManagerAdapter implements IMemoryManager {
       timestamp: Date.now()
     };
   }
-  
+
   /**
    * Elimina una conversación
    * @param chatId ID de la conversación
@@ -137,7 +139,7 @@ export class MemoryManagerAdapter implements IMemoryManager {
     this.memoryManager.clearConversationMemory(chatId);
     this.eventBus.debug(`[MemoryManagerAdapter] Cleared conversation for chat ${chatId}`);
   }
-  
+
   /**
    * Convierte un AgentState al formato WindsurfState
    * @param state Estado del agente
@@ -146,10 +148,10 @@ export class MemoryManagerAdapter implements IMemoryManager {
   private convertToWindsurfState(state: AgentState): WindsurfState {
     // Extraer el último mensaje del usuario
     const userMessage = state.messages.find(m => m.role === 'user')?.content || '';
-    
+
     // Extraer la última respuesta del asistente
     const assistantMessage = state.messages.find(m => m.role === 'assistant')?.content || '';
-    
+
     // Crear un historial de acciones a partir de toolExecutions
     const history: HistoryEntry[] = (state.toolExecutions || []).map(tool => {
       return {
@@ -162,7 +164,7 @@ export class MemoryManagerAdapter implements IMemoryManager {
         iteration: 1
       };
     });
-    
+
     // Añadir razonamientos si existen
     if (state.reasoning && state.reasoning.length > 0) {
       state.reasoning.forEach((reasoning, index) => {
@@ -174,14 +176,14 @@ export class MemoryManagerAdapter implements IMemoryManager {
         });
       });
     }
-    
+
     // Añadir reflexiones si existen
     if (state.reflections && state.reflections.length > 0) {
       state.reflections.forEach((reflection, index) => {
         history.push({
           phase: 'reflection',
           timestamp: Date.now() - (state.reflections!.length - index) * 1000,
-          data: { 
+          data: {
             insights: [reflection],
             success: true
           },
@@ -189,7 +191,7 @@ export class MemoryManagerAdapter implements IMemoryManager {
         });
       });
     }
-    
+
     return {
       chatId: state.chatId,
       objective: state.context.objective || userMessage,
@@ -203,7 +205,7 @@ export class MemoryManagerAdapter implements IMemoryManager {
       maxIterations: state.metadata?.maxIterations || 15
     };
   }
-  
+
   /**
    * Convierte un WindsurfState al formato AgentState
    * @param state Estado en formato WindsurfState
@@ -213,7 +215,7 @@ export class MemoryManagerAdapter implements IMemoryManager {
   private convertToAgentState(state: WindsurfState, chatId: string): AgentState {
     // Crear mensajes a partir del historial
     const messages = [];
-    
+
     // Añadir mensaje del usuario
     if (state.userMessage) {
       messages.push({
@@ -222,7 +224,7 @@ export class MemoryManagerAdapter implements IMemoryManager {
         timestamp: state.metadata.startTime || Date.now() - 60000
       });
     }
-    
+
     // Añadir respuesta del asistente
     if (state.response) {
       messages.push({
@@ -231,7 +233,7 @@ export class MemoryManagerAdapter implements IMemoryManager {
         timestamp: state.metadata.endTime || Date.now()
       });
     }
-    
+
     // Extraer herramientas ejecutadas
     const toolExecutions = state.history
       .filter(entry => entry.phase === 'action')
@@ -244,17 +246,17 @@ export class MemoryManagerAdapter implements IMemoryManager {
           success: true
         };
       });
-    
+
     // Extraer razonamientos
     const reasoning = state.history
       .filter(entry => entry.phase === 'reasoning')
       .map(entry => entry.data.reasoning || '');
-    
+
     // Extraer reflexiones
     const reflections = state.history
       .filter(entry => entry.phase === 'reflection')
       .flatMap(entry => entry.data.insights || []);
-    
+
     return {
       chatId,
       messages,
@@ -273,7 +275,7 @@ export class MemoryManagerAdapter implements IMemoryManager {
       metadata: state.metadata
     };
   }
-  
+
   /**
    * Extrae insights del estado de la conversación
    * @param state Estado de la conversación
@@ -281,7 +283,7 @@ export class MemoryManagerAdapter implements IMemoryManager {
    */
   private extractInsightsFromState(state: WindsurfState): string[] {
     const insights: string[] = [];
-    
+
     // Extraer insights de las reflexiones
     state.history
       .filter(entry => entry.phase === 'reflection')
@@ -290,18 +292,7 @@ export class MemoryManagerAdapter implements IMemoryManager {
           insights.push(...entry.data.insights);
         }
       });
-    
+
     return insights;
   }
-}
-
-/**
- * Tipo para una entrada en el historial
- * Copiado de core/types.ts para evitar dependencias circulares
- */
-interface HistoryEntry {
-  phase: 'reasoning' | 'action' | 'reflection' | 'correction';
-  timestamp: number;
-  data: any;
-  iteration: number;
 }

@@ -5,14 +5,14 @@
 
 // Exportar adaptadores
 export { EventBusAdapter } from '../../events/eventBusAdapter';
-export { MemoryManagerAdapter } from '../../memory/memoryManagerAdapter';
+//export { MemoryManagerAdapter } from '../../memory/memoryManagerAdapter';
 export { ModelManagerAdapter } from '../../models/modelManagerAdapter';
 export { ToolRegistryAdapter } from '../../tools/toolRegistryAdapter';
 export { ReActGraphAdapter } from '../../langgraph/reactGraphAdapter';
 
 // Exportar interfaces
 export { IEventBus } from '../interfaces/event-bus.interface';
-export { IMemoryManager } from '../interfaces/memory-manager.interface';
+//export { IMemoryManager } from '../interfaces/memory-manager.interface';
 export { IModelManager } from '../interfaces/model-manager.interface';
 export { IToolRegistry } from '../interfaces/tool-registry.interface';
 export { IReActGraph } from '../interfaces/react-graph.interface';

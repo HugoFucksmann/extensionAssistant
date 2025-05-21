@@ -3,20 +3,21 @@
  * Gestiona el ciclo ReAct y coordina todos los componentes del sistema
  */
 
-import * as vscode from 'vscode';
+
 import { VSCodeContext } from './types';
-import { WindsurfConfig, ReActNodeType } from './config';
-import { ReActState, ReActGraphResult } from '../langgraph/types';
+import {  ReActNodeType } from './config';
+import { ReActState } from '../langgraph/types';
 import { EventBus, EventType } from '../events';
 import EventEmitter from 'eventemitter3';
 
 // Importar interfaces y factory
-import { IMemoryManager } from './interfaces/memory-manager.interface';
+
 import { IModelManager } from './interfaces/model-manager.interface';
 import { IToolRegistry } from './interfaces/tool-registry.interface';
 import { IReActGraph } from './interfaces/react-graph.interface';
 import { ComponentFactory } from './factory/componentFactory';
-import { FeatureFlags, Feature } from './featureFlags';
+import { FeatureFlags } from './featureFlags';
+import { IMemoryManager } from '../features/memory';
 
 // Nota: Los eventos ahora se definen en el módulo events/eventTypes.ts
 // Mantenemos esta enumeración para compatibilidad con código existente

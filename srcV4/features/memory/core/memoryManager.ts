@@ -1,11 +1,13 @@
+// features/memory/core/memoryManager.ts
 /**
  * Gestor de memoria para la arquitectura Windsurf
  * Implementa un sistema de memoria jerárquica (corto, medio y largo plazo)
  */
 
 import * as vscode from 'vscode';
-import { WindsurfState, HistoryEntry } from '../core/types';
+import { WindsurfState, HistoryEntry } from '../types'; // <--- CAMBIO: Ruta de importación actualizada
 import { LongTermStorage } from './longTermStorage';
+
 
 /**
  * Gestor centralizado de memoria
@@ -14,21 +16,21 @@ import { LongTermStorage } from './longTermStorage';
 export class MemoryManager {
   // Memoria a corto plazo (contexto inmediato)
   private shortTermMemory: Map<string, any>;
-  
+
   // Memoria a medio plazo (contexto de la tarea actual)
   private mediumTermMemory: Map<string, any>;
-  
+
   // Memoria a largo plazo (persistente entre sesiones)
   private longTermStorage: LongTermStorage;
-  
+
   constructor() {
     this.shortTermMemory = new Map();
     this.mediumTermMemory = new Map();
     this.longTermStorage = new LongTermStorage();
-    
+
     console.log('[MemoryManager] Initialized');
   }
-  
+
   /**
    * Almacena un valor en la memoria a corto plazo
    * @param key Clave para almacenar el valor
@@ -38,7 +40,7 @@ export class MemoryManager {
   public storeShortTerm(key: string, value: any, chatId: string): void {
     this.shortTermMemory.set(`${chatId}:${key}`, value);
   }
-  
+
   /**
    * Recupera un valor de la memoria a corto plazo
    * @param key Clave del valor a recuperar
@@ -48,7 +50,7 @@ export class MemoryManager {
   public getShortTerm<T = any>(key: string, chatId: string): T | undefined {
     return this.shortTermMemory.get(`${chatId}:${key}`) as T | undefined;
   }
-  
+
   /**
    * Almacena un valor en la memoria a medio plazo
    * @param key Clave para almacenar el valor
@@ -58,7 +60,7 @@ export class MemoryManager {
   public storeMediumTerm(key: string, value: any, chatId: string): void {
     this.mediumTermMemory.set(`${chatId}:${key}`, value);
   }
-  
+
   /**
    * Recupera un valor de la memoria a medio plazo
    * @param key Clave del valor a recuperar
@@ -68,7 +70,7 @@ export class MemoryManager {
   public getMediumTerm<T = any>(key: string, chatId: string): T | undefined {
     return this.mediumTermMemory.get(`${chatId}:${key}`) as T | undefined;
   }
-  
+
   /**
    * Almacena una conversación completa en la memoria
    * Distribuye la información en los diferentes niveles de memoria según su relevancia
@@ -80,11 +82,11 @@ export class MemoryManager {
       // 1. Almacenar en memoria a corto plazo
       this.storeShortTerm('lastState', state, chatId);
       this.storeShortTerm('lastObjective', state.objective, chatId);
-      
+
       // 2. Almacenar en memoria a medio plazo
       this.storeMediumTerm('conversationHistory', state.history, chatId);
       this.storeMediumTerm('extractedEntities', state.extractedEntities, chatId);
-      
+
       // 3. Almacenar insights relevantes en memoria a largo plazo
       const insights = this.extractInsightsFromState(state);
       if (insights.length > 0) {
@@ -93,13 +95,13 @@ export class MemoryManager {
           timestamp: Date.now()
         });
       }
-      
+
       console.log(`[MemoryManager] Stored conversation state for chat ${chatId}`);
     } catch (error) {
       console.error(`[MemoryManager] Error storing conversation:`, error);
     }
   }
-  
+
   /**
    * Extrae insights relevantes del estado de la conversación
    * @param state Estado de la conversación
@@ -107,7 +109,7 @@ export class MemoryManager {
    */
   private extractInsightsFromState(state: WindsurfState): any[] {
     const insights: any[] = [];
-    
+
     // Extraer insights de las reflexiones
     state.history
       .filter(entry => entry.phase === 'reflection')
@@ -117,12 +119,13 @@ export class MemoryManager {
           insights.push(...reflection.insights);
         }
       });
-    
+
     return insights;
   }
-  
+
   /**
    * Recupera memorias relevantes para un contexto específico
+   * En una implementación real, esto utilizaría embeddings para búsqueda semántica
    * @param context Contexto para el que se quieren recuperar memorias
    * @param limit Número máximo de memorias a recuperar
    * @returns Memorias relevantes para el contexto
@@ -131,17 +134,17 @@ export class MemoryManager {
     try {
       // Construir una query basada en el contexto
       const query = this.buildMemoryQuery(context);
-      
+
       // Buscar en la memoria a largo plazo
       const memories = await this.longTermStorage.search(query, limit);
-      
+
       return memories;
     } catch (error) {
       console.error(`[MemoryManager] Error retrieving memories:`, error);
       return [];
     }
   }
-  
+
   /**
    * Construye una query para buscar memorias basada en el contexto
    * @param context Contexto para el que se quiere construir la query
@@ -149,17 +152,17 @@ export class MemoryManager {
    */
   private buildMemoryQuery(context: any): string {
     let query = '';
-    
+
     // Si hay un objetivo, incluirlo en la query
     if (context.objective) {
       query += context.objective + ' ';
     }
-    
+
     // Si hay un mensaje de usuario, incluirlo en la query
     if (context.userMessage) {
       query += context.userMessage + ' ';
     }
-    
+
     // Si hay entidades extraídas, incluirlas en la query
     if (context.extractedEntities) {
       if (context.extractedEntities.filesMentioned) {
@@ -169,10 +172,10 @@ export class MemoryManager {
         query += context.extractedEntities.functionsMentioned.join(' ') + ' ';
       }
     }
-    
+
     return query.trim();
   }
-  
+
   /**
    * Consolida memorias de corto a medio plazo y de medio a largo plazo
    * Se debe llamar periódicamente para mantener la memoria organizada
@@ -182,13 +185,13 @@ export class MemoryManager {
     try {
       // Implementación de consolidación de memorias
       // ...
-      
+
       console.log(`[MemoryManager] Consolidated memories for chat ${chatId}`);
     } catch (error) {
       console.error(`[MemoryManager] Error consolidating memories:`, error);
     }
   }
-  
+
   /**
    * Limpia las memorias a corto y medio plazo para una conversación
    * @param chatId ID de la conversación
@@ -200,17 +203,17 @@ export class MemoryManager {
         this.shortTermMemory.delete(key);
       }
     }
-    
+
     // Eliminar todas las entradas de memoria a medio plazo para este chat
     for (const key of this.mediumTermMemory.keys()) {
       if (key.startsWith(`${chatId}:`)) {
         this.mediumTermMemory.delete(key);
       }
     }
-    
+
     console.log(`[MemoryManager] Cleared memory for chat ${chatId}`);
   }
-  
+
   /**
    * Libera todos los recursos al desactivar la extensión
    */

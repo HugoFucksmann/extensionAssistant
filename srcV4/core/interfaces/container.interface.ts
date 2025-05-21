@@ -4,10 +4,11 @@
  */
 
 import { IToolRegistry } from './tool-registry.interface';
-import { IMemoryManager } from './memory-manager.interface';
+
 import { IModelManager } from './model-manager.interface';
 import { IReActGraph } from './react-graph.interface';
 import { IEventBus } from './event-bus.interface';
+import { IMemoryManager } from '../../features/memory';
 
 /**
  * Interfaz para el contenedor de dependencias

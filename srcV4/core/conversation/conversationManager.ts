@@ -5,11 +5,12 @@
 
 import { IConversationManager } from '../interfaces/conversation-manager.interface';
 import { IEventBus } from '../interfaces/event-bus.interface';
-import { IMemoryManager } from '../interfaces/memory-manager.interface';
+
 import { IReActGraph } from '../interfaces/react-graph.interface';
 import { IToolRegistry } from '../interfaces/tool-registry.interface';
 import { AgentState, createInitialAgentState, updateAgentState, addMessage } from '../state/agent-state';
 import { EventType } from '../../events/eventTypes';
+import { IMemoryManager } from '../../features/memory';
 
 /**
  * Implementación del gestor de conversaciones

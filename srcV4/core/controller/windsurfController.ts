@@ -10,18 +10,21 @@ import { IConversationManager } from '../interfaces/conversation-manager.interfa
 import { EventType } from '../../events/eventTypes';
 import { EventBusAdapter } from '../../events/eventBusAdapter';
 import { ConversationManager } from '../conversation/conversationManager';
-import { IMemoryManager } from '../interfaces/memory-manager.interface';
+
 import { IModelManager } from '../interfaces/model-manager.interface';
 import { IReActGraph } from '../interfaces/react-graph.interface';
 import { IToolRegistry } from '../interfaces/tool-registry.interface';
-import { MemoryManager } from '../../memory/memoryManager';
-import { MemoryManagerAdapter } from '../../memory/memoryManagerAdapter';
+
+
 import { ModelManager } from '../../models/modelManager';
 import { ModelManagerAdapter } from '../../models/modelManagerAdapter';
 import { ReActGraph, createReActGraph } from '../../langgraph/reactGraph';
 import { ReActGraphAdapter } from '../../langgraph/reactGraphAdapter';
 import { ToolRegistry } from '../../tools/toolRegistry';
 import { ToolRegistryAdapter } from '../../tools/toolRegistryAdapter';
+import { IMemoryManager, MemoryManagerAdapter } from '../../features/memory';
+import { MemoryManager } from '../../features/memory/core';
+
 
 /**
  * Controlador principal para la arquitectura Windsurf
