@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { ToolResult } from '../types';
+import { ToolResult } from '../../../../../srcV4/tools/types';
 
 /**
  * Herramienta para obtener el contenido de un archivo

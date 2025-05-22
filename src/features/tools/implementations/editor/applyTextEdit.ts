@@ -1,28 +1,20 @@
 import * as vscode from 'vscode';
-import { ToolResult } from '../types';
-
-/**
- * Tipo de edición de texto
- */
-export interface TextEdit {
-  range: {
-    start: { line: number; character: number };
-    end: { line: number; character: number };
-  };
-  newText: string;
-}
+import { ToolResult, EditorParams } from '../../types';
 
 /**
  * Herramienta para aplicar ediciones de texto al editor activo
  * @param params Parámetros de la herramienta
+ * @param context Contexto opcional (no utilizado en esta implementación)
  * @returns Resultado de la operación
  */
-export async function applyTextEdit(params: {
-  edits: TextEdit[];
-  documentUri?: string;
-}): Promise<ToolResult<{ success: boolean }>> {
+export async function applyTextEdit(
+  params: EditorParams,
+  context?: any
+): Promise<ToolResult<{ success: boolean }>> {
   try {
-    const { edits, documentUri } = params;
+    // Handle both old and new parameter structures
+    const edits = 'edits' in params ? params.edits : params.edits;
+    const documentUri = 'documentUri' in params ? params.documentUri : undefined;
     
     if (!edits || !Array.isArray(edits) || edits.length === 0) {
       throw new Error('No edits provided');
@@ -44,13 +36,28 @@ export async function applyTextEdit(params: {
       document = editor.document;
     }
     
+    // Define the edit object type with both possible structures
+    type TextEdit = {
+      range: {
+        start: { line: number; character: number };
+        end: { line: number; character: number };
+      };
+      newText?: string;
+      text?: string;
+    };
+
     // Convertir las ediciones al formato de VS Code
-    const vscodeEdits = edits.map(edit => {
+    const vscodeEdits = (edits as TextEdit[]).map(edit => {
       const range = new vscode.Range(
         new vscode.Position(edit.range.start.line, edit.range.start.character),
         new vscode.Position(edit.range.end.line, edit.range.end.character)
       );
-      return new vscode.TextEdit(range, edit.newText);
+      // Handle both old (newText) and new (text) property names
+      const text = 'newText' in edit ? edit.newText : edit.text;
+      if (typeof text !== 'string') {
+        throw new Error('Invalid edit: missing text or newText property');
+      }
+      return vscode.TextEdit.replace(range, text);
     });
     
     // Aplicar las ediciones

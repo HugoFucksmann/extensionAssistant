@@ -5,7 +5,17 @@
     "outDir": "out",
     "lib": ["ES2020", "DOM"],
     "sourceMap": true,
-    "rootDir": "srcV4",
+    "baseUrl": ".",
+    "paths": {
+      "@vscode/*": ["src/vscode/*"],
+      "@core/*": ["src/core/*"],
+      "@features/*": ["src/features/*"],
+      "@shared/*": ["src/shared/*"],
+      "@ai/*": ["src/features/ai/*"],
+      "@memory/*": ["src/features/memory/*"],
+      "@tools/*": ["src/features/tools/*"],
+      "@events/*": ["src/features/events/*"]
+    },
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -14,6 +24,6 @@
     "incremental": true,
     "tsBuildInfoFile": "./out/.tsbuildinfo"
   },
-  "include": ["srcV4/**/*"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", ".vscode-test", "out"]
 }

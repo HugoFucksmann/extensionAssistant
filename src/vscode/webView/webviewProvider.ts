@@ -3,8 +3,8 @@
  */
 
 import * as vscode from 'vscode';
-import { WindsurfController } from '../../core/windsurfController';
-import { eventBus, EventType } from '../../events';
+import { WindsurfController } from '../../../srcV4/core/windsurfController';
+import { eventBus, EventType } from '../../../srcV4/events';
 
 import { getReactHtmlContent } from './htmlTemplate';
 import { MessageHandler } from './MessageHandler';

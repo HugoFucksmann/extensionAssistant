@@ -6,15 +6,17 @@ const baseConfig = {
   devtool: "source-map",
   resolve: {
     extensions: [".ts", ".tsx", ".js", ".jsx"],
-    // Añadir alias para reducir la longitud de las importaciones
-   /*  alias: {
-      '@agents': path.resolve(__dirname, 'src/agents'),
-      '@models': path.resolve(__dirname, 'src/models'),
-      '@ui': path.resolve(__dirname, 'src/ui'),
-      '@vscode': path.resolve(__dirname, 'src/vscode_integration'),
-      '@commands': path.resolve(__dirname, 'src/commands'),
-      '@db': path.resolve(__dirname, 'src/db'),
-    } */
+    alias: {
+      '@vscode': path.resolve(__dirname, 'src/vscode'),
+      '@core': path.resolve(__dirname, 'src/core'),
+      '@features': path.resolve(__dirname, 'src/features'),
+      '@shared': path.resolve(__dirname, 'src/shared'),
+      // Alias más específicos si los necesitas:
+      '@ai': path.resolve(__dirname, 'src/features/ai'),
+      '@memory': path.resolve(__dirname, 'src/features/memory'),
+      '@tools': path.resolve(__dirname, 'src/features/tools'),
+      '@events': path.resolve(__dirname, 'src/features/events'),
+    }
   },
   // Añadir caché para mejorar el rendimiento de compilación
   cache: {
@@ -45,7 +47,7 @@ const extensionConfig = {
   ...baseConfig,
   target: "node",
   entry: {
-    extension: "./srcV3/extension.ts",
+    extension: "./src/extension.ts",
   },
   output: {
     path: path.resolve(__dirname, "out"),
@@ -87,7 +89,7 @@ const webviewConfig = {
   ...baseConfig,
   target: "web",
   entry: {
-    webview: "./srcV4/ui/react/webview.jsx",
+    webview: "./src/ui/react/webview.jsx",
   },
   output: {
     path: path.resolve(__dirname, "out"),

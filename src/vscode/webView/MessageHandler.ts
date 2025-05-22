@@ -3,7 +3,7 @@
  */
 
 import * as vscode from 'vscode';
-import { WindsurfController } from '../../core/windsurfController';
+import { WindsurfController } from '../../../srcV4/core/windsurfController';
 
 interface MessageResult {
   type: string;

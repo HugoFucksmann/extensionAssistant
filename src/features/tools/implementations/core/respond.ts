@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { ToolResult } from '../types';
+import { ToolResult } from '../../../../../srcV4/tools/types';
 
 /**
  * Parámetros para la herramienta de respuesta
