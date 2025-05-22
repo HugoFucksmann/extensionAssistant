@@ -1,90 +1,75 @@
 /**
- * Plantilla HTML para el webview de la extensión
+ * Updated HTML template for React webview
  */
 
 import * as vscode from 'vscode';
 
 /**
- * Genera el contenido HTML para el webview
- * @param extensionUri URI de la extensión
- * @param webview Instancia del webview
- * @returns Contenido HTML
+ * Generates React-compatible HTML content
  */
-export function getHtmlContent(extensionUri: vscode.Uri, webview: vscode.Webview): string {
-  // Obtener la URI para recursos locales
-  const styleUri = webview.asWebviewUri(
-    vscode.Uri.joinPath(extensionUri, 'media', 'styles.css')
-  );
-  
-  const scriptUri = webview.asWebviewUri(
-    vscode.Uri.joinPath(extensionUri, 'media', 'main.js')
-  );
-  
-  // Nonce para CSP
+export function getReactHtmlContent(extensionUri: vscode.Uri, webview: vscode.Webview): string {
   const nonce = getNonce();
   
+  // CDN URLs for React and ReactDOM
+  const reactUrl = 'https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js';
+  const reactDomUrl = 'https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js';
+  
+  // Webview script URI
+  const webviewScript = webview.asWebviewUri(
+    vscode.Uri.joinPath(extensionUri, 'out', 'webview.js')
+  );
+
   return `<!DOCTYPE html>
-  <html lang="es">
-  <head>
+<html lang="en">
+<head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
-    <link href="${styleUri}" rel="stylesheet">
+    <meta http-equiv="Content-Security-Policy" 
+          content="default-src 'none'; 
+                   script-src ${webview.cspSource} https://cdnjs.cloudflare.com 'nonce-${nonce}'; 
+                   style-src ${webview.cspSource} 'unsafe-inline';
+                   font-src ${webview.cspSource};">
     <title>Extension Assistant</title>
-  </head>
-  <body>
-    <div id="app">
-      <div class="chat-container">
-        <div id="messages" class="messages"></div>
-        
-        <!-- Contenedor para mostrar el progreso de procesamiento -->
-        <div id="processingContainer" class="processing-container hidden">
-          <div class="processing-header">
-            <span class="processing-title">Procesando...</span>
-            <div class="processing-spinner"></div>
-          </div>
-          
-          <!-- Fases del ciclo ReAct -->
-          <div class="processing-phases">
-            <div class="phase" data-phase="reasoning">
-              <span class="phase-icon">🧠</span>
-              <span class="phase-name">Razonamiento</span>
-              <span class="phase-status"></span>
-            </div>
-            <div class="phase" data-phase="action">
-              <span class="phase-icon">🛠️</span>
-              <span class="phase-name">Acción</span>
-              <span class="phase-status"></span>
-            </div>
-            <div class="phase" data-phase="reflection">
-              <span class="phase-icon">🔍</span>
-              <span class="phase-name">Reflexión</span>
-              <span class="phase-status"></span>
-            </div>
-          </div>
-          
-          <!-- Herramientas en ejecución -->
-          <div class="tool-execution">
-            <h4>Herramientas</h4>
-            <div id="toolsList" class="tools-list"></div>
-          </div>
-        </div>
-        
-        <div class="input-container">
-          <textarea id="userInput" placeholder="Escribe un mensaje..."></textarea>
-          <button id="sendButton">Enviar</button>
-        </div>
-      </div>
-    </div>
-    <script nonce="${nonce}" src="${scriptUri}"></script>
-  </body>
-  </html>`;
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: var(--vscode-font-family);
+            font-size: var(--vscode-font-size);
+            color: var(--vscode-foreground);
+            background-color: var(--vscode-sideBar-background);
+        }
+        #root {
+            width: 100%;
+            height: 100vh;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script nonce="${nonce}">
+        // Initialize VS Code API
+        const vscode = acquireVsCodeApi();
+        window.vscode = vscode;
+        console.log('VS Code API initialized');
+    </script>
+    
+    <script nonce="${nonce}" src="${reactUrl}"></script>
+    <script nonce="${nonce}" src="${reactDomUrl}"></script>
+    <script nonce="${nonce}" src="${webviewScript}"></script>
+</body>
+</html>`;
 }
 
 /**
- * Genera un nonce aleatorio para CSP
- * @returns Nonce aleatorio
+ * Legacy function - kept for backwards compatibility
  */
+export function getHtmlContent(extensionUri: vscode.Uri, webview: vscode.Webview): string {
+  return getReactHtmlContent(extensionUri, webview);
+}
+
 function getNonce(): string {
   let text = '';
   const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';

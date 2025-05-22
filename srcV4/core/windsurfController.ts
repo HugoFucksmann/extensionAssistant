@@ -1,137 +1,63 @@
 /**
- * Controlador principal de la arquitectura Windsurf
- * Gestiona el ciclo ReAct y coordina todos los componentes del sistema
+ * Simplified WindsurfController using unified EventBus
+ * Removed legacy event system and duplication
  */
 
 import * as vscode from 'vscode';
-import { VSCodeContext } from './types';
-import { WindsurfConfig, ReActNodeType } from './config';
+import { VSCodeContext, WindsurfState, HistoryEntry, PlanStep } from './types'; // Asegúrate que PlanStep esté exportado
+import { WindsurfConfig } from './config'; // ReActNodeType no se usa aquí directamente
 import { MemoryManager } from '../memory/memoryManager';
 import { PromptManager } from '../prompts/promptManager';
 import { ModelManager } from '../models/modelManager';
-import { createReActGraph, ReActGraph } from '../langgraph/reactGraph';
-import { ReActState, ReActGraphResult } from '../langgraph/types';
+// ReActState y ReActGraphResult ya no se importan de langgraph/types
 import { ToolRegistry } from '../tools/toolRegistry';
-import { EventBus, EventType } from '../events';
-import EventEmitter from 'eventemitter3';
-
-// Nota: Los eventos ahora se definen en el módulo events/eventTypes.ts
-// Mantenemos esta enumeración para compatibilidad con código existente
-export enum WindsurfEvents {
-  // Eventos del ciclo de vida de la conversación
-  CONVERSATION_STARTED = 'conversation:started',
-  CONVERSATION_ENDED = 'conversation:ended',
-  
-  // Eventos del ciclo ReAct
-  REASONING_STARTED = 'react:reasoning:started',
-  REASONING_COMPLETED = 'react:reasoning:completed',
-  ACTION_STARTED = 'react:action:started',
-  ACTION_COMPLETED = 'react:action:completed',
-  REFLECTION_STARTED = 'react:reflection:started',
-  REFLECTION_COMPLETED = 'react:reflection:completed',
-  CORRECTION_STARTED = 'react:correction:started',
-  CORRECTION_COMPLETED = 'react:correction:completed',
-  
-  // Eventos de respuesta
-  RESPONSE_GENERATED = 'response:generated',
-  RESPONSE_DELIVERED = 'response:delivered',
-  
-  // Eventos de error
-  ERROR_OCCURRED = 'error:occurred'
-}
-
-// Mapa de conversión entre WindsurfEvents y EventType
-const eventTypeMap = new Map<WindsurfEvents, EventType>([
-  [WindsurfEvents.CONVERSATION_STARTED, EventType.CONVERSATION_STARTED],
-  [WindsurfEvents.CONVERSATION_ENDED, EventType.CONVERSATION_ENDED],
-  [WindsurfEvents.REASONING_STARTED, EventType.REASONING_STARTED],
-  [WindsurfEvents.REASONING_COMPLETED, EventType.REASONING_COMPLETED],
-  [WindsurfEvents.ACTION_STARTED, EventType.ACTION_STARTED],
-  [WindsurfEvents.ACTION_COMPLETED, EventType.ACTION_COMPLETED],
-  [WindsurfEvents.REFLECTION_STARTED, EventType.REFLECTION_STARTED],
-  [WindsurfEvents.REFLECTION_COMPLETED, EventType.REFLECTION_COMPLETED],
-  [WindsurfEvents.CORRECTION_STARTED, EventType.CORRECTION_STARTED],
-  [WindsurfEvents.CORRECTION_COMPLETED, EventType.CORRECTION_COMPLETED],
-  [WindsurfEvents.RESPONSE_GENERATED, EventType.RESPONSE_GENERATED],
-  [WindsurfEvents.RESPONSE_DELIVERED, EventType.RESPONSE_DELIVERED],
-  [WindsurfEvents.ERROR_OCCURRED, EventType.ERROR_OCCURRED]
-]);
+import { EventBus, eventBus } from '../events/eventBus';
+import { ConversationEndedPayload, EventType } from '../events/eventTypes';
+import { WindsurfGraph } from '../agents/windsurfGraph';
 
 /**
- * Controlador principal para la arquitectura Windsurf
- * Implementa el patrón singleton
+ * Main controller for Windsurf architecture
+ * Implements singleton pattern and coordinates all system components
  */
-export class WindsurfController extends EventEmitter {
+export class WindsurfController {
   private static instance: WindsurfController;
-  
+
   private vscodeContext: VSCodeContext;
   private memoryManager: MemoryManager;
   private promptManager: PromptManager;
   private modelManager: ModelManager;
-  private reactGraph: ReActGraph;
-  private toolRegistry: ToolRegistry; 
-  private activeConversations: Map<string, ReActState> = new Map();
-  
-  // Bus de eventos centralizado para comunicación entre capas (legacy)
-  public readonly events: EventEmitter;
-  
-  // Bus de eventos avanzado
+  private windsurfGraph: WindsurfGraph; // Cambiado de reactGraph a windsurfGraph
+  private toolRegistry: ToolRegistry;
+  private activeConversations: Map<string, WindsurfState> = new Map(); // Cambiado de ReActState a WindsurfState
   private eventBus: EventBus;
-  
+
   /**
-   * Constructor privado para implementar el patrón singleton
+   * Private constructor for singleton pattern
    */
   private constructor(context: VSCodeContext) {
-    // Llamar al constructor de la clase padre (EventEmitter)
-    super();
-    
     this.vscodeContext = context;
-    
-    // Inicializar el bus de eventos centralizado (legacy)
-    this.events = new EventEmitter();
-    
-    // Inicializar el bus de eventos avanzado
-    this.eventBus = EventBus.getInstance();
-    
-    // Configurar el puente entre los dos sistemas de eventos
-    this.setupEventBridge();
-    
-    // Inicializar componentes
+    this.eventBus = eventBus;
+
+    // Initialize components
     this.memoryManager = new MemoryManager();
     this.promptManager = new PromptManager();
     this.modelManager = new ModelManager();
-    this.toolRegistry = new ToolRegistry();
-    
-    // Inicializar el grafo ReAct con el modelo predeterminado y el bus de eventos
-    const defaultModel = 'gemini-pro';
-    this.reactGraph = createReActGraph(defaultModel, this.events);
-    
-    // Pasar el toolRegistry al grafo ReAct
-    if (this.reactGraph.setToolRegistry) {
-      this.reactGraph.setToolRegistry(this.toolRegistry);
-    }
-    
-    console.log('[WindsurfController] Initialized with ReAct architecture and advanced event handling');
-    this.eventBus.debug('[WindsurfController] Initialized controller with advanced event handling');
+    this.toolRegistry = new ToolRegistry(); // ToolRegistry se pasa a WindsurfGraph
+
+    // Initialize Windsurf graph (LangGraph implementation)
+    this.windsurfGraph = new WindsurfGraph(
+      this.modelManager,
+      this.toolRegistry,
+      this.promptManager
+      // No pasamos eventBus aquí a menos que WindsurfGraph lo maneje internamente
+    );
+
+    console.log('[WindsurfController] Initialized with WindsurfGraph (LangGraph based)');
+    this.eventBus.info('WindsurfController initialized with WindsurfGraph', {}, 'WindsurfController');
   }
-  
+
   /**
-   * Configura un puente entre el sistema de eventos legacy y el nuevo EventBus
-   */
-  private setupEventBridge(): void {
-    // Reenviar eventos del EventEmitter al EventBus
-    this.events.on('*', (eventName: string, ...args: any[]) => {
-      // Convertir el tipo de evento si es posible
-      const eventType = eventTypeMap.get(eventName as WindsurfEvents) || eventName;
-      this.eventBus.emit(eventType as EventType, args[0] || {});
-    });
-    
-    // No necesitamos reenviar eventos del EventBus al EventEmitter
-    // ya que estamos migrando gradualmente al nuevo sistema
-  }
-  
-  /**
-   * Obtiene la instancia única del controlador
+   * Get singleton instance
    */
   public static getInstance(context?: VSCodeContext): WindsurfController {
     if (!WindsurfController.instance) {
@@ -142,13 +68,9 @@ export class WindsurfController extends EventEmitter {
     }
     return WindsurfController.instance;
   }
-  
+
   /**
-   * Procesa un mensaje del usuario y ejecuta el ciclo ReAct
-   * @param chatId Identificador único de la conversación
-   * @param userMessage Mensaje del usuario
-   * @param contextData Datos adicionales de contexto
-   * @returns Respuesta generada por el agente
+   * Process user message through WindsurfGraph cycle
    */
   public async processUserMessage(
     chatId: string,
@@ -156,216 +78,153 @@ export class WindsurfController extends EventEmitter {
     contextData: Record<string, any> = {}
   ): Promise<string> {
     console.log(`[WindsurfController:${chatId}] Processing message: "${userMessage.substring(0, 50)}..."`);
-    
-    // Emitir evento de inicio de conversación (usando el nuevo sistema de eventos)
-    this.eventBus.emit(EventType.CONVERSATION_STARTED, { chatId, userMessage });
-    
-    // Enriquecer los datos de contexto con información del proyecto si está disponible
+
+    this.eventBus.emitEvent(EventType.CONVERSATION_STARTED, { chatId, userMessage });
+
+    // Enrich context with project info (si es necesario antes de la inicialización del estado)
+    // WindsurfGraph podría manejar esto internamente también si se le pasa el toolRegistry
     try {
-      if (!contextData.projectContext && this.toolRegistry) {
-        const projectInfo = await this.toolRegistry.executeTool('getProjectInfo', {});
-        if (projectInfo.success) {
-          contextData.projectContext = projectInfo.data;
+        if (!contextData.projectContext && this.toolRegistry) {
+          const projectInfoTool = this.toolRegistry.getTool('getProjectInfo');
+          if (projectInfoTool) {
+            const projectInfo = await projectInfoTool.execute({});
+            if (projectInfo.success) {
+              contextData.projectContext = projectInfo.data;
+            }
+          }
         }
+      } catch (error) {
+        console.warn(`[WindsurfController:${chatId}] Error getting project info:`, error);
       }
-    } catch (error) {
-      console.warn(`[WindsurfController:${chatId}] Error getting project info:`, error);
-      // No interrumpir el flujo si falla la obtención de información del proyecto
-    }
-    
-    // Inicializar o recuperar el estado de la conversación
+
     let state = this.activeConversations.get(chatId);
     if (!state) {
-      state = this.initializeReActState(chatId, userMessage, contextData);
+      state = this.initializeWindsurfState(chatId, userMessage, contextData);
       this.activeConversations.set(chatId, state);
     } else {
-      // Actualizar el estado con el nuevo mensaje
+      // Update existing state for a new message in the same conversation
       state.userMessage = userMessage;
-      state.finalResponse = undefined; // Resetear la salida anterior
-      state.intermediateSteps = []; // Resetear los pasos intermedios
-      state.metadata = {
-        ...state.metadata,
-        chatId,
-        contextData: { ...state.metadata.contextData, ...contextData },
-        startTime: Date.now() // Actualizar el tiempo de inicio
-      };
+      state.objective = `Responder a: ${userMessage.substring(0, 100)}...`; // Reset objective
+      state.iterationCount = 0;
+      state.completionStatus = 'in_progress';
+      state.reasoningResult = undefined;
+      state.actionResult = undefined;
+      state.reflectionResult = undefined;
+      state.correctionResult = undefined;
+      // state.history.push({ phase: 'user_message', timestamp: Date.now(), data: { userMessage }, iteration: 0}); // Opcional
+      // No limpiar todo el historial si es una continuación. Si es un "nuevo" mensaje, el historial se reinicia en initializeWindsurfState.
+      // Si se desea mantener el historial entre mensajes de una misma conversación, no reinicializarlo.
+      // Por ahora, `initializeWindsurfState` crea un estado fresco.
     }
     
+    // Actualizar el estado con cualquier nuevo contextData
+    state.projectContext = contextData.projectContext || state.projectContext;
+    state.editorContext = contextData.editorContext || state.editorContext;
+
+
     try {
-      // Configurar listeners para eventos específicos del grafo
-      // Estos listeners son temporales y se eliminarán después de la ejecución
-      const tempListeners = new Map();
-      
-      // Listener para eventos de herramienta
-      const toolExecutionStartedListener = (data: any) => {
-        if (data.chatId === chatId) {
-          console.log(`[WindsurfController:${chatId}] Tool execution started: ${data.tool}`);
+      // Execute Windsurf graph
+      const resultState = await this.windsurfGraph.runGraph(state);
+      this.activeConversations.set(chatId, resultState);
+
+      let finalResponse = 'No se pudo generar una respuesta.';
+      if (resultState.completionStatus === 'completed' && resultState.actionResult?.toolName === 'respond') {
+        // Asumimos que la herramienta 'respond' devuelve el mensaje en 'result.message' o similar
+        // Esto depende de la implementación de la herramienta 'respond' y su ToolResult.data
+        if (resultState.actionResult.result && typeof resultState.actionResult.result.message === 'string') {
+            finalResponse = resultState.actionResult.result.message;
+        } else if (resultState.actionResult.result && typeof resultState.actionResult.result.delivered === 'boolean') {
+            // Si 'respond' no devuelve el mensaje, podríamos necesitar un campo específico en WindsurfState
+            // o buscar en el historial la última acción de 'respond'.
+            // Por ahora, si 'respond' tuvo éxito, asumimos que el mensaje se envió a la UI
+            // y no necesitamos devolverlo aquí explícitamente, a menos que queramos loggearlo.
+            // Para este ejemplo, vamos a asumir que el mensaje para el usuario está en el `actionResult.result.message`
+            // Si no, necesitamos un mecanismo diferente.
+             const respondAction = resultState.history.find(
+                h => h.phase === 'action' && h.data.toolName === 'respond' && h.data.success
+            );
+            if (respondAction && respondAction.data.params && typeof respondAction.data.params.message === 'string') {
+                finalResponse = respondAction.data.params.message;
+            } else {
+                finalResponse = "La acción de respuesta se completó, pero el mensaje no está disponible.";
+            }
         }
-      };
-      
-      const toolExecutionCompletedListener = (data: any) => {
-        if (data.chatId === chatId) {
-          console.log(`[WindsurfController:${chatId}] Tool execution completed: ${data.tool}`);
-        }
-      };
-      
-      // Registrar listeners temporales
-      this.events.on('tool:execution:started', toolExecutionStartedListener);
-      this.events.on('tool:execution:completed', toolExecutionCompletedListener);
-      tempListeners.set('tool:execution:started', toolExecutionStartedListener);
-      tempListeners.set('tool:execution:completed', toolExecutionCompletedListener);
-      
-      // Ejecutar el grafo ReAct
-      const result = await this.reactGraph.runGraph(state);
-      
-      // Eliminar listeners temporales
-      for (const [event, listener] of tempListeners.entries()) {
-        this.events.removeListener(event, listener);
+      } else if (resultState.error) {
+        finalResponse = `Error: ${resultState.error}`;
       }
-      
-      // Actualizar el estado de la conversación con el resultado
-      const updatedState = {
-        ...state,
-        ...result,
-        metadata: {
-          ...state.metadata,
-          ...result.metadata,
-          lastUpdated: Date.now()
-        }
-      };
-      
-      this.activeConversations.set(chatId, updatedState);
-      
-      // Extraer la respuesta final
-      const finalResponse = result.output || 'No se pudo generar una respuesta.';
-      
-      // No necesitamos emitir el evento RESPONSE_GENERATED aquí ya que el grafo ReAct ya lo emite
-      
-      // Guardar en memoria
-      await this.memoryManager.storeConversation(chatId, {
-        objective: `Responder a: ${userMessage.substring(0, 50)}...`,
-        userMessage,
+
+
+      // Store in memory
+      // La estructura de WindsurfState ya es la esperada por MemoryManager
+      await this.memoryManager.storeConversation(chatId, resultState);
+
+      this.eventBus.emitEvent(EventType.CONVERSATION_ENDED, {
         chatId,
-        iterationCount: result.executionInfo?.iterations || 1,
-        maxIterations: 10,
-        completionStatus: 'completed',
-        history: updatedState.intermediateSteps.map(step => {
-          // Convertir el tipo de fase a uno de los valores aceptados
-          const toolName = step.action.tool || '';
-          let phase: 'reasoning' | 'action' | 'reflection' | 'correction' = 'action';
-          
-          if (toolName === 'analyze' || toolName === 'reason') {
-            phase = 'reasoning';
-          } else if (toolName === 'execute') {
-            phase = 'action';
-          } else if (toolName === 'reflect') {
-            phase = 'reflection';
-          } else if (toolName === 'correct') {
-            phase = 'correction';
-          }
-          
-          return {
-            phase,
-            timestamp: step.timestamp || Date.now(),
-            data: {
-              input: step.action.toolInput || {},
-              output: step.observation
-            },
-            iteration: 1
-          };
-        }),
-        metadata: result.metadata || {}
-      });
-      
-      // Emitir evento de fin de conversación (usando el nuevo sistema de eventos)
-      this.eventBus.emit(EventType.CONVERSATION_ENDED, { 
-        chatId, 
-        success: true,
+        success: resultState.completionStatus === 'completed',
         response: finalResponse,
-        duration: result.executionInfo?.duration || 0
+        // duration: (resultState.metadata?.endTime || Date.now()) - (resultState.metadata?.startTime || Date.now()) // WindsurfState no tiene metadata.endTime/startTime
+        duration: Date.now() - (state.timestamp || Date.now()) // Usar timestamp del estado si existe
       });
-      
+
       return finalResponse;
     } catch (error: any) {
       console.error(`[WindsurfController:${chatId}] Error processing message:`, error);
-      
-      // Emitir evento de error (usando el nuevo sistema de eventos)
-      this.eventBus.emit(EventType.ERROR_OCCURRED, { 
-        chatId, 
+      this.eventBus.emitEvent(EventType.ERROR_OCCURRED, {
+        chatId,
         error: error.message || 'Unknown error',
         stack: error.stack,
         source: 'WindsurfController'
       });
-      
-      // Devolver un mensaje de error amigable
       return 'Lo siento, ha ocurrido un error al procesar tu mensaje. Por favor, inténtalo de nuevo.';
     }
   }
-  
+
   /**
-   * Inicializa el estado para el grafo ReAct
+   * Initialize WindsurfState for conversation
    */
-  private initializeReActState(
+  private initializeWindsurfState(
     chatId: string,
     userMessage: string,
     contextData: Record<string, any>
-  ): ReActState {
+  ): WindsurfState {
     return {
+      objective: `Responder a: ${userMessage.substring(0, 100)}...`,
       userMessage: userMessage,
-      finalResponse: undefined,
-      intermediateSteps: [],
-      history: {
-        reasoning: [],
-        actions: [],
-        reflections: [],
-        corrections: []
-      },
-      currentNode: ReActNodeType.INITIAL_ANALYSIS,
-      metadata: {
-        chatId,
-        userId: contextData.userId || 'anonymous',
-        contextData,
-        history: []
-      }
+      chatId: chatId,
+      iterationCount: 0,
+      maxIterations: WindsurfConfig.react.maxIterations,
+      completionStatus: 'in_progress',
+      history: [],
+      projectContext: contextData.projectContext,
+      editorContext: contextData.editorContext,
+      // Otros campos de WindsurfState con valores iniciales
+      reasoningResult: undefined,
+      actionResult: undefined,
+      reflectionResult: undefined,
+      correctionResult: undefined,
+      timestamp: Date.now(), // Añadido para calcular duración
+      // ... cualquier otro campo necesario de WindsurfState
     };
   }
-  
-  /**
-   * Limpia una conversación
-    // Respuesta por defecto
-    return 'Procesé tu solicitud, pero no pude generar una respuesta adecuada.';
-  }
-  
-  /**
-   * Limpia los recursos de una conversación
-   */
+
   public clearConversation(chatId: string): void {
     this.activeConversations.delete(chatId);
     this.memoryManager.clearConversationMemory(chatId);
-    
-    // Emitir evento de fin de conversación
-    this.events.emit(WindsurfEvents.CONVERSATION_ENDED, { 
-      chatId, 
+    this.eventBus.emitEvent(EventType.CONVERSATION_ENDED, {
+      chatId,
       cleared: true
-    });
-    
+    } as ConversationEndedPayload);
     console.log(`[WindsurfController] Cleared conversation: ${chatId}`);
   }
-  
-  /**
-   * Libera todos los recursos al desactivar la extensión
-   */
+
+  public getEventBus(): EventBus {
+    return this.eventBus;
+  }
+
   public dispose(): void {
-    // Limpiar todas las conversaciones activas
     this.activeConversations.clear();
-    
-    // Liberar recursos del gestor de memoria
     this.memoryManager.dispose();
-    
-    // Eliminar todos los listeners de eventos
-    this.events.removeAllListeners();
-    this.removeAllListeners();
-    
+    this.eventBus.dispose();
     console.log('[WindsurfController] Disposed');
   }
 }

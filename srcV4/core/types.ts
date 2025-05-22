@@ -46,6 +46,13 @@ export interface ReasoningResult {
   nextAction: NextAction;
 }
 
+export interface PlanStep { // Asegúrate que esté exportado
+  step: string;
+  rationale: string;
+  isCompleted?: boolean;
+  result?: any;
+}
+
 /**
  * Paso del plan generado en la fase de razonamiento
  */

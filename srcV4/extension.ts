@@ -5,8 +5,11 @@
 
 import * as vscode from 'vscode';
 import { WindsurfController } from './core/windsurfController';
-import { WindsurfPanel } from './ui/windsurfPanel';
+import { WebviewProvider } from './ui/webView/webviewProvider';
 import { VSCodeContext } from './core/types';
+
+// Mantener la referencia al WebviewProvider
+let webviewProvider: WebviewProvider | undefined;
 
 /**
  * Función de activación de la extensión
@@ -26,13 +29,20 @@ export function activate(context: vscode.ExtensionContext) {
   // Inicializar el controlador Windsurf
   const windsurfController = WindsurfController.getInstance(vscodeContext);
   
+  // Registrar el proveedor de la vista web
+  webviewProvider = new WebviewProvider(context.extensionUri, windsurfController);
+  const webviewRegistration = vscode.window.registerWebviewViewProvider(
+    'extensionAssistant.webview',
+    webviewProvider
+  );
+  
   // Registrar comandos
   const disposables: vscode.Disposable[] = [];
   
-  // Comando para abrir el panel de la extensión
+  // Comando para mostrar la vista web
   disposables.push(
-    vscode.commands.registerCommand('extensionAssistant.openWindsurfPanel', () => {
-      WindsurfPanel.createOrShow(context.extensionUri, windsurfController);
+    vscode.commands.registerCommand('extensionAssistant.showWebview', () => {
+      vscode.commands.executeCommand('extensionAssistant.webview.focus');
     })
   );
   
@@ -44,12 +54,8 @@ export function activate(context: vscode.ExtensionContext) {
         prompt: 'Envía un mensaje al asistente'
       });
       
-      if (message) {
-        // Obtener el panel activo o crear uno nuevo
-        const panel = WindsurfPanel.createOrShow(context.extensionUri, windsurfController);
-        
-        // Enviar el mensaje al panel
-        panel.sendMessage(message);
+      if (message && webviewProvider) {
+        webviewProvider.sendMessage('userMessage', { content: message });
       }
     })
   );
@@ -57,9 +63,8 @@ export function activate(context: vscode.ExtensionContext) {
   // Comando para limpiar la conversación actual
   disposables.push(
     vscode.commands.registerCommand('extensionAssistant.clearConversation', () => {
-      const panel = WindsurfPanel.getCurrentPanel();
-      if (panel) {
-        panel.clearConversation();
+      if (webviewProvider) {
+        webviewProvider.sendMessage('clearConversation', {});
       }
     })
   );
@@ -68,12 +73,12 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(...disposables);
   
   // Mostrar un mensaje de información
-  vscode.window.showInformationMessage('Extension Assistant V4 (Windsurf) activado');
+  vscode.window.showInformationMessage('Extension Assistant V4 activado');
   
-  // Abrir automáticamente el panel si está configurado
+  // Mostrar automáticamente la vista web si está configurado
   const config = vscode.workspace.getConfiguration('extensionAssistant');
   if (config.get<boolean>('openPanelOnStartup', false)) {
-    vscode.commands.executeCommand('extensionAssistant.openWindsurfPanel');
+    vscode.commands.executeCommand('extensionAssistant.showWebview');
   }
 }
 
@@ -82,6 +87,7 @@ export function activate(context: vscode.ExtensionContext) {
  * Se llama cuando la extensión se desactiva
  */
 export function deactivate() {
+  console.log('Extension Assistant V4 desactivado');
   // Limpiar recursos
   const controller = WindsurfController.getInstance();
   controller.dispose();

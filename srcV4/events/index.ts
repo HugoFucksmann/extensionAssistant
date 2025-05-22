@@ -1,8 +1,7 @@
 /**
- * Exportaciones del módulo de eventos
+ * Unified events module exports
  */
 
 export * from './eventTypes';
-export * from './eventManager';
 export * from './eventBus';
-export * from './eventLogger';
+export { eventBus } from './eventBus';
