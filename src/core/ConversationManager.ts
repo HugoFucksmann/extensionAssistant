@@ -1,8 +1,10 @@
 // src/core/ConversationManager.ts
 import { WindsurfState, VSCodeContext, HistoryEntry } from '../shared/types'; // Importa HistoryEntry
 import { MemoryManager } from '../features/memory/MemoryManager';
-import { WindsurfConfig } from '../shared/config';
+import { getConfig  } from '../shared/config';
 import { IConversationManager } from './interfaces/IConversationManager';
+
+const config = getConfig(process.env.NODE_ENV === 'production' ? 'production' : 'development');
 
 export class ConversationManager implements IConversationManager {
   private activeConversations: Map<string, WindsurfState> = new Map();
@@ -56,7 +58,7 @@ export class ConversationManager implements IConversationManager {
       userMessage: userMessage,
       chatId: chatId,
       iterationCount: 0,
-      maxIterations: WindsurfConfig.react.maxIterations,
+      maxIterations: config.backend.react.maxIterations,
       completionStatus: 'in_progress',
       history: [{
           phase: 'user_input', // O 'user_message'
