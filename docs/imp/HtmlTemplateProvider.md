@@ -1,25 +1,21 @@
-/**
- * Updated HTML template for React webview
- */
-
+// src/vscode/providers/HtmlTemplateProvider.ts
 import * as vscode from 'vscode';
 
-/**
- * Generates React-compatible HTML content
- */
-export function getReactHtmlContent(extensionUri: vscode.Uri, webview: vscode.Webview): string {
-  const nonce = getNonce();
-  
-  // CDN URLs for React and ReactDOM
-  const reactUrl = 'https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js';
-  const reactDomUrl = 'https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js';
-  
-  // Webview script URI
-  const webviewScript = webview.asWebviewUri(
-    vscode.Uri.joinPath(extensionUri, 'out', 'webview.js')
-  );
+export class HtmlTemplateProvider {
+  /**
+   * Generates React-compatible HTML content for webview
+   */
+  static generateReactHtml(extensionUri: vscode.Uri, webview: vscode.Webview): string {
+    const nonce = this.generateNonce();
+    
+    const reactUrl = 'https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js';
+    const reactDomUrl = 'https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js';
+    
+    const webviewScript = webview.asWebviewUri(
+      vscode.Uri.joinPath(extensionUri, 'out', 'webview.js')
+    );
 
-  return `<!DOCTYPE html>
+    return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -50,7 +46,6 @@ export function getReactHtmlContent(extensionUri: vscode.Uri, webview: vscode.We
     <div id="root"></div>
     
     <script nonce="${nonce}">
-        // Initialize VS Code API
         const vscode = acquireVsCodeApi();
         window.vscode = vscode;
         console.log('VS Code API initialized');
@@ -61,14 +56,14 @@ export function getReactHtmlContent(extensionUri: vscode.Uri, webview: vscode.We
     <script nonce="${nonce}" src="${webviewScript}"></script>
 </body>
 </html>`;
-}
-
-
-function getNonce(): string {
-  let text = '';
-  const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  for (let i = 0; i < 32; i++) {
-    text += possible.charAt(Math.floor(Math.random() * possible.length));
   }
-  return text;
+
+  private static generateNonce(): string {
+    const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let text = '';
+    for (let i = 0; i < 32; i++) {
+      text += possible.charAt(Math.floor(Math.random() * possible.length));
+    }
+    return text;
+  }
 }

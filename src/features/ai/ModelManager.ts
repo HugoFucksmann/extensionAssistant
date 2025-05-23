@@ -23,10 +23,13 @@ export class ModelManager {
   private config: Record<ModelProvider, ModelConfig>;
   private configChangeDisposable: vscode.Disposable;
 
-  constructor(defaultProvider: ModelProvider = 'gemini') {
+  // El constructor ya no necesita un defaultProvider, lo leerá de la configuración
+  constructor() { // CAMBIO: Eliminar defaultProvider del constructor
     this.models = new Map();
     this.config = this.loadConfiguration();
-    this.activeProvider = this.isProviderAvailable(defaultProvider) ? defaultProvider : 'ollama';
+    // Determinar el proveedor activo inicial basado en la configuración de VS Code
+    const configuredModelType = vscode.workspace.getConfiguration('extensionAssistant').get<ModelProvider>('modelType');
+    this.activeProvider = this.isProviderAvailable(configuredModelType || 'gemini') ? (configuredModelType || 'gemini') : 'ollama'; // Usar 'gemini' como fallback si no está configurado, luego 'ollama'
     this.initializeModels();
     console.log(`[ModelManager] Inicializado con proveedor activo: ${this.activeProvider}`);
 
@@ -35,7 +38,16 @@ export class ModelManager {
       if (e.affectsConfiguration('extensionAssistant')) {
         console.log('[ModelManager] Configuración cambiada, reinicializando modelos...');
         this.config = this.loadConfiguration();
-        this.initializeModels();
+        // Actualizar el proveedor activo si la configuración cambia
+        const newConfiguredModelType = vscode.workspace.getConfiguration('extensionAssistant').get<ModelProvider>('modelType');
+        if (newConfiguredModelType && this.isProviderAvailable(newConfiguredModelType)) {
+          this.activeProvider = newConfiguredModelType;
+        } else if (!this.models.has(this.activeProvider) && this.models.size > 0) {
+          // Si el proveedor activo ya no está disponible, cambiar a uno disponible
+          this.activeProvider = Array.from(this.models.keys())[0];
+        }
+        this.initializeModels(); // Re-inicializar modelos para aplicar cambios de nombres de modelo, etc.
+        console.log(`[ModelManager] Proveedor activo actualizado a: ${this.activeProvider}`);
       }
     });
   }
@@ -44,7 +56,7 @@ export class ModelManager {
     if (provider === 'gemini') {
       return !!this.config.gemini.apiKey;
     }
-    return true; // Ollama siempre está disponible si está en ejecución
+    return true; // Ollama siempre está disponible si está en ejecución (asumiendo que el baseUrl es válido)
   }
 
   private loadConfiguration(): Record<ModelProvider, ModelConfig> {
@@ -101,14 +113,12 @@ export class ModelManager {
         console.warn('[ModelManager] No se pudo conectar con Ollama. ¿Está en ejecución?', error.message);
       }
 
-      // Actualizar proveedor activo si el actual no está disponible
+      // Asegurarse de que el proveedor activo sea uno de los disponibles
       if (!this.models.has(this.activeProvider) && this.models.size > 0) {
         const availableProvider = Array.from(this.models.keys())[0];
         console.warn(`[ModelManager] Proveedor activo ${this.activeProvider} no disponible. Cambiando a ${availableProvider}`);
         this.activeProvider = availableProvider;
-      }
-
-      if (this.models.size === 0) {
+      } else if (this.models.size === 0) {
         console.error('[ModelManager] No hay modelos disponibles. Configura Ollama o proporciona una clave de API de Google.');
       }
 

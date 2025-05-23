@@ -1,178 +1,164 @@
-import React, { useContext, useEffect, useState } from "react";
+// src/ui/webview.jsx
+import React, { useEffect } from "react"; // Quitar useState si no se usa aquí
 import ReactDOM from "react-dom";
-import ChatInput from "./Components/InputChat/ChatInput";
-
-// Import components statically
-import ChatHistory from "./historical/ChatHistory";
-import RecentChats from "./historical/RecentChats";
-import ChatMessages from "./Components/ChatMessages/ChatMessages";
-
-import { VSCodeProvider, useVSCodeContext } from "./context/VSCodeContext";
+import ChatInput from "./Components/InputChat/ChatInput"; // Ajusta la ruta
+import ChatHistory from "./historical/ChatHistory"; // Ajusta la ruta
+import RecentChats from "./historical/RecentChats"; // Ajusta la ruta
+import ChatMessages from "./Components/ChatMessages/ChatMessages"; // Ajusta la ruta
+import { VSCodeProvider, useVSCodeContext } from "./context/VSCodeContext"; // Ajusta la ruta
 
 console.log('Webview script loaded');
 
 const styles = {
-  container: {
+  // ... (tus estilos existentes, sin cambios)
+  container: { /* ... */ },
+  content: { /* ... */ },
+  emptyStateContainer: {
     display: 'flex',
     flexDirection: 'column',
-    height: '100vh',
-    maxHeight: '100vh',
-    color: 'var(--vscode-foreground)',
-    backgroundColor: 'var(--vscode-sideBar-background)',
-    overflow: 'hidden',
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0
-  },
-  content: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    overflow: 'hidden',
-    height: '100%'
-  },
-};
-
-function Chat() {
-  const { messages, currentChatId, postMessage, newChat, chatList } = useVSCodeContext();
-  const [isInitialized, setIsInitialized] = useState(false);
-  const isEmpty = messages.length === 0;
-
-  // Initialize chat when component mounts
-  useEffect(() => {
-    if (!isInitialized) {
-      console.log('Initializing chat...');
-      postMessage('command', { command: 'getInitialState' });
-      setIsInitialized(true);
-    }
-  }, [isInitialized, postMessage]);
-
-  const containerStyle = {
-    ...styles.container,
-    ...(isEmpty && {
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: '20px'
-    })
-  };
-
-  const emptyStateContainer = {
-    display: 'flex',
-    flexDirection: 'column-reverse', // ChatInput abajo, RecentChats arriba
     alignItems: 'center',
-    justifyContent: 'center', // Centrar verticalmente
-    height: 'calc(100vh - 40px)', // Ajustar altura si es necesario
+    justifyContent: 'center',
+    height: 'calc(100vh - 40px)', // Asumiendo un input de 40px
     width: '100%',
     padding: '20px',
     boxSizing: 'border-box',
     gap: '16px',
-    overflow: 'hidden' // Evitar scroll en el contenedor del estado vacío
-  };
-
-  const headerStyle = {
+    textAlign: 'center',
+  },
+  header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '8px 16px',
-    backgroundColor: 'var(--vscode-sideBar-background)',
-    borderBottom: '1px solid var(--vscode-sideBar-border)'
-  };
-
-  const newChatButtonStyle = {
+    padding: '8px 12px',
+    borderBottom: '1px solid var(--vscode-divider-background)',
+    flexShrink: 0,
+  },
+  chatArea: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden', // El scroll lo maneja ChatMessages
+  },
+  inputWrapper: {
+    padding: '8px 12px',
+    borderTop: '1px solid var(--vscode-divider-background)',
+    backgroundColor: 'var(--vscode-sideBar-background)', // o editorGroupHeader.tabsBackground
+    flexShrink: 0,
+  },
+  title: {
+    margin: 0,
+    fontSize: 'var(--vscode-font-size)', // Usa variables de VS Code
+    fontWeight: 'bold',
+  },
+  button: { // Estilo base para botones
     padding: '4px 8px',
     backgroundColor: 'var(--vscode-button-background)',
     color: 'var(--vscode-button-foreground)',
-    border: 'none',
+    border: '1px solid var(--vscode-button-border, var(--vscode-button-background))',
     borderRadius: '2px',
     cursor: 'pointer',
     fontSize: '12px',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '4px'
+  },
+};
+
+function ChatApp() {
+  const {
+    messages,
+    currentChatId,
+    isLoading,
+    showHistory,
+    requestNewChat, // Usar la acción renombrada
+    setShowHistory,
+    // postCommandToBackend // Para solicitar lista de chats si es necesario
+  } = useVSCodeContext();
+
+  // Solicitar lista de chats al montar si no está en el historial
+  // Esto es opcional, podría hacerse cuando se muestra el historial
+  // useEffect(() => {
+  //   postCommandToBackend('webview:requestChatList');
+  // }, [postCommandToBackend]);
+
+  const handleShowHistory = () => {
+    setShowHistory(true);
   };
 
+  const handleHideHistory = () => {
+    setShowHistory(false);
+  };
+
+
+  if (showHistory) {
+    return (
+      <div style={styles.container}>
+        <ChatHistory onBack={handleHideHistory} />
+      </div>
+    );
+  }
+
+  const isEmptySession = !currentChatId && messages.length === 0 && !isLoading;
+
   return (
-    <div style={containerStyle}>
-      {!isEmpty && (
-        <div style={headerStyle}>
-          <h3>Chat</h3>
-          <button 
-            onClick={newChat}
-            style={newChatButtonStyle}
-            title="Start a new chat"
-          >
-            <span>+</span> New Chat
+    <div style={styles.container}>
+      <div style={styles.header}>
+        <h3 style={styles.title}>AI Chat</h3>
+        <div>
+          <button style={{...styles.button, marginRight: '8px'}} onClick={handleShowHistory} title="Chat History">
+            History
+          </button>
+          <button style={styles.button} onClick={requestNewChat} title="Start New Chat">
+            + New Chat
           </button>
         </div>
-      )}
-      <ChatHistory />
-      {isEmpty ? (
-        <div style={emptyStateContainer}>
-          <ChatInput />
-          <RecentChats />
+      </div>
+
+      {isEmptySession ? (
+        <div style={styles.emptyStateContainer}>
+          <p>No active chat. Start a new one or load from history.</p>
+          <RecentChats onChatSelect={(chatId) => { /* useVSCodeContext().loadChat(chatId) */ }} />
+          {/* RecentChats necesitaría acceso a loadChat del contexto o pasarlo como prop */}
         </div>
       ) : (
-        <>
-          <div style={styles.content}>
-            <ChatMessages />
-          
- 
-          </div>
-          <div style={{display: 'flex', justifyContent: 'center', padding: '0 12px', backgroundColor: 'var(--vscode-sideBar-background)'}}>
-            <ChatInput />
-          </div>
-        </>
+        <div style={styles.chatArea}>
+          <ChatMessages /> {/* ChatMessages internamente usa useVSCodeContext para messages, isLoading */}
+        </div>
       )}
+      
+      {/* El input se muestra siempre que no estemos en la vista de historial */}
+      {/* Se deshabilita si isLoading o si no hay currentChatId (a menos que queramos que cree uno nuevo al enviar) */}
+      <div style={styles.inputWrapper}>
+        <ChatInput disabled={isLoading || !currentChatId} />
+      </div>
     </div>
   );
 }
 
-// Check for VS Code API availability
-if (!window.vscode) {
-  console.error('VS Code API is not available in webview.jsx');
-  // Show error in the UI
-  document.addEventListener('DOMContentLoaded', () => {
-    const root = document.getElementById('root');
-    if (root) {
-      root.innerHTML = `
-        <div style="padding: 20px; color: #f85149;">
-          <h2>Error: VS Code API not available</h2>
-          <p>Please make sure you're running this inside VS Code's webview.</p>
-        </div>
-      `;
-    }
-  });
-} else {
-  console.log('VS Code API is available in webview.jsx');
-}
-
+// ... (código de renderizado de ReactDOM, sin cambios)
 function renderApp() {
   const root = document.getElementById("root");
   if (!root) {
     console.error('Root element not found');
     return;
   }
-
   try {
-    console.log('Rendering React app');
     ReactDOM.render(
       <VSCodeProvider>
-        <Chat />
+        <ChatApp />
       </VSCodeProvider>,
       root
     );
-    console.log('React app rendered successfully');
   } catch (error) {
     console.error('Error rendering React app:', error);
-    root.innerHTML = `
-      <div style="padding: 20px; color: red;">
-        <h2>Error loading UI</h2>
-        <pre>${error.message || JSON.stringify(error)}</pre>
-      </div>
-    `;
+    root.innerHTML = `<div style="padding: 20px; color: red;"><h2>Error loading UI</h2><pre>${error.message || JSON.stringify(error)}</pre></div>`;
   }
 }
 
-renderApp();
+// Asegurar que window.vscode esté disponible antes de renderizar
+if (window.vscode) {
+    renderApp();
+} else {
+    // Podrías tener un listener para cuando esté disponible si se carga asíncronamente,
+    // pero usualmente en webviews de VS Code está disponible de inmediato.
+    console.error("VS Code API (window.vscode) not found at initial load.");
+    // Intentar renderizar de todas formas, MessageService lo manejará.
+    renderApp();
+}

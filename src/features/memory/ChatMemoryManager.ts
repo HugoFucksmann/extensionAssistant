@@ -1,3 +1,5 @@
+// src/features/memory/ChatMemoryManager.ts
+
 /**
  * Gestor de memoria para la arquitectura Windsurf
  * Implementa un sistema de memoria jerárquica (corto, medio y largo plazo)
@@ -11,7 +13,7 @@ import { WindsurfState, HistoryEntry } from '@shared/types';
  * Gestor centralizado de memoria
  * Maneja diferentes niveles de memoria para el agente Windsurf
  */
-export class MemoryManager {
+export class ChatMemoryManager {
   // Memoria a corto plazo (contexto inmediato)
   private shortTermMemory: Map<string, any>;
   
@@ -21,12 +23,12 @@ export class MemoryManager {
   // Memoria a largo plazo (persistente entre sesiones)
   private longTermStorage: LongTermStorage;
   
-  constructor(context: vscode.ExtensionContext) {
+  constructor(private context: vscode.ExtensionContext) { // Asegurarse de que el contexto se guarda para acceder a la configuración
     this.shortTermMemory = new Map();
     this.mediumTermMemory = new Map();
     this.longTermStorage = new LongTermStorage(context);
     
-    console.log('[MemoryManager] Initialized');
+    console.log('[ChatMemoryManager] Initialized');
   }
   
   /**
@@ -77,6 +79,9 @@ export class MemoryManager {
    */
   public async storeConversation(chatId: string, state: WindsurfState): Promise<void> {
     try {
+      // Verificar si la persistencia de chat está habilitada en la configuración de VS Code
+      const persistChat = vscode.workspace.getConfiguration('extensionAssistant').get<boolean>('persistChat', true); // Por defecto true
+      
       // 1. Almacenar en memoria a corto plazo
       this.storeShortTerm('lastState', state, chatId);
       this.storeShortTerm('lastObjective', state.objective, chatId);
@@ -84,18 +89,21 @@ export class MemoryManager {
       // 2. Almacenar en memoria a medio plazo
       this.storeMediumTerm('conversationHistory', state.history, chatId);
       
-      // 3. Almacenar insights relevantes en memoria a largo plazo
-      const insights = this.extractInsightsFromState(state);
-      if (insights.length > 0) {
-        await this.longTermStorage.storeInsights(chatId, insights, {
-          objective: state.objective,
-          timestamp: Date.now()
-        });
+      // 3. Almacenar insights relevantes en memoria a largo plazo (solo si la persistencia está habilitada)
+      if (persistChat) { // AÑADIR CONDICIONAL
+        const insights = this.extractInsightsFromState(state);
+        if (insights.length > 0) {
+          await this.longTermStorage.storeInsights(chatId, insights, {
+            objective: state.objective,
+            timestamp: Date.now()
+          });
+        }
+        console.log(`[ChatMemoryManager] Stored conversation state for chat ${chatId} (persisted: ${persistChat})`); // ACTUALIZAR LOG
+      } else {
+        console.log(`[ChatMemoryManager] Stored conversation state for chat ${chatId} (persistence disabled)`); // ACTUALIZAR LOG
       }
-      
-      console.log(`[MemoryManager] Stored conversation state for chat ${chatId}`);
     } catch (error) {
-      console.error(`[MemoryManager] Error storing conversation:`, error);
+      console.error(`[ChatMemoryManager] Error storing conversation:`, error);
       throw error;
     }
   }
@@ -129,6 +137,12 @@ export class MemoryManager {
    */
   public async retrieveRelevantMemories(context: any, limit: number = 5): Promise<any[]> {
     try {
+      const persistChat = vscode.workspace.getConfiguration('extensionAssistant').get<boolean>('persistChat', true);
+      if (!persistChat) { // AÑADIR CONDICIONAL
+        console.log('[ChatMemoryManager] Persistence disabled. Not retrieving long-term memories.');
+        return [];
+      }
+
       // Construir una query basada en el contexto
       const query = this.buildMemoryQuery(context);
       
@@ -137,7 +151,7 @@ export class MemoryManager {
       
       return memories;
     } catch (error) {
-      console.error(`[MemoryManager] Error retrieving memories:`, error);
+      console.error(`[ChatMemoryManager] Error retrieving memories:`, error);
       return [];
     }
   }
@@ -183,9 +197,9 @@ export class MemoryManager {
       // Implementación de consolidación de memorias
       // ...
       
-      console.log(`[MemoryManager] Consolidated memories for chat ${chatId}`);
+      console.log(`[ChatMemoryManager] Consolidated memories for chat ${chatId}`);
     } catch (error) {
-      console.error(`[MemoryManager] Error consolidating memories:`, error);
+      console.error(`[ChatMemoryManager] Error consolidating memories:`, error);
       throw error;
     }
   }
@@ -209,7 +223,7 @@ export class MemoryManager {
       }
     }
     
-    console.log(`[MemoryManager] Cleared memory for chat ${chatId}`);
+    console.log(`[ChatMemoryManager] Cleared memory for chat ${chatId}`);
   }
   
   /**
@@ -220,9 +234,9 @@ export class MemoryManager {
       this.shortTermMemory.clear();
       this.mediumTermMemory.clear();
       await this.longTermStorage.dispose();
-      console.log('[MemoryManager] Disposed');
+      console.log('[ChatMemoryManager] Disposed');
     } catch (error) {
-      console.error('[MemoryManager] Error during disposal:', error);
+      console.error('[ChatMemoryManager] Error during disposal:', error);
       throw error;
     }
   }

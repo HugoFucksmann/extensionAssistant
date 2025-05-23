@@ -1,49 +1,27 @@
 // src/ui/services/MessageService.ts
 export class MessageService {
-    private static instance: MessageService;
-    
-    private constructor() {}
-    
-    static getInstance(): MessageService {
-      if (!MessageService.instance) {
-        MessageService.instance = new MessageService();
-      }
-      return MessageService.instance;
-    }
+  private static instance: MessageService;
   
-    postMessage(type: string, payload: Record<string, unknown> = {}) {
-      if (type === 'userMessage') {
-        this.handleUserMessage(payload);
-      } else if (type === 'command' && payload.command && typeof payload.command === 'string') {
-        this.handleCommand(payload);
-      } else {
-        window.vscode.postMessage({ type, ...payload });
-      }
-    }
+  private constructor() {}
   
-    private handleUserMessage(payload: Record<string, unknown>) {
-      const userMsgPayload = payload as { text: string, files?: string[] };
-      
-      window.vscode.postMessage({ 
-        type: 'userMessageSent',
-        payload: {
-          text: userMsgPayload.text, 
-          files: userMsgPayload.files
-        }
-      });
+  static getInstance(): MessageService {
+    if (!MessageService.instance) {
+      MessageService.instance = new MessageService();
     }
-  
-    private handleCommand(payload: Record<string, unknown>) {
-      const commandActual = payload.command as string;
-      let finalPayload: Record<string, unknown> = {};
-  
-      if (payload.payload && typeof payload.payload === 'object' && payload.payload !== null) {
-        finalPayload = { ...(payload.payload as Record<string, unknown>) };
-      } else {
-        const { command, ...restOfPayload } = payload;
-        finalPayload = restOfPayload;
-      }
-      
-      window.vscode.postMessage({ type: commandActual, ...finalPayload });
-    }
+    return MessageService.instance;
   }
+
+  /**
+   * Envía un mensaje a la extensión de VS Code (al MessageBridge).
+   * @param type El tipo de mensaje (ej. 'userMessageSent', 'uiReady', 'newChatRequestedByUI').
+   * @param payload Los datos asociados al mensaje.
+   */
+  postMessage(type: string, payload: Record<string, unknown> = {}) {
+    // Directamente postear el mensaje con el tipo y el payload
+    // El MessageBridge en el backend se encargará de la lógica de enrutamiento.
+    window.vscode.postMessage({ type, payload });
+    console.log('[MessageService] Posted message:', { type, payload });
+  }
+
+
+}

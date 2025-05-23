@@ -1,4 +1,4 @@
-// src/vscode/SessionManager.ts
+// src/vscode/managers/SessionManager.ts
 import * as vscode from 'vscode';
 
 const CURRENT_CHAT_ID_KEY = 'extensionAssistant.currentChatId';
@@ -17,10 +17,8 @@ export class SessionManager {
         const persistedId = this.extensionContext.globalState.get<string>(CURRENT_CHAT_ID_KEY);
         if (persistedId) {
             this.currentChatId = persistedId;
-            this.isSessionActive = true; // Assume active if there's a persisted ID
+            this.isSessionActive = true;
             console.log(`[SessionManager] Restored currentChatId: ${this.currentChatId}`);
-        } else {
-            console.log(`[SessionManager] No currentChatId found in globalState.`);
         }
     }
 
@@ -46,7 +44,7 @@ export class SessionManager {
         this.currentChatId = this.generateChatId();
         this.isSessionActive = true;
         this.saveCurrentChatId();
-        console.log(`[SessionManager] New chat started and set as current: ${this.currentChatId}`);
+        console.log(`[SessionManager] New chat started: ${this.currentChatId}`);
         return this.currentChatId;
     }
 
@@ -56,41 +54,28 @@ export class SessionManager {
             this.isSessionActive = true;
             this.saveCurrentChatId();
             console.log(`[SessionManager] Active chat ID set to: ${this.currentChatId}`);
-        } else {
-            // If it's the same ID, ensure session is marked active
-            if (!this.isSessionActive) {
-                this.isSessionActive = true;
-                 console.log(`[SessionManager] Chat ID ${this.currentChatId} was already current, session marked active.`);
-            }
+        } else if (!this.isSessionActive) {
+            this.isSessionActive = true;
         }
     }
 
     public initializeOrRestore(): Promise<{ chatId: string | undefined; isNew: boolean; restored: boolean }> {
         if (this.isSessionActive && this.currentChatId) {
-            console.log(`[SessionManager] Session already active with chatId: ${this.currentChatId}`);
             return Promise.resolve({ chatId: this.currentChatId, isNew: false, restored: true });
         }
 
-        // currentChatId might have been loaded by constructor
         if (this.currentChatId) {
             this.isSessionActive = true;
             console.log(`[SessionManager] Restored session for chatId: ${this.currentChatId}`);
             return Promise.resolve({ chatId: this.currentChatId, isNew: false, restored: true });
         }
         
-        console.log(`[SessionManager] No chat session to restore. A new chat must be started or loaded.`);
         return Promise.resolve({ chatId: undefined, isNew: true, restored: false });
     }
 
     public endSession(): void {
         this.isSessionActive = false;
-        // We don't clear currentChatId from globalState here.
-        // It will be overwritten when another chat is started/loaded.
-        console.log(`[SessionManager] Session ended for chatId: ${this.currentChatId}. Persisted ID remains.`);
-    }
-
-    private generateChatId(): string {
-        return `chat_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        console.log(`[SessionManager] Session ended for chatId: ${this.currentChatId}`);
     }
 
     public clearPersistedChatId(): void {
@@ -98,6 +83,10 @@ export class SessionManager {
         this.currentChatId = undefined;
         this.isSessionActive = false;
         this.extensionContext.globalState.update(CURRENT_CHAT_ID_KEY, undefined);
-        console.log(`[SessionManager] Cleared persisted currentChatId (was: ${oldChatId}).`);
+        console.log(`[SessionManager] Cleared persisted currentChatId (was: ${oldChatId})`);
+    }
+
+    private generateChatId(): string {
+        return `chat_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     }
 }

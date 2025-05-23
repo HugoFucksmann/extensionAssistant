@@ -1,14 +1,15 @@
-// src/core/ConversationManager.ts
-import { WindsurfState, VSCodeContext, HistoryEntry } from '../shared/types'; // Importa HistoryEntry
-import { MemoryManager } from '../features/memory/MemoryManager';
-import { WindsurfConfig } from '../shared/config';
-import { IConversationManager } from './interfaces/IConversationManager';
+// src/core/ChatStateManager.ts
+// (Antes: src/core/ConversationManager.ts)
 
-export class ConversationManager implements IConversationManager {
+import { WindsurfState, VSCodeContext, HistoryEntry } from '../shared/types'; // Importa HistoryEntry
+import { WindsurfConfig } from '../shared/config';
+import { ChatMemoryManager } from '@features/memory/ChatMemoryManager';
+
+export class ChatStateManager { // RENOMBRAR CLASE
   private activeConversations: Map<string, WindsurfState> = new Map();
 
   constructor() {
-    console.log('[ConversationManager] Initialized');
+    console.log('[ChatStateManager] Initialized'); // ACTUALIZAR LOG
   }
 
   public getOrCreateConversationState(
@@ -47,7 +48,7 @@ export class ConversationManager implements IConversationManager {
       state.projectContext = contextData.projectContext || state.projectContext;
       state.editorContext = contextData.editorContext || state.editorContext;
 
-      console.log(`[ConversationManager] Reusing state for chat ${chatId}`);
+      console.log(`[ChatStateManager] Reusing state for chat ${chatId}`); // ACTUALIZAR LOG
       return state;
     }
 
@@ -74,7 +75,7 @@ export class ConversationManager implements IConversationManager {
       timestamp: Date.now(),
     };
     this.activeConversations.set(chatId, newState);
-    console.log(`[ConversationManager] Created new state for chat ${chatId}`);
+    console.log(`[ChatStateManager] Created new state for chat ${chatId}`); // ACTUALIZAR LOG
     return newState;
   }
 
@@ -85,19 +86,19 @@ export class ConversationManager implements IConversationManager {
 
   public updateConversationState(chatId: string, state: WindsurfState): void {
     this.activeConversations.set(chatId, state);
-    console.log(`[ConversationManager] Updated state for chat ${chatId}`);
+    console.log(`[ChatStateManager] Updated state for chat ${chatId}`); // ACTUALIZAR LOG
   }
 
-  public async endConversation(chatId: string, memoryManager?: MemoryManager): Promise<void> {
+  public async endConversation(chatId: string, memoryManager?: ChatMemoryManager): Promise<void> {
     const state = this.activeConversations.get(chatId);
     if (state && memoryManager) {
-      console.log(`[ConversationManager] Conversation ${chatId} ended. State ready for LTM.`);
+      console.log(`[ChatStateManager] Conversation ${chatId} ended. State ready for LTM.`); // ACTUALIZAR LOG
     }
   }
 
-  public clearConversation(chatId: string, memoryManager: MemoryManager): void {
+  public clearConversation(chatId: string, memoryManager: ChatMemoryManager): void {
     this.activeConversations.delete(chatId);
     memoryManager.clearConversationMemory(chatId);
-    console.log(`[ConversationManager] Cleared active conversation state for chat ${chatId}`);
+    console.log(`[ChatStateManager] Cleared active conversation state for chat ${chatId}`); // ACTUALIZAR LOG
   }
 }

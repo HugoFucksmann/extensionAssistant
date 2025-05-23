@@ -2,7 +2,7 @@
 
 import React, { useRef, useState, useEffect } from "react";
 
-import { useVSCodeContext } from "../../context/VSCodeContext";
+
 import ModelDropdown from '../ModelSelector/ModelDropdown';
 import FileChip from './FileChip'; // Importar FileChip
 
@@ -11,9 +11,11 @@ import { useFileMention } from './useFileMention';
 import { getStyles } from './ChatInputStyles';
 import FileDropdown from "./fileDropdown";
 import { EnterIcon, FileIcon } from "./Icons";
+import { useVSCodeContext } from "../../context/VSCodeContext";
 
 const ChatInput = () => {
-  const { postMessage, isLoading, theme, currentModel, messages } = useVSCodeContext();
+  // const { postMessage, isLoading, theme, currentModel, messages } = useVSCodeContext(); // CAMBIAR
+  const { sendMessage, postCommand, isLoading, theme, currentModel, messages } = useVSCodeContext(); // AÑADIR sendMessage, postCommand
   const [inputText, setInputText] = useState('');
   const inputRef = useRef(null);
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
@@ -104,10 +106,10 @@ const ChatInput = () => {
   // Enviar mensaje
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!inputText.trim() || isLoading) return;
+    if (!inputText.trim() && selectedFiles.length === 0 || isLoading) return; // Modificar condición
 
-    // Enviar mensaje
-    postMessage('userMessage', { text: inputText, files: selectedFiles });
+    // Enviar mensaje usando el nuevo método sendMessage
+    sendMessage(inputText, selectedFiles); // CAMBIO: Usar sendMessage
     setInputText('');
     setSelectedFiles([]); // Limpiar archivos seleccionados
   };
@@ -128,10 +130,8 @@ const ChatInput = () => {
 
   // Cambiar modelo
   const handleModelChange = (modelType) => {
-    postMessage('command', { 
-      command: 'switchModel',
-      modelType
-    });
+    // CAMBIO: Usar postCommand directamente
+    postCommand('switchModel', { modelType });
     setIsModelDropdownOpen(false);
   };
 

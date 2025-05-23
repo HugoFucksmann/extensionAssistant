@@ -3,7 +3,8 @@ import { useVSCodeContext } from '../../context/VSCodeContext';
 
 // Hook para obtener y filtrar archivos del proyecto
 export const useProjectFiles = (shouldFetch = false) => {
-  const { postMessage } = useVSCodeContext();
+
+  const { postCommand } = useVSCodeContext(); // AÑADIR postCommand
   const [projectFiles, setProjectFiles] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -11,15 +12,17 @@ export const useProjectFiles = (shouldFetch = false) => {
   useEffect(() => {
     if (shouldFetch) {
       setIsLoading(true);
-      postMessage("command", { command: "getProjectFiles" });
+      // postMessage("command", { command: "getProjectFiles" }); // CAMBIAR
+      postCommand("getProjectFiles"); // AÑADIR
     }
-  }, [shouldFetch, postMessage]);
+  }, [shouldFetch, postCommand]); // Dependencia de postCommand
 
   // Escuchar respuesta con archivos del proyecto
   useEffect(() => {
     const handleMessage = (event) => {
       const message = event.data;
-      if (message.type === "projectFiles") {
+      // if (message.type === "projectFiles") { // CAMBIAR
+      if (message.type === "projectFilesLoaded") { // AÑADIR: El MessageBridge ahora envía este tipo
         // Filtrar directorios no deseados y archivos
         const filteredFiles = message.payload.files.filter(file => 
           !file.includes('node_modules/') && 
@@ -52,6 +55,7 @@ export const useProjectFiles = (shouldFetch = false) => {
     projectFiles, 
     isLoading, 
     getFilteredFiles,
-    refreshFiles: () => postMessage("command", { command: "getProjectFiles" })
+    // refreshFiles: () => postMessage("command", { command: "getProjectFiles" }) // CAMBIAR
+    refreshFiles: () => postCommand("getProjectFiles") // AÑADIR
   };
 };
