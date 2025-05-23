@@ -11,29 +11,27 @@ const baseConfig = {
       '@core': path.resolve(__dirname, 'src/core'),
       '@features': path.resolve(__dirname, 'src/features'),
       '@shared': path.resolve(__dirname, 'src/shared'),
-      // Alias más específicos si los necesitas:
       '@ai': path.resolve(__dirname, 'src/features/ai'),
       '@memory': path.resolve(__dirname, 'src/features/memory'),
       '@tools': path.resolve(__dirname, 'src/features/tools'),
       '@events': path.resolve(__dirname, 'src/features/events'),
+      // Asegurarse de que React y ReactDOM se resuelvan correctamente
+      'react': path.resolve(__dirname, 'node_modules/react'),
+      'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
     }
   },
-  // Añadir caché para mejorar el rendimiento de compilación
   cache: {
     type: 'filesystem',
     buildDependencies: {
       config: [__filename],
     },
-    // Aumentar el tiempo de caché para reducir recompilaciones innecesarias
-    maxAge: 5184000000, // 60 días en milisegundos
+    maxAge: 5184000000,
   },
-  // Optimizar la compilación
   optimization: {
     removeAvailableModules: false,
     removeEmptyChunks: false,
     splitChunks: false,
   },
-  // Añadir estadísticas para ver el progreso de la compilación
   stats: {
     modules: false,
     children: false,
@@ -70,8 +68,8 @@ const extensionConfig = {
           {
             loader: "ts-loader",
             options: {
-              transpileOnly: true, // Acelera la compilación omitiendo la verificación de tipos
-              experimentalWatchApi: true, // Mejora el rendimiento en modo watch
+              transpileOnly: true,
+              experimentalWatchApi: true,
             },
           },
         ],
@@ -89,20 +87,13 @@ const webviewConfig = {
   ...baseConfig,
   target: "web",
   entry: {
-    webview: "./src/ui/react/webview.jsx",
+    webview: "./src/vscode/react/webview.jsx",
   },
   output: {
     path: path.resolve(__dirname, "out"),
     filename: "webview.js",
-    // Configurar publicPath para que los chunks se carguen correctamente
     publicPath: "",
-    // Evitar chunks separados para solucionar el problema de carga en VS Code
     chunkFilename: "[name].js"
-  },
-  // Desactivar la división de código para evitar problemas de carga en VS Code
-  optimization: {
-    splitChunks: false,
-    runtimeChunk: false
   },
   module: {
     rules: [
@@ -111,13 +102,17 @@ const webviewConfig = {
         exclude: /node_modules/,
         use: [
           {
-            loader: "ts-loader",
+            loader: "babel-loader",
             options: {
-              transpileOnly: true, // Acelera la compilación omitiendo la verificación de tipos
-              experimentalWatchApi: true, // Mejora el rendimiento en modo watch
-            },
-          },
-        ],
+              presets: [
+                "@babel/preset-env",
+                ["@babel/preset-react", { "runtime": "automatic" }],
+                "@babel/preset-typescript"
+              ],
+              plugins: []
+            }
+          }
+        ]
       },
       {
         test: /\.jsx?$/,
@@ -126,19 +121,39 @@ const webviewConfig = {
           {
             loader: "babel-loader",
             options: {
-              presets: ["@babel/preset-env", "@babel/preset-react"],
-              cacheDirectory: true, // Habilitar caché para babel
-            },
-          },
-        ],
+              presets: [
+                "@babel/preset-env",
+                ["@babel/preset-react", { "runtime": "automatic" }]
+              ]
+            }
+          }
+        ]
       },
       {
         test: /\.css$/,
-        use: ["style-loader", "css-loader"],
+        use: [
+          'style-loader',
+          'css-loader'
+        ]
       },
-    ],
+      {
+        test: /\.(png|jpe?g|gif|svg)$/i,
+        type: 'asset/resource'
+      }
+    ]
+  },
+  // Asegurarse de que las dependencias de React no se incluyan en el bundle
+  externals: {
+    react: 'React',
+    'react-dom': 'ReactDOM',
+  },
+  // Configuración de optimización para el webview
+  optimization: {
+    ...baseConfig.optimization,
+    // Deshabilitar la división de código para evitar problemas de carga
+    splitChunks: false,
+    runtimeChunk: false,
   },
 };
 
-// Exportar ambas configuraciones como un array
 module.exports = [extensionConfig, webviewConfig];

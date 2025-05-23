@@ -1,29 +1,14 @@
-/**
- * Registro de herramientas para la arquitectura Windsurf
- * Centraliza la definición y gestión de todas las herramientas disponibles para el agente
- */
 
-import * as vscode from 'vscode';
+import { getFileContents } from '@features/tools/implementations/filesystem/getFileContents';
 import { Tool, ToolResult, ParameterDefinition } from '../core/types';
+import { writeToFile } from '@features/tools/implementations/filesystem/writeToFile';
+import { listFiles } from '@features/tools/implementations/filesystem/listFiles';
+import { getActiveEditorContent } from '@features/tools/implementations/editor/getActiveEditorContent';
+import { applyTextEdit } from '@features/tools/implementations/editor/applyTextEdit';
+import { searchWorkspace } from '@features/tools/implementations/project/searchWorkspace';
+import { getProjectInfo } from '@features/tools/implementations/project/getProjectInfo';
+import { respond } from '@features/tools/implementations/core/respond';
 
-// Importar herramientas de sistema de archivos
-import { getFileContents } from './filesystem/getFileContents';
-import { writeToFile } from './filesystem/writeToFile';
-import { listFiles } from './filesystem/listFiles';
-
-// Importar herramientas de editor
-import { getActiveEditorContent } from './editor/getActiveEditorContent';
-import { applyTextEdit } from './editor/applyTextEdit';
-
-// Importar herramientas de proyecto
-import { searchWorkspace } from './project/searchWorkspace';
-import { getProjectInfo } from './project/getProjectInfo';
-
-// Importar herramienta de respuesta
-import { respond } from './core/respond';
-
-// Importar EventEmitter3 para el bus de eventos
-import EventEmitter from 'eventemitter3';
 
 /**
  * Registro central de herramientas para el agente Windsurf

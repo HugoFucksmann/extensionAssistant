@@ -3,8 +3,9 @@
  */
 
 import * as vscode from 'vscode';
-import { WindsurfController } from '../../../srcV4/core/windsurfController';
-import { eventBus, EventType } from '../../../srcV4/events';
+import { WindsurfController } from '../../core/WindsurfController';
+import { eventBus } from '../../features/events/EventBus';
+import { EventType } from '../../features/events/eventTypes';
 
 import { getReactHtmlContent } from './htmlTemplate';
 import { MessageHandler } from './MessageHandler';
@@ -71,6 +72,9 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     // Message handling
     this.view.webview.onDidReceiveMessage(
       async (message) => {
+        if (message.type === 'getInitialState') {
+          this.postMessage('chatSessionStarted', { chatId: this.currentChatId });
+        }
         try {
           const result = await this.messageHandler.handle(message);
           if (result) {

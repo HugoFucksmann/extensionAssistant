@@ -2,7 +2,7 @@ import React, { useContext, useEffect, useState } from "react";
 import ReactDOM from "react-dom";
 import ChatInput from "./Components/InputChat/ChatInput";
 
-// Import components statically instead of using lazy loading
+// Import components statically
 import ChatHistory from "./historical/ChatHistory";
 import RecentChats from "./historical/RecentChats";
 import ChatMessages from "./Components/ChatMessages/ChatMessages";
@@ -10,7 +10,6 @@ import { ProcessingStatus, PerformanceMetrics } from "./Components/ProcessingSta
 
 import { VSCodeProvider, useVSCodeContext } from "./context/VSCodeContext";
 
-// Debug message
 console.log('Webview script loaded');
 
 const styles = {
@@ -37,9 +36,8 @@ const styles = {
   },
 };
 
-// Main component
 function Chat() {
-  const { messages } = useVSCodeContext();
+  const { messages, currentChatId } = useVSCodeContext(); // Obtener currentChatId
   const isEmpty = messages.length === 0;
 
   const containerStyle = {
@@ -53,33 +51,35 @@ function Chat() {
 
   const emptyStateContainer = {
     display: 'flex',
-    flexDirection: 'column-reverse',
+    flexDirection: 'column-reverse', // ChatInput abajo, RecentChats arriba
     alignItems: 'center',
-    justifyContent: 'center',
-    height: 'calc(100vh - 40px)',
+    justifyContent: 'center', // Centrar verticalmente
+    height: 'calc(100vh - 40px)', // Ajustar altura si es necesario
     width: '100%',
     padding: '20px',
     boxSizing: 'border-box',
     gap: '16px',
-    overflow: 'hidden'
+    overflow: 'hidden' // Evitar scroll en el contenedor del estado vacío
   };
 
   return (
     <div style={containerStyle}>
-      <ChatHistory />
+      <ChatHistory /> {/* Se muestra condicionalmente basado en showHistory desde el contexto */}
       {isEmpty ? (
         <div style={emptyStateContainer}>
+          <ChatInput /> {/* ChatInput primero en el DOM, pero abajo visualmente por column-reverse */}
           <RecentChats />
-          <ChatInput />
         </div>
       ) : (
         <>
           <div style={styles.content}>
             <ChatMessages>
-              <RecentChats />
+              {/* RecentChats no debería estar dentro de ChatMessages si ChatMessages es solo para la lista de mensajes */}
+              {/* Se podría mostrar RecentChats en otro lugar o no mostrarlo cuando hay mensajes */}
             </ChatMessages>
-            <ProcessingStatus />
-            <PerformanceMetrics chatId={messages.length > 0 ? messages[0].chatId : null} />
+            <ProcessingStatus /> {/* Este componente muestra el estado de procesamiento */}
+            {/* Pasar currentChatId al componente PerformanceMetrics */}
+            <PerformanceMetrics chatId={currentChatId} /> 
           </div>
           <div style={{display: 'flex', justifyContent: 'center', padding: '0 12px', backgroundColor: 'var(--vscode-sideBar-background)'}}>
             <ChatInput />
@@ -90,32 +90,21 @@ function Chat() {
   );
 }
 
+// const vscode = window.vscode; // Ya no es necesario aquí, VSCodeProvider lo maneja
 
-/** 
- * @type {{
- *   postMessage: (msg: {type: string, [key: string]: any}) => void,
- *   getState: () => {modelType?: string},
- *   setState: (state: object) => void
- * }} 
- */
-// Use the vscode API that was already initialized in the HTML template
-const vscode = window.vscode;
-
-// Log the VS Code API status for debugging
-if (vscode) {
-  console.log('VS Code API is available');
+if (window.vscode) {
+  console.log('VS Code API is available in webview.jsx');
 } else {
-  console.error('VS Code API is not available');
+  console.error('VS Code API is not available in webview.jsx');
 }
 
-// Function to render the application with improved error handling
 function renderApp() {
   const root = document.getElementById("root");
   if (!root) {
     console.error('Root element not found');
     return;
   }
-  
+
   try {
     console.log('Rendering React app');
     ReactDOM.render(
@@ -127,15 +116,13 @@ function renderApp() {
     console.log('React app rendered successfully');
   } catch (error) {
     console.error('Error rendering React app:', error);
-    // Fallback to show something in case of error
     root.innerHTML = `
       <div style="padding: 20px; color: red;">
         <h2>Error loading UI</h2>
-        <pre>${error.message}</pre>
+        <pre>${error.message || JSON.stringify(error)}</pre>
       </div>
     `;
   }
 }
 
-// Start the application
 renderApp();

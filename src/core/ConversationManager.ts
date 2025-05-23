@@ -1,16 +1,13 @@
 // src/core/ConversationManager.ts
-import { WindsurfState, VSCodeContext } from '../shared/types';
+import { WindsurfState, VSCodeContext, HistoryEntry } from '../shared/types'; // Importa HistoryEntry
 import { MemoryManager } from '../features/memory/MemoryManager';
 import { WindsurfConfig } from '../shared/config';
 import { IConversationManager } from './interfaces/IConversationManager';
 
 export class ConversationManager implements IConversationManager {
   private activeConversations: Map<string, WindsurfState> = new Map();
-  // Inyecta MemoryManager si ConversationManager es responsable de la persistencia final
-  // private memoryManager: MemoryManager;
 
-  constructor(/* memoryManager?: MemoryManager */) {
-    // this.memoryManager = memoryManager;
+  constructor() {
     console.log('[ConversationManager] Initialized');
   }
 
@@ -18,28 +15,35 @@ export class ConversationManager implements IConversationManager {
     chatId: string,
     userMessage: string,
     contextData: Record<string, any> = {},
-    vscodeContext: VSCodeContext // Para inicializar el estado si es necesario
+    vscodeContext: VSCodeContext
   ): WindsurfState {
     let state = this.activeConversations.get(chatId);
     if (state) {
-      // Actualizar estado para un nuevo mensaje dentro de la misma conversación
       state.userMessage = userMessage;
-      state.objective = `Responder a: ${userMessage.substring(0, 100)}...`; // O una lógica más sofisticada
+      state.objective = `Responder a: ${userMessage.substring(0, 100)}...`;
       state.iterationCount = 0;
       state.completionStatus = 'in_progress';
       state.reasoningResult = undefined;
       state.actionResult = undefined;
       state.reflectionResult = undefined;
       state.correctionResult = undefined;
-      // Considera si el historial debe reiniciarse o acumularse
-      // state.history = []; // Si cada mensaje inicia un "nuevo" ciclo ReAct
-      state.history.push({ // Si se acumula, añade el mensaje del usuario
-          phase: 'user_message' as any, // Necesitarás un tipo para esto en HistoryEntry
+      state.history.push({
+          // Asegúrate que 'user_input' o un tipo similar esté en la definición de HistoryEntry['phase']
+          phase: 'user_input', // O 'user_message' si lo tienes definido
           timestamp: Date.now(),
-          data: { userMessage, contextData },
-          iteration: 0 // O un contador de mensajes
-      });
-      // Actualizar contextos
+          // Mueve userMessage y contextData a metadata
+          metadata: { userMessage, contextData, /* otros metadatos si los tienes */ },
+          iteration: 0, // O un contador de mensajes
+          // Las propiedades 'id', 'content', 'sender' vienen de ChatMessage (Omit)
+          // Necesitas proveerlas si no son opcionales o si HistoryEntry las requiere.
+          // HistoryEntry hereda de Omit<ChatMessage, 'metadata'>.
+          // ChatMessage tiene: id, content, sender, timestamp.
+          // 'content' podría ser userMessage, 'sender' podría ser 'user'.
+          // 'id' necesitaría ser generado.
+          id: `msg_${Date.now()}`, // Ejemplo de ID
+          content: userMessage,
+          sender: 'user',
+      } as HistoryEntry); // Cast explícito si es necesario
       state.projectContext = contextData.projectContext || state.projectContext;
       state.editorContext = contextData.editorContext || state.editorContext;
 
@@ -47,7 +51,6 @@ export class ConversationManager implements IConversationManager {
       return state;
     }
 
-    // Crear nuevo estado (basado en tu initializeWindsurfState)
     const newState: WindsurfState = {
       objective: `Responder a: ${userMessage.substring(0, 100)}...`,
       userMessage: userMessage,
@@ -56,25 +59,27 @@ export class ConversationManager implements IConversationManager {
       maxIterations: WindsurfConfig.react.maxIterations,
       completionStatus: 'in_progress',
       history: [{
-          phase: 'user_message' as any, // Necesitarás un tipo para esto en HistoryEntry
+          phase: 'user_input', // O 'user_message'
           timestamp: Date.now(),
-          data: { userMessage, contextData },
-          iteration: 0
-      }],
+          // Mueve userMessage y contextData a metadata
+          metadata: { userMessage, contextData },
+          iteration: 0,
+          id: `msg_init_${Date.now()}`, // Ejemplo de ID
+          content: userMessage,
+          sender: 'user',
+      } as HistoryEntry], // Cast explícito si es necesario
       projectContext: contextData.projectContext,
       editorContext: contextData.editorContext,
-      // Otros campos de WindsurfState con valores iniciales de tus mejoras de Fase 1
-      metrics: {}, // Inicializar métricas
-      // ...
+      metrics: {},
       timestamp: Date.now(),
-      // Asegúrate de que todos los campos de WindsurfState estén aquí
     };
     this.activeConversations.set(chatId, newState);
     console.log(`[ConversationManager] Created new state for chat ${chatId}`);
     return newState;
   }
 
-  public getConversationState(chatId: string): WindsurfState | undefined {
+  // ... resto de la clase
+  public getConversationState(chatId:string): WindsurfState | undefined {
     return this.activeConversations.get(chatId);
   }
 
@@ -86,18 +91,13 @@ export class ConversationManager implements IConversationManager {
   public async endConversation(chatId: string, memoryManager?: MemoryManager): Promise<void> {
     const state = this.activeConversations.get(chatId);
     if (state && memoryManager) {
-      // El controlador principal podría ser responsable de esto
-      // await memoryManager.storeConversation(chatId, state);
       console.log(`[ConversationManager] Conversation ${chatId} ended. State ready for LTM.`);
     }
-    // No borra el estado aquí, el controlador puede querer acceder a él después de que el grafo termine.
-    // this.activeConversations.delete(chatId);
   }
 
   public clearConversation(chatId: string, memoryManager: MemoryManager): void {
     this.activeConversations.delete(chatId);
-    memoryManager.clearConversationMemory(chatId); // MemoryManager maneja STM/MTM
-    // LTM se maneja por separado si es necesario
+    memoryManager.clearConversationMemory(chatId);
     console.log(`[ConversationManager] Cleared active conversation state for chat ${chatId}`);
   }
 }

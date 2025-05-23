@@ -1,5 +1,5 @@
 // src/core/WindsurfController.ts
-import * as vscode from 'vscode';
+
 import { VSCodeContext, WindsurfState } from '@shared/types';
 
 // Define a custom interface for history entries to match the expected structure
@@ -86,7 +86,7 @@ export class WindsurfController /* implements IWindsurfController */ {
     }
 
     try {
-      const resultState = await this.reactGraph.runGraph(state);
+      const resultState = await this.reactGraph.run(state);
       this.conversationManager.updateConversationState(chatId, resultState);
 
       let finalResponse = 'No se pudo generar una respuesta.';
