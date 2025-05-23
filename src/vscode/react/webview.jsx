@@ -6,7 +6,6 @@ import ChatInput from "./Components/InputChat/ChatInput";
 import ChatHistory from "./historical/ChatHistory";
 import RecentChats from "./historical/RecentChats";
 import ChatMessages from "./Components/ChatMessages/ChatMessages";
-import { ProcessingStatus, PerformanceMetrics } from "./Components/ProcessingStatus";
 
 import { VSCodeProvider, useVSCodeContext } from "./context/VSCodeContext";
 
@@ -37,8 +36,18 @@ const styles = {
 };
 
 function Chat() {
-  const { messages, currentChatId } = useVSCodeContext(); // Obtener currentChatId
+  const { messages, currentChatId, postMessage, newChat, chatList } = useVSCodeContext();
+  const [isInitialized, setIsInitialized] = useState(false);
   const isEmpty = messages.length === 0;
+
+  // Initialize chat when component mounts
+  useEffect(() => {
+    if (!isInitialized) {
+      console.log('Initializing chat...');
+      postMessage('command', { command: 'getInitialState' });
+      setIsInitialized(true);
+    }
+  }, [isInitialized, postMessage]);
 
   const containerStyle = {
     ...styles.container,
@@ -62,24 +71,54 @@ function Chat() {
     overflow: 'hidden' // Evitar scroll en el contenedor del estado vacío
   };
 
+  const headerStyle = {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '8px 16px',
+    backgroundColor: 'var(--vscode-sideBar-background)',
+    borderBottom: '1px solid var(--vscode-sideBar-border)'
+  };
+
+  const newChatButtonStyle = {
+    padding: '4px 8px',
+    backgroundColor: 'var(--vscode-button-background)',
+    color: 'var(--vscode-button-foreground)',
+    border: 'none',
+    borderRadius: '2px',
+    cursor: 'pointer',
+    fontSize: '12px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px'
+  };
+
   return (
     <div style={containerStyle}>
-      <ChatHistory /> {/* Se muestra condicionalmente basado en showHistory desde el contexto */}
+      {!isEmpty && (
+        <div style={headerStyle}>
+          <h3>Chat</h3>
+          <button 
+            onClick={newChat}
+            style={newChatButtonStyle}
+            title="Start a new chat"
+          >
+            <span>+</span> New Chat
+          </button>
+        </div>
+      )}
+      <ChatHistory />
       {isEmpty ? (
         <div style={emptyStateContainer}>
-          <ChatInput /> {/* ChatInput primero en el DOM, pero abajo visualmente por column-reverse */}
+          <ChatInput />
           <RecentChats />
         </div>
       ) : (
         <>
           <div style={styles.content}>
-            <ChatMessages>
-              {/* RecentChats no debería estar dentro de ChatMessages si ChatMessages es solo para la lista de mensajes */}
-              {/* Se podría mostrar RecentChats en otro lugar o no mostrarlo cuando hay mensajes */}
-            </ChatMessages>
-            <ProcessingStatus /> {/* Este componente muestra el estado de procesamiento */}
-            {/* Pasar currentChatId al componente PerformanceMetrics */}
-            <PerformanceMetrics chatId={currentChatId} /> 
+            <ChatMessages />
+          
+ 
           </div>
           <div style={{display: 'flex', justifyContent: 'center', padding: '0 12px', backgroundColor: 'var(--vscode-sideBar-background)'}}>
             <ChatInput />
@@ -90,12 +129,23 @@ function Chat() {
   );
 }
 
-// const vscode = window.vscode; // Ya no es necesario aquí, VSCodeProvider lo maneja
-
-if (window.vscode) {
-  console.log('VS Code API is available in webview.jsx');
-} else {
+// Check for VS Code API availability
+if (!window.vscode) {
   console.error('VS Code API is not available in webview.jsx');
+  // Show error in the UI
+  document.addEventListener('DOMContentLoaded', () => {
+    const root = document.getElementById('root');
+    if (root) {
+      root.innerHTML = `
+        <div style="padding: 20px; color: #f85149;">
+          <h2>Error: VS Code API not available</h2>
+          <p>Please make sure you're running this inside VS Code's webview.</p>
+        </div>
+      `;
+    }
+  });
+} else {
+  console.log('VS Code API is available in webview.jsx');
 }
 
 function renderApp() {

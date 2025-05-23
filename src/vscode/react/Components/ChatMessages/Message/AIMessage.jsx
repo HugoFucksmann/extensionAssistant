@@ -4,7 +4,7 @@ import MarkdownContent from "../MessageContent/MarkdownContent";
 import { styles } from "../styles";
 import AttachedFiles from "../AttachedFiles";
 import { useVSCodeContext } from "../../../context/VSCodeContext";
-import { ToolExecutionList } from "../../ProcessingStatus";
+
 
 const parseMessage = (message) => {
   if (!message) return [{ type: "markdown", content: "" }];

@@ -34,7 +34,38 @@ export function activate(context: vscode.ExtensionContext) {
     // Comando para mostrar la vista web
     disposables.push(
       vscode.commands.registerCommand('extensionAssistant.openChat', () => {
-        vscode.commands.executeCommand('aiChat.chatView.focus'); // Use the view's full ID if needed
+        vscode.commands.executeCommand('aiChat.chatView.focus');
+        // Ensure we have a chat session when opening the chat
+        webviewProvider?.ensureChatSession();
+      })
+    );
+    
+    // Comando para mostrar el historial de chats
+    disposables.push(
+      vscode.commands.registerCommand('extensionAssistant.chat.history', () => {
+        if (webviewProvider) {
+          webviewProvider.sendMessage('command', {
+            command: 'showHistory'
+          });
+        }
+      })
+    );
+    
+    // Comando para nuevo chat
+    disposables.push(
+      vscode.commands.registerCommand('extensionAssistant.newChat', () => {
+        if (webviewProvider) {
+          webviewProvider.sendMessage('command', {
+            command: 'newChat'
+          });
+        }
+      })
+    );
+    
+    // Comando para abrir configuración
+    disposables.push(
+      vscode.commands.registerCommand('extensionAssistant.settings', () => {
+        vscode.commands.executeCommand('workbench.action.openSettings', 'extensionAssistant');
       })
     );
     
@@ -47,8 +78,9 @@ export function activate(context: vscode.ExtensionContext) {
         });
         
         if (message && webviewProvider) {
+          await webviewProvider.ensureChatSession();
           webviewProvider.sendMessage('userMessage', {
-            content: message,
+            text: message,
             timestamp: Date.now()
           });
         }

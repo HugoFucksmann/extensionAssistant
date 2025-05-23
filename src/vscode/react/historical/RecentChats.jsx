@@ -3,7 +3,15 @@ import { useVSCodeContext } from '../context/VSCodeContext';
 import ChatList from './ChatList';
 
 export const RecentChats = () => {
-  const { theme, chatList, loadChat, postMessage, showHistory, setShowHistory } = useVSCodeContext();
+  const { 
+    theme, 
+    chatList = [], 
+    loadChat, 
+    postMessage, 
+    showHistory, 
+    setShowHistory,
+    isLoading 
+  } = useVSCodeContext();
 
   const styles = {
     container: {
@@ -55,16 +63,30 @@ export const RecentChats = () => {
     postMessage('command', { command: 'showHistory' });
   };
 
-  if (!chatList || chatList.length === 0) {
+  if (isLoading && chatList.length === 0) {
     return (
       <div style={styles.container}>
-        <p style={styles.noChatsText}>No hay chats guardados</p>
+        <p style={styles.noChatsText}>Loading chats...</p>
       </div>
     );
   }
 
+  if (!chatList || chatList.length === 0) {
+    return (
+      <div style={styles.container}>
+        <p style={styles.noChatsText}>No saved chats</p>
+      </div>
+    );
+  }
+
+  // Ensure we have valid timestamps and sort by most recent
   const recentChats = chatList
-    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+    .filter(chat => chat && chat.timestamp)
+    .sort((a, b) => {
+      const timeA = new Date(a.timestamp).getTime();
+      const timeB = new Date(b.timestamp).getTime();
+      return timeB - timeA;
+    })
     .slice(0, 4);
 
   return (

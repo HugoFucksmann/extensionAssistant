@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { ToolResult } from '../../../../../srcV4/tools/types';
+import { ToolResult } from '../../types';
 
 /**
  * Herramienta para escribir contenido en un archivo

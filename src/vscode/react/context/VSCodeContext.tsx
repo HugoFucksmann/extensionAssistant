@@ -24,6 +24,7 @@ interface VSCodeContextType {
   setShowHistory: (show: boolean) => void;
   postMessage: (type: string, payload?: Record<string, unknown>) => void;
   loadChat: (chatId: string) => void;
+  newChat: () => void; // Add newChat function
   theme: ThemeType;
   isDarkMode: boolean;
   toggleTheme: () => void;
@@ -71,34 +72,68 @@ export const VSCodeProvider = ({ children }: { children: React.ReactNode }) => {
     if (type === 'userMessage') {
       const userMsgPayload = payload as { text: string, files?: string[] };
       
+      // If no chat ID, create a new chat first
       if (!currentChatId) {
-        console.error("Error: No current chat ID available for sending message.");
-        // Podríamos generar uno aquí si es el primer mensaje y no hay chatSessionStarted aún.
-        // O simplemente no enviar y mostrar un error/log.
-        setLoading(false); // Reset loading
+        const newChatId = `chat_${Date.now()}`;
+        console.log('No current chat ID, creating new chat:', newChatId);
+        
+        const userMessage: ChatMessage = {
+          id: `msg_${Date.now()}`,
+          content: userMsgPayload.text || '',
+          sender: 'user',
+          timestamp: Date.now(),
+          files: userMsgPayload.files?.map(f => (typeof f === 'string' ? f : (f as any).path)) || []
+        };
+        
+        // Update local state optimistically
+        setCurrentChatId(newChatId);
+        setMessages([userMessage]);
+        setLoading(true);
+        
+        // Notify backend to create a new chat
+        window.vscode.postMessage({
+          type: 'createChat',
+          payload: {
+            chatId: newChatId,
+            initialMessage: userMsgPayload.text,
+            files: userMsgPayload.files
+          }
+        });
         return;
       }
 
+      // Existing chat flow
       const userMessage: ChatMessage = {
-        id: `msg_${Date.now()}`, // Generar un ID único para el mensaje
-      //  chatId: currentChatId,
+        id: `msg_${Date.now()}`,
         content: userMsgPayload.text || '',
         sender: 'user',
         timestamp: Date.now(),
-        // Normalizar files a string[] si es necesario, asumiendo que payload.files ya es string[] o compatible
         files: userMsgPayload.files?.map(f => (typeof f === 'string' ? f : (f as any).path)) || []
       };
+      
+      // Update local state optimistically
       setMessages(prev => [...prev, userMessage]);
       setLoading(true);
-      // Enviar al backend como 'sendMessage'
+      
+      // Send message to backend
       window.vscode.postMessage({ 
         type: 'sendMessage', 
         text: userMsgPayload.text, 
-        files: userMsgPayload.files, // Enviar la estructura que el backend espera
-        chatId: currentChatId // Enviar el chatId actual
+        files: userMsgPayload.files,
+        chatId: currentChatId 
       });
-    } else if (type === 'command') {
-      window.vscode.postMessage({ type: 'command', ...(payload as Record<string, unknown>) });
+    } else if (type === 'command' && payload.command && typeof payload.command === 'string') {
+      const commandActual = payload.command as string;
+      let finalPayload: Record<string, unknown> = {};
+
+      if (payload.payload && typeof payload.payload === 'object' && payload.payload !== null) {
+        finalPayload = { ...(payload.payload as Record<string, unknown>) };
+      } else {
+        const { command, ...restOfPayload } = payload;
+        finalPayload = restOfPayload;
+      }
+      
+      window.vscode.postMessage({ type: commandActual, ...finalPayload });
     } else {
       window.vscode.postMessage({ type, ...payload });
     }
@@ -109,7 +144,32 @@ export const VSCodeProvider = ({ children }: { children: React.ReactNode }) => {
       command: 'loadChat', 
       payload: { chatId } 
     });
-    setShowHistory(false); // Esto podría moverse a cuando el chat realmente se carga
+    setShowHistory(false);
+  };
+
+  const newChat = () => {
+    console.log('Iniciando nuevo chat...');
+    
+    // Limpiar el estado actual
+    setMessages([]);
+    setLoading(false);
+    
+    // Enviar comando para crear un nuevo chat
+    window.vscode.postMessage({
+      type: 'command',
+      command: 'newChat'
+    });
+    
+    // No establecer el ID del chat aquí, esperaremos la confirmación del backend
+    setShowHistory(false);
+    
+    // Opcional: Podrías querer forzar un scroll al inicio
+    setTimeout(() => {
+      const chatContainer = document.getElementById('chat-messages');
+      if (chatContainer) {
+        chatContainer.scrollTop = 0;
+      }
+    }, 100);
   };
 
   const toggleTheme = () => {
@@ -133,81 +193,108 @@ export const VSCodeProvider = ({ children }: { children: React.ReactNode }) => {
     });
   };
 
+  // Initialize chat session on component mount
+  useEffect(() => {
+    // Request initial state when component mounts
+    postMessage('command', { command: 'getInitialState' });
+  }, []);
+
   useEffect(() => {
     const handleMessage = (event: MessageEvent<any>) => {
       const { type, payload } = event.data;
+      console.log('Received message:', { type, payload });
       
       switch (type) {
-        case 'chatSessionStarted': // Nuevo mensaje desde WebviewProvider
-          setCurrentChatId(payload.chatId);
-          // Opcionalmente, limpiar mensajes si es una sesión completamente nueva
-          // setMessages([]); 
-          // setLoading(false);
-          break;
-
-        case 'messageAdded': // Unificado para respuestas de user y assistant
-          setMessages(prev => {
-            // Evitar duplicados si el mensaje ya existe (ej. mensaje de usuario añadido localmente)
-            if (payload.sender === 'user' && prev.find(m => m.id === payload.id || (m.content === payload.content && m.timestamp === payload.timestamp))) {
-              return prev;
-            }
-            return [...prev, payload as ChatMessage];
-          });
-          if (payload.sender === 'assistant') {
-            setLoading(false);
-            // Resetear el estado de procesamiento para el asistente
-            // setProcessingStatus({ phase: '', status: 'inactive', tools: [] }); // Esto ya se hace en 'processingFinished'
+        case 'initialState':
+          if (payload.chatId) {
+            setCurrentChatId(payload.chatId);
+          }
+          if (payload.messages) {
+            setMessages(payload.messages);
           }
           break;
           
-        case 'modelSwitched': // Alineado con MessageHandler
+        case 'message':
+          const message = {
+            id: payload.id || `msg_${Date.now()}`,
+            chatId: payload.chatId || currentChatId || 'unknown_chat',
+            content: payload.content || '',
+            sender: payload.sender || 'assistant',
+            timestamp: payload.timestamp || Date.now(),
+            metadata: payload.metadata || {},
+            ...payload
+          };
+          
+          setMessages(prev => {
+            try {
+              // Evitar duplicados
+              if (prev.some(m => m.id === message.id || 
+                               (m.content === message.content && 
+                                m.sender === message.sender && 
+                                Math.abs((m.timestamp || 0) - (message.timestamp || 0)) < 1000))) {
+                console.log('Duplicate message detected, skipping:', message);
+                return prev;
+              }
+              console.log('Adding new message:', message);
+              return [...prev, message];
+            } catch (error) {
+              console.error('Error adding message to state:', error);
+              return prev;
+            }
+          });
+          
+          if (message.sender === 'assistant') {
+            setLoading(false);
+          }
+          break;
+          
+        case 'modelSwitched':
           setCurrentModel(payload.modelType);
           break;
           
-        case 'chatsLoaded': // Alineado con MessageHandler
+        case 'chatsLoaded':
           setChatList(payload.chats);
           break;
           
         case 'chatLoaded':
           setMessages(payload.messages);
-          setCurrentChatId(payload.chatId); // Actualizar currentChatId
-          setShowHistory(false); // Cerrar historial si estaba abierto
+          setCurrentChatId(payload.chatId);
+          setShowHistory(false);
           setLoading(false);
           break;
           
-        case 'historyRequested': // Desde la UI o backend para mostrar el panel de historial
+        case 'historyRequested':
           setShowHistory(true);
           break;
 
-        case 'newChat': // Backend confirma que se ha iniciado un nuevo chat (o la UI lo inicia)
+        case 'newChat':
           setMessages([]);
-          // setCurrentChatId(payload.newChatId); // Si el backend genera y envía un nuevo ID
+          if (payload.chatId) {
+            setCurrentChatId(payload.chatId);
+          }
           setLoading(false);
-          // Si la UI inicia 'newChat', necesita generar un ID y potencialmente informar al backend
-          // Por ahora, asumimos que 'newChat' es una limpieza local y el backend podría enviar un nuevo 'chatSessionStarted'
           break;
           
-        case 'chatCleared': // Backend confirma la limpieza
-            setMessages([]);
-            // setCurrentChatId(null); // O un nuevo ID si el backend lo proporciona
-            setLoading(false);
-            break;
+        case 'chatCleared':
+          setMessages([]);
+          setLoading(false);
+          break;
 
         case 'error':
           const errorTimestamp = Date.now();
           setMessages(prev => [...prev, {
             id: `err_${errorTimestamp}`,
             chatId: currentChatId || 'error_chat',
-            content: `Error: ${payload.message}`,
+            content: `Error: ${payload.message || 'Unknown error'}`,
             sender: 'system',
             timestamp: errorTimestamp
           }]);
           setLoading(false);
           setProcessingStatus(prev => ({
             ...prev,
-            status: 'error', // Cambiado de 'inactive' a 'error' para reflejar el estado
+            status: 'error',
             phase: 'error',
-            error: payload.message // Guardar el mensaje de error
+            error: payload.message
           }));
           break;
 
@@ -215,13 +302,13 @@ export const VSCodeProvider = ({ children }: { children: React.ReactNode }) => {
           setIsDarkMode(payload.isDarkMode);
           break;
           
-        case 'processingStatusUpdate': // Desde WebviewProvider
-          setProcessingStatus(payload); // Recibir el objeto completo
+        case 'processingStatusUpdate':
+          setProcessingStatus(payload);
           break;
           
-        case 'toolExecutionUpdate': // Desde WebviewProvider (ya compatible)
+        case 'toolExecutionUpdate':
           setProcessingStatus(prev => {
-            const toolIndex = prev.tools.findIndex(t => t.name === payload.tool && t.status === 'started'); // Asegurar que actualizamos el correcto si hay múltiples con mismo nombre
+            const toolIndex = prev.tools.findIndex(t => t.name === payload.tool && t.status === 'started');
             const updatedTools = [...prev.tools];
             
             if (toolIndex >= 0) {
@@ -237,7 +324,6 @@ export const VSCodeProvider = ({ children }: { children: React.ReactNode }) => {
                 status: 'started',
                 startTime: payload.startTime || Date.now(),
                 parameters: payload.parameters,
-                // Asegurar que todos los campos de ToolExecution estén aquí
                 result: undefined, 
                 error: undefined,
                 endTime: undefined
@@ -247,45 +333,38 @@ export const VSCodeProvider = ({ children }: { children: React.ReactNode }) => {
             return {
               ...prev,
               tools: updatedTools,
-              status: 'active' // Mantener activo mientras haya herramientas o fases activas
+              status: 'active'
             };
           });
           break;
           
-        case 'processingFinished': // Desde WebviewProvider
+        case 'processingFinished':
           setProcessingStatus(prev => ({
             ...prev,
             phase: payload.error ? 'error' : 'completed',
-            status: 'completed', // Marcar como completado para visualización final
+            status: 'completed',
             endTime: Date.now(),
             error: payload.error ? payload.errorMessage : undefined
           }));
-          // Resetear después de un delay para permitir ver el estado final
+          
           setTimeout(() => {
             setProcessingStatus({
               phase: '',
               status: 'inactive',
               tools: []
             });
-          }, 3000); // Aumentado ligeramente el delay
+          }, 3000);
           break;
         
-        case 'codeApplied': // Nuevo, desde MessageHandler
+        case 'codeApplied':
           console.log('Code changes applied acknowledgement:', payload);
-          // Aquí se podría mostrar una notificación al usuario si se desea
-          // Ejemplo: addMessage({ sender: 'system', content: `Code changes to ${payload.filename} applied.`})
           break;
       }
     };
 
-    // Request initial state or chat list on load
-    // window.vscode.postMessage({ type: 'command', command: 'getInitialData' }); // O algo similar
-    // O esperar a que 'chatSessionStarted' proporcione el ID inicial.
-    // Por ahora, getChatList se llama desde el componente RecentChats si es necesario.
-
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, []); // Cuidado con las dependencias aquí, currentChatId podría ser una.
+  }, [currentChatId]);
 
   return (
     <VSCodeContext.Provider value={{ 
@@ -298,6 +377,7 @@ export const VSCodeProvider = ({ children }: { children: React.ReactNode }) => {
       setShowHistory, 
       postMessage, 
       loadChat,
+      newChat, // Add newChat to the context value
       theme,
       isDarkMode,
       toggleTheme,

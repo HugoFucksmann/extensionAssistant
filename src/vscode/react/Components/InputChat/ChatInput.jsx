@@ -104,17 +104,12 @@ const ChatInput = () => {
   // Enviar mensaje
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (isLoading || (!inputText.trim() && selectedFiles.length === 0)) return;
-    
-    postMessage('chat', {
-      text: inputText,
-      files: selectedFiles
-    });
-    
-    setInputText("");
-    setSelectedFiles([]); // Limpiar los archivos seleccionados
-    // Reiniciar el estado de mención de archivos (dropdownRef.current = null; es manejado por closeDropdown)
-    if (isDropdownOpen) closeDropdown(); // Asegurarse que el dropdown de mención se cierre
+    if (!inputText.trim() || isLoading) return;
+
+    // Enviar mensaje
+    postMessage('userMessage', { text: inputText, files: selectedFiles });
+    setInputText('');
+    setSelectedFiles([]); // Limpiar archivos seleccionados
   };
 
   // Mostrar selector de modelo

@@ -39,6 +39,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     tools: [], 
     metrics: {} 
   };
+  private isChatInitialized = false;
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -200,6 +201,8 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
       const finalMetrics = this.calculateMetrics(event.timestamp);
       
       this.postMessage('messageAdded', {
+        id: `msg_${event.timestamp}`,
+        chatId: this.currentChatId,
         sender: 'assistant',
         content: event.payload.response,
         timestamp: event.timestamp,
@@ -294,12 +297,31 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     this.view?.webview.postMessage({ type, payload });
   }
 
+  public async ensureChatSession(): Promise<void> {
+    if (!this.isChatInitialized) {
+      this.currentChatId = this.generateChatId();
+      this.isChatInitialized = true;
+      this.postMessage('chatSessionStarted', { chatId: this.currentChatId });
+    }
+    return Promise.resolve();
+  }
+
   public sendMessage(type: string, payload: any): void {
+    if (type === 'userMessage' && !this.isChatInitialized) {
+      this.ensureChatSession().then(() => {
+        this.postMessage(type, payload);
+      });
+      return;
+    }
     this.postMessage(type, payload);
   }
 
   private generateChatId(): string {
     return `chat_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  }
+
+  public getCurrentChatId(): string | undefined {
+    return this.currentChatId;
   }
 
   public dispose(): void {
