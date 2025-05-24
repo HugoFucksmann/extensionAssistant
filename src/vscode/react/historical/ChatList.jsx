@@ -1,8 +1,9 @@
 import React from 'react';
-import { useVSCodeContext } from '../context/VSCodeContext';
+import { useApp } from '../context/AppContext';
+
 
 const ChatList = ({ chats, onChatClick }) => {
-  const { theme } = useVSCodeContext();
+  const { theme } = useApp();
 
   const styles = {
     list: {

@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { useVSCodeContext } from '../../context/VSCodeContext';
 
 // Hook para obtener y filtrar archivos del proyecto
 export const useProjectFiles = (shouldFetch = false) => {

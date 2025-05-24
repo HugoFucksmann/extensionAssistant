@@ -10,8 +10,8 @@ import "prismjs/components/prism-css";
 import "prismjs/components/prism-markdown";
 import "prismjs/components/prism-markup"; 
 import { styles } from "../styles";
-import { useVSCodeContext } from "../../../context/VSCodeContext";
 import { IconApply, IconCopy, IconTick } from "../../../IconstApp";
+import { useApp } from "../../../context/AppContext";
 
 const PrismConfig = memo(() => {
   useEffect(() => {
@@ -74,7 +74,7 @@ const CodeBlockHeader = memo(({ filename, onCopy, onApply }) => {
 });
 
 const CodeBlock = ({ language = "javascript", content, filename }) => {
-  const { postMessage } = useVSCodeContext();
+  const { postMessage } = useApp();
   const [copied, setCopied] = useState(false);
 
   // Normalizar el lenguaje

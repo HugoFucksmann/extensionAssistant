@@ -2,7 +2,7 @@
 
 import React, { useRef, useState, useEffect } from "react";
 
-import { useVSCodeContext } from "../../context/VSCodeContext";
+
 import ModelDropdown from '../ModelSelector/ModelDropdown';
 import FileChip from './FileChip'; // Importar FileChip
 
@@ -11,9 +11,10 @@ import { useFileMention } from './useFileMention';
 import { getStyles } from './ChatInputStyles';
 import FileDropdown from "./fileDropdown";
 import { EnterIcon, FileIcon } from "./Icons";
+import { useApp } from "../../context/AppContext";
 
 const ChatInput = () => {
-  const { postMessage, isLoading, theme, currentModel, messages } = useVSCodeContext();
+  const { postMessage, isLoading, theme, currentModel, messages } = useApp();
   const [inputText, setInputText] = useState('');
   const inputRef = useRef(null);
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);

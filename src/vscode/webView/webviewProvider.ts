@@ -1,62 +1,22 @@
-// src/vscode/webView/WebviewProvider.ts
+// src/vscode/webview/WebviewProvider.ts - Updated provider
 import * as vscode from 'vscode';
 import { getReactHtmlContent } from './htmlTemplate';
-import { ThemeManager } from './ThemeManager';
-import { SessionManager } from './SessionManager';
-
-
 import { ApplicationLogicService } from '../../core/ApplicationLogicService';
-import { InternalEventDispatcher } from '../../core/events/InternalEventDispatcher';
-import { IncomingMessageValidator, ValidationResult } from './IncomingMessageValidator'; 
-import { EventSubscriptionManager } from './EventSubscriptionManager';
-import { EventType } from '../../features/events/eventTypes'; 
 
 export class WebviewProvider implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView;
   private disposables: vscode.Disposable[] = [];
-
-
-  private incomingMessageValidator: IncomingMessageValidator;
-  private eventManager: EventSubscriptionManager;
-  private sessionManager: SessionManager;
-  private themeManager: ThemeManager;
-  
-  private dispatcher: InternalEventDispatcher;
+  private currentChatId: string | null = null;
 
   constructor(
     private readonly extensionUri: vscode.Uri,
-    private readonly appLogicService: ApplicationLogicService, 
-    private readonly internalDispatcher: InternalEventDispatcher 
-  ) {
-    this.dispatcher = internalDispatcher; 
-    this.sessionManager = new SessionManager();
-    this.incomingMessageValidator = new IncomingMessageValidator(this.appLogicService);
+    private readonly appLogicService: ApplicationLogicService
+  ) {}
 
-    this.eventManager = new EventSubscriptionManager(
-      this.sessionManager,
-      this.postMessageToUI.bind(this),
-      this.dispatcher 
-    );
-    this.themeManager = new ThemeManager(this.postMessageToUI.bind(this));
-
-    console.log('[WebviewProvider] Initialized with new architecture components.');
-  }
-
-  public resolveWebviewView(
-    webviewView: vscode.WebviewView,
-    context: vscode.WebviewViewResolveContext,
-    token: vscode.CancellationToken
-  ): void {
+  public resolveWebviewView(webviewView: vscode.WebviewView): void {
     this.view = webviewView;
     this.setupWebview();
-    this.setupMessageHandling(); 
-    this.eventManager.setupEventListeners();
-    this.themeManager.setup(this.disposables);
-
-    // Informar a la UI que está lista y enviar el estado inicial de la sesión
-    // Esto se hacía en UIMessageHandler, ahora lo hace directamente el provider
-    // al recibir 'uiReady' o al resolver la vista.
-    // Es mejor que la UI envíe 'uiReady' para iniciar este flujo.
+    this.setupMessageHandling();
   }
 
   private setupWebview(): void {
@@ -66,73 +26,44 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
       enableScripts: true,
       localResourceRoots: [this.extensionUri],
     };
-    this.view.webview.html = getReactHtmlContent(this.extensionUri, this.view.webview);
+    this.view.webview.html = getReactHtmlContent({
+      scriptUri: this.view.webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'out', 'webView', 'webview.js')),
+      nonce: this.getNonce()
+    });
   }
 
   private setupMessageHandling(): void {
     if (!this.view) return;
 
     this.view.webview.onDidReceiveMessage(
-      async (message: { type: string; payload: any }) => {
-        console.log('[WebviewProvider] Received message from UI:', message);
-        const currentChatId = this.sessionManager.getCurrentChatId();
+      async (message) => {
+        console.log('[WebviewProvider] Received:', message.type);
 
-        if (message.type === 'uiReady') {
-          // La UI está lista, inicializar o restaurar sesión y enviar a la UI
-          const session = await this.sessionManager.initializeOrRestore();
-          this.postMessageToUI('sessionReady', {
-            chatId: session.chatId,
-            messages: [], // TODO: Cargar mensajes si no es nueva sesión (desde ApplicationLogicService o MemoryManager)
-            // Podrías obtener el historial del chat actual aquí si es necesario
-          });
-          this.themeManager.sendCurrentTheme(); // Enviar tema actual
-          return;
-        }
-
-        if (!currentChatId) {
-          console.warn('[WebviewProvider] No active chat session. Ignoring message:', message.type);
-          this.postMessageToUI('systemError', {
-            message: 'No active chat session. Please start or select a chat.',
-          });
-          return;
-        }
-
-        // Usar IncomingMessageValidator para manejar el mensaje
-        const validationOutcome: ValidationResult = await this.incomingMessageValidator.handleMessage(
-          message,
-          currentChatId
-        );
-
-        if (!validationOutcome.isValid) {
-          console.warn(`[WebviewProvider] Invalid message: ${validationOutcome.error}`, message);
-          this.postMessageToUI('systemError', {
-            message: validationOutcome.error || 'Invalid message received from UI.',
-            source: `WebviewProvider.Validation.${message.type}`,
-          });
-          // También podríamos emitir un evento ERROR_OCCURRED a través del dispatcher
-          this.dispatcher.dispatch(EventType.ERROR_OCCURRED, {
-            chatId: currentChatId,
-            error: validationOutcome.error || 'Invalid message from UI',
-            source: `WebviewProvider.Validation.${message.type}`
-          });
-        } else {
-       
-          if (message.type === 'newChatRequestedByUI' && validationOutcome.isValid) {
-            const newChatId = this.sessionManager.startNewChat();
-            // Dispatch conversation ended for old chat
-            this.dispatcher.dispatch(EventType.CONVERSATION_ENDED, {
-                chatId: currentChatId,
-                cleared: true,
-                source: 'WebviewProvider.NewChat'
+        switch (message.type) {
+          case 'uiReady':
+            this.currentChatId = this.generateChatId();
+            this.postMessage('sessionReady', {
+              chatId: this.currentChatId,
+              messages: []
             });
-            // Dispatch conversation started for new chat
-            this.dispatcher.dispatch(EventType.CONVERSATION_STARTED, {
-                chatId: newChatId,
-                source: 'WebviewProvider.NewChat'
-            });
-            // Also send direct message to UI
-            this.postMessageToUI('newChatStarted', { chatId: newChatId });
-          }
+            break;
+
+          case 'userMessageSent':
+            if (!this.currentChatId) {
+              this.postMessage('systemError', { message: 'No active chat session' });
+              return;
+            }
+            await this.handleUserMessage(message.payload);
+            break;
+
+          case 'newChatRequestedByUI':
+            this.currentChatId = this.generateChatId();
+            this.postMessage('newChatStarted', { chatId: this.currentChatId });
+            break;
+
+          case 'showHistoryRequested':
+            this.postMessage('showHistory', {});
+            break;
         }
       },
       null,
@@ -140,58 +71,68 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     );
   }
 
-  private postMessageToUI(type: string, payload: any): void {
-    if (this.view?.webview) {
-
-      this.view.webview.postMessage({ type, payload });
-    } else {
-      console.warn(`[WebviewProvider] Cannot post message. View unavailable. Type: ${type}`);
+  private async handleUserMessage(payload: { text: string; files?: string[] }): Promise<void> {
+    if (!payload.text?.trim()) {
+      this.postMessage('systemError', { message: 'Message cannot be empty' });
+      return;
     }
-  }
 
-  // Métodos públicos para control externo (comandos de VS Code)
-  public startNewChat(): void {
-    const oldChatId = this.sessionManager.getCurrentChatId();
-    const newChatId = this.sessionManager.startNewChat();
+    try {
+      this.postMessage('processingUpdate', { phase: 'processing' });
+      
+      const result = await this.appLogicService.processUserMessage(
+        this.currentChatId!,
+        payload.text,
+        { files: payload.files || [] }
+      );
 
-    // Si había un chat activo, notificar que se limpió/terminó
-    if (oldChatId) {
-        this.appLogicService.clearConversation(oldChatId); // Esto debería manejar la lógica de limpieza
-        this.dispatcher.dispatch(EventType.CONVERSATION_ENDED, {
-            chatId: oldChatId,
-            cleared: true,
-            source: 'WebviewProvider.Command.NewChat'
+      if (result.success && result.finalResponse) {
+        this.postMessage('assistantResponse', {
+          id: `asst_${Date.now()}`,
+          content: result.finalResponse,
+          timestamp: Date.now(),
         });
+      } else {
+        this.postMessage('systemError', { 
+          message: result.error || 'Processing failed' 
+        });
+      }
+    } catch (error) {
+      console.error('[WebviewProvider] Error processing message:', error);
+      this.postMessage('systemError', { 
+        message: 'An unexpected error occurred' 
+      });
     }
-    
-   
-    this.dispatcher.dispatch(EventType.CONVERSATION_STARTED, {
-        chatId: newChatId,
-        source: 'WebviewProvider.Command.NewChat'
-    });
- 
-    this.postMessageToUI('newChatStarted', { chatId: newChatId });
-    console.log(`[WebviewProvider] New chat started by command: ${newChatId}`);
   }
 
+  // Public methods for extension commands
   public requestShowHistory(): void {
-   
-    console.log('[WebviewProvider] History requested by command.');
-    
-    const simulatedHistory = [
-      { id: 'chat1', title: 'Old Chat 1', timestamp: Date.now() - 100000, messages: [] },
-      { id: 'chat2', title: 'Another Chat', timestamp: Date.now() - 200000, messages: [] },
-    ];
-   
-    this.postMessageToUI('showHistoryView', { chats: simulatedHistory });
+    this.postMessage('showHistory', {});
+  }
+
+  public startNewChat(): void {
+    this.currentChatId = this.generateChatId();
+    this.postMessage('newChatStarted', { chatId: this.currentChatId });
+  }
+
+  private postMessage(type: string, payload: any): void {
+    this.view?.webview.postMessage({ type, payload });
+  }
+
+  private generateChatId(): string {
+    return `chat_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  }
+
+  private getNonce(): string {
+    let text = '';
+    const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    for (let i = 0; i < 32; i++) {
+      text += possible.charAt(Math.floor(Math.random() * possible.length));
+    }
+    return text;
   }
 
   public dispose(): void {
-    console.log('[WebviewProvider] Disposing...');
-    this.disposables.forEach((d) => d.dispose());
-    if (this.eventManager && typeof (this.eventManager as any).dispose === 'function') {
-        (this.eventManager as any).dispose(); 
-    }
-   
+    this.disposables.forEach(d => d.dispose());
   }
 }

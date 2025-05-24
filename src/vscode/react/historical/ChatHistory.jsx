@@ -1,6 +1,7 @@
 import React from "react";
-import { useVSCodeContext } from "../context/VSCodeContext";
+
 import ChatList from "./ChatList";
+import { useApp } from "../context/AppContext";
 
 const styles = {
   container: {
@@ -36,7 +37,7 @@ const styles = {
 const ChatHistory = () => {
   try {
     console.log("Renderizando ChatHistory");
-    const { chatList, loadChat, showHistory, setShowHistory } = useVSCodeContext();
+    const { chatList, loadChat, showHistory, setShowHistory } = useApp();
 
     if (!showHistory) return null;
 

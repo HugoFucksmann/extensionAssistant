@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
-import { useVSCodeContext } from "../../../context/VSCodeContext";
+
 import AttachedFiles from "../AttachedFiles";
+import { useApp } from "../../../context/AppContext";
 
 const IconEdit = () => (
   <svg
@@ -19,7 +20,7 @@ const IconEdit = () => (
 );
 
 export const UserMessage = ({ message, onEdit, messageIndex }) => {
-  const { theme } = useVSCodeContext();
+  const { theme } = useApp();
   const [isEditing, setIsEditing] = useState(false);
   const [editedText, setEditedText] = useState(message.text);
   const textareaRef = useRef(null);

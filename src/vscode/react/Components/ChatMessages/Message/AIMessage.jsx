@@ -3,7 +3,7 @@ import CodeBlock from "../MessageContent/CodeBlock";
 import MarkdownContent from "../MessageContent/MarkdownContent";
 import { styles } from "../styles";
 import AttachedFiles from "../AttachedFiles";
-import { useVSCodeContext } from "../../../context/VSCodeContext";
+import { useApp } from "../../../context/AppContext";
 
 
 const parseMessage = (message) => {
@@ -66,7 +66,7 @@ const confirmationStyles = {
 };
 
 export const AIMessage = ({ message }) => {
-  const { postMessage, processingStatus } = useVSCodeContext();
+  const { postMessage, processingStatus } = useApp();
   const [showConfirmButtons, setShowConfirmButtons] = useState(false);
   const [showToolDetails, setShowToolDetails] = useState(false);
   const parts = parseMessage(message?.text);

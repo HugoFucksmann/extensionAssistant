@@ -7,17 +7,10 @@ const baseConfig = {
   resolve: {
     extensions: [".ts", ".tsx", ".js", ".jsx"],
     alias: {
-      '@vscode': path.resolve(__dirname, 'src/vscode'),
-      '@core': path.resolve(__dirname, 'src/core'),
-      '@features': path.resolve(__dirname, 'src/features'),
-      '@shared': path.resolve(__dirname, 'src/shared'),
-      '@ai': path.resolve(__dirname, 'src/features/ai'),
-      '@memory': path.resolve(__dirname, 'src/features/memory'),
-      '@tools': path.resolve(__dirname, 'src/features/tools'),
-      '@events': path.resolve(__dirname, 'src/features/events'),
-      // Asegurarse de que React y ReactDOM se resuelvan correctamente
-      'react': path.resolve(__dirname, 'node_modules/react'),
-      'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
+      '../../context/VSCodeContext': path.resolve(__dirname, 'src/vscode/react/context/AppContext.tsx'),
+      '../../../context/VSCodeContext': path.resolve(__dirname, 'src/vscode/react/context/AppContext.tsx'),
+      '../context/VSCodeContext': path.resolve(__dirname, 'src/vscode/react/context/AppContext.tsx'),
+      '@shared/types': path.resolve(__dirname, 'src/shared/types.ts')
     }
   },
   cache: {
@@ -48,9 +41,10 @@ const extensionConfig = {
     extension: "./src/extension.ts",
   },
   output: {
-    path: path.resolve(__dirname, "out"),
-    filename: "extension.js",
-    libraryTarget: "commonjs2",
+    filename: '[name].js',
+    path: path.resolve(__dirname, 'out'),
+    libraryTarget: 'commonjs2',
+    devtoolModuleFilenameTemplate: '../[resource-path]',
   },
   externals: {
     vscode: "commonjs vscode",
@@ -58,6 +52,8 @@ const extensionConfig = {
     path: "commonjs path",
     fs: "commonjs fs",
     sqlite3: "commonjs sqlite3",
+    react: "commonjs react",
+    "react-dom": "commonjs react-dom",
   },
   module: {
     rules: [
@@ -85,74 +81,34 @@ const extensionConfig = {
 // Configuración para el webview (frontend)
 const webviewConfig = {
   ...baseConfig,
-  target: "web",
   entry: {
-    webview: "./src/vscode/react/webview.jsx",
+    webview: './src/vscode/webView/webview.tsx',
   },
   output: {
-    path: path.resolve(__dirname, "out"),
-    filename: "webview.js",
-    publicPath: "",
-    chunkFilename: "[name].js"
+    filename: '[name].js',
+    path: path.resolve(__dirname, 'out', 'webView'),
+  },
+  externals: {
+    // React será incluido en el bundle para el webview
   },
   module: {
     rules: [
       {
         test: /\.tsx?$/,
         exclude: /node_modules/,
-        use: [
-          {
-            loader: "babel-loader",
-            options: {
-              presets: [
-                "@babel/preset-env",
-                ["@babel/preset-react", { "runtime": "automatic" }],
-                "@babel/preset-typescript"
-              ],
-              plugins: []
-            }
-          }
-        ]
+        use: 'ts-loader',
       },
       {
         test: /\.jsx?$/,
         exclude: /node_modules/,
-        use: [
-          {
-            loader: "babel-loader",
-            options: {
-              presets: [
-                "@babel/preset-env",
-                ["@babel/preset-react", { "runtime": "automatic" }]
-              ]
-            }
+        use: {
+          loader: 'babel-loader',
+          options: {
+            presets: ['@babel/preset-react', '@babel/preset-env']
           }
-        ]
+        }
       },
-      {
-        test: /\.css$/,
-        use: [
-          'style-loader',
-          'css-loader'
-        ]
-      },
-      {
-        test: /\.(png|jpe?g|gif|svg)$/i,
-        type: 'asset/resource'
-      }
-    ]
-  },
-  // Asegurarse de que las dependencias de React no se incluyan en el bundle
-  externals: {
-    react: 'React',
-    'react-dom': 'ReactDOM',
-  },
-  // Configuración de optimización para el webview
-  optimization: {
-    ...baseConfig.optimization,
-    // Deshabilitar la división de código para evitar problemas de carga
-    splitChunks: false,
-    runtimeChunk: false,
+    ],
   },
 };
 

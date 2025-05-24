@@ -1,6 +1,7 @@
 import React from 'react';
-import { useVSCodeContext } from '../context/VSCodeContext';
+
 import ChatList from './ChatList';
+import { useApp } from '../context/AppContext';
 
 export const RecentChats = () => {
   const { 
@@ -11,7 +12,7 @@ export const RecentChats = () => {
     showHistory, 
     setShowHistory,
     isLoading 
-  } = useVSCodeContext();
+  } = useApp();
 
   const styles = {
     container: {

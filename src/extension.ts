@@ -15,7 +15,7 @@ export function activate(context: vscode.ExtensionContext) {
     const dispatcher = ComponentFactory.getInternalEventDispatcher(); // Obtener el dispatcher
 
     // WebviewProvider necesitará el ApplicationLogicService y el dispatcher
-    webviewProvider = new WebviewProvider(context.extensionUri, appLogicService, dispatcher);
+    webviewProvider = new WebviewProvider(context.extensionUri, appLogicService);
 
     const webviewRegistration = vscode.window.registerWebviewViewProvider(
       'aiChat.chatView',

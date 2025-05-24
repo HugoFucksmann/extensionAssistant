@@ -5,7 +5,7 @@ import { styles } from "./styles";
 import { UserMessage } from "./Message/UserMessage";
 import { AIMessage } from "./Message/AIMessage";
 import { AgentMessage } from "./Message/AgentMessage";
-import { useVSCodeContext } from "../../context/VSCodeContext";
+import { useApp } from '../../context/AppContext';
 
 const Message = memo(({ message, messageIndex, onEdit }) => {
   // Format message to ensure consistent structure
@@ -36,7 +36,7 @@ const ChatMessages = ({ children }) => {
       messages, 
       isLoading, 
       postMessage
-    } = useVSCodeContext();
+    } = useApp();
 
     const messagesEndRef = useRef(null);
     const containerRef = useRef(null);
