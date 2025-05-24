@@ -2,9 +2,6 @@ import React, { useRef, useEffect, memo, useState, useLayoutEffect } from "react
 import { VariableSizeList as List } from 'react-window';
 import AutoSizer from 'react-virtualized-auto-sizer';
 import { styles } from "./styles";
-import { UserMessage } from "./Message/UserMessage";
-import { AIMessage } from "./Message/AIMessage";
-import { AgentMessage } from "./Message/AgentMessage";
 import { useApp } from '../../context/AppContext';
 
 const Message = memo(({ message, messageIndex, onEdit }) => {
@@ -17,16 +14,81 @@ const Message = memo(({ message, messageIndex, onEdit }) => {
       ? message.files.map(file => typeof file === 'string' ? { path: file, content: undefined } : file)
       : [],
     timestamp: message.timestamp || Date.now(),
-    id: message.id || `msg_${Date.now()}_${messageIndex}`
+    id: message.id || `msg_${Date.now()}_${messageIndex}`,
+    metadata: message.metadata || {},
+    senderName: message.sender === 'user' ? 'You' : 
+                message.sender === 'assistant' ? 'Assistant' : 
+                message.sender === 'system' ? 'System' : message.sender
   };
 
-  if (formattedMessage.role === "user") {
-    return <UserMessage message={formattedMessage} messageIndex={messageIndex} onEdit={onEdit} />;
-  } else if (formattedMessage.role === "agent") {
-    return <AgentMessage message={formattedMessage} />;
-  } else {
-    return <AIMessage message={formattedMessage} />;
-  }
+  const messageStyle = {
+    marginBottom: '16px',
+    padding: '12px',
+    borderRadius: '8px',
+    backgroundColor: formattedMessage.sender === 'user' 
+      ? 'var(--vscode-textCodeBlock-background)' 
+      : 'var(--vscode-editor-background)',
+    border: `1px solid var(--vscode-panel-border)`,
+    maxWidth: '90%',
+    alignSelf: formattedMessage.sender === 'user' ? 'flex-end' : 'flex-start'
+  };
+
+  const headerStyle = {
+    fontWeight: 'bold', 
+    marginBottom: '4px',
+    color: formattedMessage.sender === 'user' 
+      ? 'var(--vscode-textLink-foreground)' 
+      : 'var(--vscode-foreground)'
+  };
+
+  const timestampStyle = {
+    fontSize: '11px', 
+    color: 'var(--vscode-descriptionForeground)', 
+    marginTop: '4px'
+  };
+
+  const contentStyle = {
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'break-word'
+  };
+
+  return (
+    <div style={messageStyle}>
+      <div style={headerStyle}>
+        {formattedMessage.senderName}
+      </div>
+      <div style={contentStyle}>
+        {formattedMessage.text}
+      </div>
+      {formattedMessage.files?.length > 0 && (
+        <div style={{ marginTop: '8px' }}>
+          {formattedMessage.files.map((file, i) => (
+            <div key={i} style={{ fontSize: '12px', color: 'var(--vscode-textLink-foreground)' }}>
+              📎 {file.path}
+            </div>
+          ))}
+        </div>
+      )}
+      <div style={timestampStyle}>
+        {new Date(formattedMessage.timestamp).toLocaleTimeString()}
+      </div>
+      {Object.keys(formattedMessage.metadata).length > 0 && (
+        <details style={{ marginTop: '8px', fontSize: '12px' }}>
+          <summary>Metadata</summary>
+          <pre style={{ 
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+            marginTop: '4px',
+            padding: '4px',
+            backgroundColor: 'var(--vscode-input-background)',
+            borderRadius: '4px'
+          }}>
+            {JSON.stringify(formattedMessage.metadata, null, 2)}
+          </pre>
+        </details>
+      )}
+    </div>
+  );
 });
 
 const ChatMessages = ({ children }) => {

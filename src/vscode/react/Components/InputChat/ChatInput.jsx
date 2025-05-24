@@ -2,10 +2,11 @@
 
 import React, { useRef, useState, useEffect } from "react";
 
-
+// Importar componentes
 import ModelDropdown from '../ModelSelector/ModelDropdown';
 import FileChip from './FileChip'; // Importar FileChip
 
+// Importar custom hooks
 import { useProjectFiles } from './useProjectFiles';
 import { useFileMention } from './useFileMention';
 import { getStyles } from './ChatInputStyles';
@@ -14,7 +15,7 @@ import { EnterIcon, FileIcon } from "./Icons";
 import { useApp } from "../../context/AppContext";
 
 const ChatInput = () => {
-  const { postMessage, isLoading, theme, currentModel, messages } = useApp();
+  const { sendMessage, isLoading, theme, currentModel, messages } = useApp();
   const [inputText, setInputText] = useState('');
   const inputRef = useRef(null);
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
@@ -27,7 +28,7 @@ const ChatInput = () => {
     dropdownPosition, 
     searchTerm, 
     selectedFiles, 
-    setSelectedFiles, // Asegurarse de obtener esto de useFileMention
+    setSelectedFiles,
     dropdownRef, 
     openMentionDropdown, 
     closeDropdown, 
@@ -42,77 +43,13 @@ const ChatInput = () => {
     isLoading: isLoadingFiles, 
     getFilteredFiles 
   } = useProjectFiles(isDropdownOpen);
-  
-  // Aplicar estilos
-  const styles = getStyles(theme);
-  const containerStyle = {
-    ...styles.container,
-    borderRadius: messages.length === 0 ? theme.borderRadius.medium : `${theme.borderRadius.medium} ${theme.borderRadius.medium} 0 0`
-  };
-  
-  // Estilo para el contenedor de chips (nuevo)
-  const fileChipsContainerStyle = {
-    display: 'flex',
-    flexWrap: 'wrap',
-    padding: selectedFiles.length > 0 ? '8px 8px 0px 8px' : '0px', // Espacio solo si hay chips
-    borderBottom: selectedFiles.length > 0 ? `1px solid ${theme.colors.border}` : 'none', // Separador visual
-    gap: '4px', // Espacio entre chips
-  };
-
-  // Obtener archivos filtrados
-  const filteredFiles = getFilteredFiles(searchTerm);
-  
-  // Manejar teclas especiales
-  const handleKeyDown = (e) => {
-    if (e.key === "Enter") {
-      if (isDropdownOpen) {
-        e.preventDefault();
-        const filtered = getFilteredFiles(searchTerm);
-        if (filtered.length > 0) {
-          insertFileMention(filtered[0]);
-        } else {
-          closeDropdown();
-        }
-      } else if (isMentionMode) {
-        e.preventDefault();
-        completeMention(getFilteredFiles(searchTerm));
-      } else if (!e.shiftKey) {
-        e.preventDefault();
-        handleSubmit(e);
-      }
-    } else if (e.key === "@") {
-      const currentCursorPos = inputRef.current.selectionStart;
-      openMentionDropdown(currentCursorPos);
-    } else if (e.key === "Escape") {
-      closeDropdown();
-    } else if (e.key === "Backspace" && isMentionMode) {
-      // La lógica de borrado ahora es manejada por updateSearchTerm
-    }
-  };
-
-  // Manejar cambios en el input
-  const handleInputChange = (e) => {
-    const newText = e.target.value;
-    setInputText(newText);
-
-    const currentCaretPos = e.target.selectionStart;
-
-    if (isMentionMode) {
-      updateSearchTerm(newText, currentCaretPos);
-    }
-  };
 
   // Enviar mensaje
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!inputText.trim()) return;
-
-    // Send message with files if any
-    postMessage('userMessage', { 
-      text: inputText,
-      files: selectedFiles.map(f => f.path || f)
-    });
+    if ((!inputText.trim() && selectedFiles.length === 0) || isLoading) return;
     
+    sendMessage(inputText.trim(), selectedFiles.map(f => f.path || f));
     setInputText('');
     setSelectedFiles([]);
     closeDropdown();
@@ -125,7 +62,7 @@ const ChatInput = () => {
     const safeLeft = Math.min(rect.left, viewportWidth - 150);
     
     setModelDropdownPosition({
-      top: rect.top - 90, // Ajustar según sea necesario
+      top: rect.top - 90,
       left: safeLeft,
       width: Math.max(rect.width, 120)
     });
@@ -134,36 +71,43 @@ const ChatInput = () => {
 
   // Cambiar modelo
   const handleModelChange = (modelType) => {
-    postMessage('command', { 
-      command: 'switchModel',
-      modelType
+    window.vscode?.postMessage({
+      type: 'switchModel',
+      payload: { modelType }
     });
     setIsModelDropdownOpen(false);
   };
 
-  // Manejar la eliminación de un FileChip (nuevo)
+  // Manejar la eliminación de un FileChip
   const handleRemoveFile = (fileToRemovePath) => {
-    // 1. Eliminar de selectedFiles
     setSelectedFiles(prevFiles => prevFiles.filter(f => f !== fileToRemovePath));
-
-    // 2. Eliminar el placeholder [fileName] del inputText
-    const fileNameToRemove = fileToRemovePath.split(/[\/\\]/).pop();
-    // Escapar caracteres especiales en el nombre del archivo para usar en RegExp
-    const escapedFileName = fileNameToRemove.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-    const chipTextPattern = new RegExp(`\\[${escapedFileName}\\]\\s?`, 'g'); // Busca "[fileName]" opcionalmente seguido de un espacio
     
-    setInputText(prevText => {
-        const newText = prevText.replace(chipTextPattern, '');
-        // Si el input queda vacío o solo con espacios, limpiarlo completamente
-        return newText.trim() === '' ? '' : newText;
-    });
+    const fileNameToRemove = fileToRemovePath.split(/[\/\\]/).pop();
+    const escapedFileName = fileNameToRemove.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const chipTextPattern = new RegExp(`\\[${escapedFileName}\\]\\s?`, 'g');
+    
+    setInputText(prevText => prevText.replace(chipTextPattern, '').trim());
   };
 
   useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.focus();
-    }
+    if (inputRef.current) inputRef.current.focus();
   }, [messages]);
+
+  // Aplicar estilos
+  const styles = getStyles(theme);
+  const containerStyle = {
+    ...styles.container,
+    borderRadius: messages.length === 0 ? theme.borderRadius.medium : `${theme.borderRadius.medium} ${theme.borderRadius.medium} 0 0`
+  };
+  
+  // Estilo para el contenedor de chips
+  const fileChipsContainerStyle = {
+    display: 'flex',
+    flexWrap: 'wrap',
+    padding: selectedFiles.length > 0 ? '8px 8px 0px 8px' : '0px',
+    borderBottom: selectedFiles.length > 0 ? `1px solid ${theme.colors.border}` : 'none',
+    gap: '4px'
+  };
 
   return (
     <div style={containerStyle} ref={dropdownRef}>
@@ -196,36 +140,47 @@ const ChatInput = () => {
               color: theme.colors.text,
               fontFamily: 'inherit',
               fontSize: 'inherit',
-              padding: 0, // El padding se maneja en styles.input
+              padding: 0,
               margin: 0,
             }}
             value={inputText}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-            placeholder={selectedFiles.length > 0 ? "Add more details or mention files..." : "Type your message... (Use @ to mention files)"}
+            onChange={(e) => setInputText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) handleSubmit(e);
+              else if (e.key === "@") {
+                const currentCursorPos = inputRef.current.selectionStart;
+                openMentionDropdown(currentCursorPos);
+              } else if (e.key === "Escape") closeDropdown();
+            }}
+            placeholder={selectedFiles.length > 0 
+              ? "Add more details..." 
+              : "Type your message... (Use @ to mention files)"}
+            disabled={isLoading}
           />
         </div>
         
         <button 
           style={styles.sendButton} 
           onClick={handleSubmit}
-          disabled={isLoading || (!inputText.trim() && selectedFiles.length === 0)}
+          disabled={(!inputText.trim() && selectedFiles.length === 0) || isLoading}
         >
-          <EnterIcon color={(inputText.trim() || selectedFiles.length > 0) ? theme.colors.primary : theme.colors.disabled} />
+          <EnterIcon color={((inputText.trim() || selectedFiles.length > 0) && !isLoading) 
+            ? theme.colors.primary 
+            : theme.colors.disabled} />
         </button>
-        
-        {isDropdownOpen && (
-          <FileDropdown
-            theme={theme}
-            position={dropdownPosition}
-            searchTerm={searchTerm}
-            filteredFiles={filteredFiles}
-            isLoading={isLoadingFiles}
-            onSelectFile={insertFileMention}
-          />
-        )}
       </div>
-      
+
+      {isDropdownOpen && (
+        <FileDropdown
+          theme={theme}
+          position={dropdownPosition}
+          searchTerm={searchTerm}
+          filteredFiles={getFilteredFiles(searchTerm)}
+          isLoading={isLoadingFiles}
+          onSelectFile={insertFileMention}
+        />
+      )}
+
       <div style={styles.controlsRow}>
         <div style={styles.leftControls}>
           <div style={styles.modelSelector} onClick={handleModelClick}>

@@ -124,14 +124,3 @@ export enum ReActTransitionType {
   TO_END = 'toEnd'
 }
 
-/**
- * Configuración de comandos de la extensión
- */
-export const CommandIds = {
-  OPEN_PANEL: 'extensionAssistant.openPanel',
-  PROCESS_MESSAGE: 'extensionAssistant.processMessage',
-  CLEAR_CONVERSATION: 'extensionAssistant.clearConversation',
-  SWITCH_MODEL: 'extensionAssistant.switchModel',
-  EXPORT_CONVERSATION: 'extensionAssistant.exportConversation',
-  IMPORT_CONVERSATION: 'extensionAssistant.importConversation'
-};

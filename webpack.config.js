@@ -7,10 +7,16 @@ const baseConfig = {
   resolve: {
     extensions: [".ts", ".tsx", ".js", ".jsx"],
     alias: {
+      // Alias para compatibilidad
       '../../context/VSCodeContext': path.resolve(__dirname, 'src/vscode/react/context/AppContext.tsx'),
       '../../../context/VSCodeContext': path.resolve(__dirname, 'src/vscode/react/context/AppContext.tsx'),
       '../context/VSCodeContext': path.resolve(__dirname, 'src/vscode/react/context/AppContext.tsx'),
-      '@shared/types': path.resolve(__dirname, 'src/shared/types.ts')
+      // Alias para módulos de la aplicación
+      '@shared/types': path.resolve(__dirname, 'src/shared/types.ts'),
+      '@components': path.resolve(__dirname, 'src/vscode/react/Components'),
+      '@context': path.resolve(__dirname, 'src/vscode/react/context'),
+      // Alias para compatibilidad con rutas antiguas
+      '@vscode/react/context/AppContext': path.resolve(__dirname, 'src/vscode/react/context/AppContext.tsx')
     }
   },
   cache: {
@@ -58,7 +64,7 @@ const extensionConfig = {
   module: {
     rules: [
       {
-        test: /\.tsx?$/,
+        test: /\.(ts|tsx)$/,
         exclude: /node_modules/,
         use: [
           {
@@ -82,7 +88,7 @@ const extensionConfig = {
 const webviewConfig = {
   ...baseConfig,
   entry: {
-    webview: './src/vscode/webView/webview.tsx',
+    webview: './src/vscode/react/webview.jsx',
   },
   output: {
     filename: '[name].js',
@@ -93,18 +99,23 @@ const webviewConfig = {
   },
   module: {
     rules: [
+      // Manejo de archivos CSS
       {
-        test: /\.tsx?$/,
-        exclude: /node_modules/,
-        use: 'ts-loader',
+        test: /\.css$/,
+        use: ['style-loader', 'css-loader']
       },
+      // Manejo de TypeScript/JavaScript
       {
-        test: /\.jsx?$/,
+        test: /\.(ts|tsx|js|jsx)$/,
         exclude: /node_modules/,
         use: {
           loader: 'babel-loader',
           options: {
-            presets: ['@babel/preset-react', '@babel/preset-env']
+            presets: [
+              '@babel/preset-react',
+              '@babel/preset-env',
+              '@babel/preset-typescript'
+            ]
           }
         }
       },

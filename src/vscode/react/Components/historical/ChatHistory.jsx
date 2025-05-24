@@ -1,7 +1,7 @@
 import React from "react";
 
 import ChatList from "./ChatList";
-import { useApp } from "../context/AppContext";
+import { useApp } from "../../context/AppContext";
 
 const styles = {
   container: {

@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
+import { useApp } from '../../context/AppContext';
 
 // Hook para obtener y filtrar archivos del proyecto
 export const useProjectFiles = (shouldFetch = false) => {
-  const { postMessage } = useVSCodeContext();
+  const { postMessage } = useApp();
   const [projectFiles, setProjectFiles] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
 
