@@ -33,15 +33,10 @@ export class ConversationManager implements IConversationManager {
           // Asegúrate que 'user_input' o un tipo similar esté en la definición de HistoryEntry['phase']
           phase: 'user_input', // O 'user_message' si lo tienes definido
           timestamp: Date.now(),
-          // Mueve userMessage y contextData a metadata
+        
           metadata: { userMessage, contextData, /* otros metadatos si los tienes */ },
           iteration: 0, // O un contador de mensajes
-          // Las propiedades 'id', 'content', 'sender' vienen de ChatMessage (Omit)
-          // Necesitas proveerlas si no son opcionales o si HistoryEntry las requiere.
-          // HistoryEntry hereda de Omit<ChatMessage, 'metadata'>.
-          // ChatMessage tiene: id, content, sender, timestamp.
-          // 'content' podría ser userMessage, 'sender' podría ser 'user'.
-          // 'id' necesitaría ser generado.
+        
           id: `msg_${Date.now()}`, // Ejemplo de ID
           content: userMessage,
           sender: 'user',
@@ -61,15 +56,15 @@ export class ConversationManager implements IConversationManager {
       maxIterations: config.backend.react.maxIterations,
       completionStatus: 'in_progress',
       history: [{
-          phase: 'user_input', // O 'user_message'
+          phase: 'user_input',
           timestamp: Date.now(),
-          // Mueve userMessage y contextData a metadata
+        
           metadata: { userMessage, contextData },
           iteration: 0,
           id: `msg_init_${Date.now()}`, // Ejemplo de ID
           content: userMessage,
           sender: 'user',
-      } as HistoryEntry], // Cast explícito si es necesario
+      } as HistoryEntry], 
       projectContext: contextData.projectContext,
       editorContext: contextData.editorContext,
       metrics: {},
@@ -80,7 +75,7 @@ export class ConversationManager implements IConversationManager {
     return newState;
   }
 
-  // ... resto de la clase
+ 
   public getConversationState(chatId:string): WindsurfState | undefined {
     return this.activeConversations.get(chatId);
   }

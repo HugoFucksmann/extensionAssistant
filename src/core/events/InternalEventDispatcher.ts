@@ -1,12 +1,12 @@
 // src/core/events/InternalEventDispatcher.ts
 import { EventType, EventPayload, WindsurfEvent, EventFilter } from '../../features/events/eventTypes'; // Reutiliza tus tipos de eventos existentes
 import { v4 as uuidv4 } from 'uuid';
-import EventEmitter from 'eventemitter3'; // Usamos una librería robusta y conocida
+import EventEmitter from 'eventemitter3'; 
 
 export class InternalEventDispatcher {
   private emitter: EventEmitter;
-  private eventHistory: WindsurfEvent[] = []; // Opcional: si quieres mantener un historial
-  private maxHistorySize: number = 200; // Opcional
+  private eventHistory: WindsurfEvent[] = []; 
+  private maxHistorySize: number = 200; 
 
   constructor() {
     this.emitter = new EventEmitter();
@@ -23,24 +23,24 @@ export class InternalEventDispatcher {
     const event: WindsurfEvent = {
       type,
       payload: {
-        ...payload, // Asegura que el payload base se incluya
-        timestamp: payload.timestamp || Date.now(), // Sobrescribe o añade timestamp al payload
+        ...payload, 
+        timestamp: payload.timestamp || Date.now(), 
       },
-      timestamp: Date.now(), // Timestamp del evento en sí
+      timestamp: Date.now(),
       id: uuidv4(),
     };
 
-    // Opcional: Guardar en historial
+  
     this.eventHistory.push(event);
     if (this.eventHistory.length > this.maxHistorySize) {
       this.eventHistory.shift();
     }
 
-    // Emitir para listeners específicos del tipo Y para listeners wildcard '*'
+   
     this.emitter.emit(type, event);
     this.emitter.emit('*', event);
 
-    // console.debug(`[InternalEventDispatcher] Dispatched event: ${type}`, payload); // Usar debug para no saturar consola
+   
     return event;
   }
 
@@ -98,10 +98,10 @@ export class InternalEventDispatcher {
   }
 
   private passesFilter(event: WindsurfEvent, filter: EventFilter): boolean {
-    // Lógica de filtrado (puedes copiarla de tu EventBus actual si es compleja)
+  
     if (filter.types && !filter.types.includes(event.type)) return false;
     if (filter.chatId && event.payload.chatId !== filter.chatId) return false;
-    // ... más condiciones de filtro
+  
     return true;
   }
 
@@ -115,7 +115,7 @@ export class InternalEventDispatcher {
     console.log('[InternalEventDispatcher] Disposed and all listeners removed.');
   }
 
-  // Métodos de conveniencia para eventos comunes del sistema (opcional)
+  
   public systemInfo(message: string, details?: Record<string, any>, source?: string): void {
     this.dispatch(EventType.SYSTEM_INFO, { message, details, source, level: 'info' });
   }

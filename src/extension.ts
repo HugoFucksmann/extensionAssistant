@@ -1,7 +1,7 @@
 // src/extension.ts
 import * as vscode from 'vscode';
 import { WebviewProvider } from './vscode/webView/webviewProvider';
-import { ComponentFactory } from './core/ComponentFactory'; // Asegúrate que la ruta es correcta
+import { ComponentFactory } from './core/ComponentFactory';
 
 let webviewProvider: WebviewProvider | undefined;
 
@@ -9,12 +9,11 @@ export function activate(context: vscode.ExtensionContext) {
   console.log('Activating extensionAssistant (Windsurf Architecture)');
 
   try {
-    // Obtener el ApplicationLogicService a través de la factory
-    // La factory también inicializará el InternalEventDispatcher y EventLogger
+   
     const appLogicService = ComponentFactory.getApplicationLogicService(context);
-    const dispatcher = ComponentFactory.getInternalEventDispatcher(); // Obtener el dispatcher
+    const dispatcher = ComponentFactory.getInternalEventDispatcher(); 
 
-    // WebviewProvider necesitará el ApplicationLogicService y el dispatcher
+  
     webviewProvider = new WebviewProvider(context.extensionUri, appLogicService);
 
     const webviewRegistration = vscode.window.registerWebviewViewProvider(
@@ -23,7 +22,7 @@ export function activate(context: vscode.ExtensionContext) {
       { webviewOptions: { retainContextWhenHidden: true } }
     );
 
-    // ... (resto de tus comandos, no cambian mucho aquí) ...
+    
     const disposables: vscode.Disposable[] = [];
 
     disposables.push(
@@ -70,7 +69,7 @@ export function deactivate() {
   }
   webviewProvider = undefined;
 
-  // Llamar al dispose de la factory para limpiar los singletons
+  
   ComponentFactory.dispose();
   console.log('Extension deactivated.');
 }

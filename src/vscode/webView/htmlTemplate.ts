@@ -1,6 +1,4 @@
-/**
- * Updated HTML template for React webview
- */
+
 import * as vscode from 'vscode';
 
 export function getReactHtmlContent(options: {
