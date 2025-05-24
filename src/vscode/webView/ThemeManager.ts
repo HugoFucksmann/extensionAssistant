@@ -17,7 +17,7 @@ export class ThemeManager {
       );
     }
   
-    private sendCurrentTheme(): void {
+    public sendCurrentTheme(): void {
       this.postMessageToUI('themeChanged', {
         isDarkMode: vscode.window.activeColorTheme.kind === vscode.ColorThemeKind.Dark,
       });

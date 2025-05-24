@@ -1,61 +1,90 @@
 // src/core/ComponentFactory.ts
-import * as vscode from 'vscode'; // Asegúrate de importar vscode
-import { VSCodeContext } from '../shared/types'; // Este VSCodeContext es tu tipo personalizado
-import { eventBus } from '../features/events/EventBus';
+import * as vscode from 'vscode';
+import { VSCodeContext } from '../shared/types';
+// import { eventBus } from '../features/events/EventBus'; // Ya no usaremos el EventBus global directamente aquí para el flujo principal
 import { EventLogger } from '../features/events/EventLogger';
 import { ModelManager } from '../features/ai/ModelManager';
 import { PromptManager } from '../features/ai/promptManager';
 import { ToolRegistry } from '../features/tools/ToolRegistry';
-import { WindsurfGraph } from '../features/ai/ReActGraph';
+import { WindsurfGraph } from '../features/ai/ReActGraph'; // Asumiendo que este es el nombre correcto
 import { MemoryManager } from '../features/memory/MemoryManager';
 import { ConversationManager } from './ConversationManager';
-import { WindsurfController } from './WindsurfController';
+// Nuevas importaciones
+import { ApplicationLogicService } from './ApplicationLogicService';
+import { InternalEventDispatcher } from './events/InternalEventDispatcher'; // Asegúrate que la ruta sea correcta
 
 export class ComponentFactory {
-  private static windsurfControllerInstance: WindsurfController;
+  private static applicationLogicServiceInstance: ApplicationLogicService;
+  private static internalEventDispatcherInstance: InternalEventDispatcher;
+  private static eventLoggerInstance: EventLogger; // Para asegurar que se cree una sola vez
 
-  // Cambia VSCodeContext aquí por vscode.ExtensionContext
-  public static getWindsurfController(extensionContext: vscode.ExtensionContext): WindsurfController {
-    if (!this.windsurfControllerInstance) {
-      // EventBus es un singleton, EventLogger se suscribe al ser instanciado
-      // Pasa el outputChannel del extensionContext si EventLogger lo necesita así,
-      // o ajusta EventLogger para tomar solo el OutputChannel.
-      // Por ahora, asumimos que EventLogger puede tomar el VSCodeContext personalizado si es necesario,
-      // o simplemente el outputChannel.
-      // Si EventLogger necesita el VSCodeContext personalizado:
+  // Método para obtener el InternalEventDispatcher (singleton)
+  public static getInternalEventDispatcher(): InternalEventDispatcher {
+    if (!this.internalEventDispatcherInstance) {
+      this.internalEventDispatcherInstance = new InternalEventDispatcher();
+      console.log('[ComponentFactory] InternalEventDispatcher instance created.');
+    }
+    return this.internalEventDispatcherInstance;
+  }
+
+  // Método para obtener el ApplicationLogicService (singleton)
+  public static getApplicationLogicService(extensionContext: vscode.ExtensionContext): ApplicationLogicService {
+    if (!this.applicationLogicServiceInstance) {
       const customVSCodeContext: VSCodeContext = {
-          extensionUri: extensionContext.extensionUri,
-          extensionPath: extensionContext.extensionPath,
-          subscriptions: extensionContext.subscriptions,
-          outputChannel: vscode.window.createOutputChannel("Extension Assistant Log"), // O pásalo desde extension.ts
-          // Asegúrate de que el outputChannel se cree y pase correctamente.
-          // Si ya tienes un outputChannel en tu VSCodeContext personalizado, úsalo.
-          // El error principal es con MemoryManager.
-          state: extensionContext.globalState, // o workspaceState según necesites
+        extensionUri: extensionContext.extensionUri,
+        extensionPath: extensionContext.extensionPath,
+        subscriptions: extensionContext.subscriptions,
+        outputChannel: vscode.window.createOutputChannel("Extension Assistant Log"), // Crear o reutilizar
+        state: extensionContext.globalState,
       };
-      new EventLogger(customVSCodeContext); // O ajusta EventLogger
 
-      // Los managers que necesitan contexto de VS Code (para almacenamiento, config)
-      const memoryManager = new MemoryManager(extensionContext); // <--- AHORA USA extensionContext
-      const modelManager = new ModelManager(/* defaultProvider, se carga desde config VSCode */);
+      // Obtener el dispatcher (se crea si no existe)
+      const dispatcher = this.getInternalEventDispatcher();
 
-      // Managers que no dependen directamente del contexto de VS Code en su constructor
+      // EventLogger se suscribe al InternalEventDispatcher
+      // Solo crear si no existe para evitar múltiples suscripciones
+      if (!this.eventLoggerInstance) {
+        this.eventLoggerInstance = new EventLogger(customVSCodeContext, dispatcher); // EventLogger ahora toma el dispatcher
+        console.log('[ComponentFactory] EventLogger instance created and subscribed to InternalEventDispatcher.');
+      }
+
+
+      const memoryManager = new MemoryManager(extensionContext);
+      const modelManager = new ModelManager(/* config */);
       const promptManager = new PromptManager();
-      const toolRegistry = new ToolRegistry(/* extensionContext si alguna herramienta lo necesita directamente */);
+      const toolRegistry = new ToolRegistry(/* extensionContext si es necesario */);
       const conversationManager = new ConversationManager();
+      const reactGraph = new WindsurfGraph(modelManager, toolRegistry, promptManager, dispatcher); // ReActGraph podría usar el dispatcher para eventos internos
 
-      const reactGraph = new WindsurfGraph(modelManager, toolRegistry, promptManager);
-
-      this.windsurfControllerInstance = new WindsurfController(
-        customVSCodeContext, // WindsurfController usa tu tipo personalizado
-        eventBus,
+      this.applicationLogicServiceInstance = new ApplicationLogicService(
+        customVSCodeContext,
         memoryManager,
         reactGraph,
         conversationManager,
         toolRegistry
       );
-      console.log('[ComponentFactory] WindsurfController instance created.');
+      console.log('[ComponentFactory] ApplicationLogicService instance created.');
     }
-    return this.windsurfControllerInstance;
+    return this.applicationLogicServiceInstance;
+  }
+
+  // Método para limpiar instancias si es necesario durante la desactivación
+  public static dispose(): void {
+    if (this.applicationLogicServiceInstance && typeof (this.applicationLogicServiceInstance as any).dispose === 'function') {
+        (this.applicationLogicServiceInstance as any).dispose();
+    }
+    if (this.internalEventDispatcherInstance && typeof this.internalEventDispatcherInstance.dispose === 'function') {
+        this.internalEventDispatcherInstance.dispose();
+    }
+    if (this.eventLoggerInstance && typeof (this.eventLoggerInstance as any).dispose === 'function') {
+        (this.eventLoggerInstance as any).dispose();
+    }
+    // @ts-ignore // Para permitir reasignación a undefined
+    this.applicationLogicServiceInstance = undefined;
+    // @ts-ignore
+    this.internalEventDispatcherInstance = undefined;
+    // @ts-ignore
+    this.eventLoggerInstance = undefined;
+    console.log('[ComponentFactory] All instances disposed.');
   }
 }

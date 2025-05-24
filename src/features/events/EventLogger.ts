@@ -1,33 +1,47 @@
 // src/features/events/EventLogger.ts
 import { VSCodeContext } from '../../shared/types';
-import { eventBus } from './EventBus'; // Importa la instancia singleton
-import { WindsurfEvent } from './eventTypes'; // Importa el tipo de evento
+// import { eventBus } from './EventBus'; // Ya no se usa la instancia global directamente
+import { WindsurfEvent } from './eventTypes';
+import { InternalEventDispatcher } from '../../core/events/InternalEventDispatcher'; // Nueva importación
 
 export class EventLogger {
   private vscodeOutputChannel: import('vscode').OutputChannel | undefined;
+  private dispatcherSubscription?: { unsubscribe: () => void }; // Para guardar la suscripción
 
-  constructor(vscodeContext?: VSCodeContext) {
+  constructor(
+    vscodeContext: VSCodeContext, // vscodeContext ahora es requerido
+    private dispatcher: InternalEventDispatcher // Inyectar el dispatcher
+  ) {
     if (vscodeContext && vscodeContext.outputChannel) {
       this.vscodeOutputChannel = vscodeContext.outputChannel;
+    } else {
+      // Considerar crear un output channel aquí si no se provee, o lanzar un error.
+      console.warn('[EventLogger] VSCodeContext o outputChannel no proporcionado. El logging al output channel de VS Code estará deshabilitado.');
     }
 
-    // Suscribirse a todos los eventos
-    // Usamos una arrow function para mantener el contexto de 'this'
-    eventBus.on('*', (event: WindsurfEvent) => this.logEvent(event));
+    // Suscribirse a todos los eventos del dispatcher
+    this.dispatcherSubscription = this.dispatcher.subscribe('*', (event: WindsurfEvent) => this.logEvent(event));
 
-    this.logToConsole('[EventLogger] Initialized and subscribed to all events.');
+    this.logToConsole('[EventLogger] Initialized and subscribed to InternalEventDispatcher.');
     if (this.vscodeOutputChannel) {
-      this.vscodeOutputChannel.appendLine('[EventLogger] Initialized and subscribed to all events.');
+      this.vscodeOutputChannel.appendLine('[EventLogger] Initialized and subscribed to InternalEventDispatcher.');
     }
   }
 
   private logEvent(event: WindsurfEvent): void {
     const logMessage = `[Event] Type: ${event.type}, ID: ${event.id}, Timestamp: ${new Date(event.timestamp).toISOString()}`;
-    const payloadString = JSON.stringify(event.payload, null, 2); // Pretty print payload
+    // Evitar serializar payloads muy grandes o complejos en el log principal si es necesario
+    let payloadSummary = JSON.stringify(event.payload);
+    if (payloadSummary.length > 200) { // Ejemplo de límite
+        payloadSummary = payloadSummary.substring(0, 200) + "... (payload truncated)";
+    }
 
-    this.logToConsole(logMessage, event.payload); // Loguea el objeto payload para inspección
+
+    this.logToConsole(logMessage, /* No loguear el payload completo aquí para evitar ruido, solo el resumen */ payloadSummary);
     if (this.vscodeOutputChannel) {
       this.vscodeOutputChannel.appendLine(logMessage);
+      // Para el output channel, sí podemos ser más verbosos si se desea
+      const payloadString = JSON.stringify(event.payload, null, 2);
       this.vscodeOutputChannel.appendLine(`Payload: ${payloadString}`);
       this.vscodeOutputChannel.appendLine('---');
     }
@@ -38,15 +52,10 @@ export class EventLogger {
   }
 
   public dispose(): void {
-    // La desuscripción es un poco más compleja si no guardas la referencia exacta de la función.
-    // EventEmitter3 no tiene un método fácil para remover todos los listeners de un tipo específico
-    // sin la referencia. Sin embargo, para un logger que vive durante toda la extensión,
-    // la limpieza al desinstalar la extensión suele ser suficiente.
-    // Si necesitas desregistrar explícitamente:
-    // eventBus.off('*', this.logEvent); // Esto no funcionará directamente si this.logEvent se bindea diferente cada vez.
-    // Una forma sería guardar la referencia:
-    // private readonly _logEventHandler = (event: WindsurfEvent) => this.logEvent(event);
-    // y luego usar this._logEventHandler en on() y off().
+    if (this.dispatcherSubscription) {
+      this.dispatcherSubscription.unsubscribe();
+      this.dispatcherSubscription = undefined; // Limpiar la referencia
+    }
 
     this.logToConsole('[EventLogger] Disposed (logging stopped).');
     if (this.vscodeOutputChannel) {

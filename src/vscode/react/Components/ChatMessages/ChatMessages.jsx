@@ -8,16 +8,16 @@ import { AgentMessage } from "./Message/AgentMessage";
 import { useVSCodeContext } from "../../context/VSCodeContext";
 
 const Message = memo(({ message, messageIndex, onEdit }) => {
-  
+  // Format message to ensure consistent structure
   const formattedMessage = {
     ...message,
-    role: message.role || (message.isUser ? "user" : message.isAgent ? "agent" : "assistant"),
-    text: message.text || message.content || message.message,
+    role: message.role || (message.sender || 'assistant'),
+    text: message.text || message.content || message.message || '',
     files: Array.isArray(message.files) 
       ? message.files.map(file => typeof file === 'string' ? { path: file, content: undefined } : file)
       : [],
-    agente: message.agente || null,
-    acción: message.acción || null,
+    timestamp: message.timestamp || Date.now(),
+    id: message.id || `msg_${Date.now()}_${messageIndex}`
   };
 
   if (formattedMessage.role === "user") {

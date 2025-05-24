@@ -1,7 +1,7 @@
 // src/extension.ts
 import * as vscode from 'vscode';
 import { WebviewProvider } from './vscode/webView/webviewProvider';
-import { ComponentFactory } from './core/ComponentFactory';
+import { ComponentFactory } from './core/ComponentFactory'; // Asegúrate que la ruta es correcta
 
 let webviewProvider: WebviewProvider | undefined;
 
@@ -9,36 +9,37 @@ export function activate(context: vscode.ExtensionContext) {
   console.log('Activating extensionAssistant (Windsurf Architecture)');
 
   try {
-    const windsurfController = ComponentFactory.getWindsurfController(context);
+    // Obtener el ApplicationLogicService a través de la factory
+    // La factory también inicializará el InternalEventDispatcher y EventLogger
+    const appLogicService = ComponentFactory.getApplicationLogicService(context);
+    const dispatcher = ComponentFactory.getInternalEventDispatcher(); // Obtener el dispatcher
 
-    webviewProvider = new WebviewProvider(context.extensionUri, windsurfController);
+    // WebviewProvider necesitará el ApplicationLogicService y el dispatcher
+    webviewProvider = new WebviewProvider(context.extensionUri, appLogicService, dispatcher);
+
     const webviewRegistration = vscode.window.registerWebviewViewProvider(
       'aiChat.chatView',
       webviewProvider,
-      { webviewOptions: { retainContextWhenHidden: true } } // Mantener contexto
+      { webviewOptions: { retainContextWhenHidden: true } }
     );
 
+    // ... (resto de tus comandos, no cambian mucho aquí) ...
     const disposables: vscode.Disposable[] = [];
 
     disposables.push(
       vscode.commands.registerCommand('extensionAssistant.openChat', () => {
-        // Al abrir el chat, la vista se resolverá y `resolveWebviewView`
-        // eventualmente llamará a `initializeOrRestoreSession` (vía 'uiReady').
-        // Forzar el foco es bueno.
         vscode.commands.executeCommand('aiChat.chatView.focus');
       })
     );
 
     disposables.push(
       vscode.commands.registerCommand('extensionAssistant.chat.history', () => {
-        // WebviewProvider ahora tiene un método directo
         webviewProvider?.requestShowHistory();
       })
     );
 
     disposables.push(
       vscode.commands.registerCommand('extensionAssistant.newChat', () => {
-        // WebviewProvider ahora tiene un método directo
         webviewProvider?.startNewChat();
       })
     );
@@ -49,11 +50,9 @@ export function activate(context: vscode.ExtensionContext) {
       })
     );
 
-    // El comando 'extensionAssistant.sendMessage' ya no es necesario aquí,
-    // ya que la UI enviará 'userMessageSent' directamente.
-
     disposables.forEach(disposable => context.subscriptions.push(disposable));
     context.subscriptions.push(webviewRegistration);
+
 
     console.log('Extension activated successfully');
   } catch (error) {
@@ -67,7 +66,11 @@ export function activate(context: vscode.ExtensionContext) {
 export function deactivate() {
   console.log('Deactivating extension');
   if (webviewProvider) {
-    webviewProvider.dispose(); // Llamar al dispose del provider
+    webviewProvider.dispose();
   }
   webviewProvider = undefined;
+
+  // Llamar al dispose de la factory para limpiar los singletons
+  ComponentFactory.dispose();
+  console.log('Extension deactivated.');
 }

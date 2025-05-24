@@ -104,12 +104,17 @@ const ChatInput = () => {
   // Enviar mensaje
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!inputText.trim() || isLoading) return;
+    if (!inputText.trim()) return;
 
-    // Enviar mensaje
-    postMessage('userMessage', { text: inputText, files: selectedFiles });
+    // Send message with files if any
+    postMessage('userMessage', { 
+      text: inputText,
+      files: selectedFiles.map(f => f.path || f)
+    });
+    
     setInputText('');
-    setSelectedFiles([]); // Limpiar archivos seleccionados
+    setSelectedFiles([]);
+    closeDropdown();
   };
 
   // Mostrar selector de modelo

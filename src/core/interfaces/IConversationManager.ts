@@ -10,11 +10,10 @@ export interface IConversationManager {
   clearConversation(chatId: string, memoryManager: MemoryManager): void;
 }
 
-// src/core/interfaces/IWindsurfController.ts
-// Define los métodos públicos que expondrá tu controlador
-export interface IWindsurfController {
+
+/* export interface IWindsurfController {
   processUserMessage(chatId: string, userMessage: string, contextData?: Record<string, any>): Promise<string>;
   clearConversation(chatId: string): void;
   dispose(): void;
   // ... otros métodos públicos
-}
+} */

@@ -59,8 +59,13 @@ export const RecentChats = () => {
   };
 
   const handleShowHistory = () => {
-    setShowHistory(!showHistory);
-    postMessage('command', { command: 'showHistory' });
+    const newShowHistory = !showHistory;
+    setShowHistory(newShowHistory);
+    
+    // Only request history if we're showing it
+    if (newShowHistory) {
+      postMessage('command', { command: 'getChatHistory' });
+    }
   };
 
   if (isLoading && chatList.length === 0) {

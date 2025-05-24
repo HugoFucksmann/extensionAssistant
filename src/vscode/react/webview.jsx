@@ -36,18 +36,8 @@ const styles = {
 };
 
 function Chat() {
-  const { messages, currentChatId, postMessage, newChat, chatList } = useVSCodeContext();
-  const [isInitialized, setIsInitialized] = useState(false);
+  const { messages, currentChatId, newChat, chatList } = useVSCodeContext();
   const isEmpty = messages.length === 0;
-
-  // Initialize chat when component mounts
-  useEffect(() => {
-    if (!isInitialized) {
-      console.log('Initializing chat...');
-      postMessage('command', { command: 'getInitialState' });
-      setIsInitialized(true);
-    }
-  }, [isInitialized, postMessage]);
 
   const containerStyle = {
     ...styles.container,
