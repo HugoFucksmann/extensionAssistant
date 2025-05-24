@@ -10,7 +10,7 @@ import * as vscode from 'vscode';
 export function getReactHtmlContent(extensionUri: vscode.Uri, webview: vscode.Webview): string {
   const nonce = getNonce();
   
-  // CDN URLs for React and ReactDOM
+ 
   const reactUrl = 'https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js';
   const reactDomUrl = 'https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js';
   
@@ -63,12 +63,6 @@ export function getReactHtmlContent(extensionUri: vscode.Uri, webview: vscode.We
 </html>`;
 }
 
-/**
- * Legacy function - kept for backwards compatibility
- */
-export function getHtmlContent(extensionUri: vscode.Uri, webview: vscode.Webview): string {
-  return getReactHtmlContent(extensionUri, webview);
-}
 
 function getNonce(): string {
   let text = '';

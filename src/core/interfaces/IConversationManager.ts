@@ -11,9 +11,3 @@ export interface IConversationManager {
 }
 
 
-/* export interface IWindsurfController {
-  processUserMessage(chatId: string, userMessage: string, contextData?: Record<string, any>): Promise<string>;
-  clearConversation(chatId: string): void;
-  dispose(): void;
-  // ... otros métodos públicos
-} */

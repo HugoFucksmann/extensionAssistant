@@ -1,10 +1,8 @@
-import { 
-  analysisOutputSchema, 
-  reasoningOutputSchema, 
-  reflectionOutputSchema, 
-  correctionOutputSchema, 
-  responseOutputSchema 
-} from './';
+import { analysisOutputSchema } from './initialAnalysisPrompt';
+import { reasoningOutputSchema } from './reasoningPrompt';
+import { reflectionOutputSchema } from './reflectionPrompt';
+import { correctionOutputSchema } from './correctionPrompt';
+import { responseOutputSchema } from './responseGenerationPrompt';
 import { z } from 'zod';
 
 /**
