@@ -1,6 +1,7 @@
 import React from 'react';
-import Markdown from 'markdown-to-jsx';
+
 import { styles } from '../styles';
+import Markdown from 'markdown-to-jsx';
 
 const MarkdownContent = ({ content }) => {
   return (

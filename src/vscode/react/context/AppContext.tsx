@@ -23,8 +23,7 @@ interface AppState {
   currentModel: string;
   isDarkMode: boolean;
   theme: ThemeType;
-  processingPhase: string; // Podríamos deprec_old este si 'status' en metadata lo cubre mejor
-  // --- Feedback ---
+  processingPhase: string; 
   activeFeedbackOperationId: string | null;
   feedbackMessages: { [operationId: string]: ChatMessage[] };
 }
@@ -43,7 +42,7 @@ type AppAction =
   | { type: 'TOGGLE_DARK_MODE' }
   | { type: 'SET_THEME'; payload: ThemeType }
   | { type: 'SESSION_READY'; payload: { chatId: string; messages: ChatMessage[]; model?: string; history?: Chat[] } }
-  | { type: 'AGENT_ACTION_UPDATE'; payload: ChatMessage }; // <--- AÑADIDO
+  | { type: 'AGENT_ACTION_UPDATE'; payload: ChatMessage };
 
 const body = document.body;
 const initialIsDarkMode = body.classList.contains('vscode-dark');
@@ -77,19 +76,13 @@ function appReducer(state: AppState, action: AppAction): AppState {
       };
     case 'SET_MESSAGES':
       return { ...state, messages: action.payload, isLoading: false };
-    case 'ADD_MESSAGE': // Usado para mensajes de usuario y respuestas finales del asistente
-      return { 
-        ...state, 
-        messages: [...state.messages, action.payload],
-        // isLoading se maneja por separado o por eventos de feedback
-      };
     case 'SET_LOADING':
       return { ...state, isLoading: action.payload };
     case 'SET_CHAT_ID':
       return { ...state, currentChatId: action.payload };
     case 'SET_SHOW_HISTORY':
       return { ...state, showHistory: action.payload };
-    case 'SET_PROCESSING_PHASE': // Podría ser redundante con los nuevos mensajes de feedback
+    case 'SET_PROCESSING_PHASE': 
       return { ...state, processingPhase: action.payload };
     case 'NEW_CHAT_STARTED':
       return { 
@@ -112,13 +105,20 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, isDarkMode: newIsDarkMode, theme: getTheme(newIsDarkMode) };
     case 'SET_THEME':
         return { ...state, theme: action.payload };
-    // --- Feedback grouping logic ---
+    
     case 'AGENT_ACTION_UPDATE': {
       const opId = action.payload.metadata?.operationId;
-      if (!opId) return state;
+      if (!opId) return state; // Should not happen if backend sends operationId
+
+      // Add to general messages list AND specific feedbackMessages list
+      const updatedMessages = [...state.messages, action.payload];
+      
+      // Ensure messages are sorted by timestamp if necessary, though append order should be fine
+      // updatedMessages.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
       return {
         ...state,
-        messages: [...state.messages, action.payload],
+        messages: updatedMessages,
         activeFeedbackOperationId: opId,
         feedbackMessages: {
           ...state.feedbackMessages,
@@ -126,24 +126,28 @@ function appReducer(state: AppState, action: AppAction): AppState {
         },
         isLoading: action.payload.metadata?.status === 'thinking' || 
                      action.payload.metadata?.status === 'tool_executing',
-        processingPhase: action.payload.metadata?.status || state.processingPhase, // Actualizar phase si es relevante
+        processingPhase: action.payload.metadata?.status || state.processingPhase,
       };
     }
-    // Cuando llega una respuesta final del asistente, limpiar feedback activo
-    case 'ADD_MESSAGE': {
-      // Si el mensaje es del asistente y tiene operationId, limpiar
-      const isAssistant = action.payload.sender === 'assistant';
-      if (isAssistant && state.activeFeedbackOperationId) {
-        return {
-          ...state,
-          messages: [...state.messages, action.payload],
-          activeFeedbackOperationId: null,
-        };
-      }
-      return {
+    
+    case 'ADD_MESSAGE': { // Used for user messages and final assistant responses
+      const newState = {
         ...state,
         messages: [...state.messages, action.payload],
+        // isLoading is handled by SET_LOADING or by AGENT_ACTION_UPDATE for ongoing processes
       };
+      
+      // If this is a final assistant response and an operation was active, clear it.
+      const isAssistantFinalResponse = action.payload.sender === 'assistant';
+      if (isAssistantFinalResponse && state.activeFeedbackOperationId) {
+        // The operation associated with activeFeedbackOperationId is now considered complete.
+        // We don't clear feedbackMessages[state.activeFeedbackOperationId] here,
+        // as those messages are part of the history.
+        newState.activeFeedbackOperationId = null;
+        // isLoading should be false, typically set by 'assistantResponse' event handler calling SET_LOADING false.
+        newState.processingPhase = action.payload.metadata?.status || 'completed';
+      }
+      return newState;
     }
     default:
       return state;
@@ -158,9 +162,6 @@ interface AppContextType extends AppState {
   loadChat: (chatId: string) => void;
   switchModel: (modelType: string) => void;
   toggleDarkMode: () => void;
-  // Exponer feedback
-  activeFeedbackOperationId: string | null;
-  feedbackMessages: { [operationId: string]: ChatMessage[] };
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -187,56 +188,59 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         case 'sessionReady':
           dispatch({ type: 'SESSION_READY', payload });
           break;
-        case 'assistantResponse':
+        case 'assistantResponse': // This is the FINAL response from the assistant
           dispatch({
             type: 'ADD_MESSAGE', payload: {
               id: payload.id || `asst_${Date.now()}`,
               content: payload.content || '',
               sender: 'assistant',
               timestamp: payload.timestamp || Date.now(),
-              metadata: payload.metadata, // Pasar metadata (ej. { status: 'error' } si es una respuesta de error)
+              metadata: payload.metadata || { status: 'completed' }, 
             }
           });
-          dispatch({ type: 'SET_LOADING', payload: false }); // Asegurar que el loading principal se apague
+          dispatch({ type: 'SET_LOADING', payload: false }); 
+          // activeFeedbackOperationId is cleared in the ADD_MESSAGE reducer
           break;
         case 'newChatStarted':
           dispatch({ type: 'NEW_CHAT_STARTED', payload: { chatId: payload.chatId } });
           break;
-        case 'processingUpdate': // Este es el mensaje que WebviewProvider enviaba antes
-                                 // Ahora será reemplazado/complementado por 'agentActionUpdate'
+        case 'processingUpdate': 
+          // This event might be deprecated in favor of agentActionUpdate's status
           dispatch({ type: 'SET_PROCESSING_PHASE', payload: payload.phase || '' });
-          if (payload.phase === 'processing' || payload.phase === 'thinking') { // Mantener por si se usa
+          if (payload.phase === 'processing' || payload.phase === 'thinking') {
             dispatch({ type: 'SET_LOADING', payload: true });
-          } else {
+          } else if (payload.phase === 'completed' || payload.phase === 'error') {
             dispatch({ type: 'SET_LOADING', payload: false });
           }
           break;
         
-        case 'agentActionUpdate': // <--- AÑADIDO ESTE CASE
+        case 'agentActionUpdate': // For intermediate feedback steps
           dispatch({
             type: 'AGENT_ACTION_UPDATE',
             payload: {
               id: payload.id || `agent_${Date.now()}`,
               content: payload.content || '',
-              sender: 'system',
+              sender: 'system', // Feedback messages are from 'system'
               timestamp: payload.timestamp || Date.now(),
               metadata: {
-                status: payload.status,
-                operationId: payload.operationId // <--- MUY IMPORTANTE
+                status: payload.status, // e.g., 'thinking', 'tool_executing', 'tool_completed', 'error'
+                operationId: payload.operationId, // Crucial for grouping
+                toolName: payload.toolName, // Optional: if a tool is involved
+                // ...any other relevant metadata for feedback
               },
             }
           });
-          // El isLoading se maneja en el reducer basado en el status
+          // isLoading and processingPhase are handled within the AGENT_ACTION_UPDATE reducer
           break;
 
-        case 'systemError': // Errores generales del sistema que no son feedback de ReAct
+        case 'systemError': // General system errors not tied to a specific ReAct operation
           dispatch({
             type: 'ADD_MESSAGE', payload: {
               id: `err_${Date.now()}`,
               content: `Error: ${payload.message}`,
-              sender: 'system',
+              sender: 'system', // General system error
               timestamp: Date.now(),
-              metadata: { status: 'error' }, // Marcar como error
+              metadata: { status: 'error' }, 
             }
           });
           dispatch({ type: 'SET_LOADING', payload: false });
@@ -282,20 +286,18 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         window.removeEventListener('message', handleMessage);
         observer.disconnect();
     };
-  }, [state.isDarkMode, state.chatList.length]); // Añadido state.chatList.length a dependencias
+  }, [state.isDarkMode, state.chatList.length]); 
 
   const sendMessage = (text: string, files: string[] = []) => {
-    dispatch({
-      type: 'ADD_MESSAGE', payload: {
-        id: `user_${Date.now()}`,
-        content: text,
-        sender: 'user',
-        timestamp: Date.now(),
-        files: files,
-      }
-    });
-    // No activar isLoading aquí directamente; dejar que los eventos de feedback lo manejen.
-    // dispatch({ type: 'SET_LOADING', payload: true }); 
+    const userMessage: ChatMessage = {
+      id: `user_${Date.now()}`,
+      content: text,
+      sender: 'user',
+      timestamp: Date.now(),
+      files: files,
+    };
+    dispatch({ type: 'ADD_MESSAGE', payload: userMessage });
+    // SET_LOADING true will be triggered by the first AGENT_ACTION_UPDATE from backend
     postMessageToBackend('userMessageSent', { text, files });
   };
 
@@ -305,7 +307,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
   const setShowHistory = (show: boolean) => {
     dispatch({ type: 'SET_SHOW_HISTORY', payload: show });
-    if (show) {
+    if (show && state.chatList.length === 0) { // Fetch only if history is empty and being shown
         postMessageToBackend('command', { command: 'getChatHistory' });
     }
   };

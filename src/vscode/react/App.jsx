@@ -2,7 +2,6 @@ import React from 'react';
 
 // Componentes de la interfaz
 import ChatInput from './Components/InputChat/ChatInput';
-// Fix: Check if ChatMessages is a default export or named export
 import ChatMessages from './Components/ChatMessages/ChatMessages';
 import ChatHistory from './Components/historical/ChatHistory';
 import EmptyChatView from './Components/EmptyChatView';
@@ -13,13 +12,13 @@ const LoadingIndicator = () => {
   const { theme } = useApp();
   return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: theme.colors.text }}>
-      Loading...
+      Loading initial chat...
     </div>
   );
 };
 
 const App = () => {
-  const { messages, isLoading, showHistory, newChat, theme } = useApp();
+  const { messages, isLoading, showHistory, theme, activeFeedbackOperationId } = useApp();
   const isEmpty = messages.length === 0;
 
   // Main container styles
@@ -29,44 +28,25 @@ const App = () => {
     height: '100vh',
     backgroundColor: theme.colors.background,
     color: theme.colors.text,
-    overflow: 'hidden', // Prevent body scroll, individual components handle their scroll
+    overflow: 'hidden', 
   };
 
-  const headerStyle = {
-    padding: `${theme.spacing.medium} ${theme.spacing.large}`,
-    borderBottom: `1px solid ${theme.colors.border}`,
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: theme.colors.background, // Or a slightly different header background
-  };
-
-  const titleStyle = {
-    margin: 0,
-    fontSize: theme.typography.title, // Example
-  };
-
-  const newChatButtonStyle = {
-    padding: `${theme.spacing.small} ${theme.spacing.medium}`,
-    border: 'none',
-    borderRadius: theme.borderRadius.small,
-    backgroundColor: theme.colors.primary, // Use theme colors
-    color: '#ffffff', // Assuming primary button text is white
-    cursor: 'pointer',
-    fontSize: '13px', // Example
-  };
+  // Header style (not used in this simplified layout, but kept for potential future use)
+  // const headerStyle = { ... };
+  // const titleStyle = { ... };
+  // const newChatButtonStyle = { ... };
 
   const chatAreaStyle = {
-    flex: 1, // Takes remaining space
+    flex: 1, 
     display: 'flex',
     flexDirection: 'column',
-    overflow: 'hidden', // Important for ChatMessages to scroll correctly
+    overflow: 'hidden', 
   };
 
   const chatInputContainerStyle = {
     padding: theme.spacing.medium,
     borderTop: `1px solid ${theme.colors.border}`,
-    backgroundColor: theme.colors.background, // Or chat input specific background
+    backgroundColor: theme.colors.chatInputBg || theme.colors.background, 
   };
 
   if (showHistory) {
@@ -77,17 +57,21 @@ const App = () => {
     );
   }
 
+  // Show top-level loading only if it's initial load, no messages, and no active feedback operation
+  const showTopLevelLoading = isLoading && isEmpty && !activeFeedbackOperationId;
+  // Show empty view if no messages and no active feedback operation (and not loading)
+  const showEmptyView = isEmpty && !activeFeedbackOperationId && !showTopLevelLoading;
+
   return (
     <div style={appContainerStyle}>
       <main style={chatAreaStyle}>
-        {isLoading && isEmpty ? (
+        {showTopLevelLoading ? (
           <LoadingIndicator />
-        ) : isEmpty ? (
+        ) : showEmptyView ? (
           <EmptyChatView />
         ) : (
           <>
-       
-            <ChatMessages />
+            <ChatMessages /> {/* ChatMessages now includes UnifiedFeedbackDisplay for active operations */}
             <div style={chatInputContainerStyle}>
               <ChatInput />
             </div>
