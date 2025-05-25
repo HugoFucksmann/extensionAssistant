@@ -78,11 +78,23 @@ export class WindsurfGraph {
 
     try {
       // --- Simulación del Análisis Inicial / Preparación ---
-      await this.timeout(1500);
-      addHistoryEntry('system', 'Initial analysis and context gathering (mocked)', state.iterationCount);
+      state.iterationCount++;
       this.dispatcher.dispatch(EventType.NODE_START, { chatId, nodeType: 'InitialAnalysis' });
-      // Simular que se obtiene alguna información de contexto
+      
+      // Estado inicial
+      addHistoryEntry('system', 'Starting initial analysis...', state.iterationCount, { status: 'thinking' });
+      await this.timeout(1000);
+      
+      // Estado de progreso
+      addHistoryEntry('system', 'Analyzing project context...', state.iterationCount, { status: 'thinking' });
+      await this.timeout(2000);
+      
+      // Estado de éxito
       state.projectContext = { name: 'MockProject', path: '/mock/path' };
+      addHistoryEntry('system', 'Initial analysis completed successfully', state.iterationCount, { 
+        status: 'success',
+        result: state.projectContext
+      });
       this.dispatcher.dispatch(EventType.NODE_COMPLETE, { chatId, nodeType: 'InitialAnalysis' });
 
 
@@ -93,8 +105,16 @@ export class WindsurfGraph {
         phase: `Reasoning-${state.iterationCount}`,
         nodeType: 'Reasoning'
       });
-      await this.timeout(1500); // Simular tiempo de razonamiento
 
+      // Estado inicial
+      addHistoryEntry('reasoning', 'Starting reasoning process...', state.iterationCount, { status: 'thinking' });
+      await this.timeout(1500);
+
+      // Estado de generación de plan
+      addHistoryEntry('reasoning', 'Generating action plan...', state.iterationCount, { status: 'thinking' });
+      await this.timeout(2000);
+
+      // Generar plan
       const mockPlanStep1: PlanStep = {
         id: 'plan-step-1',
         step: '1. Use mockTool to get information.',
@@ -107,36 +127,54 @@ export class WindsurfGraph {
         expectedOutcome: 'Get some mocked data.',
         requiredContext: ['projectContext']
       };
+
+      // Estado de éxito
       state.reasoningResult = {
         reasoning: 'The agent decided to use mockTool based on the objective (mocked).',
         plan: [mockPlanStep1],
         nextAction: mockNextAction,
-        metrics: { reasoningTime: 500 } as PerformanceMetrics,
+        metrics: { reasoningTime: 3500 } as PerformanceMetrics,
       };
-      addHistoryEntry('reasoning', `Reasoning complete. Plan: ${mockPlanStep1.step}`, state.iterationCount, { reasoning: state.reasoningResult.reasoning });
+      addHistoryEntry('reasoning', 'Action plan generated successfully', state.iterationCount, { 
+        status: 'success',
+        plan: state.reasoningResult.plan
+      });
       this.dispatcher.dispatch(EventType.REASONING_COMPLETED, {
         chatId,
         phase: `Reasoning-${state.iterationCount}`,
         nodeType: 'Reasoning',
         result: { plan: state.reasoningResult.plan, nextAction: state.reasoningResult.nextAction },
-        duration: 500
+        duration: 3500
       });
 
       // --- Simulación Iteración 1: Acción ---
-      this.dispatcher.dispatch(EventType.TOOL_EXECUTION_STARTED, { // O ACTION_STARTED
+      this.dispatcher.dispatch(EventType.TOOL_EXECUTION_STARTED, { 
         chatId,
         tool: mockNextAction.toolName,
         parameters: mockNextAction.params,
-        // iteration: state.iterationCount // Opcional
       });
-      await this.timeout(1900); // Simular tiempo de ejecución de herramienta
+      
+      // Estado inicial
+      addHistoryEntry('action', `Executing tool: ${mockNextAction.toolName}...`, state.iterationCount, { 
+        status: 'thinking',
+        tool: mockNextAction.toolName
+      });
+      await this.timeout(1500);
 
+      // Estado de progreso
+      addHistoryEntry('action', `Processing request with ${mockNextAction.toolName}...`, state.iterationCount, { 
+        status: 'thinking',
+        tool: mockNextAction.toolName
+      });
+      await this.timeout(2000);
+
+      // Generar resultado
       const mockToolExecution: ToolExecution = {
         name: mockNextAction.toolName,
         status: 'completed',
         parameters: mockNextAction.params,
         result: { data: 'This is the mocked result from mockTool' },
-        startTime: Date.now() - 300,
+        startTime: Date.now() - 3500,
         endTime: Date.now(),
       };
       state.actionResult = {
@@ -166,7 +204,14 @@ export class WindsurfGraph {
         phase: `Reflection-${state.iterationCount}`,
         nodeType: 'Reflection'
       });
-      await this.timeout(1800); // Simular tiempo de reflexión
+
+      // Estado inicial
+      addHistoryEntry('reflection', 'Starting reflection process...', state.iterationCount, { status: 'thinking' });
+      await this.timeout(1500);
+
+      // Estado de análisis
+      addHistoryEntry('reflection', 'Analyzing results...', state.iterationCount, { status: 'thinking' });
+      await this.timeout(2000);
 
       const mockInsight: Insight = {
         id: 'insight-1',
@@ -192,10 +237,18 @@ export class WindsurfGraph {
         duration: 400
       });
 
-      // --- Simulación: Decisión de Responder (final de ciclo para este mock) ---
-      // Suponemos que el plan se completó y ahora se debe generar una respuesta.
-      // En un flujo real, esto podría ser otra acción (ej. 'respond' tool).
-      await this.timeout(800);
+      // --- Simulación: Generación de Respuesta ---
+      state.iterationCount++;
+      
+      // Estado inicial
+      addHistoryEntry('system', 'Generating final response...', state.iterationCount, { status: 'thinking' });
+      await this.timeout(1500);
+
+      // Estado de formateo
+      addHistoryEntry('system', 'Formatting response...', state.iterationCount, { status: 'thinking' });
+      await this.timeout(2000);
+
+      // Generar respuesta final
       const finalResponseMessage = "Mocked ReAct flow completed successfully. The mockTool provided: 'This is the mocked result from mockTool'.";
 
       // Simular que la herramienta 'respond' se ejecuta (o una lógica similar)

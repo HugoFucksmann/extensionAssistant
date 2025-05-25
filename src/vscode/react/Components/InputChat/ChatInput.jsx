@@ -3,7 +3,7 @@
 import React, { useRef, useState, useEffect } from "react";
 
 // Importar componentes
-import ModelDropdown from '../ModelSelector/ModelDropdown';
+import ModelDropdown from './ModelDropdown';
 import FileChip from './FileChip'; // Importar FileChip
 
 // Importar custom hooks

@@ -2,6 +2,7 @@ import React from 'react';
 
 // Componentes de la interfaz
 import ChatInput from './Components/InputChat/ChatInput';
+// Fix: Check if ChatMessages is a default export or named export
 import ChatMessages from './Components/ChatMessages/ChatMessages';
 import ChatHistory from './Components/historical/ChatHistory';
 import EmptyChatView from './Components/EmptyChatView';
@@ -68,7 +69,6 @@ const App = () => {
     backgroundColor: theme.colors.background, // Or chat input specific background
   };
 
-
   if (showHistory) {
     return (
       <div style={appContainerStyle}>
@@ -79,21 +79,15 @@ const App = () => {
 
   return (
     <div style={appContainerStyle}>
-    
-
       <main style={chatAreaStyle}>
-        {isLoading && isEmpty ? ( // Show loading indicator only if messages are empty and loading
+        {isLoading && isEmpty ? (
           <LoadingIndicator />
         ) : isEmpty ? (
           <EmptyChatView />
         ) : (
           <>
-            <ChatMessages>
-                {/* Children for ChatMessages if it's designed to show something when empty,
-                    otherwise EmptyChatView handles the "truly empty" state.
-                    If ChatMessages is self-contained, you might not need children here.
-                */}
-            </ChatMessages>
+       
+            <ChatMessages />
             <div style={chatInputContainerStyle}>
               <ChatInput />
             </div>
