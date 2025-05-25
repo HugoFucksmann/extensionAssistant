@@ -89,6 +89,53 @@ const ChatInput = () => {
     setInputText(prevText => prevText.replace(chipTextPattern, '').trim());
   };
 
+  const handleFileSelect = (filePath) => {
+    const fileName = filePath.split(/[\/\\]/).pop();
+    const cursorPos = inputRef.current.selectionStart;
+    
+    // Buscar la posición del @ más reciente antes del cursor
+    const textBeforeCursor = inputText.substring(0, cursorPos);
+    const lastAtPos = textBeforeCursor.lastIndexOf('@');
+    
+    if (lastAtPos === -1) {
+      // Si no hay @, insertar normalmente
+      const newText = 
+        inputText.substring(0, cursorPos) + 
+        fileName + 
+        inputText.substring(cursorPos);
+      
+      setInputText(newText);
+      
+      setTimeout(() => {
+        inputRef.current.focus();
+        inputRef.current.setSelectionRange(
+          cursorPos + fileName.length,
+          cursorPos + fileName.length
+        );
+      }, 0);
+    } else {
+      // Reemplazar desde @ hasta cursor con el nombre del archivo
+      const newText = 
+        inputText.substring(0, lastAtPos) + 
+        fileName + 
+        inputText.substring(cursorPos);
+      
+      setInputText(newText);
+      
+      setTimeout(() => {
+        inputRef.current.focus();
+        inputRef.current.setSelectionRange(
+          lastAtPos + fileName.length,
+          lastAtPos + fileName.length
+        );
+      }, 0);
+    }
+    
+    if (!selectedFiles.includes(filePath)) {
+      setSelectedFiles([...selectedFiles, filePath]);
+    }
+  };
+
   useEffect(() => {
     if (inputRef.current) inputRef.current.focus();
   }, [messages]);
@@ -177,7 +224,7 @@ const ChatInput = () => {
           searchTerm={searchTerm}
           filteredFiles={getFilteredFiles(searchTerm)}
           isLoading={isLoadingFiles}
-          onSelectFile={insertFileMention}
+          onSelectFile={handleFileSelect}
         />
       )}
 

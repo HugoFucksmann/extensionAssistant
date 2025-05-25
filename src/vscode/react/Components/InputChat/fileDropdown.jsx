@@ -67,13 +67,21 @@ const FileDropdown = ({
       backgroundColor: isHovered ? (theme.colors.hoverBg || '#f0f0f0') : 'transparent'
     };
     
+    const handleKeyDown = (e) => {
+      if (e.key === 'Enter') {
+        onSelectFile(file);
+      }
+    };
+    
     return (
       <li 
         style={fileItemStyle}
         onClick={() => onSelectFile(file)}
+        onKeyDown={handleKeyDown}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
         title={file}
+        tabIndex={0} // Hacemos el li focusable
       >
         {fileName}
       </li>

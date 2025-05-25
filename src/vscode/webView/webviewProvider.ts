@@ -64,6 +64,36 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
           case 'showHistoryRequested':
             this.postMessage('showHistory', {});
             break;
+
+          case 'command':
+            if (message.payload?.command === 'getProjectFiles') {
+              try {
+                const result = await this.appLogicService.executeTool('listFiles', {
+                  dirPath: '.', 
+                  excludePattern: 'node_modules|\\\\.git',
+                  recursive: true
+                });
+                
+                if (result.success) {
+                  this.postMessage('projectFiles', { 
+                    files: result.data.files
+                      .filter((f: {isDirectory: boolean}) => !f.isDirectory)
+                      .map((f: {path: string}) => f.path) 
+                  });
+                } else {
+                  console.error('Error getting project files:', result.error);
+                  this.postMessage('systemError', { message: result.error });
+                }
+              } catch (error) {
+                console.error('Error in getProjectFiles handler:', error);
+                this.postMessage('systemError', { message: 'Failed to list project files' });
+              }
+            }
+            break;
+
+          default:
+            console.log('[WebviewProvider] Unknown message type:', message.type);
+            break;
         }
       },
       null,

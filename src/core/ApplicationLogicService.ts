@@ -121,6 +121,17 @@ export class ApplicationLogicService {
     // o por un EventSubscriptionManager que reacciona a la acción.
   }
 
+  public async executeTool(toolName: string, params: any) {
+    if (!this.toolRegistry) {
+      throw new Error('ToolRegistry not available');
+    }
+    const tool = this.toolRegistry.getTool(toolName);
+    if (!tool) {
+      throw new Error(`Tool ${toolName} not found`);
+    }
+    return await tool.execute(params);
+  }
+
   public dispose(): void {
     // Lógica para liberar recursos si es necesario (ej. listeners, timers)
     // Los managers (memoryManager, etc.) deberían tener sus propios métodos dispose
