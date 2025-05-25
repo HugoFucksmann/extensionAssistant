@@ -1,5 +1,5 @@
-// FeedbackRenderer.jsx - Collapsible feedback display
-import React, { useState, memo } from 'react';
+// FeedbackRenderer.jsx - Indicador único que cambia de estado
+import React, { useState, memo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import StatusIndicator from './StatusIndicator';
 import MarkdownContent from './MessageContent/MarkdownContent';
@@ -7,26 +7,65 @@ import MarkdownContent from './MessageContent/MarkdownContent';
 const FeedbackRenderer = memo(({ operationId, isActive = false }) => {
   const { feedbackMessages, theme, processingPhase } = useApp();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [currentStatus, setCurrentStatus] = useState('thinking');
+  const [currentTitle, setCurrentTitle] = useState('Processing...');
+  const [currentContent, setCurrentContent] = useState('');
+  const [shouldRender, setShouldRender] = useState(false);
 
-  if (!operationId) return null;
+  // Process messages and determine if we should render anything
+  useEffect(() => {
+    if (!operationId) {
+      setShouldRender(false);
+      return;
+    }
 
-  const operationMessages = feedbackMessages[operationId] || [];
-  if (operationMessages.length === 0 && !isActive) return null;
+    const operationMessages = feedbackMessages[operationId] || [];
+    if (operationMessages.length === 0 && !isActive) {
+      setShouldRender(false);
+      return;
+    }
 
-  const latestMessage = operationMessages[operationMessages.length - 1];
-  const isCompleted = processingPhase === 'completed' || processingPhase === 'error';
-  const currentStatus = isCompleted ? processingPhase : latestMessage?.metadata?.status || 'thinking';
+    setShouldRender(true);
 
-  let title = "Processing...";
-  if (currentStatus === 'tool_executing') {
-    title = latestMessage?.metadata?.toolName ? `Executing: ${latestMessage.metadata.toolName}...` : "Executing tool...";
-  } else if (currentStatus === 'thinking') {
-    title = "Thinking...";
-  } else if (currentStatus === 'success') {
-    title = "Processing completed";
-  } else if (currentStatus === 'error') {
-    title = "Error occurred";
-  }
+    // Determine the current state based on messages
+    const latestMessage = operationMessages[operationMessages.length - 1];
+    const isCompleted = processingPhase === 'completed' || processingPhase === 'error';
+
+    let status = 'thinking';
+    let title = 'Processing...';
+    let content = '';
+
+    if (isCompleted) {
+      status = processingPhase;
+      title = processingPhase === 'completed' ? 'Processing completed' : 'Error occurred';
+    } else if (latestMessage) {
+      status = latestMessage.metadata?.status || 'thinking';
+      content = latestMessage.content || '';
+
+      switch (status) {
+        case 'tool_executing':
+          title = latestMessage.metadata?.toolName
+            ? `Executing: ${latestMessage.metadata.toolName}...`
+            : 'Executing tool...';
+          break;
+        case 'thinking':
+          title = 'Thinking...';
+          break;
+        case 'success':
+          title = 'Step completed';
+          break;
+        case 'error':
+          title = 'Error occurred';
+          break;
+        default:
+          title = 'Processing...';
+      }
+    }
+
+    setCurrentStatus(status);
+    setCurrentTitle(title);
+    setCurrentContent(content);
+  }, [operationId, feedbackMessages, processingPhase, isActive]);
 
   const containerStyle = {
     padding: theme.spacing.medium,
@@ -36,6 +75,7 @@ const FeedbackRenderer = memo(({ operationId, isActive = false }) => {
     border: `1px solid ${theme.colors.glassBorder}`,
     boxShadow: theme.shadows.medium,
     backdropFilter: 'blur(10px)',
+    transition: 'all 0.3s ease', // Transición suave para cambios de estado
   };
 
   const headerStyle = {
@@ -59,16 +99,22 @@ const FeedbackRenderer = memo(({ operationId, isActive = false }) => {
   };
 
   const contentStyle = {
-    maxHeight: isCollapsed ? '0' : '250px',
+    maxHeight: isCollapsed ? '0' : '300px',
     overflow: 'hidden',
     transition: 'max-height 0.3s ease',
   };
 
   const scrollableContentStyle = {
-    maxHeight: '250px',
+    maxHeight: '300px',
     overflowY: 'auto',
     paddingRight: theme.spacing.small,
   };
+
+  // If we shouldn't render, return null
+  if (!shouldRender) return null;
+
+  // Get operation messages only after we've determined we should render
+  const operationMessages = feedbackMessages[operationId] || [];
 
   return (
     <div className="message-fade-in" style={containerStyle}>
@@ -76,10 +122,10 @@ const FeedbackRenderer = memo(({ operationId, isActive = false }) => {
         <div style={{ display: 'flex', alignItems: 'center' }}>
           <StatusIndicator status={currentStatus} size="medium" />
           <span style={{ marginLeft: theme.spacing.small, fontWeight: '600' }}>
-            {title}
+            {currentTitle}
           </span>
         </div>
-        <button 
+        <button
           style={collapseButtonStyle}
           onClick={(e) => {
             e.stopPropagation();
@@ -89,20 +135,48 @@ const FeedbackRenderer = memo(({ operationId, isActive = false }) => {
           {isCollapsed ? '▼' : '▲'}
         </button>
       </div>
-      
+
       <div style={contentStyle}>
         <div style={scrollableContentStyle}>
-          {operationMessages.map(msg => (
-            <FeedbackItem key={msg.id} message={msg} />
-          ))}
-          {currentStatus === 'completed' && operationMessages.length > 0 && (
+          {/* Mostrar contenido actual */}
+          {currentContent && (
+            <div style={{
+              padding: theme.spacing.medium,
+              borderRadius: theme.borderRadius.medium,
+              backgroundColor: theme.colors.feedbackThinkingBackground,
+              marginBottom: theme.spacing.small,
+            }}>
+              <MarkdownContent content={currentContent} />
+            </div>
+          )}
+
+          {/* Mostrar historial de pasos si hay múltiples mensajes */}
+          {operationMessages.length > 1 && (
+            <details style={{ marginTop: theme.spacing.medium }}>
+              <summary style={{
+                color: theme.colors.textMuted,
+                fontSize: theme.typography.small,
+                cursor: 'pointer',
+                padding: theme.spacing.small,
+              }}>
+                View step history ({operationMessages.length} steps)
+              </summary>
+              <div style={{ marginTop: theme.spacing.small }}>
+                {operationMessages.map((msg, index) => (
+                  <FeedbackHistoryItem key={msg.id || `step-${index}`} message={msg} stepNumber={index + 1} />
+                ))}
+              </div>
+            </details>
+          )}
+
+          {currentStatus === 'completed' && (
             <div style={{
               padding: theme.spacing.small,
               textAlign: 'center',
               color: theme.colors.textMuted,
               fontSize: theme.typography.small
             }}>
-              All steps completed.
+              ✅ All steps completed successfully.
             </div>
           )}
         </div>
@@ -111,7 +185,8 @@ const FeedbackRenderer = memo(({ operationId, isActive = false }) => {
   );
 });
 
-const FeedbackItem = memo(({ message }) => {
+// Componente para mostrar el historial de pasos
+const FeedbackHistoryItem = memo(({ message, stepNumber }) => {
   const { theme } = useApp();
   const status = message.metadata?.status || "info";
   const content = message.content || message.text || "";
@@ -148,23 +223,22 @@ const FeedbackItem = memo(({ message }) => {
 
   const colors = getStatusColors(status);
   const itemStyle = {
-    padding: `${theme.spacing.medium} ${theme.spacing.large}`,
-    marginBottom: theme.spacing.small,
-    borderRadius: theme.borderRadius.medium,
-    borderLeft: `3px solid ${colors.border}`,
+    padding: `${theme.spacing.small} ${theme.spacing.medium}`,
+    marginBottom: theme.spacing.xs,
+    borderRadius: theme.borderRadius.small,
+    borderLeft: `2px solid ${colors.border}`,
     backgroundColor: colors.bg,
     color: colors.text,
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: theme.spacing.medium,
+    fontSize: theme.typography.small,
+    opacity: 0.8,
   };
 
   return (
     <div style={itemStyle}>
-      <StatusIndicator status={status} size="small" />
-      <div style={{ flex: 1 }}>
-        <MarkdownContent content={content} />
+      <div style={{ fontWeight: '500', marginBottom: theme.spacing.xs }}>
+        Step {stepNumber}: {message.metadata?.toolName || 'Processing'}
       </div>
+      <MarkdownContent content={content} />
     </div>
   );
 });
