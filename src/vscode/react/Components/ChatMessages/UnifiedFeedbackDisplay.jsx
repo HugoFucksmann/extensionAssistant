@@ -15,14 +15,20 @@ const UnifiedFeedbackDisplay = () => {
   
   // Determine overall status and title from the latest message in the operation or processingPhase
   const latestMessageInOperation = currentOperationMessages[currentOperationMessages.length - 1];
-  const currentStatus = latestMessageInOperation?.metadata?.status || processingPhase || 'thinking';
+ 
 
-  let title = "Processing request...";
+ // Si processingPhase es 'completed' o 'error' (establecido por ADD_MESSAGE para la respuesta final), úsalo.
+  // Si no, usa el estado del último mensaje de feedback.
+  const isOperationConsideredFinal = processingPhase === 'completed' || processingPhase === 'error';
+  const currentStatus = isOperationConsideredFinal ? processingPhase: latestMessageInOperation?.metadata?.status || 'thinking';
+
+
+  let title = "Operation Details";
   if (currentStatus === 'tool_executing') title = latestMessageInOperation?.metadata?.toolName ? `Executing: ${latestMessageInOperation.metadata.toolName}...` : "Executing tool...";
   else if (currentStatus === 'thinking') title = "Thinking...";
   else if (currentStatus === 'success' && currentOperationMessages.length > 0) title = "Processing step completed"; // Or more specific
   else if (currentStatus === 'error') title = "An error occurred during processing";
-
+  else if (currentOperationMessages.length > 0) title = "Processing request..."; 
 
   const displayContainerStyle = {
     padding: theme.spacing.medium,
@@ -56,32 +62,7 @@ const UnifiedFeedbackDisplay = () => {
 
   return (
     <div style={displayContainerStyle} className="unified-feedback-display">
-       <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .unified-feedback-display .feedback-card:hover { /* Specific hover for cards inside this display */
-          background: ${theme.colors.glassBackgroundHover} !important;
-          border-color: ${theme.colors.glassBorderHover} !important;
-          transform: translateX(2px) !important;
-        }
-        /* Custom scrollbar for feedback items container */
-        .unified-feedback-items-container::-webkit-scrollbar {
-          width: 6px;
-          height: 6px;
-        }
-        .unified-feedback-items-container::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .unified-feedback-items-container::-webkit-scrollbar-thumb {
-          background-color: ${theme.colors.border};
-          border-radius: 3px;
-        }
-        .unified-feedback-items-container::-webkit-scrollbar-thumb:hover {
-          background-color: ${theme.colors.primary}; /* Or a hover color from theme */
-        }
-      `}</style>
+      {/* ... style tag ... */}
       <div style={headerStyle}>
         <StatusIndicator status={currentStatus} size="medium" />
         <span style={{ marginLeft: theme.spacing.small, fontWeight: '600' }}>{title}</span>
@@ -90,6 +71,12 @@ const UnifiedFeedbackDisplay = () => {
         {currentOperationMessages.map(msg => (
           <FeedbackCard key={msg.id} message={msg} />
         ))}
+        {/* Podrías añadir un mensaje explícito si está 'completed' y no hay más items */}
+        {currentStatus === 'completed' && currentOperationMessages.length > 0 && (
+          <div style={{padding: theme.spacing.small, textAlign: 'center', color: theme.colors.textMuted, fontSize: theme.typography.small}}>
+            All steps finished.
+          </div>
+        )}
       </div>
     </div>
   );

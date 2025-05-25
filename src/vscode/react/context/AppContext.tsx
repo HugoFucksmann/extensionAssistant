@@ -108,14 +108,12 @@ function appReducer(state: AppState, action: AppAction): AppState {
     
     case 'AGENT_ACTION_UPDATE': {
       const opId = action.payload.metadata?.operationId;
-      if (!opId) return state; // Should not happen if backend sends operationId
+      if (!opId) return state; 
 
-      // Add to general messages list AND specific feedbackMessages list
+   
       const updatedMessages = [...state.messages, action.payload];
       
-      // Ensure messages are sorted by timestamp if necessary, though append order should be fine
-      // updatedMessages.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
-
+     
       return {
         ...state,
         messages: updatedMessages,
@@ -139,13 +137,10 @@ function appReducer(state: AppState, action: AppAction): AppState {
       
       // If this is a final assistant response and an operation was active, clear it.
       const isAssistantFinalResponse = action.payload.sender === 'assistant';
-      if (isAssistantFinalResponse && state.activeFeedbackOperationId) {
-        // The operation associated with activeFeedbackOperationId is now considered complete.
-        // We don't clear feedbackMessages[state.activeFeedbackOperationId] here,
-        // as those messages are part of the history.
-        newState.activeFeedbackOperationId = null;
-        // isLoading should be false, typically set by 'assistantResponse' event handler calling SET_LOADING false.
-        newState.processingPhase = action.payload.metadata?.status || 'completed';
+      if (isAssistantFinalResponse) {
+       
+        newState.isLoading = false; 
+        newState.processingPhase = action.payload.metadata?.status || 'completed'; 
       }
       return newState;
     }

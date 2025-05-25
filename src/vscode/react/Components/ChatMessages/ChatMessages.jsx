@@ -1,19 +1,15 @@
 import React, { useRef, useLayoutEffect, memo } from "react";
 import { styles, combineStyles } from "./styles";
 import { useApp } from "../../context/AppContext";
-import FeedbackCard from "./FeedbackCard"; // Keep for rendering past feedback if needed, or remove if Message handles all
 import StatusIndicator from "./StatusIndicator"; // Keep for rendering past feedback if needed
 import UnifiedFeedbackDisplay from "./UnifiedFeedbackDisplay";
 import MarkdownContent from './MessageContent/MarkdownContent';
-// import CodeBlock from "./CodeBlock"; // If messages can be pure code blocks
-// UserMessage component is separate, this Message is for assistant/system
-// SystemMessage.jsx is deprecated for active feedback
+
 
 const Message = memo(({ message, messageIndex }) => {
   const { theme, activeFeedbackOperationId } = useApp();
 
-  // If this message is part of the currently active feedback operation,
-  // UnifiedFeedbackDisplay will handle rendering it. So, skip here.
+ 
   if (
     message.sender === "system" &&
     message.metadata?.operationId &&

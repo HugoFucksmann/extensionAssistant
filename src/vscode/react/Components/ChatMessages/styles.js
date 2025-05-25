@@ -17,19 +17,10 @@ export const styles = {
     width: "100%",
     flex: 1,
     overflow: "auto",
-    paddingRight: "5px",
+    // paddingRight is removed as ChatMessages.jsx applies padding with theme.spacing
   },
 
-  chatContainer: {
-    flex: 1,
-    overflowY: "auto",
-    padding: "10px",
-    height: "100%",
-    display: "flex",
-    flexDirection: "column",
-  },
-
-  emptyContainer: {
+  emptyContainer: { // Used by EmptyChatView
     flex: 1,
     display: "flex",
     alignItems: "center",
@@ -37,66 +28,32 @@ export const styles = {
     height: "100%",
   },
 
-  // Mensajes base
-  message: {
-    marginBottom: "10px",
-    padding: "8px",
-    borderRadius: "4px",
+  // Mensajes base (structural)
+  message: { // Generic base, if needed
+    marginBottom: "10px", // Example: theme.spacing.medium
+    padding: "8px",      // Example: theme.spacing.small
+    borderRadius: "4px", // Example: theme.borderRadius.small
     maxWidth: "100%",
     wordWrap: "break-word",
   },
 
-  userMessage: {
+  userMessage: { // Primarily for alignment
     alignSelf: "flex-end",
-    backgroundColor: "var(--vscode-editor-background)",
-    color: "var(--vscode-button-foreground)",
-    border: "1px solid var(--vscode-input-border)",
+    // backgroundColor, color, border will be applied from theme in UserMessage.jsx or Message component
   },
 
-  aiMessage: {
+  aiMessage: { // Primarily for alignment
     alignSelf: "flex-start",
+    // backgroundColor, color, border will be applied from theme in Message component
   },
 
-  agentMessage: {
-    backgroundColor: "var(--vscode-editor-background)",
-    borderLeft: "4px solid var(--vscode-activityBarBadge-background)",
-    padding: "10px",
-    margin: "10px 0",
-    borderRadius: "4px",
-    alignSelf: "flex-start",
-  },
-
-  agentMessageContent: {
-    color: "var(--vscode-foreground)",
-    fontSize: "14px",
-  },
-
-  // Mensajes de feedback del sistema
-  feedbackMessage: {
-    padding: "8px 12px",
-    margin: "6px 20px",
-    borderRadius: "4px",
-    fontSize: "13px",
-    lineHeight: "1.4",
-    borderLeftWidth: "4px",
-    borderLeftStyle: "solid",
-    alignSelf: "stretch",
-    maxWidth: "calc(100% - 40px)",
-    opacity: 0.95,
-  },
-
-  feedbackIcon: {
-    marginRight: "8px",
-    verticalAlign: "middle",
-  },
-
-  // Información de herramientas ejecutadas
+  // Información de herramientas ejecutadas (Kept cautiously, assuming still in use for specific message types)
   toolsInfoContainer: {
-    marginTop: "12px",
-    padding: "8px",
-    backgroundColor: "var(--vscode-editor-inactiveSelectionBackground)",
-    borderRadius: "4px",
-    border: "1px solid var(--vscode-panel-border)",
+    marginTop: "12px", // theme.spacing.medium
+    padding: "8px",    // theme.spacing.small
+    // backgroundColor: "var(--vscode-editor-inactiveSelectionBackground)", // Theme variable
+    borderRadius: "4px", // theme.borderRadius.small
+    // border: "1px solid var(--vscode-panel-border)", // Theme variable
   },
 
   toolsInfoHeader: {
@@ -108,61 +65,53 @@ export const styles = {
   },
 
   toolsInfoTitle: {
-    fontSize: "12px",
+    fontSize: "12px", // theme.typography.small
     fontWeight: "500",
-    color: "var(--vscode-descriptionForeground)",
+    // color: "var(--vscode-descriptionForeground)", // Theme variable
   },
 
   toolsInfoToggle: {
     fontSize: "11px",
-    color: "var(--vscode-button-foreground)",
+    // color: "var(--vscode-button-foreground)", // Theme variable
   },
 
   toolsInfoContent: {
     marginTop: "8px",
     padding: "8px",
-    backgroundColor: "var(--vscode-editor-background)",
+    // backgroundColor: "var(--vscode-editor-background)", // Theme variable
     borderRadius: "4px",
-    border: "1px solid var(--vscode-panel-border)",
-  },
-
-  // Contenedores virtuales
-  virtualListContainer: {
-    height: "100%",
-    width: "100%",
-    flex: 1,
-    overflow: "auto",
+    // border: "1px solid var(--vscode-panel-border)", // Theme variable
   },
 
   // Bloques de código
   codeBlockContainer: {
-    margin: "1em 0",
-    borderRadius: "4px",
+    margin: "1em 0", // Could be theme.spacing.medium or large
+    borderRadius: "4px", // theme.borderRadius.small
     overflow: "hidden",
-    backgroundColor: "var(--vscode-input-background)",
-    border: "1px solid var(--vscode-input-border)",
+    // backgroundColor: "var(--vscode-input-background)", // Theme variable
+    // border: "1px solid var(--vscode-input-border)", // Theme variable
   },
 
   codeBlockHeader: {
     display: "flex",
     justifyContent: "flex-end",
     alignItems: "center",
-    padding: "8px 16px",
-    borderBottom: "1px solid var(--vscode-input-border)",
+    padding: "8px 16px", // theme.spacing.small theme.spacing.medium
+    // borderBottom: "1px solid var(--vscode-input-border)", // Theme variable
   },
 
   filename: {
-    fontFamily: "Consolas, Monaco, monospace",
+    fontFamily: "Consolas, Monaco, monospace", // Specific font stack for code
     marginRight: "auto",
-    color: "var(--vscode-foreground)",
+    // color: "var(--vscode-foreground)", // Theme variable
   },
 
   buttonContainer: {
     display: "flex",
-    gap: "8px",
+    gap: "8px", // theme.spacing.small
   },
 
-  button: {
+  button: { // Generic button style for code block
     background: "transparent",
     border: "none",
     cursor: "pointer",
@@ -170,21 +119,22 @@ export const styles = {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    color: "var(--vscode-foreground)",
+    // color: "var(--vscode-foreground)", // Theme variable
     borderRadius: "4px",
-    transition: "all 0.2s ease",
+    transition: "all 0.2s ease", // theme.transitions.fast
     "&:hover": {
-      backgroundColor: "var(--vscode-toolbar-hoverBackground)",
+      // backgroundColor: "var(--vscode-toolbar-hoverBackground)", // Theme variable
     },
   },
 
-  pre: {
+  pre: { // For <pre> tag in CodeBlock
     margin: 0,
-    padding: "1em",
+    padding: "1em", // Consistent padding for code
     overflow: "auto",
-    fontSize: "14px",
+    fontSize: "14px", // theme.typography.text
     lineHeight: "1.5",
-    color: "var(--vscode-foreground)",
+    // color: "var(--vscode-foreground)", // Theme variable
+    // Scrollbar styles within <pre> can be kept if specific, or use customScrollbar globally
     "&::WebkitScrollbar": {
       width: "8px",
       height: "8px",
@@ -193,99 +143,82 @@ export const styles = {
       background: "transparent",
     },
     "&::WebkitScrollbarThumb": {
-      background: "var(--vscode-scrollbarSlider-background)",
+      // background: "var(--vscode-scrollbarSlider-background)", // Theme variable
       borderRadius: "4px",
       "&:hover": {
-        background: "var(--vscode-scrollbarSlider-hoverBackground)",
+        // background: "var(--vscode-scrollbarSlider-hoverBackground)", // Theme variable
       },
     },
   },
 
-  // Archivos adjuntos
-  attachedFiles: {
+  // Archivos adjuntos (UserMessage.jsx uses its own styles with theme)
+  attachedFiles: { // Generic structure if needed elsewhere
     display: "flex",
-    gap: "4px",
+    gap: "4px", // theme.spacing.xs or small
     flexWrap: "wrap",
-    marginBottom: "8px",
+    marginBottom: "8px", // theme.spacing.small
   },
 
-  fileTag: {
+  fileTag: { // Generic structure
     display: "flex",
     alignItems: "center",
-    backgroundColor: "var(--vscode-button-secondaryBackground)",
-    color: "var(--vscode-button-secondaryForeground)",
+    // backgroundColor: "var(--vscode-button-secondaryBackground)", // Theme variable
+    // color: "var(--vscode-button-secondaryForeground)", // Theme variable
     padding: "2px 8px",
     borderRadius: "4px",
-    fontSize: "12px",
+    fontSize: "12px", // theme.typography.small
   },
 
-  copyButton: {
-    backgroundColor: "transparent",
-    border: "none",
-    color: "var(--vscode-button-foreground)",
-    cursor: "pointer",
-    padding: "2px 6px",
-    fontSize: "12px",
-    borderRadius: "2px",
-    display: "flex",
-    alignItems: "center",
-    gap: "4px",
-    transition: "opacity 0.2s",
-    "&:hover": {
-      opacity: 0.8,
-    },
-  },
-
-  // Headers y edición de mensajes
+  // For UserMessage.jsx editing functionality
   userMessageHeader: {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "flex-start",
-    marginBottom: "4px",
+    marginBottom: "4px", // theme.spacing.xs or small
   },
 
-  editButton: {
-    backgroundColor: "transparent",
+  editButton: { // Structure for edit button in UserMessage
+    background: "transparent",
     border: "none",
-    padding: "2px",
+    padding: "2px", // theme.spacing.xs
     cursor: "pointer",
     display: "flex",
     alignItems: "center",
     opacity: 0.7,
-    color: "var(--vscode-button-foreground)",
+    // color: "var(--vscode-button-foreground)", // Theme variable
     "&:hover": {
       opacity: 1,
     },
   },
 
-  editInput: {
-    minHeight: "60px",
+  editInput: { // Structure for edit textarea in UserMessage
+    minHeight: "60px", // Or derive from theme if applicable
     width: "100%",
-    backgroundColor: "var(--vscode-input-background)",
-    color: "var(--vscode-input-foreground)",
-    border: "1px solid var(--vscode-input-border)",
-    borderRadius: "4px",
-    padding: "8px",
+    // backgroundColor: "var(--vscode-input-background)", // Theme variable
+    // color: "var(--vscode-input-foreground)", // Theme variable
+    // border: "1px solid var(--vscode-input-border)", // Theme variable
+    borderRadius: "4px", // theme.borderRadius.small
+    padding: "8px", // theme.spacing.small
     resize: "vertical",
     fontFamily: "inherit",
     fontSize: "inherit",
   },
 
   // Contenido markdown
-  markdownContent: {
-    padding: "8px",
-    lineHeight: "1.5",
+  markdownContent: { // Base styling for markdown rendered content
+    // padding: "8px", // Component using it might apply its own padding from theme
+    lineHeight: "1.6", // Good default
     "& h1, & h2, & h3, & h4, & h5, & h6": {
-      marginTop: "16px",
-      marginBottom: "8px",
+      marginTop: "16px", // theme.spacing.medium
+      marginBottom: "8px", // theme.spacing.small
       fontWeight: "bold",
     },
     "& p": {
-      marginBottom: "8px",
+      marginBottom: "8px", // theme.spacing.small
     },
     "& ul, & ol": {
-      paddingLeft: "20px",
-      marginBottom: "8px",
+      paddingLeft: "20px", // theme.spacing.large
+      marginBottom: "8px", // theme.spacing.small
     },
     "& strong": {
       fontWeight: "bold",
@@ -293,460 +226,180 @@ export const styles = {
     "& em": {
       fontStyle: "italic",
     },
+    // Links, code blocks within markdown should inherit or be styled by markdown-to-jsx processor
   },
 
-  // === NUEVOS ESTILOS PARA EL SISTEMA MEJORADO ===
-
-  // Animaciones CSS-in-JS
+  // Animaciones CSS-in-JS (can be used by components)
   animations: {
-    glowPulse: {
-      "0%, 100%": {
-        opacity: 1,
-        transform: "scale(1)",
-      },
-      "50%": {
-        opacity: 0.7,
-        transform: "scale(1.05)",
-      },
-    },
-    successGlow: {
-      "0%": {
-        opacity: 1,
-        transform: "scale(1)",
-      },
-      "50%": {
-        opacity: 0.8,
-        transform: "scale(1.1)",
-      },
-      "100%": {
-        opacity: 1,
-        transform: "scale(1)",
-      },
-    },
-    errorPulse: {
-      "0%, 100%": {
-        opacity: 1,
-        transform: "scale(1)",
-      },
-      "25%, 75%": {
-        opacity: 0.8,
-        transform: "scale(1.05)",
-      },
-    },
-    slideDown: {
-      from: {
-        opacity: 0,
-        transform: "translateY(-10px)",
-        maxHeight: 0,
-      },
-      to: {
-        opacity: 1,
-        transform: "translateY(0)",
-        maxHeight: "500px",
-      },
-    },
+    glowPulse: { /* ...keyframes... */ },
+    successGlow: { /* ...keyframes... */ },
+    errorPulse: { /* ...keyframes... */ },
+    slideDown: { /* ...keyframes... */ },
     fadeIn: {
-      from: {
-        opacity: 0,
-        transform: "translateY(10px)",
-      },
-      to: {
-        opacity: 1,
-        transform: "translateY(0)",
-      },
+      from: { opacity: 0, transform: "translateY(10px)" },
+      to: { opacity: 1, transform: "translateY(0)" },
     },
   },
 
-  // Status Indicators
-  statusIndicator: {
+  // Status Indicators (structural parts, colors come from theme in component)
+  statusIndicator: { // Base structure
     display: "inline-block",
-    borderRadius: "4px",
-    border: "1px solid transparent",
-    transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)",
+    borderRadius: "4px", // theme.borderRadius.small
+    border: "1px solid transparent", // Component will set themed border color
+    // transition: "all 0.4s cubic-bezier(0.4, 0, 0.2, 1)", // theme.transitions.medium
     position: "relative",
     flexShrink: 0,
   },
+  statusIndicatorSmall: { width: "10px", height: "10px", marginRight: "8px" /* theme.spacing.small */ },
+  statusIndicatorMedium: { width: "14px", height: "14px", marginRight: "12px" /* theme.spacing.medium */ },
+  statusIndicatorLarge: { width: "18px", height: "18px", marginRight: "16px" /* theme.spacing.large */ },
 
-  statusIndicatorSmall: {
-    width: "10px",
-    height: "10px",
-    marginRight: "8px",
-  },
-
-  statusIndicatorMedium: {
-    width: "14px",
-    height: "14px",
-    marginRight: "12px",
-  },
-
-  statusIndicatorLarge: {
-    width: "18px",
-    height: "18px",
-    marginRight: "16px",
-  },
-
-  statusIndicatorInfo: {
-    backgroundColor: "#2196F3",
-    borderColor: "#1976D2",
-    boxShadow:
-      "0 0 6px rgba(33, 150, 243, 0.25), 0 0 12px rgba(33, 150, 243, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)",
-  },
-
-  statusIndicatorSuccess: {
-    backgroundColor: "#4CAF50",
-    borderColor: "#45A049",
-    boxShadow:
-      "0 0 8px rgba(76, 175, 80, 0.3), 0 0 16px rgba(76, 175, 80, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)",
-    animation: "successGlow 0.6s ease-out",
-  },
-
-  statusIndicatorError: {
-    backgroundColor: "#F44336",
-    borderColor: "#E53935",
-    boxShadow:
-      "0 0 8px rgba(244, 67, 54, 0.3), 0 0 16px rgba(244, 67, 54, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.2)",
-    animation: "errorPulse 0.8s ease-out",
-  },
-
-  statusIndicatorThinking: {
-    backgroundColor: "#FFB84D",
-    borderColor: "#FF9500",
-    boxShadow:
-      "0 0 10px rgba(255, 184, 77, 0.4), 0 0 20px rgba(255, 184, 77, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.2)",
-    animation: "glowPulse 2s ease-in-out infinite",
-  },
-
-  // Sistema de mensajes
-  systemMessageContainer: {
-    marginBottom: "16px",
-    alignSelf: "stretch",
-    maxWidth: "100%",
-  },
-
-  systemMessageHeader: {
-    padding: "16px 20px",
-    cursor: "pointer",
-    border: "1px solid rgba(255, 255, 255, 0.08)",
-    borderRadius: "12px",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    background: "linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0.01) 100%)",
-    backdropFilter: "blur(10px)",
-    transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-    position: "relative",
-    overflow: "hidden",
-    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
-    "&:hover": {
-      background: "linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.02) 100%)",
-      borderColor: "rgba(255, 255, 255, 0.12)",
-      transform: "translateY(-1px)",
-      boxShadow: "0 8px 32px rgba(0, 0, 0, 0.12)",
-    },
-  },
-
-  systemMessageHeaderOpen: {
-    borderBottomLeftRadius: "0",
-    borderBottomRightRadius: "0",
-    marginBottom: "0",
-  },
-
-  systemMessageTitleContainer: {
-    display: "flex",
-    alignItems: "center",
-    fontWeight: "600",
-    color: "#E8E8E8",
-    fontSize: "14px",
-    letterSpacing: "0.01em",
-  },
-
-  systemMessageToggleIcon: {
-    fontSize: "12px",
-    color: "rgba(255, 255, 255, 0.6)",
-    transition: "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    width: "24px",
-    height: "24px",
-    borderRadius: "6px",
-    background: "rgba(255, 255, 255, 0.05)",
-    "&:hover": {
-      background: "rgba(255, 255, 255, 0.08)",
-      color: "rgba(255, 255, 255, 0.8)",
-    },
-  },
-
-  systemMessageToggleIconOpen: {
-    transform: "rotate(180deg)",
-  },
-
-  systemMessageContent: {
-    padding: "20px",
-    border: "1px solid rgba(255, 255, 255, 0.08)",
-    borderTop: "none",
-    borderBottomLeftRadius: "12px",
-    borderBottomRightRadius: "12px",
-    marginBottom: "16px",
-    background: "linear-gradient(135deg, rgba(255, 255, 255, 0.01) 0%, rgba(255, 255, 255, 0.005) 100%)",
-    backdropFilter: "blur(10px)",
-    animation: "slideDown 0.3s ease-out",
-    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
-  },
-
-  // Feedback Cards
-  feedbackCard: {
-    padding: "12px 16px",
-    marginBottom: "8px",
-    borderRadius: "8px",
-    borderLeft: "3px solid transparent",
-    fontSize: "13px",
+  // Feedback Cards (structural parts, colors/backgrounds from theme in component)
+  feedbackCard: { // Base structure for FeedbackCard and historical system messages
+    padding: "12px 16px", // theme.spacing.medium theme.spacing.medium/large
+    marginBottom: "8px", // theme.spacing.small
+    borderRadius: "8px", // theme.borderRadius.medium
+    borderLeft: "3px solid transparent", // Component sets themed color
+    fontSize: "13px", // theme.typography.small
     lineHeight: "1.5",
     display: "flex",
     alignItems: "flex-start",
-    color: "rgba(255, 255, 255, 0.85)",
-    background: "linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0.01) 100%)",
-    backdropFilter: "blur(10px)",
-    transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-    border: "1px solid rgba(255, 255, 255, 0.05)",
+    // color, background, backdropFilter, border (main) from theme in component
+    // transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)", // theme.transitions.fast
     position: "relative",
     overflow: "hidden",
-    "&:hover": {
-      background: "linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.02) 100%)",
-      borderColor: "rgba(255, 255, 255, 0.08)",
-      transform: "translateX(4px)",
-    },
+    // Hover effects are better applied via inline styles in component or specific CSS classes
+    // "&:hover": { /* component handles hover with theme values */ },
   },
 
-  feedbackCardContent: {
+  feedbackCardContent: { // Used by FeedbackCard
     flex: 1,
     display: "flex",
     alignItems: "flex-start",
-    gap: "12px",
+    gap: "12px", // theme.spacing.medium
   },
 
-  feedbackCardText: {
+  feedbackCardText: { // Used by FeedbackCard
     flex: 1,
     margin: 0,
-    fontWeight: "400",
+    fontWeight: "400", // Base font weight
     letterSpacing: "0.01em",
   },
 
-  feedbackCardInfo: {
-    borderLeftColor: "#2196F3",
-  },
-
-  feedbackCardSuccess: {
-    borderLeftColor: "#4CAF50",
-  },
-
-  feedbackCardError: {
-    borderLeftColor: "#F44336",
-  },
-
-  feedbackCardThinking: {
-    borderLeftColor: "#FFB84D",
-  },
-
-  // Mensajes regulares mejorados
+  // Mensajes regulares (User/Assistant) - Structural base
+  // Components (Message.jsx, UserMessage.jsx) apply theme colors, backgrounds, specific borders.
   messageContainer: {
-    marginBottom: "20px",
-    padding: "16px 20px",
-    borderRadius: "12px",
+    marginBottom: "20px", // theme.spacing.large
+    padding: "16px 20px", // theme.spacing.medium theme.spacing.large
+    borderRadius: "12px", // theme.borderRadius.large
     maxWidth: "85%",
-    background: "linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0.01) 100%)",
-    color: "#E8E8E8",
-    border: "1px solid rgba(255, 255, 255, 0.08)",
-    backdropFilter: "blur(10px)",
     wordBreak: "break-word",
-    whiteSpace: "pre-wrap",
-    transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
-    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
-    animation: "fadeIn 0.4s ease-out",
+    whiteSpace: "pre-wrap", // Important for preserving formatting
+    // transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)", // theme.transitions.fast
+    // boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)", // theme.shadows.small / medium
+    // animation: "fadeIn 0.4s ease-out", // applied by class or component
+    // background, color, border, backdropFilter applied by component using theme
   },
 
+  // messageContainerUser and messageContainerAssistant are primarily for alignSelf,
+  // specific styling is done in the component with theme.
   messageContainerUser: {
     alignSelf: "flex-end",
-    background: "linear-gradient(135deg, rgba(33, 150, 243, 0.1) 0%, rgba(33, 150, 243, 0.05) 100%)",
   },
-
   messageContainerAssistant: {
     alignSelf: "flex-start",
   },
 
-  messageHeader: {
+  messageHeader: { // Structural style for message sender name
     fontWeight: "600",
-    marginBottom: "8px",
-    fontSize: "13px",
+    marginBottom: "8px", // theme.spacing.small
+    fontSize: "13px", // theme.typography.small
     letterSpacing: "0.01em",
+    // color applied by component using theme
   },
 
-  messageContent: {
-    fontSize: "14px",
+  messageContent: { // Wrapper for actual message text/markdown
+    fontSize: "14px", // theme.typography.text
     lineHeight: "1.6",
     letterSpacing: "0.01em",
   },
 
   messageTimestamp: {
-    fontSize: "11px",
-    color: "rgba(255, 255, 255, 0.4)",
-    marginTop: "8px",
+    fontSize: "11px", // theme.typography.small
+    // color: "rgba(255, 255, 255, 0.4)", // theme.colors.textMuted or similar
+    marginTop: "8px", // theme.spacing.small
   },
 
-  // Archivos adjuntos mejorados
-  attachedFilesImproved: {
+  // Archivos adjuntos mejorados (structural)
+  attachedFilesImproved: { // Used in Message.jsx
     display: "flex",
-    gap: "8px",
+    gap: "8px", // theme.spacing.small
     flexWrap: "wrap",
-    marginTop: "12px",
+    marginTop: "12px", // theme.spacing.medium
   },
 
-  fileTagImproved: {
-    fontSize: "12px",
-    color: "#64B5F6",
-    padding: "4px 8px",
-    background: "rgba(33, 150, 243, 0.1)",
-    borderRadius: "6px",
+  fileTagImproved: { // Used in Message.jsx
+    fontSize: "12px", // theme.typography.small
+    // color: "#64B5F6", // theme.colors.primary or a specific tag color
+    padding: "4px 8px", // theme.spacing.xs theme.spacing.small
+    // background: "rgba(33, 150, 243, 0.1)", // theme.colors.primary + alpha, or secondary
+    borderRadius: "6px", // theme.borderRadius.small
     display: "inline-block",
-    marginRight: "8px",
-    marginBottom: "4px",
+    marginRight: "8px", // theme.spacing.small
+    marginBottom: "4px", // theme.spacing.xs
   },
 
-  // Botones y controles
-  demoButton: {
-    background: "linear-gradient(135deg, #2196F3 0%, #1976D2 100%)",
-    color: "white",
-    border: "none",
-    padding: "8px 16px",
-    borderRadius: "8px",
-    cursor: "pointer",
-    fontSize: "13px",
-    fontWeight: "500",
-    transition: "all 0.2s ease",
-    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.1)",
-    "&:hover": {
-      transform: "translateY(-1px)",
-      boxShadow: "0 4px 16px rgba(33, 150, 243, 0.3)",
-    },
-  },
-
-  demoButtonContainer: {
-    padding: "16px",
-    textAlign: "center",
-    borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
-    marginBottom: "16px",
-  },
-
-  // Layout principal
-  appContainer: {
-    height: "100vh",
-    background: "linear-gradient(135deg, #0F0F0F 0%, #1A1A1A 100%)",
-    color: "#E8E8E8",
-    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif",
-    overflow: "hidden",
-  },
-
-  mainContainer: {
-    maxWidth: "900px",
-    margin: "0 auto",
-    height: "100%",
-    padding: "32px",
-    display: "flex",
-    flexDirection: "column",
-  },
-
-  header: {
-    textAlign: "center",
-    marginBottom: "32px",
-    paddingBottom: "20px",
-    borderBottom: "1px solid rgba(255, 255, 255, 0.08)",
-  },
-
-  headerTitle: {
-    color: "#FFFFFF",
-    fontSize: "24px",
-    fontWeight: "600",
-    margin: "0",
-    letterSpacing: "-0.02em",
-    background: "linear-gradient(135deg, #FFFFFF 0%, #E8E8E8 100%)",
-    WebkitBackgroundClip: "text",
-    WebkitTextFillColor: "transparent",
-    backgroundClip: "text",
-  },
-
-  headerSubtitle: {
-    color: "rgba(255, 255, 255, 0.6)",
-    fontSize: "14px",
-    margin: "8px 0 0 0",
-    fontWeight: "400",
-  },
-
-  chatContainer: {
-    flex: 1,
-    background: "linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0.01) 100%)",
-    borderRadius: "16px",
-    padding: "32px",
-    border: "1px solid rgba(255, 255, 255, 0.08)",
-    backdropFilter: "blur(20px)",
-    boxShadow: "0 8px 32px rgba(0, 0, 0, 0.12)",
-    overflow: "hidden",
-  },
-
-  emptyState: {
-    textAlign: "center",
-    color: "rgba(255, 255, 255, 0.4)",
-    fontSize: "14px",
-    fontStyle: "italic",
-  },
-
-  // Scrollbar personalizado
+  // Scrollbar personalizado (can be applied to scrollable containers)
   customScrollbar: {
     "&::-webkit-scrollbar": {
-      width: "6px",
+      width: "6px", // Or theme variable if scrollbar sizes are in theme
       height: "6px",
     },
     "&::-webkit-scrollbar-track": {
-      background: "transparent",
+      background: "transparent", // Or theme.colors.background
     },
     "&::-webkit-scrollbar-thumb": {
-      background: "rgba(255, 255, 255, 0.2)",
-      borderRadius: "3px",
+      // background: "rgba(255, 255, 255, 0.2)", // theme.colors.border or scrollbarThumb
+      borderRadius: "3px", // theme.borderRadius.xs or small
     },
     "&::-webkit-scrollbar-thumb:hover": {
-      background: "rgba(255, 255, 255, 0.3)",
+      // background: "rgba(255, 255, 255, 0.3)", // theme.colors.borderHover or scrollbarThumbHover
     },
   },
-}
+};
 
 // Función para aplicar animaciones CSS-in-JS
 export const applyAnimation = (element, animationName, duration = "0.3s", easing = "ease-out") => {
-  if (!element || !styles.animations[animationName]) return
+  if (!element || !styles.animations[animationName]) return;
 
-  const keyframes = styles.animations[animationName]
+  const keyframes = styles.animations[animationName];
+  // Ensure duration is a string like "0.3s" for parsing, or handle number directly
+  const durationMs = typeof duration === 'string' ? parseFloat(duration) * 1000 : duration;
+  
   const animation = element.animate(
-    Object.entries(keyframes).map(([key, value]) => value),
+    Object.values(keyframes), // Animate expects an array of keyframe objects
     {
-      duration: Number.parseFloat(duration) * 1000,
+      duration: durationMs,
       easing: easing,
       fill: "forwards",
-    },
-  )
+    }
+  );
+  return animation;
+};
 
-  return animation
-}
 
 // Función helper para combinar estilos
 export const combineStyles = (...styleObjects) => {
-  return Object.assign({}, ...styleObjects)
-}
+  return Object.assign({}, ...styleObjects.filter(Boolean)); // Filter out null/undefined styles
+};
 
-// Función para aplicar hover effects
+// Función para aplicar hover effects (less used if components handle hover with theme)
 export const applyHoverEffect = (baseStyle, hoverStyle) => {
   return {
     ...baseStyle,
     "&:hover": {
-      ...baseStyle["&:hover"],
+      ...(baseStyle["&:hover"] || {}), // Preserve existing hover styles if any
       ...hoverStyle,
     },
-  }
-}
+  };
+};

@@ -248,8 +248,28 @@ export class WindsurfGraph {
       addHistoryEntry('system', 'Formatting response...', state.iterationCount, { status: 'thinking' });
       await this.timeout(2000);
 
-      // Generar respuesta final
-      const finalResponseMessage = "Mocked ReAct flow completed successfully. The mockTool provided: 'This is the mocked result from mockTool'.";
+      // Generar respuesta final con formato markdown
+      const finalResponseMessage = `## Aquí está la solución
+
+He analizado el problema y encontré la solución:
+
+\`\`\`jsx
+// Solución para el componente ChatMessages
+{messages.map((message, index) => (
+  <Message 
+    key={\`msg-\${message.id}-\${index}\`}
+    message={message}
+    messageIndex={index}
+  />
+))}
+\`\`\`
+
+### Explicación:
+1. El componente Message ahora recibe todos los props necesarios
+2. Se genera un key único combinando id e índice
+3. Se eliminó el renderizado duplicado que causaba problemas
+
+¿Necesitas más detalles sobre alguna parte?`;
 
       // Simular que la herramienta 'respond' se ejecuta (o una lógica similar)
       // Esto es importante para que ApplicationLogicService pueda extraer la respuesta.
