@@ -24,6 +24,9 @@ interface AppState {
   isDarkMode: boolean;
   theme: ThemeType;
   processingPhase: string; // Podríamos deprec_old este si 'status' en metadata lo cubre mejor
+  // --- Feedback ---
+  activeFeedbackOperationId: string | null;
+  feedbackMessages: { [operationId: string]: ChatMessage[] };
 }
 
 type AppAction =
@@ -55,6 +58,8 @@ const initialState: AppState = {
   isDarkMode: initialIsDarkMode,
   theme: getTheme(initialIsDarkMode),
   processingPhase: '',
+  activeFeedbackOperationId: null,
+  feedbackMessages: {},
 };
 
 function appReducer(state: AppState, action: AppAction): AppState {
@@ -67,6 +72,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
         currentModel: action.payload.model || state.currentModel,
         chatList: action.payload.history || state.chatList,
         isLoading: false,
+        activeFeedbackOperationId: null,
+        feedbackMessages: {},
       };
     case 'SET_MESSAGES':
       return { ...state, messages: action.payload, isLoading: false };
@@ -90,10 +97,12 @@ function appReducer(state: AppState, action: AppAction): AppState {
         messages: [], 
         currentChatId: action.payload.chatId, 
         isLoading: false, 
-        showHistory: false 
+        showHistory: false,
+        activeFeedbackOperationId: null,
+        feedbackMessages: {},
       };
     case 'CLEAR_MESSAGES':
-      return { ...state, messages: [], isLoading: false };
+      return { ...state, messages: [], isLoading: false, activeFeedbackOperationId: null, feedbackMessages: {} };
     case 'SET_CHAT_LIST':
       return { ...state, chatList: action.payload };
     case 'SET_CURRENT_MODEL':
@@ -103,18 +112,39 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, isDarkMode: newIsDarkMode, theme: getTheme(newIsDarkMode) };
     case 'SET_THEME':
         return { ...state, theme: action.payload };
-    
-    case 'AGENT_ACTION_UPDATE': // <--- AÑADIDO ESTE CASE
-      // Los mensajes de feedback no deberían limpiar los mensajes existentes, sino añadirse.
-      // El payload ya debería ser un ChatMessage formateado desde el backend.
+    // --- Feedback grouping logic ---
+    case 'AGENT_ACTION_UPDATE': {
+      const opId = action.payload.metadata?.operationId;
+      if (!opId) return state;
       return {
         ...state,
         messages: [...state.messages, action.payload],
+        activeFeedbackOperationId: opId,
+        feedbackMessages: {
+          ...state.feedbackMessages,
+          [opId]: [...(state.feedbackMessages[opId] || []), action.payload]
+        },
         isLoading: action.payload.metadata?.status === 'thinking' || 
                      action.payload.metadata?.status === 'tool_executing',
         processingPhase: action.payload.metadata?.status || state.processingPhase, // Actualizar phase si es relevante
       };
-
+    }
+    // Cuando llega una respuesta final del asistente, limpiar feedback activo
+    case 'ADD_MESSAGE': {
+      // Si el mensaje es del asistente y tiene operationId, limpiar
+      const isAssistant = action.payload.sender === 'assistant';
+      if (isAssistant && state.activeFeedbackOperationId) {
+        return {
+          ...state,
+          messages: [...state.messages, action.payload],
+          activeFeedbackOperationId: null,
+        };
+      }
+      return {
+        ...state,
+        messages: [...state.messages, action.payload],
+      };
+    }
     default:
       return state;
   }
@@ -128,6 +158,9 @@ interface AppContextType extends AppState {
   loadChat: (chatId: string) => void;
   switchModel: (modelType: string) => void;
   toggleDarkMode: () => void;
+  // Exponer feedback
+  activeFeedbackOperationId: string | null;
+  feedbackMessages: { [operationId: string]: ChatMessage[] };
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -182,12 +215,15 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         case 'agentActionUpdate': // <--- AÑADIDO ESTE CASE
           dispatch({
             type: 'AGENT_ACTION_UPDATE',
-            payload: { // Construir el ChatMessage aquí
+            payload: {
               id: payload.id || `agent_${Date.now()}`,
               content: payload.content || '',
-              sender: 'system', // Marcar como 'system' para diferenciarlo
+              sender: 'system',
               timestamp: payload.timestamp || Date.now(),
-              metadata: { status: payload.status }, // Guardar el status
+              metadata: {
+                status: payload.status,
+                operationId: payload.operationId // <--- MUY IMPORTANTE
+              },
             }
           });
           // El isLoading se maneja en el reducer basado en el status

@@ -4,13 +4,14 @@ import { getReactHtmlContent } from './htmlTemplate';
 import { ApplicationLogicService } from '../../core/ApplicationLogicService';
 import { InternalEventDispatcher } from '../../core/events/InternalEventDispatcher'; // <--- AÑADIDO
 import { EventType, WindsurfEvent, ToolExecutionEventPayload, ReActEventPayload, NodeEventPayload, ErrorEventPayload } from '../../features/events/eventTypes';
+import * as crypto from 'crypto';
 
 export class WebviewProvider implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView;
   private disposables: vscode.Disposable[] = [];
   private currentChatId: string | null = null;
+  private currentOperationId: string | null = null;
   private dispatcherSubscriptions: { unsubscribe: () => void }[] = [];
- 
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -114,6 +115,9 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
       this.postMessage('systemError', { message: 'Message cannot be empty' });
       return;
     }
+    
+    // Generate a new operation ID for each user message
+    this.currentOperationId = `op_${crypto.randomBytes(8).toString('hex')}`;
 
     try {
      // this.postMessage('processingUpdate', { phase: 'processing' }); // UI puede mostrar "Procesando..."
@@ -129,18 +133,29 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
           id: `asst_${Date.now()}`,
           content: result.finalResponse,
           timestamp: Date.now(),
+          operationId: this.currentOperationId
           // Aquí podrías añadir metadatos del result.updatedState si es relevante
         });
+        // Reset operation ID after final response
+        this.currentOperationId = null;
       } else {
         this.postMessage('systemError', { 
-          message: result.error || 'Processing failed' 
+          message: result.error || 'Processing failed',
+          operationId: this.currentOperationId
         });
+        // Reset operation ID on error if it's a final response
+        if (result.finalResponse) {
+          this.currentOperationId = null;
+        }
       }
     } catch (error: any) {
       console.error('[WebviewProvider] Error processing message:', error);
       this.postMessage('systemError', { 
-        message: error.message || 'An unexpected error occurred' 
+        message: error.message || 'An unexpected error occurred',
+        operationId: this.currentOperationId
       });
+      // Reset operation ID on error
+      this.currentOperationId = null;
     }
   }
 
@@ -259,13 +274,18 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
       }
   
       if (messageText) {
-        console.log(`[WebviewProvider] Posting agentActionUpdate: ${messageText.substring(0,50)}... (Status: ${status})`);
-        this.postMessage('agentActionUpdate', {
-          id: `agent_${event.id || Date.now()}`, // Asegurar un ID
-          content: messageText,
-          status: status,
-          timestamp: event.timestamp || Date.now(), // Asegurar un timestamp
-        });
+        if (this.currentOperationId) {
+          console.log(`[WebviewProvider] Posting agentActionUpdate for opID ${this.currentOperationId}: ${messageText.substring(0,50)}... (Status: ${status})`);
+          this.postMessage('agentActionUpdate', {
+            id: `agent_${event.id || Date.now()}`,
+            content: messageText,
+            status: status,
+            timestamp: event.timestamp || Date.now(),
+            operationId: this.currentOperationId
+          });
+        } else {
+          console.log(`[WebviewProvider] No operation ID for agent action: ${messageText.substring(0,50)}...`);
+        }
       }
     }
   
