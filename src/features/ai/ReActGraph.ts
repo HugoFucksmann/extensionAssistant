@@ -78,7 +78,7 @@ export class WindsurfGraph {
 
     try {
       // --- Simulación del Análisis Inicial / Preparación ---
-      await this.timeout(200);
+      await this.timeout(1500);
       addHistoryEntry('system', 'Initial analysis and context gathering (mocked)', state.iterationCount);
       this.dispatcher.dispatch(EventType.NODE_START, { chatId, nodeType: 'InitialAnalysis' });
       // Simular que se obtiene alguna información de contexto
@@ -93,7 +93,7 @@ export class WindsurfGraph {
         phase: `Reasoning-${state.iterationCount}`,
         nodeType: 'Reasoning'
       });
-      await this.timeout(500); // Simular tiempo de razonamiento
+      await this.timeout(1500); // Simular tiempo de razonamiento
 
       const mockPlanStep1: PlanStep = {
         id: 'plan-step-1',
@@ -129,7 +129,7 @@ export class WindsurfGraph {
         parameters: mockNextAction.params,
         // iteration: state.iterationCount // Opcional
       });
-      await this.timeout(300); // Simular tiempo de ejecución de herramienta
+      await this.timeout(1900); // Simular tiempo de ejecución de herramienta
 
       const mockToolExecution: ToolExecution = {
         name: mockNextAction.toolName,
@@ -166,7 +166,7 @@ export class WindsurfGraph {
         phase: `Reflection-${state.iterationCount}`,
         nodeType: 'Reflection'
       });
-      await this.timeout(400); // Simular tiempo de reflexión
+      await this.timeout(1800); // Simular tiempo de reflexión
 
       const mockInsight: Insight = {
         id: 'insight-1',
@@ -195,14 +195,14 @@ export class WindsurfGraph {
       // --- Simulación: Decisión de Responder (final de ciclo para este mock) ---
       // Suponemos que el plan se completó y ahora se debe generar una respuesta.
       // En un flujo real, esto podría ser otra acción (ej. 'respond' tool).
-      await this.timeout(100);
+      await this.timeout(800);
       const finalResponseMessage = "Mocked ReAct flow completed successfully. The mockTool provided: 'This is the mocked result from mockTool'.";
 
       // Simular que la herramienta 'respond' se ejecuta (o una lógica similar)
       // Esto es importante para que ApplicationLogicService pueda extraer la respuesta.
       const respondActionToolName = 'respond';
       this.dispatcher.dispatch(EventType.TOOL_EXECUTION_STARTED, { chatId, tool: respondActionToolName, parameters: { message: finalResponseMessage } });
-      await this.timeout(50);
+      await this.timeout(1750);
       const respondToolExecution: ToolExecution = {
           name: respondActionToolName, status: 'completed',
           parameters: { message: finalResponseMessage }, result: { success: true, message: finalResponseMessage },
