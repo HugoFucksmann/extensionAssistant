@@ -5,15 +5,15 @@ export const useFileMention = (inputRef, inputTextProp, setInputText) => {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
   const [searchTerm, setSearchTerm] = useState('');
-  const [cursorPosition, setCursorPosition] = useState(0);
+  const [cursorPosition, setCursorPosition] = useState(0); // Posición del '@' que inició la mención
   const [selectedFiles, setSelectedFiles] = useState([]);
   
-  // Manejar el cierre del dropdown al hacer clic fuera
   const dropdownRef = useRef(null);
   
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target) && 
+          inputRef.current && !inputRef.current.contains(event.target)) { // No cerrar si se hace clic en el input
         closeDropdown();
       }
     };
@@ -25,61 +25,55 @@ export const useFileMention = (inputRef, inputTextProp, setInputText) => {
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isDropdownOpen]);
+  }, [isDropdownOpen, inputRef]); // Añadir inputRef a dependencias
   
-  // Cerrar dropdown y resetear estados de mención
   const closeDropdown = () => {
     setIsDropdownOpen(false);
-    if (isMentionMode) {
+    if (isMentionMode) { // Solo resetear modo mención si estábamos en él
       setIsMentionMode(false);
       setSearchTerm('');
+      // No resetear cursorPosition aquí, podría ser útil si se reabre inmediatamente
     }
   };
   
-  // Abrir dropdown de mención en la posición actual del cursor
-  const openMentionDropdown = (position) => {
+  const openMentionDropdown = (atPosition) => {
     if (!inputRef.current) return;
     
     const rect = inputRef.current.getBoundingClientRect();
     
     setDropdownPosition({
-      top: rect.top - 220, // Increased from 250 to appear higher
-      left: rect.left, // Align with input left edge
-      width: rect.width // Match input width
+      top: rect.top - 220, 
+      left: rect.left, 
+      width: rect.width 
     });
     
-    setCursorPosition(position);
+    setCursorPosition(atPosition); // Guardar la posición del '@'
     setIsMentionMode(true);
     setIsDropdownOpen(true);
-    setSearchTerm('');
+    setSearchTerm(''); // Iniciar con término de búsqueda vacío
   };
   
-  // Insertar mención de archivo en el texto
   const insertFileMention = (fullPath) => {
     const fileName = fullPath.split(/[\/\\]/).pop();
-    const chipText = `${fileName}`;
-    const textToInsert = `${chipText} `;
+    const textToInsert = `${fileName} `; // Añadir un espacio después
+    
+    // inputTextProp es el texto actual del input
+    // cursorPosition es la posición donde se escribió el '@' original
+    // searchTerm es el texto que el usuario escribió después del '@'
     
     const textBeforeAt = inputTextProp.substring(0, cursorPosition);
-    let lengthOfReplacedText = 0;
-    
-    if (inputTextProp[cursorPosition] === '@') {
-      lengthOfReplacedText = 1 + searchTerm.length;
-    } else {
-      lengthOfReplacedText = searchTerm.length;
-    }
-    
+    const lengthOfReplacedText = 1 + searchTerm.length; // '@' + searchTerm
     const textAfterMentionPoint = inputTextProp.substring(cursorPosition + lengthOfReplacedText);
+    
     const newText = `${textBeforeAt}${textToInsert}${textAfterMentionPoint}`;
     setInputText(newText);
     
-    if (!selectedFiles.includes(fullPath)) {
+    if (!selectedFiles.some(f => f === fullPath)) {
       setSelectedFiles(prev => [...prev, fullPath]);
     }
     
     closeDropdown();
     
-    // Actualizar posición del cursor después de la inserción
     setTimeout(() => {
       if (inputRef.current) {
         inputRef.current.focus();
@@ -89,53 +83,61 @@ export const useFileMention = (inputRef, inputTextProp, setInputText) => {
     }, 0);
   };
   
-  // Actualizar término de búsqueda mientras se escribe
-  const updateSearchTerm = (currentTextValue, caretPosition) => {
-    if (isMentionMode && caretPosition > cursorPosition && currentTextValue[cursorPosition] === '@') {
-      const textAfterAt = currentTextValue.substring(cursorPosition + 1, caretPosition);
-      setSearchTerm(textAfterAt);
-      
-      if (!isDropdownOpen && textAfterAt.length > 0) {
-        setIsDropdownOpen(true);
-      }
-    } else {
-      if (isMentionMode && currentTextValue[cursorPosition] !== '@') {
+  const updateSearchTerm = (currentTextValue, caretPositionInInput) => {
+    // cursorPosition es la posición del '@' que inició el modo mención.
+    if (isMentionMode && caretPositionInInput >= cursorPosition) {
+      // Asegurarse que el carácter en cursorPosition (donde estaba el '@') sigue siendo '@'.
+      if (currentTextValue[cursorPosition] === '@') {
+        const textAfterAt = currentTextValue.substring(cursorPosition + 1, caretPositionInInput);
+        setSearchTerm(textAfterAt);
+
+        if (!isDropdownOpen) { // Si el dropdown se cerró por alguna razón (ej. Escape) y el usuario sigue escribiendo
+          setIsDropdownOpen(true); 
+        }
+      } else {
+        // El '@' original fue eliminado, salir del modo mención.
         closeDropdown();
-      } else if (isMentionMode && caretPosition <= cursorPosition) {
-        closeDropdown();
       }
+    } else if (isMentionMode && caretPositionInInput < cursorPosition) {
+      // El cursor se movió antes del '@' original, salir del modo mención.
+      closeDropdown();
     }
+    // Si no está en isMentionMode, esta función no debería hacer nada.
   };
   
-  // Completar mención cuando no hay dropdown visible
+  // completeMention no se usa activamente con la nueva lógica de Enter en ChatInput
+  // pero se mantiene por si se necesita en el futuro.
   const completeMention = (filteredFiles) => {
-    if (searchTerm && filteredFiles.length > 0) {
-      insertFileMention(filteredFiles[0]);
+    if (isMentionMode && searchTerm && filteredFiles.length > 0) {
+      insertFileMention(filteredFiles[0]); // Inserta el primer archivo coincidente
     } else {
-      setIsMentionMode(false);
-      setSearchTerm('');
+      // Si no hay coincidencias o no hay término, simplemente cierra el modo mención
+      closeDropdown();
     }
   };
   
-  // Iniciar mención por botón
   const startMentionByButton = () => {
     if (!inputRef.current) return;
     
     const currentCaret = inputRef.current.selectionStart;
-    
-    // Insertar @ virtual en la posición actual
     const textBefore = inputTextProp.substring(0, currentCaret);
     const textAfter = inputTextProp.substring(currentCaret);
+    
     const tempTextWithAt = `${textBefore}@${textAfter}`;
+    setInputText(tempTextWithAt); // Actualizar el input text
     
-    setInputText(tempTextWithAt);
-    setCursorPosition(currentCaret);
-    setSearchTerm('');
-    setIsMentionMode(true);
-    setIsDropdownOpen(true);
-    
-    // Actualizar posición del dropdown
-    setTimeout(() => openMentionDropdown(currentCaret), 0);
+    // Usar setTimeout para asegurar que el input se actualice y el cursor se posicione
+    // antes de llamar a openMentionDropdown, que puede depender de la geometría del input.
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+        // Mueve el cursor a justo después del '@' insertado
+        inputRef.current.setSelectionRange(currentCaret + 1, currentCaret + 1); 
+      }
+      // `currentCaret` es la posición donde se insertó el '@'.
+      // openMentionDropdown usará esta posición como `cursorPosition` para la mención.
+      openMentionDropdown(currentCaret); 
+    }, 0);
   };
   
   return {
@@ -143,10 +145,10 @@ export const useFileMention = (inputRef, inputTextProp, setInputText) => {
     isDropdownOpen,
     dropdownPosition,
     searchTerm,
-    cursorPosition,
+    // cursorPosition, // No es necesario exponerlo fuera del hook
     selectedFiles,
     dropdownRef,
-    setSelectedFiles,
+    setSelectedFiles, // Exponer para que ChatInput pueda limpiar al enviar mensaje
     openMentionDropdown,
     closeDropdown,
     insertFileMention,
