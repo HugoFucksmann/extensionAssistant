@@ -11,10 +11,11 @@ export function activate(context: vscode.ExtensionContext) {
   try {
    
     const appLogicService = ComponentFactory.getApplicationLogicService(context);
-    const dispatcher = ComponentFactory.getInternalEventDispatcher(); 
+    const dispatcher = ComponentFactory.getInternalEventDispatcher(); // <--- AÑADIDO
 
   
-    webviewProvider = new WebviewProvider(context.extensionUri, appLogicService);
+    // Pasa el dispatcher al WebviewProvider
+    webviewProvider = new WebviewProvider(context.extensionUri, appLogicService, dispatcher); // <--- MODIFICADO
 
     const webviewRegistration = vscode.window.registerWebviewViewProvider(
       'aiChat.chatView',

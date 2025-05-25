@@ -7,6 +7,23 @@ export const styles = {
     overflow: 'hidden',
     height: '100%',
   },
+  feedbackMessage: { // Estilo base para todos los mensajes de feedback del sistema
+    padding: '8px 12px',
+    margin: '6px 20px', // Un poco de margen horizontal para distinguirlos
+    borderRadius: '4px',
+    fontSize: '13px',
+    lineHeight: '1.4',
+    borderLeftWidth: '4px',
+    borderLeftStyle: 'solid',
+    alignSelf: 'stretch', // Para que ocupe el ancho disponible menos los márgenes
+    maxWidth: 'calc(100% - 40px)', // Considerando los márgenes
+    opacity: 0.95, // Ligeramente translúcido para diferenciarlos
+    // El color del texto, borde y fondo se aplicará dinámicamente desde el tema
+  },
+  feedbackIcon: { // Si decides añadir un ícono
+    marginRight: '8px',
+    verticalAlign: 'middle',
+  },
   
   // Estilos para la información de herramientas ejecutadas
   toolsInfoContainer: {

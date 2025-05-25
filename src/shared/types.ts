@@ -46,7 +46,7 @@ export interface WindsurfState {
 export interface ChatMessage {
   id: string;
   content: string;
-  sender: 'user' | 'assistant' | 'system' | 'tool';
+  sender: 'user' | 'assistant' | 'system' | 'tool'; // 'system' se usará para feedback
   timestamp: number;
   files?: string[];
   metadata?: {
@@ -54,6 +54,8 @@ export interface ChatMessage {
     success?: boolean;
     tools?: ToolExecution[];
     metrics?: PerformanceMetrics;
+    status?: 'info' | 'success' | 'error' | 'thinking' | 'tool_executing'; // <--- ASEGÚRATE QUE ESTÉ ASÍ O SIMILAR
+    [key: string]: any; // Para flexibilidad
   };
 }
 
@@ -188,11 +190,12 @@ export interface CorrectionResult {
 export interface HistoryEntry extends Omit<ChatMessage, 'metadata'> {
   phase: 'reasoning' | 'action' | 'reflection' | 'correction' | 'user_input' | 'system';
   iteration: number;
-  metadata: {
+  metadata: { // <--- ASEGÚRATE QUE HistoryEntry TAMBIÉN PUEDA TENER status SI ES NECESARIO
     processingTime?: number;
     success?: boolean;
     tools?: ToolExecution[];
     metrics?: PerformanceMetrics;
+    status?: 'info' | 'success' | 'error' | 'thinking' | 'tool_executing'; // <--- AÑADIR/MODIFICAR
     [key: string]: any;
   };
 }
