@@ -1,12 +1,8 @@
-// Nombre del archivo: ChatInput.jsx
+
 
 import React, { useRef, useState, useEffect } from "react";
-
-// Importar componentes
 import ModelDropdown from './ModelDropdown';
-import FileChip from './FileChip'; // Importar FileChip
-
-// Importar custom hooks
+import FileChip from './FileChip';
 import { useProjectFiles } from './useProjectFiles';
 import { useFileMention } from './useFileMention';
 import { getStyles } from './ChatInputStyles';
@@ -20,9 +16,8 @@ const ChatInput = () => {
   const inputRef = useRef(null);
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const [modelDropdownPosition, setModelDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
-  const [activeIndex, setActiveIndex] = useState(-1); // Para el FileDropdown, -1 para ninguna selección
+  const [activeIndex, setActiveIndex] = useState(-1); 
   
-  // Custom hooks
   const { 
     isMentionMode, 
     isDropdownOpen, 
@@ -39,36 +34,32 @@ const ChatInput = () => {
   } = useFileMention(inputRef, inputText, setInputText);
   
   const { 
-    // projectFiles, // No necesitamos la lista completa aquí directamente
     isLoading: isLoadingFiles, 
     getFilteredFiles 
-  } = useProjectFiles(isDropdownOpen); // Fetch cuando el dropdown se abre
+  } = useProjectFiles(isDropdownOpen); 
 
-  const filteredMentionFiles = getFilteredFiles(searchTerm); // Archivos filtrados para la mención
+  const filteredMentionFiles = getFilteredFiles(searchTerm); 
 
-  // Reset activeIndex cuando cambia el término de búsqueda o los archivos filtrados
-  // o cuando el dropdown se abre/cierra.
   useEffect(() => {
     if (isDropdownOpen) {
-        setActiveIndex(0); // Seleccionar el primer elemento por defecto
+        setActiveIndex(0); 
     } else {
-        setActiveIndex(-1); // -1 cuando está cerrado para indicar ninguna selección
+        setActiveIndex(-1); 
     }
   }, [searchTerm, filteredMentionFiles.length, isDropdownOpen]);
 
 
-  // Enviar mensaje
   const handleSubmit = (e) => {
     e.preventDefault();
     if ((!inputText.trim() && selectedFiles.length === 0) || isLoading) return;
     
     sendMessage(inputText.trim(), selectedFiles.map(f => f.path || f));
     setInputText('');
-    setSelectedFiles([]); // Limpiar selectedFiles del hook useFileMention
-    closeDropdown(); // Asegurarse que el dropdown de mención se cierre
+    setSelectedFiles([]); 
+    closeDropdown(); 
   };
 
-  // Mostrar selector de modelo
+
   const handleModelClick = (e) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const viewportWidth = window.innerWidth;
@@ -82,7 +73,7 @@ const ChatInput = () => {
     setIsModelDropdownOpen(!isModelDropdownOpen);
   };
 
-  // Cambiar modelo
+
   const handleModelChange = (modelType) => {
     window.vscode?.postMessage({
       type: 'switchModel',
@@ -91,24 +82,20 @@ const ChatInput = () => {
     setIsModelDropdownOpen(false);
   };
 
-  // Manejar la eliminación de un FileChip
+
   const handleRemoveFile = (fileToRemovePath) => {
     setSelectedFiles(prevFiles => prevFiles.filter(f => f !== fileToRemovePath));
     
     const fileNameToRemove = fileToRemovePath.split(/[\/\\]/).pop();
     const escapedFileName = fileNameToRemove.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-    // El texto en el input es solo el nombre del archivo, no [fileName]
+    
     const chipTextPattern = new RegExp(`${escapedFileName}\\s?`, 'g'); 
     
     setInputText(prevText => prevText.replace(chipTextPattern, '').trim());
   };
 
   const handleFileSelect = (filePath) => {
-    // insertFileMention del hook se encarga de:
-    // 1. Actualizar inputText
-    // 2. Añadir a selectedFiles (si no está ya)
-    // 3. Cerrar el dropdown
-    // 4. Posicionar el cursor
+ 
     insertFileMention(filePath);
   };
   
@@ -129,21 +116,21 @@ const ChatInput = () => {
         if (filteredMentionFiles.length > 0 && activeIndex >= 0 && activeIndex < filteredMentionFiles.length) {
           handleFileSelect(filteredMentionFiles[activeIndex]);
         } else {
-          // Si no hay selección válida, o no hay archivos, Enter cierra el dropdown.
+         
           closeDropdown();
         }
       } else if (e.key === "Escape") {
-        e.preventDefault(); // Prevenir otros manejadores de Escape
+        e.preventDefault(); 
         closeDropdown();
       }
-      // Otros caracteres (letras, backspace, etc.) son manejados por onChange -> handleInputChange -> updateSearchTerm
-    } else { // Dropdown CERRADO
+     
+    } else { 
       if (e.key === "Enter" && !e.shiftKey) {
         handleSubmit(e);
       } else if (e.key === "@") {
-        // No e.preventDefault() para que '@' se escriba en el input.
+       
         const currentCursorPos = inputRef.current.selectionStart;
-        // openMentionDropdown establece isMentionMode, cursorPosition, etc. y abre el dropdown.
+        
         openMentionDropdown(currentCursorPos); 
       }
     }
@@ -151,11 +138,8 @@ const ChatInput = () => {
 
   const handleInputChange = (e) => {
     const newText = e.target.value;
-    setInputText(newText); // Actualiza el estado del input
+    setInputText(newText); 
     
-    // Si estamos en modo mención, actualiza el término de búsqueda.
-    // `updateSearchTerm` es llamado con el texto actual y la posición del cursor.
-    // `cursorPosition` en el hook (la posición del '@') ya está establecida por `openMentionDropdown`.
     if (isMentionMode && inputRef.current) {
       const caretPosition = inputRef.current.selectionStart;
       updateSearchTerm(newText, caretPosition);

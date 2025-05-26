@@ -1,8 +1,8 @@
-// src/vscode/webview/WebviewProvider.ts - Updated provider
+// src/vscode/webview/WebviewProvider.ts
 import * as vscode from 'vscode';
 import { getReactHtmlContent } from './htmlTemplate';
 import { ApplicationLogicService } from '../../core/ApplicationLogicService';
-import { InternalEventDispatcher } from '../../core/events/InternalEventDispatcher'; // <--- AÑADIDO
+import { InternalEventDispatcher } from '../../core/events/InternalEventDispatcher';
 import { EventType, WindsurfEvent, ToolExecutionEventPayload, ReActEventPayload, NodeEventPayload, ErrorEventPayload } from '../../features/events/eventTypes';
 import * as crypto from 'crypto';
 
@@ -23,7 +23,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     this.view = webviewView;
     this.setupWebview();
     this.setupMessageHandling();
-    this.subscribeToInternalEvents(); // <--- AÑADIDA ESTA LLAMADA
+    this.subscribeToInternalEvents();
   }
 
   private setupWebview(): void {
@@ -44,14 +44,14 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
 
     this.view.webview.onDidReceiveMessage(
       async (message) => {
-        console.log('[WebviewProvider] Received:', message.type);
+        // console.log('[WebviewProvider] Received:', message.type); // Opcional para depuración
 
         switch (message.type) {
           case 'uiReady':
             this.currentChatId = this.generateChatId();
             this.postMessage('sessionReady', {
               chatId: this.currentChatId,
-              messages: [] // Podrías cargar mensajes previos aquí si es necesario
+              messages: []
             });
             break;
 
@@ -68,22 +68,20 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
             this.postMessage('newChatStarted', { chatId: this.currentChatId });
             break;
 
-          case 'showHistoryRequested': // Este es un mensaje DEL webview AL backend
-            this.postMessage('showHistory', {}); // Este mensaje va AL webview
-            // Aquí podrías, por ejemplo, cargar el historial desde el appLogicService
-            // y luego enviarlo al webview. O el webview podría solicitarlo con otro comando.
-            break;
+          // case 'showHistoryRequested': // Eliminado, se maneja por comando de VS Code
+          //   this.postMessage('showHistory', {});
+          //   break;
 
           case 'command':
             if (message.payload?.command === 'getProjectFiles') {
               try {
                 const result = await this.appLogicService.executeTool('listFiles', {
                   dirPath: '.', 
-                  excludePattern: 'node_modules|\\\\.git', // Asegúrate que el patrón sea correcto para tu OS
+                  excludePattern: 'node_modules|\\\\.git',
                   recursive: true
                 });
                 
-                if (result.success && result.data?.files) { // Verificar result.data.files
+                if (result.success && result.data?.files) {
                   this.postMessage('projectFiles', { 
                     files: result.data.files
                       .filter((f: {isDirectory: boolean}) => !f.isDirectory)
@@ -101,7 +99,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
             break;
 
           default:
-            console.log('[WebviewProvider] Unknown message type:', message.type);
+            console.warn('[WebviewProvider] Unknown message type:', message.type);
             break;
         }
       },
@@ -116,16 +114,13 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
       return;
     }
     
-    // Generate a new operation ID for each user message
     this.currentOperationId = `op_${crypto.randomBytes(8).toString('hex')}`;
 
     try {
-     // this.postMessage('processingUpdate', { phase: 'processing' }); // UI puede mostrar "Procesando..."
-      
       const result = await this.appLogicService.processUserMessage(
         this.currentChatId!,
         payload.text,
-        { files: payload.files || [] } // Asegúrate que contextData se maneje bien en appLogicService
+        { files: payload.files || [] }
       );
 
       if (result.success && result.finalResponse) {
@@ -134,16 +129,13 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
           content: result.finalResponse,
           timestamp: Date.now(),
           operationId: this.currentOperationId
-          // Aquí podrías añadir metadatos del result.updatedState si es relevante
         });
-        // Reset operation ID after final response
         this.currentOperationId = null;
       } else {
         this.postMessage('systemError', { 
           message: result.error || 'Processing failed',
           operationId: this.currentOperationId
         });
-        // Reset operation ID on error if it's a final response
         if (result.finalResponse) {
           this.currentOperationId = null;
         }
@@ -154,15 +146,11 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
         message: error.message || 'An unexpected error occurred',
         operationId: this.currentOperationId
       });
-      // Reset operation ID on error
       this.currentOperationId = null;
     }
   }
 
-    // --- INICIO DE NUEVOS MÉTODOS Y MODIFICACIONES PARA ETAPA 2 ---
-
     private subscribeToInternalEvents(): void {
-      // Limpiar suscripciones previas
       this.dispatcherSubscriptions.forEach(s => s.unsubscribe());
       this.dispatcherSubscriptions = [];
   
@@ -174,13 +162,12 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
         EventType.TOOL_EXECUTION_ERROR,
         EventType.REFLECTION_STARTED,
         EventType.REFLECTION_COMPLETED,
-        EventType.NODE_START, // Para fases más genéricas si ReActGraph los emite
+        EventType.NODE_START,
         EventType.NODE_COMPLETE,
-        EventType.NODE_ERROR, // Error general del grafo o un nodo
-        EventType.SYSTEM_INFO, // Para mensajes informativos del sistema
-        EventType.SYSTEM_WARNING, // Para advertencias
-        EventType.SYSTEM_ERROR, // Para errores críticos del sistema
-        // EventType.ERROR_OCCURRED, // Ya cubierto por NODE_ERROR o SYSTEM_ERROR en muchos casos
+        EventType.NODE_ERROR,
+        EventType.SYSTEM_INFO,
+        EventType.SYSTEM_WARNING,
+        EventType.SYSTEM_ERROR,
       ];
   
       eventTypesToWatch.forEach(eventType => {
@@ -188,18 +175,16 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
           this.internalEventDispatcher.subscribe(eventType, (event: WindsurfEvent) => this.handleInternalEvent(event))
         );
       });
-      console.log('[WebviewProvider] Subscribed to internal ReAct events.');
+      // console.log('[WebviewProvider] Subscribed to internal ReAct events.'); // Opcional para depuración
     }
   
     private handleInternalEvent(event: WindsurfEvent): void {
       if (!this.view || !this.currentChatId ) {
-        return; // Vista no lista o no hay chat activo
+        return;
       }
       
-      // Solo procesar eventos para el chat actual, si el evento tiene chatId
-      // Algunos eventos del sistema podrían no tener chatId
       if (event.payload.chatId && event.payload.chatId !== this.currentChatId) {
-          console.log(`[WebviewProvider] Ignoring event for different chatId. Current: ${this.currentChatId}, Event: ${event.payload.chatId}`);
+          // console.log(`[WebviewProvider] Ignoring event for different chatId. Current: ${this.currentChatId}, Event: ${event.payload.chatId}`); // Opcional
           return;
       }
   
@@ -226,8 +211,6 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
         case EventType.TOOL_EXECUTION_COMPLETED:
           const toolExecCompletedPayload = event.payload as ToolExecutionEventPayload;
           const completedTool = toolExecCompletedPayload.tool || 'herramienta';
-          // Podrías añadir un resumen del resultado si es breve y seguro de mostrar
-          // const resultSummary = JSON.stringify(toolExecCompletedPayload.result).substring(0, 50) + "...";
           messageText = `Herramienta ${completedTool} completada.`;
           status = 'success';
           break;
@@ -246,7 +229,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
           messageText = "Reflexión completada.";
           status = 'info';
           break;
-        case EventType.NODE_START: // Para nodos genéricos
+        case EventType.NODE_START:
           const nodeStartPayload = event.payload as NodeEventPayload;
           messageText = `Iniciando: ${nodeStartPayload.nodeType || 'paso'}...`;
           status = 'thinking';
@@ -266,16 +249,15 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
         case EventType.SYSTEM_INFO:
         case EventType.SYSTEM_WARNING:
         case EventType.SYSTEM_ERROR:
-          const systemPayload = event.payload as ErrorEventPayload; // O SystemEventPayload
+          const systemPayload = event.payload as ErrorEventPayload;
           messageText = systemPayload.message || 'Mensaje del sistema';
-          status = event.type === EventType.SYSTEM_ERROR ? 'error' : (event.type === EventType.SYSTEM_WARNING ? 'info' : 'info'); // Warnings como info por ahora
-          // Podrías querer un status 'warning' si lo defines en la UI
+          status = event.type === EventType.SYSTEM_ERROR ? 'error' : (event.type === EventType.SYSTEM_WARNING ? 'info' : 'info');
           break;
       }
   
       if (messageText) {
         if (this.currentOperationId) {
-          console.log(`[WebviewProvider] Posting agentActionUpdate for opID ${this.currentOperationId}: ${messageText.substring(0,50)}... (Status: ${status})`);
+          // console.log(`[WebviewProvider] Posting agentActionUpdate for opID ${this.currentOperationId}: ${messageText.substring(0,50)}... (Status: ${status})`); // Opcional
           this.postMessage('agentActionUpdate', {
             id: `agent_${event.id || Date.now()}`,
             content: messageText,
@@ -284,20 +266,12 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
             operationId: this.currentOperationId
           });
         } else {
-          console.log(`[WebviewProvider] No operation ID for agent action: ${messageText.substring(0,50)}...`);
+          // console.warn(`[WebviewProvider] No operation ID for agent action: ${messageText.substring(0,50)}...`); // Opcional
         }
       }
     }
-  
-    // --- FIN DE NUEVOS MÉTODOS ---
 
-
-
-
-  // Public methods for extension commands
   public requestShowHistory(): void {
-    // Este método es llamado desde extension.ts
-    // Envía un mensaje al webview para que muestre la UI de historial
     this.postMessage('showHistory', {});
   }
 
@@ -325,7 +299,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
 
   public dispose(): void {
     this.disposables.forEach(d => d.dispose());
-    this.dispatcherSubscriptions.forEach(s => s.unsubscribe()); // <--- AÑADIDO
-    this.dispatcherSubscriptions = []; // <--- AÑADIDO
+    this.dispatcherSubscriptions.forEach(s => s.unsubscribe());
+    this.dispatcherSubscriptions = [];
   }
 }

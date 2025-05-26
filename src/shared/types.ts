@@ -1,48 +1,35 @@
-/**
- * Tipos centrales para la arquitectura Windsurf
- * Define las interfaces y tipos principales utilizados en todo el sistema
- */
 
 import * as vscode from 'vscode';
 
-/**
- * Estado del agente Windsurf
- * Contiene toda la información sobre el estado actual del ciclo ReAct
- */
+
 export interface WindsurfState {
-  // Información sobre el objetivo y contexto
+ 
   objective: string;
   userMessage: string;
   chatId: string;
   
-  // Estado del ciclo ReAct
+ 
   iterationCount: number;
   maxIterations: number;
   completionStatus: 'in_progress' | 'completed' | 'failed';
   
-  // Resultados de cada fase
   reasoningResult?: ReasoningResult;
   actionResult?: ActionResult;
   reflectionResult?: ReflectionResult;
   correctionResult?: CorrectionResult;
   
-  // Historial y logs
   history: HistoryEntry[];
-  
-  // Contexto del proyecto y editor
   projectContext?: any;
   editorContext?: any;
   
-  // Métricas de rendimiento
+  
   metrics?: PerformanceMetrics;
   
-  // Cualquier otro dato relevante
+  
   [key: string]: any;
 }
 
-/**
- * Mensaje en el historial de chat
- */
+
 export interface ChatMessage {
   id: string;
   content: string;
@@ -59,9 +46,7 @@ export interface ChatMessage {
   };
 }
 
-/**
- * Ejecución de una herramienta
- */
+
 export interface ToolExecution {
   name: string;
   status: 'started' | 'completed' | 'error';
@@ -72,9 +57,7 @@ export interface ToolExecution {
   endTime?: number;
 }
 
-/**
- * Métricas de rendimiento
- */
+
 export interface PerformanceMetrics {
   totalDuration?: number;
   reasoningTime?: number;
@@ -86,9 +69,7 @@ export interface PerformanceMetrics {
   [key: string]: any;
 }
 
-/**
- * Estado de procesamiento
- */
+
 export interface ProcessingStatus {
   phase: string;
   status: 'active' | 'completed' | 'inactive' | 'error';
@@ -99,9 +80,7 @@ export interface ProcessingStatus {
   error?: string;
 }
 
-/**
- * Resultado de la fase de razonamiento
- */
+
 export interface ReasoningResult {
   reasoning: string;
   plan: PlanStep[];
@@ -109,9 +88,7 @@ export interface ReasoningResult {
   metrics?: PerformanceMetrics;
 }
 
-/**
- * Paso del plan generado en la fase de razonamiento
- */
+
 export interface PlanStep {
   id: string;
   step: string;
@@ -123,9 +100,6 @@ export interface PlanStep {
   endTime?: number;
 }
 
-/**
- * Siguiente acción a ejecutar
- */
 export interface NextAction {
   toolName: string;
   params: Record<string, any>;
@@ -133,9 +107,7 @@ export interface NextAction {
   requiredContext?: string[];
 }
 
-/**
- * Resultado de la fase de acción
- */
+
 export interface ActionResult {
   toolName: string;
   params: Record<string, any>;
@@ -147,9 +119,7 @@ export interface ActionResult {
   execution?: ToolExecution;
 }
 
-/**
- * Resultado de la fase de reflexión
- */
+
 export interface ReflectionResult {
   reflection: string;
   isSuccessful: boolean;
@@ -161,9 +131,7 @@ export interface ReflectionResult {
   metrics?: PerformanceMetrics;
 }
 
-/**
- * Insight generado durante la reflexión
- */
+
 export interface Insight {
   id: string;
   type: 'observation' | 'learning' | 'warning' | 'suggestion';
@@ -172,9 +140,7 @@ export interface Insight {
   context?: Record<string, any>;
 }
 
-/**
- * Resultado de la fase de corrección
- */
+
 export interface CorrectionResult {
   needsCorrection: boolean;
   correctionDescription?: string;
@@ -184,28 +150,21 @@ export interface CorrectionResult {
   metrics?: PerformanceMetrics;
 }
 
-/**
- * Entrada en el historial del agente
- */
+
 export interface HistoryEntry extends Omit<ChatMessage, 'metadata'> {
   phase: 'reasoning' | 'action' | 'reflection' | 'correction' | 'user_input' | 'system';
   iteration: number;
-  metadata: { // <--- ASEGÚRATE QUE HistoryEntry TAMBIÉN PUEDA TENER status SI ES NECESARIO
+  metadata: { 
     processingTime?: number;
     success?: boolean;
     tools?: ToolExecution[];
     metrics?: PerformanceMetrics;
-    status?: 'info' | 'success' | 'error' | 'thinking' | 'tool_executing'; // <--- AÑADIR/MODIFICAR
+    status?: 'info' | 'success' | 'error' | 'thinking' | 'tool_executing'; 
     [key: string]: any;
   };
 }
 
-// Tipos relacionados con herramientas han sido movidos a src/features/tools/types.ts
-// Importa los tipos desde allí cuando los necesites
 
-/**
- * Contexto de la extensión VS Code
- */
 export interface VSCodeContext {
   extensionUri: vscode.Uri;
   extensionPath: string;
@@ -216,9 +175,6 @@ export interface VSCodeContext {
   state: vscode.Memento;
 }
 
-/**
- * Estado de un chat
- */
 export interface Chat {
   id: string;
   title: string;
@@ -230,9 +186,6 @@ export interface Chat {
   };
 }
 
-/**
- * Historial de chats
- */
 export interface ChatHistory {
   chats: Chat[];
   currentChatId?: string;

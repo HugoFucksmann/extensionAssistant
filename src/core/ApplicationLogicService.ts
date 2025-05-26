@@ -69,22 +69,14 @@ export class ApplicationLogicService {
       this.conversationManager.updateConversationState(chatId, resultState);
 
       let finalResponseText = 'No se pudo generar una respuesta.';
-      if (resultState.completionStatus === 'completed' && resultState.actionResult?.toolName === 'respond') {
-        // Lógica para extraer finalResponseText del resultState.history o actionResult
-      
-        const respondAction = resultState.history.find(
-            (h) => h.phase === 'action' && (h.metadata as any)?.toolName === 'respond' && (h.metadata as any)?.success
-        ) as ChatMessage | undefined; // Ajusta el tipo según tu HistoryEntry
 
-        if (respondAction && (respondAction.metadata as any)?.params?.message) {
-            finalResponseText = (respondAction.metadata as any).params.message;
-        } else if (resultState.actionResult?.result?.message) {
-            finalResponseText = resultState.actionResult.result.message;
-        }
+      if (resultState.completionStatus === 'completed' && resultState.actionResult?.result?.message) {
+        finalResponseText = resultState.actionResult.result.message;
       } else if (resultState.error) {
         finalResponseText = `Error procesando tu solicitud: ${resultState.error}`;
       } else if (resultState.completionStatus === 'failed') {
-         finalResponseText = `La tarea no pudo completarse. Último estado: ${resultState.history.slice(-1)[0]?.phase || 'desconocido'}.`;
+        const lastPhase = resultState.history.length > 0 ? resultState.history.slice(-1)[0]?.phase : 'desconocido';
+        finalResponseText = `La tarea no pudo completarse. Último estado: ${lastPhase}.`;
       }
 
       await this.memoryManager.storeConversation(chatId, resultState);

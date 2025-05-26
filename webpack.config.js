@@ -1,21 +1,16 @@
 const path = require("path");
 
-// Configuración base común
 const baseConfig = {
   mode: "development",
   devtool: "source-map",
   resolve: {
     extensions: [".ts", ".tsx", ".js", ".jsx"],
     alias: {
-      // Alias para compatibilidad
-      '../../context/VSCodeContext': path.resolve(__dirname, 'src/vscode/react/context/AppContext.tsx'),
-      '../../../context/VSCodeContext': path.resolve(__dirname, 'src/vscode/react/context/AppContext.tsx'),
-      '../context/VSCodeContext': path.resolve(__dirname, 'src/vscode/react/context/AppContext.tsx'),
       // Alias para módulos de la aplicación
       '@shared/types': path.resolve(__dirname, 'src/shared/types.ts'),
       '@components': path.resolve(__dirname, 'src/vscode/react/Components'),
       '@context': path.resolve(__dirname, 'src/vscode/react/context'),
-      // Alias para compatibilidad con rutas antiguas
+      // Alias para compatibilidad con rutas antiguas (mantener si es necesario para imports existentes)
       '@vscode/react/context/AppContext': path.resolve(__dirname, 'src/vscode/react/context/AppContext.tsx')
     }
   },
@@ -39,7 +34,7 @@ const baseConfig = {
   },
 };
 
-// Configuración para la extensión (backend)
+
 const extensionConfig = {
   ...baseConfig,
   target: "node",
@@ -58,8 +53,7 @@ const extensionConfig = {
     path: "commonjs path",
     fs: "commonjs fs",
     sqlite3: "commonjs sqlite3",
-    react: "commonjs react",
-    "react-dom": "commonjs react-dom",
+    // react y react-dom eliminados de aquí
   },
   module: {
     rules: [
@@ -84,7 +78,7 @@ const extensionConfig = {
   },
 };
 
-// Configuración para el webview (frontend)
+
 const webviewConfig = {
   ...baseConfig,
   entry: {
@@ -95,16 +89,16 @@ const webviewConfig = {
     path: path.resolve(__dirname, 'out', 'webView'),
   },
   externals: {
-    // React será incluido en el bundle para el webview
+   
   },
   module: {
     rules: [
-      // Manejo de archivos CSS
+     
       {
         test: /\.css$/,
         use: ['style-loader', 'css-loader']
       },
-      // Manejo de TypeScript/JavaScript
+    
       {
         test: /\.(ts|tsx|js|jsx)$/,
         exclude: /node_modules/,

@@ -1,5 +1,5 @@
 // src/core/ConversationManager.ts
-import { WindsurfState, VSCodeContext, HistoryEntry } from '../shared/types'; // Importa HistoryEntry
+import { WindsurfState, VSCodeContext, HistoryEntry, ChatMessage } from '../shared/types'; // Asegúrate que ChatMessage esté aquí si es necesario para el cast, aunque idealmente no
 import { MemoryManager } from '../features/memory/MemoryManager';
 import { getConfig  } from '../shared/config';
 import { IConversationManager } from './interfaces/IConversationManager';
@@ -23,30 +23,41 @@ export class ConversationManager implements IConversationManager {
     if (state) {
       state.userMessage = userMessage;
       state.objective = `Responder a: ${userMessage.substring(0, 100)}...`;
-      state.iterationCount = 0;
+      state.iterationCount = 0; // Reiniciar para un nuevo mensaje en una conversación existente
       state.completionStatus = 'in_progress';
       state.reasoningResult = undefined;
       state.actionResult = undefined;
       state.reflectionResult = undefined;
       state.correctionResult = undefined;
-      state.history.push({
-          // Asegúrate que 'user_input' o un tipo similar esté en la definición de HistoryEntry['phase']
-          phase: 'user_input', // O 'user_message' si lo tienes definido
+      // No limpiar todo el historial, solo añadir la nueva entrada de usuario
+      // state.history = []; // Esto borraría el historial previo de la conversación
+
+      const userHistoryEntry: HistoryEntry = {
+          phase: 'user_input',
           timestamp: Date.now(),
-        
-          metadata: { userMessage, contextData, /* otros metadatos si los tienes */ },
-          iteration: 0, // O un contador de mensajes
-        
-          id: `msg_${Date.now()}`, // Ejemplo de ID
+          metadata: { userMessage, contextData, status: 'info' }, // Añadido status
+          iteration: state.history.length, // Iteración basada en el número de entradas
+          id: `msg_${chatId}_${Date.now()}`,
           content: userMessage,
           sender: 'user',
-      } as HistoryEntry); // Cast explícito si es necesario
+      };
+      state.history.push(userHistoryEntry);
       state.projectContext = contextData.projectContext || state.projectContext;
       state.editorContext = contextData.editorContext || state.editorContext;
 
-      console.log(`[ConversationManager] Reusing state for chat ${chatId}`);
+      console.log(`[ConversationManager] Reusing and updating state for chat ${chatId}`);
       return state;
     }
+
+    const initialUserEntry: HistoryEntry = {
+        phase: 'user_input',
+        timestamp: Date.now(),
+        metadata: { userMessage, contextData, status: 'info' }, // Añadido status
+        iteration: 0,
+        id: `msg_init_${chatId}_${Date.now()}`,
+        content: userMessage,
+        sender: 'user',
+    };
 
     const newState: WindsurfState = {
       objective: `Responder a: ${userMessage.substring(0, 100)}...`,
@@ -55,16 +66,7 @@ export class ConversationManager implements IConversationManager {
       iterationCount: 0,
       maxIterations: config.backend.react.maxIterations,
       completionStatus: 'in_progress',
-      history: [{
-          phase: 'user_input',
-          timestamp: Date.now(),
-        
-          metadata: { userMessage, contextData },
-          iteration: 0,
-          id: `msg_init_${Date.now()}`, // Ejemplo de ID
-          content: userMessage,
-          sender: 'user',
-      } as HistoryEntry], 
+      history: [initialUserEntry],
       projectContext: contextData.projectContext,
       editorContext: contextData.editorContext,
       metrics: {},
@@ -75,7 +77,7 @@ export class ConversationManager implements IConversationManager {
     return newState;
   }
 
- 
+  // ... (resto de la clase sin cambios)
   public getConversationState(chatId:string): WindsurfState | undefined {
     return this.activeConversations.get(chatId);
   }
@@ -88,13 +90,18 @@ export class ConversationManager implements IConversationManager {
   public async endConversation(chatId: string, memoryManager?: MemoryManager): Promise<void> {
     const state = this.activeConversations.get(chatId);
     if (state && memoryManager) {
+      // La lógica de guardado ya está en processUserMessage, aquí solo marcamos como finalizada en memoria si es necesario
+      // await memoryManager.storeConversation(chatId, state);
       console.log(`[ConversationManager] Conversation ${chatId} ended. State ready for LTM.`);
     }
+    // Opcionalmente, podrías removerla de activeConversations aquí si ya no se va a reutilizar
+    // this.activeConversations.delete(chatId);
   }
 
   public clearConversation(chatId: string, memoryManager: MemoryManager): void {
     this.activeConversations.delete(chatId);
-    memoryManager.clearConversationMemory(chatId);
+    memoryManager.clearConversationMemory(chatId); // Asumiendo que esto limpia STM y MTM
+    // Considera si también quieres limpiar LTM para este chatId o si es una acción separada
     console.log(`[ConversationManager] Cleared active conversation state for chat ${chatId}`);
   }
 }

@@ -23,7 +23,7 @@ interface AppState {
   currentModel: string;
   isDarkMode: boolean;
   theme: ThemeType;
-  processingPhase: string; 
+  // processingPhase: string; // Eliminado si no se usa en otro lugar
   activeFeedbackOperationId: string | null;
   feedbackMessages: { [operationId: string]: ChatMessage[] };
 }
@@ -34,7 +34,7 @@ type AppAction =
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_CHAT_ID'; payload: string | null }
   | { type: 'SET_SHOW_HISTORY'; payload: boolean }
-  | { type: 'SET_PROCESSING_PHASE'; payload: string }
+  // | { type: 'SET_PROCESSING_PHASE'; payload: string } // Eliminado
   | { type: 'NEW_CHAT_STARTED'; payload: { chatId: string } }
   | { type: 'CLEAR_MESSAGES' }
   | { type: 'SET_CHAT_LIST'; payload: Chat[] }
@@ -56,7 +56,7 @@ const initialState: AppState = {
   currentModel: 'gemini',
   isDarkMode: initialIsDarkMode,
   theme: getTheme(initialIsDarkMode),
-  processingPhase: '',
+  // processingPhase: '', // Eliminado
   activeFeedbackOperationId: null,
   feedbackMessages: {},
 };
@@ -82,8 +82,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, currentChatId: action.payload };
     case 'SET_SHOW_HISTORY':
       return { ...state, showHistory: action.payload };
-    case 'SET_PROCESSING_PHASE': 
-      return { ...state, processingPhase: action.payload };
+    // case 'SET_PROCESSING_PHASE':  // Eliminado
+    //   return { ...state, processingPhase: action.payload };
     case 'NEW_CHAT_STARTED':
       return { 
         ...state, 
@@ -110,10 +110,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
       const opId = action.payload.metadata?.operationId;
       if (!opId) return state; 
 
-   
       const updatedMessages = [...state.messages, action.payload];
       
-     
       return {
         ...state,
         messages: updatedMessages,
@@ -124,23 +122,20 @@ function appReducer(state: AppState, action: AppAction): AppState {
         },
         isLoading: action.payload.metadata?.status === 'thinking' || 
                      action.payload.metadata?.status === 'tool_executing',
-        processingPhase: action.payload.metadata?.status || state.processingPhase,
+        // processingPhase: action.payload.metadata?.status || state.processingPhase, // Eliminado si processingPhase se elimina del estado
       };
     }
     
-    case 'ADD_MESSAGE': { // Used for user messages and final assistant responses
+    case 'ADD_MESSAGE': {
       const newState = {
         ...state,
         messages: [...state.messages, action.payload],
-        // isLoading is handled by SET_LOADING or by AGENT_ACTION_UPDATE for ongoing processes
       };
       
-      // If this is a final assistant response and an operation was active, clear it.
       const isAssistantFinalResponse = action.payload.sender === 'assistant';
       if (isAssistantFinalResponse) {
-       
         newState.isLoading = false; 
-        newState.processingPhase = action.payload.metadata?.status || 'completed'; 
+        // newState.processingPhase = action.payload.metadata?.status || 'completed'; // Eliminado si processingPhase se elimina
       }
       return newState;
     }
@@ -177,13 +172,13 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       const { type, payload } = event.data;
-      console.log('[AppContext] Received from backend:', type, payload);
+      // console.log('[AppContext] Received from backend:', type, payload); // Opcional para depuración
 
       switch (type) {
         case 'sessionReady':
           dispatch({ type: 'SESSION_READY', payload });
           break;
-        case 'assistantResponse': // This is the FINAL response from the assistant
+        case 'assistantResponse':
           dispatch({
             type: 'ADD_MESSAGE', payload: {
               id: payload.id || `asst_${Date.now()}`,
@@ -194,46 +189,42 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             }
           });
           dispatch({ type: 'SET_LOADING', payload: false }); 
-          // activeFeedbackOperationId is cleared in the ADD_MESSAGE reducer
           break;
         case 'newChatStarted':
           dispatch({ type: 'NEW_CHAT_STARTED', payload: { chatId: payload.chatId } });
           break;
-        case 'processingUpdate': 
-          // This event might be deprecated in favor of agentActionUpdate's status
-          dispatch({ type: 'SET_PROCESSING_PHASE', payload: payload.phase || '' });
-          if (payload.phase === 'processing' || payload.phase === 'thinking') {
-            dispatch({ type: 'SET_LOADING', payload: true });
-          } else if (payload.phase === 'completed' || payload.phase === 'error') {
-            dispatch({ type: 'SET_LOADING', payload: false });
-          }
-          break;
+        // case 'processingUpdate': // Eliminado
+        //   dispatch({ type: 'SET_PROCESSING_PHASE', payload: payload.phase || '' });
+        //   if (payload.phase === 'processing' || payload.phase === 'thinking') {
+        //     dispatch({ type: 'SET_LOADING', payload: true });
+        //   } else if (payload.phase === 'completed' || payload.phase === 'error') {
+        //     dispatch({ type: 'SET_LOADING', payload: false });
+        //   }
+        //   break;
         
-        case 'agentActionUpdate': // For intermediate feedback steps
+        case 'agentActionUpdate':
           dispatch({
             type: 'AGENT_ACTION_UPDATE',
             payload: {
               id: payload.id || `agent_${Date.now()}`,
               content: payload.content || '',
-              sender: 'system', // Feedback messages are from 'system'
+              sender: 'system',
               timestamp: payload.timestamp || Date.now(),
               metadata: {
-                status: payload.status, // e.g., 'thinking', 'tool_executing', 'tool_completed', 'error'
-                operationId: payload.operationId, // Crucial for grouping
-                toolName: payload.toolName, // Optional: if a tool is involved
-                // ...any other relevant metadata for feedback
+                status: payload.status,
+                operationId: payload.operationId,
+                toolName: payload.toolName,
               },
             }
           });
-          // isLoading and processingPhase are handled within the AGENT_ACTION_UPDATE reducer
           break;
 
-        case 'systemError': // General system errors not tied to a specific ReAct operation
+        case 'systemError':
           dispatch({
             type: 'ADD_MESSAGE', payload: {
               id: `err_${Date.now()}`,
               content: `Error: ${payload.message}`,
-              sender: 'system', // General system error
+              sender: 'system',
               timestamp: Date.now(),
               metadata: { status: 'error' }, 
             }
@@ -292,7 +283,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       files: files,
     };
     dispatch({ type: 'ADD_MESSAGE', payload: userMessage });
-    // SET_LOADING true will be triggered by the first AGENT_ACTION_UPDATE from backend
     postMessageToBackend('userMessageSent', { text, files });
   };
 
@@ -302,7 +292,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
   const setShowHistory = (show: boolean) => {
     dispatch({ type: 'SET_SHOW_HISTORY', payload: show });
-    if (show && state.chatList.length === 0) { // Fetch only if history is empty and being shown
+    if (show && state.chatList.length === 0) {
         postMessageToBackend('command', { command: 'getChatHistory' });
     }
   };

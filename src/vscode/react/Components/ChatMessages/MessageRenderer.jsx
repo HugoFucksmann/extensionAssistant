@@ -1,10 +1,10 @@
-// MessageRenderer.jsx - Unified message rendering
+// MessageRenderer.jsx
 import React, { memo } from "react";
 import { useApp } from "../../context/AppContext";
 import MarkdownContent from './MessageContent/MarkdownContent';
 import StatusIndicator from "./StatusIndicator";
 
-const MessageRenderer = memo(({ message, messageIndex, onEdit }) => {
+const MessageRenderer = memo(({ message, messageIndex /*, onEdit */ }) => { // onEdit comentado
   const { theme } = useApp();
 
   const formattedMessage = {
@@ -27,7 +27,6 @@ const MessageRenderer = memo(({ message, messageIndex, onEdit }) => {
     margin: `${theme.spacing.small} ${theme.spacing.large}`,
   };
 
-  // System messages (historical feedback)
   if (formattedMessage.sender === "system") {
     const systemStyle = {
       ...baseMessageStyle,
@@ -62,7 +61,6 @@ const MessageRenderer = memo(({ message, messageIndex, onEdit }) => {
     );
   }
 
-  // User and Assistant messages
   const isUserMessage = formattedMessage.sender === "user";
   const messageStyle = {
     ...baseMessageStyle,
@@ -89,7 +87,7 @@ const MessageRenderer = memo(({ message, messageIndex, onEdit }) => {
     <div className={`message-fade-in ${isUserMessage ? 'user' : 'assistant'}`} style={messageStyle}>
       <div style={headerStyle}>
         {isUserMessage ? "You" : "Assistant"}
-        {isUserMessage && onEdit && (
+        {/* {isUserMessage && onEdit && ( // Comentado
           <button
             onClick={() => onEdit(messageIndex)}
             style={{
@@ -103,7 +101,7 @@ const MessageRenderer = memo(({ message, messageIndex, onEdit }) => {
           >
             ✏️
           </button>
-        )}
+        )} */}
       </div>
       
       <MarkdownContent content={formattedMessage.content} />
