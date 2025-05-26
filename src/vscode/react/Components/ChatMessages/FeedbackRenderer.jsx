@@ -1,11 +1,11 @@
-// FeedbackRenderer.jsx - Indicador único que cambia de estado
+// FeedbackRenderer.jsx - Fixed version
 import React, { useState, memo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import StatusIndicator from './StatusIndicator';
 import MarkdownContent from './MessageContent/MarkdownContent';
 
 const FeedbackRenderer = memo(({ operationId, isActive = false }) => {
-  const { feedbackMessages, theme, processingPhase } = useApp();
+  const { feedbackMessages, theme, processingPhase, activeFeedbackOperationId } = useApp();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [currentStatus, setCurrentStatus] = useState('thinking');
   const [currentTitle, setCurrentTitle] = useState('Processing...');
@@ -27,7 +27,17 @@ const FeedbackRenderer = memo(({ operationId, isActive = false }) => {
 
     setShouldRender(true);
 
-    // Determine the current state based on messages
+    // If this is not the active operation, collapse it and show completed state
+    const isActiveOperation = operationId === activeFeedbackOperationId;
+    if (!isActiveOperation && operationMessages.length > 0) {
+      setIsCollapsed(true);
+      setCurrentStatus('success');
+      setCurrentTitle('Processing completed');
+      setCurrentContent('');
+      return;
+    }
+
+    // Determine the current state based on messages for active operation
     const latestMessage = operationMessages[operationMessages.length - 1];
     const isCompleted = processingPhase === 'completed' || processingPhase === 'error';
 
@@ -35,7 +45,7 @@ const FeedbackRenderer = memo(({ operationId, isActive = false }) => {
     let title = 'Processing...';
     let content = '';
 
-    if (isCompleted) {
+    if (isCompleted && isActiveOperation) {
       status = processingPhase;
       title = processingPhase === 'completed' ? 'Processing completed' : 'Error occurred';
     } else if (latestMessage) {
@@ -65,7 +75,7 @@ const FeedbackRenderer = memo(({ operationId, isActive = false }) => {
     setCurrentStatus(status);
     setCurrentTitle(title);
     setCurrentContent(content);
-  }, [operationId, feedbackMessages, processingPhase, isActive]);
+  }, [operationId, feedbackMessages, processingPhase, isActive, activeFeedbackOperationId]);
 
   const containerStyle = {
     padding: theme.spacing.medium,
@@ -75,7 +85,7 @@ const FeedbackRenderer = memo(({ operationId, isActive = false }) => {
     border: `1px solid ${theme.colors.glassBorder}`,
     boxShadow: theme.shadows.medium,
     backdropFilter: 'blur(10px)',
-    transition: 'all 0.3s ease', // Transición suave para cambios de estado
+    transition: 'all 0.3s ease',
   };
 
   const headerStyle = {
@@ -138,45 +148,12 @@ const FeedbackRenderer = memo(({ operationId, isActive = false }) => {
 
       <div style={contentStyle}>
         <div style={scrollableContentStyle}>
-          {/* Mostrar contenido actual */}
-          {currentContent && (
-            <div style={{
-              padding: theme.spacing.medium,
-              borderRadius: theme.borderRadius.medium,
-              backgroundColor: theme.colors.feedbackThinkingBackground,
-              marginBottom: theme.spacing.small,
-            }}>
-              <MarkdownContent content={currentContent} />
-            </div>
-          )}
-
-          {/* Mostrar historial de pasos si hay múltiples mensajes */}
-          {operationMessages.length > 1 && (
-            <details style={{ marginTop: theme.spacing.medium }}>
-              <summary style={{
-                color: theme.colors.textMuted,
-                fontSize: theme.typography.small,
-                cursor: 'pointer',
-                padding: theme.spacing.small,
-              }}>
-                View step history ({operationMessages.length} steps)
-              </summary>
-              <div style={{ marginTop: theme.spacing.small }}>
-                {operationMessages.map((msg, index) => (
-                  <FeedbackHistoryItem key={msg.id || `step-${index}`} message={msg} stepNumber={index + 1} />
-                ))}
-              </div>
-            </details>
-          )}
-
-          {currentStatus === 'completed' && (
-            <div style={{
-              padding: theme.spacing.small,
-              textAlign: 'center',
-              color: theme.colors.textMuted,
-              fontSize: theme.typography.small
-            }}>
-              ✅ All steps completed successfully.
+          {/* Show step history if there are multiple messages */}
+          {operationMessages.length > 0 && (
+            <div>
+              {operationMessages.map((msg, index) => (
+                <FeedbackHistoryItem key={msg.id || `step-${index}`} message={msg} stepNumber={index + 1} />
+              ))}
             </div>
           )}
         </div>
@@ -185,7 +162,7 @@ const FeedbackRenderer = memo(({ operationId, isActive = false }) => {
   );
 });
 
-// Componente para mostrar el historial de pasos
+// Component to show step history
 const FeedbackHistoryItem = memo(({ message, stepNumber }) => {
   const { theme } = useApp();
   const status = message.metadata?.status || "info";
