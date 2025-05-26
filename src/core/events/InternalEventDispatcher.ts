@@ -128,7 +128,6 @@ export class InternalEventDispatcher {
     this.dispatch(EventType.SYSTEM_ERROR, {
       message,
       error: error?.message,
-      stack: error?.stack,
       details,
       source,
       level: 'error'

@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 import { getReactHtmlContent } from './htmlTemplate';
 import { ApplicationLogicService } from '../../core/ApplicationLogicService';
 import { InternalEventDispatcher } from '../../core/events/InternalEventDispatcher';
-import { EventType, WindsurfEvent, ToolExecutionEventPayload, ReActEventPayload, NodeEventPayload, ErrorEventPayload } from '../../features/events/eventTypes';
+import { EventType, WindsurfEvent, ToolExecutionEventPayload, SystemEventPayload, ErrorOccurredEventPayload } from '../../features/events/eventTypes';
 import * as crypto from 'crypto';
 
 export class WebviewProvider implements vscode.WebviewViewProvider {
@@ -44,40 +44,42 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
 
     this.view.webview.onDidReceiveMessage(
       async (message) => {
-        // console.log('[WebviewProvider] Received:', message.type); // Opcional para depuración
+        // console.log('[WebviewProvider] Received from UI:', message.type); 
 
         switch (message.type) {
           case 'uiReady':
             this.currentChatId = this.generateChatId();
+            console.log(`[WebviewProvider DEBUG] UI Ready. New Chat ID: ${this.currentChatId}`);
             this.postMessage('sessionReady', {
               chatId: this.currentChatId,
-              messages: []
+              messages: [] 
             });
             break;
 
           case 'userMessageSent':
             if (!this.currentChatId) {
+              console.error('[WebviewProvider DEBUG] userMessageSent but no currentChatId.');
               this.postMessage('systemError', { message: 'No active chat session' });
               return;
             }
+            console.log(`[WebviewProvider DEBUG] userMessageSent for chatId: ${this.currentChatId}. Payload: ${JSON.stringify(message.payload)}`);
             await this.handleUserMessage(message.payload);
             break;
 
           case 'newChatRequestedByUI':
             this.currentChatId = this.generateChatId();
+            this.currentOperationId = null; 
+            console.log(`[WebviewProvider DEBUG] newChatRequestedByUI. New Chat ID: ${this.currentChatId}`);
             this.postMessage('newChatStarted', { chatId: this.currentChatId });
             break;
 
-          // case 'showHistoryRequested': // Eliminado, se maneja por comando de VS Code
-          //   this.postMessage('showHistory', {});
-          //   break;
-
           case 'command':
+            console.log(`[WebviewProvider DEBUG] Received command from UI: ${message.payload?.command}`);
             if (message.payload?.command === 'getProjectFiles') {
               try {
                 const result = await this.appLogicService.executeTool('listFiles', {
                   dirPath: '.', 
-                  excludePattern: 'node_modules|\\\\.git',
+                  excludePattern: 'node_modules|\\.git', 
                   recursive: true
                 });
                 
@@ -88,18 +90,18 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
                       .map((f: {path: string}) => f.path) 
                   });
                 } else {
-                  console.error('Error getting project files:', result.error || 'No files data');
+                  console.error('[WebviewProvider] Error getting project files:', result.error || 'No files data');
                   this.postMessage('systemError', { message: result.error || 'Failed to list project files (no data)' });
                 }
               } catch (error) {
-                console.error('Error in getProjectFiles handler:', error);
+                console.error('[WebviewProvider] Error in getProjectFiles handler:', error);
                 this.postMessage('systemError', { message: 'Failed to list project files' });
               }
             }
             break;
 
           default:
-            console.warn('[WebviewProvider] Unknown message type:', message.type);
+            console.warn('[WebviewProvider] Unknown message type from UI:', message.type);
             break;
         }
       },
@@ -115,38 +117,47 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     }
     
     this.currentOperationId = `op_${crypto.randomBytes(8).toString('hex')}`;
+    console.log(`[WebviewProvider DEBUG] Starting handleUserMessage. New OpID: ${this.currentOperationId}`);
 
     try {
       const result = await this.appLogicService.processUserMessage(
         this.currentChatId!,
         payload.text,
-        { files: payload.files || [] }
+        { files: payload.files || [] } 
       );
 
+      console.log(`[WebviewProvider DEBUG] appLogicService.processUserMessage result for OpID ${this.currentOperationId}:`, JSON.stringify(result));
+
       if (result.success && result.finalResponse) {
+        console.log(`[WebviewProvider DEBUG] Attempting to post 'assistantResponse'. OpID: ${this.currentOperationId}, Content: ${result.finalResponse.substring(0,50)}...`);
         this.postMessage('assistantResponse', {
           id: `asst_${Date.now()}`,
           content: result.finalResponse,
           timestamp: Date.now(),
-          operationId: this.currentOperationId
+          operationId: this.currentOperationId 
         });
-        this.currentOperationId = null;
+        this.currentOperationId = null; 
+        console.log(`[WebviewProvider DEBUG] OpID ${this.currentOperationId} (was ${this.currentOperationId}) cleared after assistantResponse.`);
       } else {
+        const errorMessage = result.error || 'Processing failed to produce a response.';
+        console.log(`[WebviewProvider DEBUG] Attempting to post 'systemError' (from processUserMessage). OpID: ${this.currentOperationId}, Message: ${errorMessage}`);
         this.postMessage('systemError', { 
-          message: result.error || 'Processing failed',
+          message: errorMessage,
           operationId: this.currentOperationId
         });
-        if (result.finalResponse) {
-          this.currentOperationId = null;
-        }
+        this.currentOperationId = null; 
+        console.log(`[WebviewProvider DEBUG] OpID ${this.currentOperationId} (was ${this.currentOperationId}) cleared after systemError from processUserMessage.`);
       }
     } catch (error: any) {
-      console.error('[WebviewProvider] Error processing message:', error);
+      console.error('[WebviewProvider] Critical error processing message:', error);
+      const criticalErrorMessage = error.message || 'An unexpected critical error occurred';
+      console.log(`[WebviewProvider DEBUG] Attempting to post 'systemError' (critical). OpID: ${this.currentOperationId}, Message: ${criticalErrorMessage}`);
       this.postMessage('systemError', { 
-        message: error.message || 'An unexpected error occurred',
-        operationId: this.currentOperationId
+        message: criticalErrorMessage,
+        operationId: this.currentOperationId 
       });
-      this.currentOperationId = null;
+      this.currentOperationId = null; 
+      console.log(`[WebviewProvider DEBUG] OpID ${this.currentOperationId} (was ${this.currentOperationId}) cleared after critical error.`);
     }
   }
 
@@ -155,19 +166,10 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
       this.dispatcherSubscriptions = [];
   
       const eventTypesToWatch: EventType[] = [
-        EventType.REASONING_STARTED,
-        EventType.REASONING_COMPLETED,
         EventType.TOOL_EXECUTION_STARTED,
         EventType.TOOL_EXECUTION_COMPLETED,
         EventType.TOOL_EXECUTION_ERROR,
-        EventType.REFLECTION_STARTED,
-        EventType.REFLECTION_COMPLETED,
-        EventType.NODE_START,
-        EventType.NODE_COMPLETE,
-        EventType.NODE_ERROR,
-        EventType.SYSTEM_INFO,
-        EventType.SYSTEM_WARNING,
-        EventType.SYSTEM_ERROR,
+        EventType.SYSTEM_ERROR, 
       ];
   
       eventTypesToWatch.forEach(eventType => {
@@ -175,113 +177,112 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
           this.internalEventDispatcher.subscribe(eventType, (event: WindsurfEvent) => this.handleInternalEvent(event))
         );
       });
-      // console.log('[WebviewProvider] Subscribed to internal ReAct events.'); // Opcional para depuración
+      console.log('[WebviewProvider] Subscribed to UI-relevant events (Tools, System Errors). Watched types:', eventTypesToWatch.join(', '));
     }
   
     private handleInternalEvent(event: WindsurfEvent): void {
-      if (!this.view || !this.currentChatId ) {
+      if (!this.view) return; // No view, no postMessage
+      // No filtrar por currentChatId aquí si queremos que SYSTEM_ERROR globales se muestren
+      // Pero para TOOL_*, sí es importante.
+      // if (event.payload.chatId && event.payload.chatId !== this.currentChatId) {
+      //     console.log(`[WebviewProvider DEBUG] Ignoring event for different chatId. Current: ${this.currentChatId}, Event ChatID: ${event.payload.chatId}, Event Type: ${event.type}`);
+      //     return;
+      // }
+      
+      console.log(`[WebviewProvider DEBUG] Received internal event: ${event.type}, CurrentOpID: ${this.currentOperationId}, Event ChatID: ${event.payload.chatId}, Current ChatID: ${this.currentChatId}`);
+
+      let messageText: string | undefined;
+      let status: 'info' | 'success' | 'error' | 'thinking' | 'tool_executing' = 'info'; 
+      let toolName: string | undefined; // Para logging y potencialmente para la UI
+
+      // Filtrar eventos de herramientas si no corresponden al chat activo
+      if (event.type.startsWith('tool:execution:') && event.payload.chatId && event.payload.chatId !== this.currentChatId) {
+        console.log(`[WebviewProvider DEBUG] Tool event ${event.type} for different chatId ${event.payload.chatId} ignored. Current is ${this.currentChatId}.`);
         return;
       }
-      
-      if (event.payload.chatId && event.payload.chatId !== this.currentChatId) {
-          // console.log(`[WebviewProvider] Ignoring event for different chatId. Current: ${this.currentChatId}, Event: ${event.payload.chatId}`); // Opcional
-          return;
-      }
-  
-      let messageText: string | undefined;
-      let status: 'info' | 'success' | 'error' | 'thinking' | 'tool_executing' = 'info';
-  
+
       switch (event.type) {
-        case EventType.REASONING_STARTED:
-          messageText = "Pensando...";
-          status = 'thinking';
-          break;
-        case EventType.REASONING_COMPLETED:
-          const reasoningPayload = event.payload as ReActEventPayload;
-          const planSteps = (reasoningPayload.result as any)?.plan?.map((step: any) => step.step).join('\n- ');
-          messageText = `Plan de acción generado.${planSteps ? `\nPlan:\n- ${planSteps}` : ''}`;
-          status = 'info';
-          break;
         case EventType.TOOL_EXECUTION_STARTED:
           const toolExecStartPayload = event.payload as ToolExecutionEventPayload;
-          const toolName = toolExecStartPayload.tool || 'herramienta';
+          toolName = toolExecStartPayload.toolName || 'una herramienta';
           messageText = `Ejecutando ${toolName}...`;
           status = 'tool_executing';
+          console.log(`[WebviewProvider DEBUG] Matched TOOL_EXECUTION_STARTED. Tool: ${toolName}`);
           break;
+
         case EventType.TOOL_EXECUTION_COMPLETED:
           const toolExecCompletedPayload = event.payload as ToolExecutionEventPayload;
-          const completedTool = toolExecCompletedPayload.tool || 'herramienta';
-          messageText = `Herramienta ${completedTool} completada.`;
+          toolName = toolExecCompletedPayload.toolName || 'La herramienta';
+          messageText = `${toolName} finalizó.`;
           status = 'success';
+          console.log(`[WebviewProvider DEBUG] Matched TOOL_EXECUTION_COMPLETED. Tool: ${toolName}`);
           break;
+
         case EventType.TOOL_EXECUTION_ERROR:
           const toolExecErrorPayload = event.payload as ToolExecutionEventPayload;
-          const errorTool = toolExecErrorPayload.tool || 'herramienta';
+          toolName = toolExecErrorPayload.toolName || 'una herramienta';
           const errorMsg = toolExecErrorPayload.error || 'Error desconocido';
-          messageText = `Error ejecutando ${errorTool}: ${errorMsg}`;
+          messageText = `Error ejecutando ${toolName}: ${errorMsg}`;
           status = 'error';
+          console.log(`[WebviewProvider DEBUG] Matched TOOL_EXECUTION_ERROR. Tool: ${toolName}, Error: ${errorMsg}`);
           break;
-        case EventType.REFLECTION_STARTED:
-          messageText = "Reflexionando sobre los resultados...";
-          status = 'thinking';
-          break;
-        case EventType.REFLECTION_COMPLETED:
-          messageText = "Reflexión completada.";
-          status = 'info';
-          break;
-        case EventType.NODE_START:
-          const nodeStartPayload = event.payload as NodeEventPayload;
-          messageText = `Iniciando: ${nodeStartPayload.nodeType || 'paso'}...`;
-          status = 'thinking';
-          break;
-        case EventType.NODE_COMPLETE:
-          const nodeCompletePayload = event.payload as NodeEventPayload;
-          messageText = `${nodeCompletePayload.nodeType || 'Paso'} completado.`;
-          status = 'success';
-          break;
-        case EventType.NODE_ERROR:
-          const nodeErrorPayload = event.payload as NodeEventPayload;
-          const nodeType = nodeErrorPayload.nodeType || 'proceso';
-          const nodeError = nodeErrorPayload.error?.message || (nodeErrorPayload.error as any)?.toString() || 'Error desconocido';
-          messageText = `Error en ${nodeType}: ${nodeError}`;
-          status = 'error';
-          break;
-        case EventType.SYSTEM_INFO:
-        case EventType.SYSTEM_WARNING:
+
         case EventType.SYSTEM_ERROR:
-          const systemPayload = event.payload as ErrorEventPayload;
-          messageText = systemPayload.message || 'Mensaje del sistema';
-          status = event.type === EventType.SYSTEM_ERROR ? 'error' : (event.type === EventType.SYSTEM_WARNING ? 'info' : 'info');
+          const systemErrorPayload = event.payload as SystemEventPayload | ErrorOccurredEventPayload;
+          messageText = 'message' in systemErrorPayload 
+            ? systemErrorPayload.message 
+            : systemErrorPayload.errorMessage || 'Ocurrió un error en el sistema.';
+          status = 'error';
+          // Para SYSTEM_ERROR, no necesariamente hay un currentOperationId si es un error global.
+          // La UI decidirá cómo mostrarlo.
+          console.log(`[WebviewProvider DEBUG] Matched SYSTEM_ERROR. Message: ${messageText}`);
           break;
+        
+        default: 
+          console.log(`[WebviewProvider DEBUG] Event ${event.type} not explicitly handled for UI feedback by this switch.`);
+          return; 
       }
   
       if (messageText) {
-        if (this.currentOperationId) {
-          // console.log(`[WebviewProvider] Posting agentActionUpdate for opID ${this.currentOperationId}: ${messageText.substring(0,50)}... (Status: ${status})`); // Opcional
-          this.postMessage('agentActionUpdate', {
-            id: `agent_${event.id || Date.now()}`,
-            content: messageText,
-            status: status,
-            timestamp: event.timestamp || Date.now(),
-            operationId: this.currentOperationId
-          });
-        } else {
-          // console.warn(`[WebviewProvider] No operation ID for agent action: ${messageText.substring(0,50)}...`); // Opcional
+        // Para eventos de herramientas, deben estar asociados a una operación.
+        // Para SYSTEM_ERROR, podría no haber operationId si es un error global.
+        if (event.type.startsWith('tool:execution:') && !this.currentOperationId) {
+          console.warn(`[WebviewProvider DEBUG] No currentOperationId for tool event ${event.type}. 'agentActionUpdate' NOT sent for: ${messageText.substring(0,50)}...`);
+          return; // No enviar feedback de herramienta si no hay operación activa
         }
+
+        console.log(`[WebviewProvider DEBUG] Attempting to post 'agentActionUpdate'. OpID: ${this.currentOperationId}, Status: ${status}, Content: ${messageText.substring(0, 50)}...`);
+        this.postMessage('agentActionUpdate', {
+          id: `agent_event_${event.id || Date.now()}`,
+          content: messageText,
+          status: status,
+          timestamp: event.timestamp || Date.now(),
+          operationId: this.currentOperationId, // Será null para SYSTEM_ERROR globales si no hay op activa
+          toolName: toolName // Añadido para dar más contexto a la UI si lo necesita
+        });
       }
     }
 
   public requestShowHistory(): void {
+    console.log(`[WebviewProvider DEBUG] requestShowHistory called.`);
     this.postMessage('showHistory', {});
   }
 
   public startNewChat(): void {
+    const oldChatId = this.currentChatId;
     this.currentChatId = this.generateChatId();
+    this.currentOperationId = null; 
+    console.log(`[WebviewProvider DEBUG] startNewChat called. Old Chat ID: ${oldChatId}, New Chat ID: ${this.currentChatId}. OpID cleared.`);
     this.postMessage('newChatStarted', { chatId: this.currentChatId });
   }
 
   private postMessage(type: string, payload: any): void {
-    this.view?.webview.postMessage({ type, payload });
+    if (this.view) {
+      // console.log(`[WebviewProvider DEBUG] Posting message to UI: Type: ${type}, Payload: ${JSON.stringify(payload).substring(0,100)}...`);
+      this.view.webview.postMessage({ type, payload });
+    } else {
+      console.warn(`[WebviewProvider DEBUG] View not available. Cannot post message: Type: ${type}`);
+    }
   }
 
   private generateChatId(): string {
@@ -298,6 +299,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
   }
 
   public dispose(): void {
+    console.log(`[WebviewProvider DEBUG] Disposing WebviewProvider.`);
     this.disposables.forEach(d => d.dispose());
     this.dispatcherSubscriptions.forEach(s => s.unsubscribe());
     this.dispatcherSubscriptions = [];

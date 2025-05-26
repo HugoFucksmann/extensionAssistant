@@ -9,42 +9,29 @@ import {
   ReasoningResult,
   ReflectionResult,
   WindsurfState,
-  HistoryEntry, // Asegúrate que este tipo sea el correcto para tu historial
+  HistoryEntry, 
   NextAction,
   ToolExecution,
   PerformanceMetrics,
 } from '@shared/types';
 import { ToolRegistry } from '@features/tools/ToolRegistry';
-import { InternalEventDispatcher } from '../../core/events/InternalEventDispatcher'; // Importar el dispatcher
-import { EventType } from '../events/eventTypes'; // Importar los tipos de eventos
+import { InternalEventDispatcher } from '../../core/events/InternalEventDispatcher'; 
+import { EventType } from '../events/eventTypes'; 
 
 export class WindsurfGraph {
-  // No es necesario que sean privados si no hay métodos que los usen internamente
-  // y solo se pasan en el constructor.
-  // private modelManager: ModelManager;
-  // private toolRegistry: ToolRegistry;
-  // private promptManager: PromptManager;
   private dispatcher: InternalEventDispatcher;
 
   constructor(
-    modelManager: ModelManager, // Los parámetros no usados directamente pueden omitirse si solo son para la firma
+    modelManager: ModelManager, 
     toolRegistry: ToolRegistry,
     promptManager: PromptManager,
-    dispatcher: InternalEventDispatcher // Recibir el dispatcher
+    dispatcher: InternalEventDispatcher 
   ) {
-    // this.modelManager = modelManager;
-    // this.toolRegistry = toolRegistry;
-    // this.promptManager = promptManager;
-    this.dispatcher = dispatcher; // Guardar el dispatcher
+    this.dispatcher = dispatcher; 
 
     console.log('[WindsurfGraph] Initialized with MOCKED implementation and Event Dispatcher.');
   }
 
-  /**
-   * Simulates the ReAct flow with timeouts and event emissions
-   * @param initialState The initial state for the graph
-   * @returns A promise that resolves with the final state
-   */
   async run(initialState: WindsurfState): Promise<WindsurfState> {
     const chatId = initialState.chatId;
     console.log(`[WindsurfGraph:${chatId}] Starting mocked ReAct flow`);
@@ -52,7 +39,7 @@ export class WindsurfGraph {
     let state: WindsurfState = {
       ...initialState,
       iterationCount: 0,
-      history: [...(initialState.history || [])], // Asegurar que history sea un array
+      history: [...(initialState.history || [])], 
       completionStatus: 'in_progress',
     };
 
@@ -65,12 +52,13 @@ export class WindsurfGraph {
       state.history.push({
         id: `hist_${chatId}_${Date.now()}_${Math.random().toString(16).slice(2)}`,
         content,
-        sender: phase === 'user_input' ? 'user' : 'assistant', // O 'system'
+        sender: phase === 'user_input' ? 'user' : 'assistant', 
         timestamp: Date.now(),
         phase,
         iteration,
         metadata: {
           success: true,
+          status: 'info', // Default status for history entries
           ...metadata,
         },
       });
@@ -81,21 +69,18 @@ export class WindsurfGraph {
       state.iterationCount++;
       this.dispatcher.dispatch(EventType.NODE_START, { chatId, nodeType: 'InitialAnalysis' });
       
-      // Estado inicial
       addHistoryEntry('system', 'Starting initial analysis...', state.iterationCount, { status: 'thinking' });
-      await this.timeout(1000);
+      await this.timeout(100); // Reducido para acelerar el mock
       
-      // Estado de progreso
       addHistoryEntry('system', 'Analyzing project context...', state.iterationCount, { status: 'thinking' });
-      await this.timeout(2000);
+      await this.timeout(200); // Reducido
       
-      // Estado de éxito
       state.projectContext = { name: 'MockProject', path: '/mock/path' };
       addHistoryEntry('system', 'Initial analysis completed successfully', state.iterationCount, { 
         status: 'success',
         result: state.projectContext
       });
-      this.dispatcher.dispatch(EventType.NODE_COMPLETE, { chatId, nodeType: 'InitialAnalysis' });
+      this.dispatcher.dispatch(EventType.NODE_COMPLETE, { chatId, nodeType: 'InitialAnalysis', duration: 300 });
 
 
       // --- Simulación Iteración 1: Razonamiento ---
@@ -106,15 +91,12 @@ export class WindsurfGraph {
         nodeType: 'Reasoning'
       });
 
-      // Estado inicial
       addHistoryEntry('reasoning', 'Starting reasoning process...', state.iterationCount, { status: 'thinking' });
-      await this.timeout(1500);
+      await this.timeout(150); // Reducido
 
-      // Estado de generación de plan
       addHistoryEntry('reasoning', 'Generating action plan...', state.iterationCount, { status: 'thinking' });
-      await this.timeout(2000);
+      await this.timeout(200); // Reducido
 
-      // Generar plan
       const mockPlanStep1: PlanStep = {
         id: 'plan-step-1',
         step: '1. Use mockTool to get information.',
@@ -128,12 +110,11 @@ export class WindsurfGraph {
         requiredContext: ['projectContext']
       };
 
-      // Estado de éxito
       state.reasoningResult = {
         reasoning: 'The agent decided to use mockTool based on the objective (mocked).',
         plan: [mockPlanStep1],
         nextAction: mockNextAction,
-        metrics: { reasoningTime: 3500 } as PerformanceMetrics,
+        metrics: { reasoningTime: 350 } as PerformanceMetrics,
       };
       addHistoryEntry('reasoning', 'Action plan generated successfully', state.iterationCount, { 
         status: 'success',
@@ -144,37 +125,35 @@ export class WindsurfGraph {
         phase: `Reasoning-${state.iterationCount}`,
         nodeType: 'Reasoning',
         result: { plan: state.reasoningResult.plan, nextAction: state.reasoningResult.nextAction },
-        duration: 3500
+        duration: 350
       });
 
-      // --- Simulación Iteración 1: Acción ---
+      // --- Simulación Iteración 1: Acción (mockTool) ---
       this.dispatcher.dispatch(EventType.TOOL_EXECUTION_STARTED, { 
         chatId,
-        tool: mockNextAction.toolName,
+        toolName: mockNextAction.toolName,
         parameters: mockNextAction.params,
       });
       
-      // Estado inicial
       addHistoryEntry('action', `Executing tool: ${mockNextAction.toolName}...`, state.iterationCount, { 
-        status: 'thinking',
+        status: 'tool_executing', // Cambiado a 'tool_executing' para consistencia con UI
         tool: mockNextAction.toolName
       });
-      await this.timeout(1500);
+      await this.timeout(150); // Reducido
 
-      // Estado de progreso
-      addHistoryEntry('action', `Processing request with ${mockNextAction.toolName}...`, state.iterationCount, { 
-        status: 'thinking',
-        tool: mockNextAction.toolName
-      });
-      await this.timeout(2000);
+      // No es necesario un segundo 'thinking' para la misma herramienta si es una simulación rápida
+      // addHistoryEntry('action', `Processing request with ${mockNextAction.toolName}...`, state.iterationCount, { 
+      //   status: 'tool_executing', 
+      //   tool: mockNextAction.toolName
+      // });
+      // await this.timeout(200); // Reducido
 
-      // Generar resultado
       const mockToolExecution: ToolExecution = {
         name: mockNextAction.toolName,
         status: 'completed',
         parameters: mockNextAction.params,
         result: { data: 'This is the mocked result from mockTool' },
-        startTime: Date.now() - 3500,
+        startTime: Date.now() - 150, // Ajustar al timeout
         endTime: Date.now(),
       };
       state.actionResult = {
@@ -184,18 +163,21 @@ export class WindsurfGraph {
         result: mockToolExecution.result,
         timestamp: Date.now(),
         execution: mockToolExecution,
-        metrics: { actionTime: 300 } as PerformanceMetrics,
+        metrics: { actionTime: 150 } as PerformanceMetrics,
       };
-      mockPlanStep1.status = 'completed'; // Actualizar estado del plan
+      mockPlanStep1.status = 'completed'; 
       mockPlanStep1.result = mockToolExecution.result;
-      addHistoryEntry('action', `Action '${mockNextAction.toolName}' executed. Result: ${JSON.stringify(mockToolExecution.result)}`, state.iterationCount, { toolName: mockNextAction.toolName, result: mockToolExecution.result });
-      this.dispatcher.dispatch(EventType.TOOL_EXECUTION_COMPLETED, { // O ACTION_COMPLETED
+      addHistoryEntry('action', `Action '${mockNextAction.toolName}' executed. Result: ${JSON.stringify(mockToolExecution.result)}`, state.iterationCount, { 
+          toolName: mockNextAction.toolName, 
+          result: mockToolExecution.result,
+          status: 'success' 
+      });
+      this.dispatcher.dispatch(EventType.TOOL_EXECUTION_COMPLETED, { 
         chatId,
-        tool: mockNextAction.toolName,
+        toolName: mockNextAction.toolName,
         parameters: mockNextAction.params,
         result: mockToolExecution.result,
-        duration: 300,
-        // iteration: state.iterationCount // Opcional
+        duration: 150, // Ajustar al timeout
       });
 
       // --- Simulación Iteración 1: Reflexión ---
@@ -205,13 +187,11 @@ export class WindsurfGraph {
         nodeType: 'Reflection'
       });
 
-      // Estado inicial
       addHistoryEntry('reflection', 'Starting reflection process...', state.iterationCount, { status: 'thinking' });
-      await this.timeout(1500);
+      await this.timeout(150); // Reducido
 
-      // Estado de análisis
       addHistoryEntry('reflection', 'Analyzing results...', state.iterationCount, { status: 'thinking' });
-      await this.timeout(2000);
+      await this.timeout(200); // Reducido
 
       const mockInsight: Insight = {
         id: 'insight-1',
@@ -226,104 +206,108 @@ export class WindsurfGraph {
         evaluationReasons: ['Tool executed correctly', 'Result matches expected outcome'],
         needsCorrection: false,
         insights: [mockInsight],
-        metrics: { reflectionTime: 400 } as PerformanceMetrics,
+        metrics: { reflectionTime: 350 } as PerformanceMetrics, // Suma de timeouts
       };
-      addHistoryEntry('reflection', `Reflection complete. Confidence: ${state.reflectionResult.confidence}`, state.iterationCount, { reflection: state.reflectionResult.reflection });
+      addHistoryEntry('reflection', `Reflection complete. Confidence: ${state.reflectionResult.confidence}`, state.iterationCount, { 
+          reflection: state.reflectionResult.reflection,
+          status: 'success'
+      });
       this.dispatcher.dispatch(EventType.REFLECTION_COMPLETED, {
         chatId,
         phase: `Reflection-${state.iterationCount}`,
         nodeType: 'Reflection',
         result: { reflection: state.reflectionResult.reflection, needsCorrection: state.reflectionResult.needsCorrection },
-        duration: 400
+        duration: 350 // Suma de timeouts
       });
 
-      // --- Simulación: Generación de Respuesta ---
-      state.iterationCount++;
+      // --- Simulación: Generación de Respuesta (respond tool) ---
+      state.iterationCount++; // Nueva iteración para la respuesta final si se considera un paso separado
       
-      // Estado inicial
-      addHistoryEntry('system', 'Generating final response...', state.iterationCount, { status: 'thinking' });
-      await this.timeout(1500);
+      const respondActionToolName = 'respond';
+      const finalResponseMessage = `## Mocked Solution
 
-      // Estado de formateo
-      addHistoryEntry('system', 'Formatting response...', state.iterationCount, { status: 'thinking' });
-      await this.timeout(2000);
+He analizado (mock) y esta es la respuesta:
 
-      // Generar respuesta final con formato markdown
-      const finalResponseMessage = `## Aquí está la solución
-
-He analizado el problema y encontré la solución:
-
-\`\`\`jsx
-// Solución para el componente ChatMessages
-{messages.map((message, index) => (
-  <Message 
-    key={\`msg-\${message.id}-\${index}\`}
-    message={message}
-    messageIndex={index}
-  />
-))}
+\`\`\`javascript
+// Mocked code snippet
+function hello() { console.log("World!"); }
 \`\`\`
 
-### Explicación:
-1. El componente Message ahora recibe todos los props necesarios
-2. Se genera un key único combinando id e índice
-3. Se eliminó el renderizado duplicado que causaba problemas
+Esto es un ejemplo de respuesta mockeada.`;
 
-¿Necesitas más detalles sobre alguna parte?`;
+      this.dispatcher.dispatch(EventType.TOOL_EXECUTION_STARTED, { 
+          chatId, 
+          toolName: respondActionToolName, 
+          parameters: { message: finalResponseMessage.substring(0, 50) + "..." } // Log params resumidos
+      });
+      addHistoryEntry('action', `Generating final response with ${respondActionToolName}...`, state.iterationCount, { 
+          status: 'tool_executing', 
+          toolName: respondActionToolName 
+      });
+      await this.timeout(170); // Reducido
 
-      // Simular que la herramienta 'respond' se ejecuta (o una lógica similar)
-      // Esto es importante para que ApplicationLogicService pueda extraer la respuesta.
-      const respondActionToolName = 'respond';
-      this.dispatcher.dispatch(EventType.TOOL_EXECUTION_STARTED, { chatId, tool: respondActionToolName, parameters: { message: finalResponseMessage } });
-      await this.timeout(1750);
       const respondToolExecution: ToolExecution = {
           name: respondActionToolName, status: 'completed',
           parameters: { message: finalResponseMessage }, result: { success: true, message: finalResponseMessage },
-          startTime: Date.now() - 50, endTime: Date.now()
+          startTime: Date.now() - 170, endTime: Date.now()
       };
-      state.actionResult = { // Sobrescribir el actionResult con el de 'respond'
+      // Esto es crucial: ApplicationLogicService usa actionResult.result.message para el finalResponse
+      state.actionResult = { 
           toolName: respondActionToolName, params: { message: finalResponseMessage },
-          success: true, result: { message: finalResponseMessage },
+          success: true, result: { message: finalResponseMessage }, // Asegurar que el mensaje esté aquí
           timestamp: Date.now(), execution: respondToolExecution,
       };
-      addHistoryEntry('action', `Final response generated: ${finalResponseMessage.substring(0,30)}...`, state.iterationCount, { toolName: respondActionToolName, message: finalResponseMessage });
-      this.dispatcher.dispatch(EventType.TOOL_EXECUTION_COMPLETED, { chatId, tool: respondActionToolName, result: { message: finalResponseMessage }, duration: 50 });
-
-
-      state.completionStatus = 'completed';
-      this.dispatcher.dispatch(EventType.RESPONSE_GENERATED, { // Evento específico para la respuesta final
-          chatId,
-          response: finalResponseMessage,
-          success: true,
-          // duration: /* tiempo total o de generación de respuesta */
+      addHistoryEntry('action', `Final response generated via ${respondActionToolName}.`, state.iterationCount, { 
+          toolName: respondActionToolName, 
+          // message: finalResponseMessage.substring(0,30)+"...", // No es necesario duplicar el mensaje completo en historial
+          status: 'success'
+      });
+      this.dispatcher.dispatch(EventType.TOOL_EXECUTION_COMPLETED, { 
+          chatId, 
+          toolName: respondActionToolName, 
+          parameters: { message: finalResponseMessage.substring(0,50) + "..." },
+          result: { success: true, messageDelivered: true }, // El resultado de 'respond' es más sobre la entrega
+          duration: 170 
       });
 
+      // RESPONSE_GENERATED es un evento adicional, puede ser útil para logging específico de respuestas.
+      // El flujo de UI se basará en TOOL_EXECUTION_COMPLETED para 'respond' y el finalResponse de AppLogicService.
+      this.dispatcher.dispatch(EventType.RESPONSE_GENERATED, { 
+          chatId,
+          responseContent: finalResponseMessage,
+          isFinal: true,
+          duration: 170 
+      });
+
+      state.completionStatus = 'completed';
       console.log(`[WindsurfGraph:${chatId}] Completed mocked ReAct flow successfully.`);
 
     } catch (error: any) {
       console.error(`[WindsurfGraph:${chatId}] Error in mocked ReAct flow:`, error);
       state.completionStatus = 'failed';
       state.error = error.message;
-      addHistoryEntry('system', `Error in ReAct flow: ${error.message}`, state.iterationCount, { error: error.message });
-      this.dispatcher.dispatch(EventType.NODE_ERROR, { // Evento genérico de error del nodo/grafo
+      addHistoryEntry('system', `Error in ReAct flow: ${error.message}`, state.iterationCount, { error: error.message, status: 'error' });
+      
+      // Si el error ocurre durante una ejecución de herramienta, se debería haber emitido TOOL_EXECUTION_ERROR
+      // Este es un error más general del grafo.
+      this.dispatcher.dispatch(EventType.NODE_ERROR, { 
         chatId,
         nodeType: 'ReActGraphExecution',
-        error: error, // Pasar el objeto error completo
-        // state: { completionStatus: state.completionStatus, error: state.error }
+        error: error.message
       });
-       this.dispatcher.dispatch(EventType.ERROR_OCCURRED, { // Evento más general de error
+       this.dispatcher.dispatch(EventType.ERROR_OCCURRED, { 
         chatId,
-        error: error.message,
-        stack: error.stack,
-        source: 'ReActGraph.Mock',
+        errorMessage: error.message,
+        errorStack: error.stack,
+        source: 'ReActGraph.Mock'
       });
     } finally {
-        // Evento final del grafo, ya sea completado o fallido
         this.dispatcher.dispatch(state.completionStatus === 'completed' ? EventType.NODE_COMPLETE : EventType.NODE_ERROR, {
             chatId,
             nodeType: 'ReActGraphExecution',
-            state: { completionStatus: state.completionStatus, error: state.error, finalResponse: state.actionResult?.toolName === 'respond' ? state.actionResult.result?.message : undefined },
-            // duration: /* tiempo total del grafo */
+            error: state.error,
+            output: (state.actionResult?.toolName === 'respond' && state.actionResult.success) ? state.actionResult.result?.message : undefined
+            // duration: /* calcular tiempo total del grafo */
         });
     }
 
@@ -331,6 +315,7 @@ He analizado el problema y encontré la solución:
   }
 
   private timeout(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    // Reducir todos los timeouts para acelerar las pruebas de flujo
+    return new Promise(resolve => setTimeout(resolve, ms / 10)); // Dividido por 10 para acelerar
   }
 }
