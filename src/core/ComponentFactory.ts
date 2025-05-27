@@ -4,21 +4,29 @@ import { VSCodeContext } from '../shared/types';
 import { EventLogger } from '../features/events/EventLogger';
 import { ModelManager } from '../features/ai/ModelManager';
 import { PromptManager } from '../features/ai/promptManager';
-import { ToolRegistry } from '../features/tools/ToolRegistry'; // Asegúrate que la ruta sea correcta
-import { allToolDefinitions } from '../features/tools/definitions'; // Importar todas las definiciones de herramientas
-import { WindsurfGraph } from '../features/ai/ReActGraph'; 
+import { ToolRegistry } from '../features/tools/ToolRegistry';
+import { allToolDefinitions } from '../features/tools/definitions';
 import { MemoryManager } from '../features/memory/MemoryManager';
 import { ConversationManager } from './ConversationManager';
 import { ApplicationLogicService } from './ApplicationLogicService';
 import { InternalEventDispatcher } from './events/InternalEventDispatcher';
-import { ToolExecutionContext } from '../features/tools/types'; // Importar
+// import { WindsurfGraph } from '../features/ai/ReActGraph'; // <-- REMOVE or COMMENT OUT
+
+import { LanguageModelService } from './LanguageModelService'; // <-- ADD
+import { ReActEngine } from './ReActEngine';             // <-- ADD
 
 export class ComponentFactory {
   private static applicationLogicServiceInstance: ApplicationLogicService;
   private static internalEventDispatcherInstance: InternalEventDispatcher;
   private static eventLoggerInstance: EventLogger;
-  private static toolRegistryInstance: ToolRegistry; // Añadir instancia de ToolRegistry
-  private static vscodeContextInstance: VSCodeContext; // Guardar el VSCodeContext
+  private static toolRegistryInstance: ToolRegistry;
+  private static vscodeContextInstance: VSCodeContext;
+
+  // New singletons for core AI components
+  private static modelManagerInstance: ModelManager;             // <-- ADD
+  private static promptManagerInstance: PromptManager;           // <-- ADD
+  private static languageModelServiceInstance: LanguageModelService; // <-- ADD
+  private static reActEngineInstance: ReActEngine;               // <-- ADD
 
   public static getInternalEventDispatcher(): InternalEventDispatcher {
     if (!this.internalEventDispatcherInstance) {
@@ -34,61 +42,94 @@ export class ComponentFactory {
             extensionUri: extensionContext.extensionUri,
             extensionPath: extensionContext.extensionPath,
             subscriptions: extensionContext.subscriptions,
-            outputChannel: vscode.window.createOutputChannel("Extension Assistant Log"),
+            outputChannel: vscode.window.createOutputChannel("Extension Assistant Log"), // Ensure this is used by EventLogger
             globalState: extensionContext.globalState,
             workspaceState: extensionContext.workspaceState,
-            // Añadir workspaceFolders y activeTextEditor si se actualizan dinámicamente
-            // o se obtienen cuando se necesitan. Por ahora, los dejamos fuera del context almacenado
-            // para evitar que se queden obsoletos, a menos que se actualicen activamente.
         };
         console.log('[ComponentFactory] VSCodeContext instance created.');
     }
     return this.vscodeContextInstance;
   }
 
-
   public static getToolRegistry(extensionContext: vscode.ExtensionContext): ToolRegistry {
     if (!this.toolRegistryInstance) {
       const dispatcher = this.getInternalEventDispatcher();
-      // El ToolRegistry ahora toma el dispatcher para su logging interno.
-      // No necesita el VSCodeContext directamente en su constructor si el ToolExecutionContext
-      // se construye y pasa en el momento de la ejecución de la herramienta.
       this.toolRegistryInstance = new ToolRegistry(dispatcher);
-      
-      // Registrar todas las herramientas definidas
       this.toolRegistryInstance.registerTools(allToolDefinitions);
       console.log(`[ComponentFactory] ToolRegistry instance created with ${allToolDefinitions.length} tools.`);
     }
     return this.toolRegistryInstance;
   }
   
+  // --- NEW SINGLETON GETTERS ---
+
+  public static getModelManager(): ModelManager { // <-- ADDED METHOD
+    if (!this.modelManagerInstance) {
+      // Pass any necessary initial config if ModelManager constructor changes
+      this.modelManagerInstance = new ModelManager(); 
+      console.log('[ComponentFactory] ModelManager instance created.');
+    }
+    return this.modelManagerInstance;
+  }
+
+  public static getPromptManager(): PromptManager { // <-- ADDED METHOD
+    if (!this.promptManagerInstance) {
+      this.promptManagerInstance = new PromptManager();
+      console.log('[ComponentFactory] PromptManager instance created.');
+    }
+    return this.promptManagerInstance;
+  }
+  
+  public static getLanguageModelService(extensionContext: vscode.ExtensionContext): LanguageModelService { // <-- ADDED METHOD
+    if (!this.languageModelServiceInstance) {
+      const modelManager = this.getModelManager();
+      const promptManager = this.getPromptManager();
+      const dispatcher = this.getInternalEventDispatcher();
+      this.languageModelServiceInstance = new LanguageModelService(modelManager, promptManager, dispatcher);
+      console.log('[ComponentFactory] LanguageModelService instance created.');
+    }
+    return this.languageModelServiceInstance;
+  }
+
+  public static getReActEngine(extensionContext: vscode.ExtensionContext): ReActEngine { // <-- ADDED METHOD
+    if (!this.reActEngineInstance) {
+      const languageModelService = this.getLanguageModelService(extensionContext);
+      const toolRegistry = this.getToolRegistry(extensionContext);
+      const dispatcher = this.getInternalEventDispatcher();
+      this.reActEngineInstance = new ReActEngine(languageModelService, toolRegistry, dispatcher);
+      console.log('[ComponentFactory] ReActEngine instance created.');
+    }
+    return this.reActEngineInstance;
+  }
+  
+  // --- UPDATED getApplicationLogicService ---
+
   public static getApplicationLogicService(extensionContext: vscode.ExtensionContext): ApplicationLogicService {
     if (!this.applicationLogicServiceInstance) {
       const vscodeContext = this.getVSCodeContext(extensionContext);
       const dispatcher = this.getInternalEventDispatcher();
 
       if (!this.eventLoggerInstance) {
+        // Ensure EventLogger uses the outputChannel from vscodeContext
         this.eventLoggerInstance = new EventLogger(vscodeContext, dispatcher);
         console.log('[ComponentFactory] EventLogger instance created and subscribed.');
       }
 
-      const memoryManager = new MemoryManager(extensionContext); // MemoryManager podría necesitar el dispatcher también
-      const modelManager = new ModelManager(/* config */);
-      const promptManager = new PromptManager();
-      const toolRegistry = this.getToolRegistry(extensionContext); // Obtener la instancia
+      const memoryManager = new MemoryManager(extensionContext);
+      // ModelManager & PromptManager are now obtained via their own getters if directly needed,
+      // but primarily accessed through LanguageModelService.
+      const toolRegistry = this.getToolRegistry(extensionContext);
       const conversationManager = new ConversationManager();
       
-      // ReActGraph podría necesitar el ToolExecutionContext base si llama directamente a herramientas
-      // o si el ApplicationLogicService lo construye y lo pasa.
-      const reactGraph = new WindsurfGraph(modelManager, toolRegistry, promptManager, dispatcher);
+      const reActEngine = this.getReActEngine(extensionContext); // <-- USE NEW METHOD
 
       this.applicationLogicServiceInstance = new ApplicationLogicService(
         vscodeContext,
         memoryManager,
-        reactGraph,
+        reActEngine, // <-- INJECT ReActEngine instead of WindsurfGraph/old ReActGraph
         conversationManager,
-        toolRegistry, // Pasar la instancia de ToolRegistry
-        // dispatcher // ApplicationLogicService no debería usar el dispatcher directamente
+        toolRegistry
+        // dispatcher is not directly injected into ApplicationLogicService
       );
       console.log('[ComponentFactory] ApplicationLogicService instance created.');
     }
@@ -99,13 +140,20 @@ export class ComponentFactory {
     if (this.applicationLogicServiceInstance && typeof (this.applicationLogicServiceInstance as any).dispose === 'function') {
         (this.applicationLogicServiceInstance as any).dispose();
     }
-    // ToolRegistry no tiene un método dispose actualmente, pero si lo tuviera, se llamaría aquí.
+    // Dispose new singletons if they have dispose methods
+    if (this.modelManagerInstance && typeof (this.modelManagerInstance as any).dispose === 'function') {
+        (this.modelManagerInstance as any).dispose(); // ModelManager has a dispose
+    }
+    // PromptManager, LanguageModelService, ReActEngine currently don't have dispose methods.
+    // ToolRegistry also doesn't have one.
     if (this.internalEventDispatcherInstance && typeof this.internalEventDispatcherInstance.dispose === 'function') {
         this.internalEventDispatcherInstance.dispose();
     }
     if (this.eventLoggerInstance && typeof (this.eventLoggerInstance as any).dispose === 'function') {
         (this.eventLoggerInstance as any).dispose();
     }
+
+    // Clear instance references
     // @ts-ignore 
     this.applicationLogicServiceInstance = undefined;
     // @ts-ignore
@@ -116,6 +164,14 @@ export class ComponentFactory {
     this.toolRegistryInstance = undefined;
     // @ts-ignore
     this.vscodeContextInstance = undefined;
+    // @ts-ignore
+    this.modelManagerInstance = undefined; // <-- ADD
+    // @ts-ignore
+    this.promptManagerInstance = undefined; // <-- ADD
+    // @ts-ignore
+    this.languageModelServiceInstance = undefined; // <-- ADD
+    // @ts-ignore
+    this.reActEngineInstance = undefined; // <-- ADD
     console.log('[ComponentFactory] All instances disposed.');
   }
 }

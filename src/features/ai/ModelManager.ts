@@ -67,7 +67,7 @@ export class ModelManager {
       },
       ollama: {
         provider: 'ollama',
-        modelName: vsCodeConfig.get<string>('ollama.modelName') || 'llama3',
+        modelName: vsCodeConfig.get<string>('ollama.modelName') || 'gemma3:4b',
         temperature: vsCodeConfig.get<number>('ollama.temperature') ?? 0.2,
         baseUrl: vsCodeConfig.get<string>('ollama.baseUrl') || 'http://localhost:11434',
         maxTokens: vsCodeConfig.get<number>('ollama.maxTokens') || 4096,

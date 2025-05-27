@@ -6,207 +6,199 @@
 export enum EventType {
   // Conversation lifecycle
   CONVERSATION_STARTED = 'conversation:started',
-  CONVERSATION_ENDED = 'conversation:ended', // Podría tener payload con motivo, si fue limpiada, etc.
-  
-  // ReAct cycle events (o ciclo del agente)
+  CONVERSATION_ENDED = 'conversation:ended',
+
+  // LLM Interaction Events (NEW)
+  LLM_REQUEST_STARTED = 'llm:request:started',
+  LLM_REQUEST_COMPLETED = 'llm:request:completed',
+
+  // Agent/ReAct Cycle Events
+  AGENT_PHASE_STARTED = 'agent:phase:started', // More generic than specific react phases initially
+  AGENT_PHASE_COMPLETED = 'agent:phase:completed',
+  // Old ReAct specific events (can be kept or removed if AGENT_PHASE_* is preferred)
   REASONING_STARTED = 'react:reasoning:started',
   REASONING_COMPLETED = 'react:reasoning:completed',
-  ACTION_STARTED = 'react:action:started', // Evento genérico de inicio de acción del agente
-  ACTION_COMPLETED = 'react:action:completed', // Evento genérico de fin de acción del agente
+  ACTION_STARTED = 'react:action:started', 
+  ACTION_COMPLETED = 'react:action:completed',
   REFLECTION_STARTED = 'react:reflection:started',
   REFLECTION_COMPLETED = 'react:reflection:completed',
   CORRECTION_STARTED = 'react:correction:started',
   CORRECTION_COMPLETED = 'react:correction:completed',
   
-  // Tool execution (más específico que ACTION_*)
+  // Tool execution
   TOOL_EXECUTION_STARTED = 'tool:execution:started',
   TOOL_EXECUTION_COMPLETED = 'tool:execution:completed',
   TOOL_EXECUTION_ERROR = 'tool:execution:error',
-  
+  // TOOL_EXECUTION_ATTEMPT = 'tool:execution:attempt', // Consider if needed vs. just STARTED
+
   // Response handling
-  RESPONSE_GENERATED = 'response:generated', // Cuando el LLM genera la respuesta final
-  RESPONSE_DELIVERED = 'response:delivered', // Cuando la UI muestra la respuesta (si se necesita este nivel)
+  RESPONSE_GENERATED = 'response:generated',
+  RESPONSE_DELIVERED = 'response:delivered',
   
-  // Node execution (para un grafo más genérico si se usa LangGraph o similar)
+  // Node execution (for LangGraph or similar)
   NODE_START = 'node:start',
   NODE_COMPLETE = 'node:complete',
   NODE_ERROR = 'node:error',
   
   // System events
-  ERROR_OCCURRED = 'error:occurred', // Un error general que no encaja en otro sitio
+  ERROR_OCCURRED = 'error:occurred',
   SYSTEM_INFO = 'system:info',
   SYSTEM_WARNING = 'system:warning',
-  SYSTEM_ERROR = 'system:error', // Errores del sistema, no necesariamente de una herramienta o nodo
+  SYSTEM_ERROR = 'system:error',
 
   // UI Interaction events
-  USER_INTERACTION_REQUIRED = 'ui:interaction:required', // Agente solicita input/confirmación a la UI
-  USER_INPUT_RECEIVED = 'ui:input:received' // UI envía el input del usuario de vuelta al sistema
+  USER_INTERACTION_REQUIRED = 'ui:interaction:required',
+  USER_INPUT_RECEIVED = 'ui:input:received'
 }
 
 /**
 * Base interface for all event payloads
 */
 export interface BaseEventPayload {
-timestamp?: number; // Unix timestamp (ms)
-chatId?: string;    // ID de la conversación asociada, si aplica
-source?: string;    // Origen del evento (e.g., 'ReActGraph', 'ToolRegistry', 'WebviewProvider')
-// Podría añadirse un operationId si los eventos necesitan correlacionarse con una operación específica
+  timestamp?: number; 
+  chatId?: string;    
+  source?: string;    
+  // operationId?: string; // Optional: for correlating events to a specific user operation
 }
 
-/**
-* Conversation event payload
-*/
+// ... (ConversationEventPayload, ConversationEndedPayload - keep as is) ...
 export interface ConversationEventPayload extends BaseEventPayload {
-// Para CONVERSATION_STARTED
-userMessage?: string; 
-// Para CONVERSATION_ENDED
-finalStatus?: 'completed' | 'failed' | 'cancelled';
-duration?: number; // ms
-// Otros metadatos de la conversación
+  userMessage?: string; 
+  finalStatus?: 'completed' | 'failed' | 'cancelled';
+  duration?: number; 
 }
-
-/**
-* Payload para CONVERSATION_ENDED, si se quiere ser más específico que ConversationEventPayload
-*/
 export interface ConversationEndedPayload extends BaseEventPayload {
-reason: 'completed' | 'cleared_by_user' | 'error' | 'max_iterations_reached';
-duration?: number;
-// stateSummary?: any; // Un resumen del estado final si es útil
+  reason: 'completed' | 'cleared_by_user' | 'error' | 'max_iterations_reached';
+  duration?: number;
+}
+
+
+/**
+* LLM Request Payloads (NEW)
+*/
+export interface LlmRequestStartedPayload extends BaseEventPayload {
+  llmRequestType: 'reasoning' | 'responseGeneration' | string; // string for extensibility
+  promptLength?: number;
+  modelProvider?: string; // e.g., 'gemini', 'ollama'
+  modelName?: string;
+}
+
+export interface LlmRequestCompletedPayload extends LlmRequestStartedPayload {
+  responseLength?: number;
+  duration: number; // ms
+  success: boolean;
+  error?: string;
+  // rawPrompt?: string; // Optional for debugging, can be large
+  rawResponse?: string; // Optional for debugging, can be large
+  tokenUsage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number };
 }
 
 /**
-* ReAct phase event payload (o Agente/Nodo genérico)
+* Agent Phase Event Payload (NEW or Refined ReActEventPayload)
 */
-export interface ReActEventPayload extends BaseEventPayload {
-phase?: string;     // e.g., 'Reasoning', 'Reflection', 'ActionPlanning'
-nodeType?: string;  // Si se usa un sistema de nodos más genérico
-data?: any;       // Datos relevantes de la fase/nodo (plan, reflexión, etc.)
-duration?: number;  // ms
-error?: string;     // Si la fase/nodo falló
+export interface AgentPhaseEventPayload extends BaseEventPayload {
+  phase: 'reasoning' | 'action' | 'finalResponseGeneration' | 'reflection' | 'correction' | string; // string for extensibility
+  iteration?: number;
+  data?: any;       // Relevant data from the phase (e.g., reasoning output, action details)
+  duration?: number;  // ms for this phase
+  error?: string;     // If the phase failed
 }
 
-/**
-* Tool execution event payload
-*/
+// ReActEventPayload can be an alias or be replaced by AgentPhaseEventPayload
+export type ReActEventPayload = AgentPhaseEventPayload;
+
+
+// ... (ToolExecutionEventPayload, ResponseEventPayload, NodeEventPayload, ErrorOccurredEventPayload, SystemEventPayload, UserInteractionRequiredPayload, UserInputReceivedPayload - keep as is or ensure they extend BaseEventPayload correctly) ...
 export interface ToolExecutionEventPayload extends BaseEventPayload {
-toolName: string; // Nombre de la herramienta
-parameters?: Record<string, any>; // Parámetros con los que se llamó
-result?: any;     // Resultado de la ejecución (para _COMPLETED)
-error?: string;     // Mensaje de error (para _ERROR)
-duration?: number;  // ms (tiempo de ejecución de la herramienta)
-// executionId?: string; // Un ID único para esta ejecución de herramienta específica
+  toolName: string; 
+  parameters?: Record<string, any>; 
+  result?: any;     
+  error?: string;     
+  duration?: number;  
 }
-
-/**
-* Response event payload
-*/
 export interface ResponseEventPayload extends BaseEventPayload {
-responseContent: string; // El contenido de la respuesta generada
-isFinal?: boolean;      // Si es la respuesta final al usuario
-metadata?: Record<string, any>; // Metadatos sobre la generación de la respuesta
-duration?: number;      // ms (tiempo para generar esta respuesta)
+  responseContent: string; 
+  isFinal?: boolean;      
+  metadata?: Record<string, any>; 
+  duration?: number;      
 }
-
-/**
-* Node execution event payload (si se usa un sistema de grafo genérico)
-*/
 export interface NodeEventPayload extends BaseEventPayload {
-nodeType: string;  // Tipo del nodo que se ejecutó
-nodeId?: string;    // ID del nodo
-input?: any;      // Entrada al nodo
-output?: any;     // Salida del nodo
-duration?: number;  // ms
-error?: string;     // Si el nodo falló
+  nodeType: string;  
+  nodeId?: string;    
+  input?: any;      
+  output?: any;     
+  duration?: number;  
+  error?: string;     
 }
-
-/**
-* Error event payload (para ERROR_OCCURRED o errores más específicos)
-*/
 export interface ErrorOccurredEventPayload extends BaseEventPayload {
-errorMessage: string;
-errorStack?: string;
-errorType?: string; // e.g., 'NetworkError', 'ValidationError', 'ToolExecutionError'
-details?: Record<string, any>; // Contexto adicional sobre el error
+  errorMessage: string;
+  errorStack?: string;
+  errorType?: string; 
+  details?: Record<string, any>; 
 }
-
-/**
-* System event payload (para SYSTEM_INFO, SYSTEM_WARNING, SYSTEM_ERROR)
-*/
 export interface SystemEventPayload extends BaseEventPayload {
-message: string;
-level: 'info' | 'warning' | 'error'; // Nivel del mensaje del sistema
-details?: Record<string, any>;
-// Para SYSTEM_ERROR, podría incluir campos de ErrorOccurredEventPayload
-errorObject?: { name?: string; message: string; stack?: string }; // Para serializar un Error
+  message: string;
+  level: 'info' | 'warning' | 'error'; 
+  details?: Record<string, any>;
+  errorObject?: { name?: string; message: string; stack?: string }; 
 }
-
-/**
-* Payload para USER_INTERACTION_REQUIRED
-*/
 export interface UserInteractionRequiredPayload extends BaseEventPayload {
-interactionType: 'requestInput' | 'confirmation' | 'choiceSelection';
-uiOperationId: string; // ID para que la UI lo devuelva y se correlacione la respuesta
-promptMessage: string;
-// Específicos para 'requestInput'
-inputType?: 'text' | 'password' | 'number'; 
-placeholder?: string;
-defaultValue?: string;
-// Específicos para 'choiceSelection'
-options?: Array<{ label: string; value: any }>;
-// Específicos para 'confirmation'
-confirmButtonText?: string;
-cancelButtonText?: string;
-// Para todos
-title?: string; // Título opcional para el diálogo/prompt de UI
+  interactionType: 'requestInput' | 'confirmation' | 'choiceSelection';
+  uiOperationId: string; 
+  promptMessage: string;
+  inputType?: 'text' | 'password' | 'number'; 
+  placeholder?: string;
+  defaultValue?: string;
+  options?: Array<{ label: string; value: any }>;
+  confirmButtonText?: string;
+  cancelButtonText?: string;
+  title?: string; 
+}
+export interface UserInputReceivedPayload extends BaseEventPayload {
+  uiOperationId: string; 
+  value?: any; 
+  wasCancelled?: boolean; 
 }
 
-/**
-* Payload para USER_INPUT_RECEIVED
-*/
-export interface UserInputReceivedPayload extends BaseEventPayload {
-  uiOperationId: string; // El mismo ID que se envió en USER_INTERACTION_REQUIRED
-  value?: any; // El valor ingresado por el usuario (puede ser string, boolean, objeto de la opción seleccionada)
-  wasCancelled?: boolean; // Si el usuario canceló la interacción
-}
 
 /**
 * Union type for all event payloads
-* Esto ayuda a asegurar que cuando se despacha un evento, el payload coincida con el tipo.
 */
 export type EventPayload = 
-| BaseEventPayload // Podría ser usado para eventos muy genéricos sin payload específico
-| ConversationEventPayload
-| ConversationEndedPayload
-| ReActEventPayload
-| ToolExecutionEventPayload
-| ResponseEventPayload
-| NodeEventPayload
-| ErrorOccurredEventPayload
-| SystemEventPayload
-| UserInteractionRequiredPayload
-| UserInputReceivedPayload;
+  | BaseEventPayload
+  | ConversationEventPayload
+  | ConversationEndedPayload
+  | LlmRequestStartedPayload        // <-- ADDED
+  | LlmRequestCompletedPayload      // <-- ADDED
+  | AgentPhaseEventPayload          // <-- ADDED (or ReActEventPayload if you keep that name)
+  | ToolExecutionEventPayload
+  | ResponseEventPayload
+  | NodeEventPayload
+  | ErrorOccurredEventPayload
+  | SystemEventPayload
+  | UserInteractionRequiredPayload
+  | UserInputReceivedPayload;
 
 /**
 * Complete event structure
 */
 export interface WindsurfEvent {
-type: EventType;
-payload: EventPayload; // El payload ahora es más estrictamente tipado por el EventType
-timestamp: number;     // Unix timestamp (ms)
-id: string;            // UUID v4 para el evento
+  type: EventType;
+  payload: EventPayload; 
+  timestamp: number;     
+  id: string;            
 }
 
 /**
 * Event filter interface
 */
 export interface EventFilter {
-types?: EventType[];
-chatId?: string;
-source?: string;
-timeRange?: {
-  start?: number; // Unix timestamp (ms)
-  end?: number;   // Unix timestamp (ms)
-};
-// Para filtros más complejos
-custom?: (event: WindsurfEvent) => boolean;
+  types?: EventType[];
+  chatId?: string;
+  source?: string;
+  timeRange?: {
+    start?: number; 
+    end?: number;   
+  };
+  custom?: (event: WindsurfEvent) => boolean;
 }

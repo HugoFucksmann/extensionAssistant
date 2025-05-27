@@ -9,7 +9,7 @@ export interface WindsurfState {
   chatId: string;
   iterationCount: number;
   maxIterations: number;
-  completionStatus: 'in_progress' | 'completed' | 'failed' | 'error'; // Añadido 'error' para más claridad
+  completionStatus: 'in_progress' | 'completed' | 'failed'; // Añadido 'error' para más claridad
   error?: string; // Para almacenar mensajes de error en el estado
   reasoningResult?: ReasoningResult;
   actionResult?: ActionResult;

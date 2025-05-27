@@ -4,10 +4,7 @@ import { JsonOutputParser } from '@langchain/core/output_parsers';
 
 // Esquema para la salida de la generación de respuesta
 export const responseOutputSchema = z.object({
-  response: z.string().describe("La respuesta generada para el usuario"),
-  followUpQuestions: z.array(z.string()).describe("Posibles preguntas de seguimiento"),
-  sources: z.array(z.string()).describe("Fuentes utilizadas para generar la respuesta"),
-  confidence: z.number().min(0).max(1).describe("Nivel de confianza en la respuesta")
+  response: z.string().describe("La respuesta final para el usuario")
 });
 
 export type ResponseOutput = z.infer<typeof responseOutputSchema>;
@@ -20,30 +17,25 @@ export const responseGenerationPrompt = ChatPromptTemplate.fromMessages([
   [
     'system',
     `Eres un asistente experto en generar respuestas claras y útiles.
-    Genera una respuesta adecuada basada en el análisis y razonamiento proporcionados.`
+    Genera una respuesta final para el usuario basada en el objetivo y el historial de la conversación.
+    Tu respuesta debe ser directa y resolver el objetivo planteado.`
   ],
   [
     'human',
-    `Consulta del usuario: {userQuery}
-    \nAnálisis: {analysis}
-    \nRazonamiento: {reasoning}
-    \nDatos adicionales: {additionalData || 'Ninguno'}
-    \nPor favor, genera una respuesta clara y útil.`
+    `Objetivo: {objective}
+    \nHistorial de la conversación: {history}
+    \nPor favor, genera una respuesta final clara y útil.`
   ]
 ]);
 
 // Función para formatear el prompt de generación de respuesta
 export function formatResponseGenerationPrompt(
-  userQuery: string,
-  analysis: Record<string, any>,
-  reasoning: Record<string, any>,
-  additionalData?: Record<string, any>
+  objective: string,
+  history: string
 ) {
   return responseGenerationPrompt.format({
-    userQuery,
-    analysis: JSON.stringify(analysis, null, 2),
-    reasoning: JSON.stringify(reasoning, null, 2),
-    additionalData: additionalData ? JSON.stringify(additionalData, null, 2) : '',
+    objective,
+    history,
     format_instructions: responseParser.getFormatInstructions()
   });
 }

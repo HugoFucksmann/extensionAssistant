@@ -412,6 +412,7 @@ const mockPlanStep1: PlanStep = {
   private timeout(ms: number): Promise<void> {
     // Reducir todos los timeouts para acelerar las pruebas de flujo
     // En un entorno real, esto no se dividiría.
-    return new Promise(resolve => setTimeout(resolve, ms / (process.env.NODE_ENV === 'test' ? 100 : 10)));
+    // En entorno real, usar el timeout solicitado. Solo acelerar en test.
+    return new Promise(resolve => setTimeout(resolve, process.env.NODE_ENV === 'test' ? ms / 100 : ms));
   }
 }
