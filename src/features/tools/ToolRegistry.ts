@@ -1,37 +1,16 @@
 // src/features/tools/ToolRegistry.ts
-import { ToolDefinition, ToolResult, ToolExecutionContext, ToolPermission, ParameterDefinition } from './types'; // Asegúrate que ParameterDefinition esté aquí
-import * as filesystem from './definitions/filesystem';
-import * as editor from './definitions/editor';
-import * as workspaceTools from './definitions/workspace'; // Renombrado para evitar conflicto con 'vscode.workspace'
-import * as core from './definitions/core';
-// Esqueletos para nuevas herramientas (se implementarán después)
-// import * as filesystemExtended from './definitions/filesystemExtended';
-// import * as terminal from './definitions/terminal';
-// import * as diagnostics from './definitions/diagnostics';
-// import * as git from './definitions/git';
-// import * as interaction from './definitions/interaction';
-
-import { InternalEventDispatcher } from '../../core/events/InternalEventDispatcher';
-import { EventType } from '../../features/events/eventTypes';
-import * as vscode from 'vscode'; // Necesario para construir el ToolExecutionContext
+import { ToolDefinition, ToolResult, ToolExecutionContext, ParameterDefinition } from './types';
+import { InternalEventDispatcher } from '../../core/events/InternalEventDispatcher'; // Ajusta la ruta
+import * as vscode from 'vscode';
 import { PermissionManager } from './PermissionManager';
 
 export class ToolRegistry {
   private tools = new Map<string, ToolDefinition>();
 
-  constructor(private dispatcher: InternalEventDispatcher) { // Inyectar dispatcher
-    this.registerTools([
-      filesystem.getFileContents,
-      filesystem.writeToFile,
-      filesystem.listFiles,
-      editor.getActiveEditorContent,
-      editor.applyTextEdit,
-      workspaceTools.getProjectInfo, // Usar el alias
-      workspaceTools.searchWorkspace, // Usar el alias
-      core.respond,
-      // Aquí se añadirán las nuevas herramientas
-    ]);
-    this.log('info', 'ToolRegistry initialized.', { registeredTools: this.getToolNames() });
+  constructor(private dispatcher: InternalEventDispatcher) {
+    // El registro de herramientas se hará externamente ahora,
+    // pasando los arrays de definiciones al método registerTools.
+    this.log('info', 'ToolRegistry initialized. Ready to register tools.');
   }
 
   private log(level: 'info' | 'warning' | 'error', message: string, details?: Record<string, any>, errorObj?: Error) {
@@ -53,10 +32,14 @@ export class ToolRegistry {
     }
   }
 
-  private registerTools(tools: ToolDefinition[]): void {
-    for (const tool of tools) {
+  public registerTools(toolsToRegister: ToolDefinition[]): void {
+    for (const tool of toolsToRegister) {
+      if (this.tools.has(tool.name)) {
+        this.log('warning', `Tool "${tool.name}" is already registered. Overwriting.`, { toolName: tool.name });
+      }
       this.tools.set(tool.name, tool);
     }
+    this.log('info', `Registered ${toolsToRegister.length} tools. Total tools: ${this.tools.size}.`, { registeredNow: toolsToRegister.map(t => t.name) });
   }
 
   getTool(name: string): ToolDefinition | undefined {
@@ -71,9 +54,14 @@ export class ToolRegistry {
     return Array.from(this.tools.values());
   }
 
-  // executeTool ahora construye y pasa el ToolExecutionContext
-  async executeTool(name: string, params: any, chatId?: string): Promise<ToolResult> {
-    const logDetails = { toolName: name, params, chatId };
+  async executeTool(
+    name: string, 
+    params: any, 
+    // El contexto de ejecución ahora puede incluir más cosas, como chatId o uiOperationId
+    // que el orquestador puede querer pasar.
+    executionCtxArgs: { chatId?: string; uiOperationId?: string; [key: string]: any } = {} 
+  ): Promise<ToolResult> {
+    const logDetails = { toolName: name, params, executionCtxArgs };
     this.log('info', `Attempting to execute tool: ${name}`, logDetails);
 
     const tool = this.getTool(name);
@@ -82,56 +70,58 @@ export class ToolRegistry {
       return { success: false, error: `Tool not found: ${name}` };
     }
 
-    // Construir el ToolExecutionContext
-    // Esto asume que 'vscode' es el módulo global de VS Code.
-    // Si tienes un VSCodeContext más estructurado en ComponentFactory, podrías usarlo.
     const executionContext: ToolExecutionContext = {
       vscodeAPI: vscode, // El módulo 'vscode' importado
-      chatId: chatId,
       dispatcher: this.dispatcher,
-      // dispatcher: this.dispatcher, // Si las herramientas necesitan emitir eventos
-      // outputChannel: vscode.window.createOutputChannel("Tool Output") // O una compartida
+      chatId: executionCtxArgs.chatId,
+      ...executionCtxArgs // Pasar cualquier otro argumento del contexto
     };
 
     try {
       this.log('info', `Validating parameters for tool: ${name}`, logDetails);
       this.validateParameters(tool, params);
 
-      // >>> INICIO DE VERIFICACIÓN DE PERMISOS <<<
       if (tool.requiredPermissions && tool.requiredPermissions.length > 0) {
         this.log('info', `Checking permissions for tool: ${name}`, { ...logDetails, permissions: tool.requiredPermissions });
         const permissionGranted = await PermissionManager.checkPermissions(
           tool.name,
           tool.requiredPermissions,
-          params
+          params, // Pasar params para el contexto del prompt de permisos
+          executionContext // Pasar el contexto completo por si PermissionManager lo necesita
         );
         if (!permissionGranted) {
-          const errorMsg = `Permission denied by user or configuration for tool ${name}. Required: ${tool.requiredPermissions.join(', ')}`;
+          const errorMsg = `Permission denied for tool ${name}. Required: ${tool.requiredPermissions.join(', ')}`;
           this.log('warning', errorMsg, logDetails);
           return { success: false, error: errorMsg };
         }
         this.log('info', `Permissions granted for tool: ${name}`, logDetails);
       }
-      // >>> FIN DE VERIFICACIÓN DE PERMISOS <<<
 
       this.log('info', `Parameters validated. Executing tool: ${name}`, logDetails);
-      return await tool.execute(params, executionContext); // Pasar el contexto
+      const startTime = Date.now();
+      const result = await tool.execute(params, executionContext);
+      const executionTime = Date.now() - startTime;
+      
+      this.log('info', `Tool ${name} execution finished. Success: ${result.success}. Time: ${executionTime}ms`, { ...logDetails, resultSummary: result.success ? 'OK' : result.error?.substring(0,100) });
+      return { ...result, executionTime };
 
     } catch (error: any) {
-      // Si validateParameters lanza un error, se captura aquí.
-      // Si tool.execute lanza un error, también se captura aquí.
       this.log('error', `Error during execution of tool ${name}: ${error.message}`, logDetails, error);
-      return { success: false, error: error.message };
+      return { success: false, error: error.message, executionTime: 0 };
     }
   }
 
-  // validateParameters y validateParameterValue (sin cambios respecto a tu versión, pero incluidos por completitud)
   private validateParameters(tool: ToolDefinition, params: any): void {
     const errors: string[] = [];
     
     for (const [paramName, def] of Object.entries(tool.parameters)) {
-      if (def.required && (params == null || !(paramName in params))) {
-        errors.push(`Missing required parameter: ${paramName}`);
+      if (def.required && (params == null || !(paramName in params) || params[paramName] === undefined)) {
+        // Considerar undefined como no presente para parámetros requeridos
+        if (params && paramName in params && params[paramName] === null && !def.nullable) { // Si es null pero no nullable
+             errors.push(`Required parameter: ${paramName} cannot be null.`);
+        } else if (!(params && paramName in params && params[paramName] !== undefined)) {
+             errors.push(`Missing required parameter: ${paramName}`);
+        }
       }
     }
     
@@ -149,52 +139,80 @@ export class ToolRegistry {
     }
     
     if (errors.length > 0) {
-      const validationErrorMsg = `Validation failed for ${tool.name}: ${errors.join(', ')}`;
+      const validationErrorMsg = `Validation failed for ${tool.name}: ${errors.join('; ')}`;
       throw new Error(validationErrorMsg);
     }
   }
 
   private validateParameterValue(name: string, value: any, def: ParameterDefinition): string | null {
-    if (value == null && !def.required) return null; 
-    if (value == null && def.required) return `Parameter ${name} is required but was null/undefined`;
+    if (value === undefined && !def.required) return null;
+    if (value === null && def.nullable) return null; // Si es nullable y es null, está bien
+    if (value === null && !def.nullable && def.required) return `Parameter ${name} is required and cannot be null.`;
+    if (value === null && !def.nullable && !def.required) return null; // Si no es requerido y es null, está bien
+
+    if (value === undefined && def.required) return `Parameter ${name} is required but was undefined.`;
+
 
     const expectedType = def.type === 'any' ? typeof value : def.type;
     let actualType = Array.isArray(value) ? 'array' : typeof value;
     
-    if (def.type === 'file') {
+    if (def.type === 'file') { // 'file' es un string (path)
         actualType = typeof value; 
     }
 
     if (expectedType !== actualType && def.type !== 'any') {
-      return `Parameter ${name} must be ${expectedType}, got ${actualType}`;
+      // Permitir números para parámetros string si se pueden convertir (ej. enums numéricos como string)
+      // Esto puede ser demasiado permisivo, evaluar si es necesario.
+      // if (!(def.type === 'string' && typeof value === 'number')) {
+        return `Parameter ${name} must be of type ${expectedType}, but got type ${actualType}.`;
+      // }
     }
     
-    if (def.enum && !(def.enum as unknown[]).includes(value)) {
-      return `Parameter ${name} must be one of: ${def.enum.join(', ')}`;
+    if (def.enum && Array.isArray(def.enum) && !def.enum.includes(value)) {
+      return `Parameter ${name} has value "${value}" which is not in the allowed enum list: [${def.enum.join(', ')}].`;
     }
     
     if ((def.type === 'string' || def.type === 'array') && value != null && value.length != null) {
       if (def.minLength != null && value.length < def.minLength) {
-        return `Parameter ${name} must have at least ${def.minLength} items/characters`;
+        return `Parameter ${name} must have at least ${def.minLength} items/characters, but has ${value.length}.`;
       }
       if (def.maxLength != null && value.length > def.maxLength) {
-        return `Parameter ${name} must have at most ${def.maxLength} items/characters`;
+        return `Parameter ${name} must have at most ${def.maxLength} items/characters, but has ${value.length}.`;
       }
     }
     
-    if (def.type === 'number' && value != null) { // Check value is not null for numeric comparisons
+    if (def.type === 'number' && typeof value === 'number') {
       if (def.minimum != null && value < def.minimum) {
-        return `Parameter ${name} must be at least ${def.minimum}`;
+        return `Parameter ${name} must be at least ${def.minimum}, but is ${value}.`;
       }
       if (def.maximum != null && value > def.maximum) {
-        return `Parameter ${name} must be at most ${def.maximum}`;
+        return `Parameter ${name} must be at most ${def.maximum}, but is ${value}.`;
       }
     }
     
-    if (def.type === 'string' && def.pattern && value != null) { // Check value is not null for regex test
+    if (def.type === 'string' && def.pattern && typeof value === 'string') {
       if (!new RegExp(def.pattern).test(value)) {
-        return `Parameter ${name} does not match pattern: ${def.pattern}`;
+        return `Parameter ${name} with value "${value}" does not match pattern: ${def.pattern}.`;
       }
+    }
+
+    if (def.type === 'array' && def.items && Array.isArray(value)) {
+        for (let i = 0; i < value.length; i++) {
+            const itemError = this.validateParameterValue(`${name}[${i}]`, value[i], def.items);
+            if (itemError) return itemError;
+        }
+    }
+
+    if (def.type === 'object' && def.properties && typeof value === 'object' && value !== null) {
+        for (const propName in def.properties) {
+            if (def.properties.hasOwnProperty(propName)) {
+                const propDef = def.properties[propName];
+                const propError = this.validateParameterValue(`${name}.${propName}`, value[propName], propDef);
+                if (propError) return propError;
+            }
+        }
+        // Opcional: verificar si hay propiedades extra no definidas en `def.properties`
+        // if (!def.additionalProperties) { ... }
     }
     
     return null;

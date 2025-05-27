@@ -1,75 +1,87 @@
 // src/features/tools/definitions/workspace.ts
-import * as vscode from 'vscode';
-import * as fs from 'fs';
-import * as path from 'path';
-import { ToolDefinition } from '../types';
+// import * as vscode from 'vscode'; // NO MÁS
+// import * as fs from 'fs'; // Intentar usar vscode.workspace.fs si es posible, o mantener para cosas muy específicas
+// import * as path from 'path'; // path es genérico, puede mantenerse
+import { ToolDefinition, ToolExecutionContext, ToolPermission } from '../types';
+import * as path from 'path'; // path es un módulo de Node, está bien importarlo directamente
 
 export const getProjectInfo: ToolDefinition = {
   name: 'getProjectInfo',
   description: 'Gets project information including package.json, git info, and file statistics',
   parameters: {},
-  async execute() {
+  requiredPermissions: ['workspace.info.read'], // AÑADIDO
+  async execute(params: {}, context?: ToolExecutionContext) { // params y context añadidos
+    if (!context?.vscodeAPI) { // COMPROBACIÓN CLAVE
+      return { success: false, error: 'VSCode API context not available for getProjectInfo.' };
+    }
+    const vscodeInstance = context.vscodeAPI;
+    // fs se usará de vscode.workspace.fs para consistencia
+    const fs = vscodeInstance.workspace.fs;
+
+
     try {
-      // Verificar que haya un workspace abierto
-      const workspaceFolders = vscode.workspace.workspaceFolders;
+      const workspaceFolders = vscodeInstance.workspace.workspaceFolders;
       if (!workspaceFolders || workspaceFolders.length === 0) {
-        throw new Error('No workspace folders found');
+        return { success: false, error: 'No workspace folders found' };
       }
-      
+
       const rootFolder = workspaceFolders[0];
       const rootPath = rootFolder.uri.fsPath;
       const workspaceFolderPaths = workspaceFolders.map(folder => folder.uri.fsPath);
-      
-      // Obtener nombre del proyecto
+
       let projectName = path.basename(rootPath);
       let packageJson: any = undefined;
-      
-      // Intentar leer el package.json
-      const packageJsonPath = path.join(rootPath, 'package.json');
-      if (fs.existsSync(packageJsonPath)) {
-        try {
-          const packageJsonContent = fs.readFileSync(packageJsonPath, 'utf-8');
-          packageJson = JSON.parse(packageJsonContent);
-          if (packageJson.name) {
-            projectName = packageJson.name;
-          }
-        } catch (err) {
-          console.warn('Error reading package.json:', err);
+
+      const packageJsonUri = vscodeInstance.Uri.joinPath(rootFolder.uri, 'package.json');
+      try {
+        // Leer con vscode.workspace.fs
+        const packageJsonContentUint8 = await fs.readFile(packageJsonUri);
+        const packageJsonContent = new TextDecoder().decode(packageJsonContentUint8);
+        packageJson = JSON.parse(packageJsonContent);
+        if (packageJson.name) {
+          projectName = packageJson.name;
+        }
+      } catch (err) {
+        // Si el archivo no existe (ENOENT) o hay error de parseo, es un warning, no un fallo de la herramienta
+        if (err instanceof vscodeInstance.FileSystemError && err.code === 'FileNotFound') {
+             console.warn(`[getProjectInfo] package.json not found at ${packageJsonUri.fsPath}`);
+        } else {
+             console.warn(`[getProjectInfo] Error reading or parsing package.json at ${packageJsonUri.fsPath}:`, err);
         }
       }
-      
-      // Verificar si es un repositorio git
-      const gitInfo: { hasGit: boolean; currentBranch?: string } = {
-        hasGit: false
-      };
-      
-      const gitPath = path.join(rootPath, '.git');
-      if (fs.existsSync(gitPath)) {
+
+      const gitInfo: { hasGit: boolean; currentBranch?: string } = { hasGit: false };
+      const gitUri = vscodeInstance.Uri.joinPath(rootFolder.uri, '.git');
+      try {
+        await fs.stat(gitUri); // Verificar si .git existe
         gitInfo.hasGit = true;
-        
-        // Intentar obtener la rama actual
+
+        const headUri = vscodeInstance.Uri.joinPath(gitUri, 'HEAD');
         try {
-          const headPath = path.join(gitPath, 'HEAD');
-          if (fs.existsSync(headPath)) {
-            const headContent = fs.readFileSync(headPath, 'utf-8').trim();
-            const match = headContent.match(/ref: refs\/heads\/(.+)/);
-            if (match && match[1]) {
-              gitInfo.currentBranch = match[1];
-            }
+          const headContentUint8 = await fs.readFile(headUri);
+          const headContent = new TextDecoder().decode(headContentUint8).trim();
+          const match = headContent.match(/ref: refs\/heads\/(.+)/);
+          if (match && match[1]) {
+            gitInfo.currentBranch = match[1];
           }
         } catch (err) {
-          console.warn('Error reading git branch:', err);
+          console.warn('[getProjectInfo] Error reading .git/HEAD:', err);
         }
+      } catch (err) {
+         // .git no existe, no es un error, solo no hay git.
+         if (err instanceof vscodeInstance.FileSystemError && err.code === 'FileNotFound') {
+             // Silencioso, es normal que no haya .git
+         } else {
+             console.warn('[getProjectInfo] Error checking for .git directory:', err);
+         }
       }
-      
-      // Obtener estadísticas de archivos
-      const files = await vscode.workspace.findFiles('**/*', '**/node_modules/**');
+
+      const files = await vscodeInstance.workspace.findFiles('**/*', '**/node_modules/**');
       const fileStats = {
         totalFiles: files.length,
         byExtension: {} as Record<string, number>
       };
-      
-      // Contar archivos por extensión
+
       for (const file of files) {
         const ext = path.extname(file.fsPath).toLowerCase();
         if (ext) {
@@ -77,7 +89,7 @@ export const getProjectInfo: ToolDefinition = {
           fileStats.byExtension[extName] = (fileStats.byExtension[extName] || 0) + 1;
         }
       }
-      
+
       const projectInfo = {
         name: projectName,
         rootPath,
@@ -86,16 +98,10 @@ export const getProjectInfo: ToolDefinition = {
         gitInfo,
         fileStats
       };
-      
-      return {
-        success: true,
-        data: projectInfo
-      };
+
+      return { success: true, data: projectInfo };
     } catch (error: any) {
-      return {
-        success: false,
-        error: error.message
-      };
+      return { success: false, error: error.message };
     }
   }
 };
@@ -103,54 +109,14 @@ export const getProjectInfo: ToolDefinition = {
 export const searchWorkspace: ToolDefinition = {
   name: 'searchWorkspace',
   description: 'Search for text in workspace files',
-  parameters: {
-    query: {
-      type: 'string',
-      description: 'Search query',
-      required: true
-    },
-    includePattern: {
-      type: 'string',
-      description: 'File pattern to include (glob)',
-      default: '**/*'
-    },
-    excludePattern: {
-      type: 'string',
-      description: 'File pattern to exclude (glob)',
-      required: false
-    },
-    maxResults: {
-      type: 'number',
-      description: 'Maximum number of results',
-      default: 100,
-      minimum: 1,
-      maximum: 1000
-    },
-    isCaseSensitive: {
-      type: 'boolean',
-      description: 'Case sensitive search',
-      default: false
-    },
-    isRegExp: {
-      type: 'boolean',
-      description: 'Use regular expression',
-      default: false
-    },
-    isWholeWord: {
-      type: 'boolean',
-      description: 'Match whole words only',
-      default: false
+  parameters: { /*...*/ },
+  requiredPermissions: ['workspace.info.read'], // AÑADIDO
+  async execute(params: { /*...*/ }, context?: ToolExecutionContext) { // context añadido
+    if (!context?.vscodeAPI) { // COMPROBACIÓN CLAVE
+      return { success: false, error: 'VSCode API context not available for searchWorkspace.' };
     }
-  },
-  async execute(params: {
-    query: string;
-    includePattern?: string;
-    excludePattern?: string;
-    maxResults?: number;
-    isCaseSensitive?: boolean;
-    isRegExp?: boolean;
-    isWholeWord?: boolean;
-  }) {
+    const vscodeInstance = context.vscodeAPI;
+
     try {
       const {
         query,
@@ -160,53 +126,41 @@ export const searchWorkspace: ToolDefinition = {
         isCaseSensitive = false,
         isRegExp = false,
         isWholeWord = false
-      } = params;
-      
+      } = params as any; // Cast params for now, ensure types match later
+
       if (!query || typeof query !== 'string') {
-        throw new Error(`Invalid query parameter: ${JSON.stringify(query)}. Expected a string.`);
+        // Devolver ToolResult
+        return { success: false, error: `Invalid query parameter: ${JSON.stringify(query)}. Expected a string.`};
       }
 
-      // Get all matching files
-      const files = await vscode.workspace.findFiles(
+      const files = await vscodeInstance.workspace.findFiles(
         includePattern,
-        excludePattern ? excludePattern : undefined,
-        maxResults
+        excludePattern ? excludePattern : undefined, // findFiles espera undefined, no null
+        maxResults // findFiles usa maxResults para el número de archivos, no de coincidencias de texto
       );
 
-      const results: Array<{
-        uri: string;
-        fileName: string;
-        lineNumber: number;
-        lineText: string;
-        matchText: string;
-      }> = [];
-      let resultCount = 0;
+      const results: Array<{ /*...*/ }> = [];
+      let resultCount = 0; // Este contador es para las coincidencias de texto
 
-      // Search in each file
       for (const file of files) {
-        if (resultCount >= maxResults) break;
+        if (resultCount >= maxResults) break; // Detenerse si se alcanza el maxResults de coincidencias
 
         try {
-          const document = await vscode.workspace.openTextDocument(file);
+          const document = await vscodeInstance.workspace.openTextDocument(file);
+          // ... (lógica de búsqueda existente, ya usa vscodeInstance indirectamente a través de document)
           const text = document.getText();
-          
-          // Create regex pattern based on parameters
-          let pattern = isRegExp ? query : 
+          let pattern = isRegExp ? query :
             query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-          
           if (isWholeWord) {
             pattern = `\\b${pattern}\\b`;
           }
-          
           const flags = isCaseSensitive ? 'g' : 'gi';
           const regex = new RegExp(pattern, flags);
-          
-          // Search in each line
+
           const lines = text.split('\n');
           for (let i = 0; i < lines.length && resultCount < maxResults; i++) {
             const line = lines[i];
             let match: RegExpExecArray | null;
-            
             while ((match = regex.exec(line)) !== null && resultCount < maxResults) {
               results.push({
                 uri: file.toString(),
@@ -216,27 +170,19 @@ export const searchWorkspace: ToolDefinition = {
                 matchText: match[0]
               });
               resultCount++;
-              
-              // Avoid infinite loop for zero-length matches
               if (match.index === regex.lastIndex) {
                 regex.lastIndex++;
               }
             }
           }
         } catch (error) {
-          console.warn(`Error processing file ${file.fsPath}:`, error);
+          console.warn(`[searchWorkspace] Error processing file ${file.fsPath}:`, error);
         }
       }
-      
-      return {
-        success: true,
-        data: { results }
-      };
+
+      return { success: true, data: { results } };
     } catch (error: any) {
-      return {
-        success: false,
-        error: error.message
-      };
+      return { success: false, error: error.message };
     }
   }
 };

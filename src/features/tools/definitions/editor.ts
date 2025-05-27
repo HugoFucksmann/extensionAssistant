@@ -1,21 +1,28 @@
 // src/features/tools/definitions/editor.ts
-import * as vscode from 'vscode';
-import { ToolDefinition } from '../types';
+// import * as vscode from 'vscode'; // NO MÁS IMPORT GLOBAL SIEMPRE QUE SEA POSIBLE
+import { ToolDefinition, ToolExecutionContext } from '../types'; // ToolExecutionContext ya importa vscode
 
 export const getActiveEditorContent: ToolDefinition = {
   name: 'getActiveEditorContent',
   description: 'Gets content from the active editor',
   parameters: {},
-  async execute() {
+  requiredPermissions: ['editor.read'], // AÑADIDO requiredPermissions
+  async execute(params: {}, context?: ToolExecutionContext) { // params añadido aunque vacío, y context
+    if (!context?.vscodeAPI) { // COMPROBACIÓN CLAVE
+      return { success: false, error: 'VSCode API context not available for getActiveEditorContent.' };
+    }
+    const vscodeInstance = context.vscodeAPI;
+
     try {
-      const editor = vscode.window.activeTextEditor;
+      const editor = vscodeInstance.window.activeTextEditor;
       if (!editor) {
-        throw new Error('No active editor found');
+        // Devolver un ToolResult en lugar de lanzar error directamente
+        return { success: false, error: 'No active editor found' };
       }
-      
+
       const document = editor.document;
       const selection = editor.selection;
-      
+
       return {
         success: true,
         data: {
@@ -42,53 +49,32 @@ export const getActiveEditorContent: ToolDefinition = {
 export const applyTextEdit: ToolDefinition = {
   name: 'applyTextEdit',
   description: 'Applies text edits to a document',
-  parameters: {
-    edits: {
-      type: 'array',
-      description: 'Array of text edits to apply',
-      required: true,
-      items: {
-        type: 'object',
-        description: 'Text edit definition', // Añade esta línea
-        properties: {
-          range: {
-            type: 'object',
-            description: 'Range to edit',
-            required: true
-          },
-          text: {
-            type: 'string',
-            description: 'New text', 
-            required: true
-          }
-        }
-      }
-    },
-    documentUri: {
-      type: 'string',
-      description: 'URI of document to edit',
-      required: false
+  parameters: { /*...*/ },
+  requiredPermissions: ['editor.write'], // AÑADIDO requiredPermissions
+  async execute(params: { edits: any[]; documentUri?: string }, context?: ToolExecutionContext) {
+    if (!context?.vscodeAPI) { // COMPROBACIÓN CLAVE
+      return { success: false, error: 'VSCode API context not available for applyTextEdit.' };
     }
-  },
-  async execute(params: { edits: any[]; documentUri?: string }) {
+    const vscodeInstance = context.vscodeAPI;
+
     try {
       const { edits, documentUri } = params;
-      
-      let document: vscode.TextDocument;
+
+      let document: import('vscode').TextDocument;
       if (documentUri) {
-        document = await vscode.workspace.openTextDocument(vscode.Uri.parse(documentUri));
+        document = await vscodeInstance.workspace.openTextDocument(vscodeInstance.Uri.parse(documentUri));
       } else {
-        const editor = vscode.window.activeTextEditor;
+        const editor = vscodeInstance.window.activeTextEditor;
         if (!editor) {
-          throw new Error('No active editor and no document URI provided');
+          return { success: false, error: 'No active editor and no document URI provided' };
         }
         document = editor.document;
       }
-      
-      const workspaceEdit = new vscode.WorkspaceEdit();
-      
+
+      const workspaceEdit = new vscodeInstance.WorkspaceEdit();
+
       for (const edit of edits) {
-        const range = new vscode.Range(
+        const range = new vscodeInstance.Range(
           edit.range.start.line,
           edit.range.start.character,
           edit.range.end.line,
@@ -96,12 +82,12 @@ export const applyTextEdit: ToolDefinition = {
         );
         workspaceEdit.replace(document.uri, range, edit.text);
       }
-      
-      const success = await vscode.workspace.applyEdit(workspaceEdit);
-      
+
+      const success = await vscodeInstance.workspace.applyEdit(workspaceEdit);
+
       return {
         success,
-        data: { success }
+        data: { success } // El resultado de applyEdit es un booleano
       };
     } catch (error: any) {
       return {
