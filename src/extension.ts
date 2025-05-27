@@ -2,6 +2,7 @@
 import * as vscode from 'vscode';
 import { WebviewProvider } from './vscode/webView/webviewProvider';
 import { ComponentFactory } from './core/ComponentFactory';
+import { PermissionManager } from './features/tools/PermissionManager';
 
 let webviewProvider: WebviewProvider | undefined;
 
@@ -47,6 +48,22 @@ export function activate(context: vscode.ExtensionContext) {
     disposables.push(
       vscode.commands.registerCommand('extensionAssistant.settings', () => {
         vscode.commands.executeCommand('workbench.action.openSettings', 'extensionAssistant');
+      })
+    );
+
+    // Comando para habilitar/deshabilitar el modo de prueba
+    disposables.push(
+      vscode.commands.registerCommand('extensionAssistant.toggleTestMode', () => {
+        const currentTestMode = PermissionManager.isTestModeEnabled();
+        const newTestMode = !currentTestMode;
+        PermissionManager.setTestMode(newTestMode);
+        
+        // Notificar al webview sobre el cambio de modo
+        webviewProvider?.notifyTestModeChange(newTestMode);
+        
+        vscode.window.showInformationMessage(
+          `Modo de prueba ${newTestMode ? 'habilitado' : 'deshabilitado'}. ${newTestMode ? 'Todos los permisos serán aprobados automáticamente.' : 'Los permisos serán verificados normalmente.'}`
+        );
       })
     );
 

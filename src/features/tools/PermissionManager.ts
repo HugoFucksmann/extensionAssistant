@@ -1,9 +1,30 @@
 // src/features/tools/PermissionManager.ts
 import * as vscode from 'vscode';
 import { ToolPermission, ToolExecutionContext } from './types'; // ToolExecutionContext para el contexto del prompt
+import { EventType, WindsurfEvent, UserInputReceivedPayload, UserInteractionRequiredPayload } from '../events/eventTypes';
+
+// Variable global para habilitar el modo de prueba
+let testModeEnabled = false;
 
 export class PermissionManager {
     private static sessionGrantedPermissions = new Set<string>(); // Cache para permisos "prompt-session"
+
+    /**
+     * Habilita o deshabilita el modo de prueba. En modo de prueba, todas las verificaciones de permisos son automáticamente aprobadas.
+     * @param enabled True para habilitar el modo de prueba, false para deshabilitarlo.
+     */
+    public static setTestMode(enabled: boolean): void {
+        testModeEnabled = enabled;
+        console.log(`[PermissionManager] Test mode ${enabled ? 'enabled' : 'disabled'}. All permission checks will be ${enabled ? 'automatically approved' : 'enforced'}.`);
+    }
+
+    /**
+     * Verifica si el modo de prueba está habilitado.
+     * @returns True si el modo de prueba está habilitado, false en caso contrario.
+     */
+    public static isTestModeEnabled(): boolean {
+        return testModeEnabled;
+    }
 
     public static async checkPermissions(
         toolName: string,
@@ -13,6 +34,16 @@ export class PermissionManager {
     ): Promise<boolean> {
         if (!requiredPermissions || requiredPermissions.length === 0) {
             return true; // No se requieren permisos específicos
+        }
+
+        // Si el modo de prueba está habilitado, aprobar automáticamente todos los permisos
+        if (testModeEnabled) {
+            executionContext?.dispatcher?.systemInfo(
+                `[TestMode] Permission check for tool '${toolName}' automatically approved in test mode.`,
+                { toolName, requiredPermissions, testMode: true },
+                executionContext?.chatId
+            );
+            return true;
         }
 
         const vscodeAPI = executionContext?.vscodeAPI || vscode; // Usar del contexto o el global
@@ -43,23 +74,79 @@ export class PermissionManager {
                     continue; // Ya concedido en esta sesión
                 }
 
-                const userResponse = await vscodeAPI.window.showWarningMessage(
-                    `Tool '${toolName}' requires permission: '${this.getPermissionDescription(perm)}' to perform its task with parameters: ${JSON.stringify(toolParams, null, 2).substring(0, 200)}...\n\nDo you allow this action?`,
-                    { modal: true },
-                    'Allow', 'Deny'
-                );
-
-                if (userResponse === 'Allow') {
-                    if (configValue === 'prompt-session') {
-                        this.sessionGrantedPermissions.add(sessionPermKey);
-                    }
-                    executionContext?.dispatcher?.systemInfo(`Permission '${perm}' for tool '${toolName}' granted by user prompt.`, { toolName, perm, response: 'Allow' }, executionContext?.chatId);
-                    continue; // Permitido por el usuario
+                // Si tenemos un contexto de ejecución con dispatcher, usar la UI para solicitar el permiso
+                if (executionContext?.dispatcher && executionContext?.uiOperationId) {
+                    // Generar un ID único para esta solicitud de permiso
+                    const permissionRequestId = `perm_req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+                    
+                    // Enviar evento de solicitud de permiso a la UI
+                    executionContext.dispatcher.dispatch(EventType.USER_INTERACTION_REQUIRED, {
+                        interactionType: 'confirmation',
+                        uiOperationId: permissionRequestId,
+                        promptMessage: `Tool '${toolName}' requires permission: '${this.getPermissionDescription(perm)}'`,
+                        title: 'Permission Required',
+                        chatId: executionContext.chatId,
+                        confirmButtonText: 'Permitir',
+                        cancelButtonText: 'Denegar',
+                        // Incluir metadatos en el mensaje para que la UI pueda mostrar información relevante
+                        options: [{
+                            label: 'Permitir',
+                            value: true
+                        }, {
+                            label: 'Denegar',
+                            value: false
+                        }]
+                    });
+                    
+                    // Esperar la respuesta del usuario
+                    return new Promise<boolean>((resolve) => {
+                        const handlePermissionResponse = (event: WindsurfEvent) => {
+                            const payload = event.payload as UserInputReceivedPayload;
+                            if (payload.uiOperationId === permissionRequestId) {
+                                // Eliminar el listener una vez recibida la respuesta
+                                const subscription = executionContext.dispatcher?.subscribe(EventType.USER_INPUT_RECEIVED, handlePermissionResponse);
+                                subscription?.unsubscribe();
+                                
+                                // Resolver con la respuesta del usuario
+                                const allowed = !payload.wasCancelled && payload.value === true;
+                                
+                                if (allowed && configValue === 'prompt-session') {
+                                    this.sessionGrantedPermissions.add(sessionPermKey);
+                                }
+                                
+                                executionContext.dispatcher?.systemInfo(
+                                    `Permission '${perm}' for tool '${toolName}' ${allowed ? 'granted' : 'denied'} by user via UI.`,
+                                    { toolName, perm, response: allowed ? 'Allow' : 'Deny' },
+                                    executionContext.chatId
+                                );
+                                
+                                resolve(allowed);
+                            }
+                        };
+                        
+                        // Suscribirse al evento de respuesta
+                        executionContext.dispatcher?.subscribe(EventType.USER_INPUT_RECEIVED, handlePermissionResponse);
+                    });
                 } else {
-                    const msg = `Action for tool '${toolName}' (permission: '${perm}') was denied by user.`;
-                    executionContext?.dispatcher?.systemWarning(msg, { toolName, perm, response: 'Deny' }, executionContext?.chatId);
-                    vscodeAPI.window.showInformationMessage(msg);
-                    return false; // Denegado por el usuario
+                    // Fallback a diálogo nativo si no hay contexto de UI
+                    const userResponse = await vscodeAPI.window.showWarningMessage(
+                        `Tool '${toolName}' requires permission: '${this.getPermissionDescription(perm)}' to perform its task with parameters: ${JSON.stringify(toolParams, null, 2).substring(0, 200)}...\n\nDo you allow this action?`,
+                        { modal: true },
+                        'Allow', 'Deny'
+                    );
+
+                    if (userResponse === 'Allow') {
+                        if (configValue === 'prompt-session') {
+                            this.sessionGrantedPermissions.add(sessionPermKey);
+                        }
+                        executionContext?.dispatcher?.systemInfo(`Permission '${perm}' for tool '${toolName}' granted by user prompt.`, { toolName, perm, response: 'Allow' }, executionContext?.chatId);
+                        continue; // Permitido por el usuario
+                    } else {
+                        const msg = `Action for tool '${toolName}' (permission: '${perm}') was denied by user.`;
+                        executionContext?.dispatcher?.systemWarning(msg, { toolName, perm, response: 'Deny' }, executionContext?.chatId);
+                        vscodeAPI.window.showInformationMessage(msg);
+                        return false; // Denegado por el usuario
+                    }
                 }
             } else {
                 // Configuración desconocida, inválida, o no establecida (undefined)
@@ -76,6 +163,11 @@ export class PermissionManager {
     }
 
     private static getPermissionConfigKey(permission: ToolPermission): string {
+        // Caso especial para workspace.info.read
+        if (permission === 'workspace.info.read') {
+            return 'allowWorkspaceInfoRead';
+        }
+        
         const parts = permission.split('.');
         const actionPart = parts[1] ? parts[1].charAt(0).toUpperCase() + parts[1].slice(1) : '';
         return `allow${parts[0].charAt(0).toUpperCase() + parts[0].slice(1)}${actionPart}`;

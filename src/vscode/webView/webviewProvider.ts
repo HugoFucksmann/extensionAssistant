@@ -10,8 +10,9 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
   private view?: vscode.WebviewView;
   private disposables: vscode.Disposable[] = [];
   private currentChatId: string | null = null;
-  private currentOperationId: string | null = null;
+  private currentOperationId: string | null = null; // Para rastrear la operación actual iniciada por el usuario
   private dispatcherSubscriptions: { unsubscribe: () => void }[] = [];
+  private testModeEnabled: boolean = false;
 
   constructor(
     private readonly extensionUri: vscode.Uri,
@@ -44,15 +45,14 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
 
     this.view.webview.onDidReceiveMessage(
       async (message) => {
-        // console.log('[WebviewProvider] Received from UI:', message.type); 
-
         switch (message.type) {
           case 'uiReady':
             this.currentChatId = this.generateChatId();
             console.log(`[WebviewProvider DEBUG] UI Ready. New Chat ID: ${this.currentChatId}`);
             this.postMessage('sessionReady', {
               chatId: this.currentChatId,
-              messages: [] 
+              messages: [],
+              testMode: this.testModeEnabled
             });
             break;
 
@@ -65,6 +65,18 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
             console.log(`[WebviewProvider DEBUG] userMessageSent for chatId: ${this.currentChatId}. Payload: ${JSON.stringify(message.payload)}`);
             await this.handleUserMessage(message.payload);
             break;
+            
+          case 'permissionResponse':
+            // Recibir respuesta de la UI sobre una solicitud de permiso
+            console.log(`[WebviewProvider DEBUG] Permission response received: ${JSON.stringify(message.payload)}`);
+            // Emitir evento para que PermissionManager lo reciba
+            this.internalEventDispatcher.dispatch(EventType.USER_INPUT_RECEIVED, {
+              uiOperationId: message.payload.operationId,
+              value: message.payload.allowed,
+              wasCancelled: !message.payload.allowed,
+              chatId: this.currentChatId || undefined
+            });
+            break;
 
           case 'newChatRequestedByUI':
             this.currentChatId = this.generateChatId();
@@ -73,29 +85,42 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
             this.postMessage('newChatStarted', { chatId: this.currentChatId });
             break;
 
-          case 'command':
+          case 'command': // Comando directo desde la UI para ejecutar una herramienta
             console.log(`[WebviewProvider DEBUG] Received command from UI: ${message.payload?.command}`);
-            if (message.payload?.command === 'getProjectFiles') {
+            
+            if (message.payload?.command === 'toggleTestMode') {
+              // Este comando se maneja en extension.ts, no necesitamos hacer nada aquí
+              console.log(`[WebviewProvider DEBUG] toggleTestMode command received from UI`);
+            } else if (message.payload?.command === 'getProjectFiles') {
+              if (!this.currentChatId) {
+                this.postMessage('systemError', { message: 'No active chat session to associate with tool execution.' });
+                return;
+              }
               try {
-                const result = await this.appLogicService.executeTool('listFiles', {
-                  dirPath: '.', 
-                  excludePattern: 'node_modules|\\.git', 
-                  recursive: true
-                });
+                // Usar el nuevo método invokeTool de ApplicationLogicService
+                const result = await this.appLogicService.invokeTool(
+                  'listFiles', // Nombre de la herramienta
+                  { pattern: '**/*' }, // Parámetros para listFiles (ajusta según tu esquema Zod)
+                                      // El esquema de listFiles tiene 'pattern' como opcional con default '**/*'
+                                      // así que pasar {} también funcionaría si quieres el default.
+                  { chatId: this.currentChatId } // Contexto de ejecución
+                );
                 
                 if (result.success && result.data?.files) {
-                  this.postMessage('projectFiles', { 
-                    files: result.data.files
-                      .filter((f: {isDirectory: boolean}) => !f.isDirectory)
-                      .map((f: {path: string}) => f.path) 
-                  });
+                  // Asumimos que result.data.files es Array<{ path: string; type: 'file' | 'directory' | ... }>
+                  const filePaths = (result.data.files as Array<{ path: string; type: string }>)
+                    .filter(f => f.type === 'file') // Filtrar solo archivos
+                    .map(f => f.path);
+
+                  this.postMessage('projectFiles', { files: filePaths });
                 } else {
-                  console.error('[WebviewProvider] Error getting project files:', result.error || 'No files data');
-                  this.postMessage('systemError', { message: result.error || 'Failed to list project files (no data)' });
+                  const errorMsg = result.error || 'Failed to list project files (no data or unsuccessful)';
+                  console.error('[WebviewProvider] Error getting project files:', errorMsg);
+                  this.postMessage('systemError', { message: errorMsg });
                 }
-              } catch (error) {
+              } catch (error: any) {
                 console.error('[WebviewProvider] Error in getProjectFiles handler:', error);
-                this.postMessage('systemError', { message: 'Failed to list project files' });
+                this.postMessage('systemError', { message: error.message || 'Failed to list project files' });
               }
             }
             break;
@@ -111,22 +136,29 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
   }
 
   private async handleUserMessage(payload: { text: string; files?: string[] }): Promise<void> {
+    if (!this.currentChatId) { // Doble check, aunque ya se hace en el switch
+        this.postMessage('systemError', { message: 'No active chat session' });
+        return;
+    }
     if (!payload.text?.trim()) {
       this.postMessage('systemError', { message: 'Message cannot be empty' });
       return;
     }
     
     this.currentOperationId = `op_${crypto.randomBytes(8).toString('hex')}`;
-    console.log(`[WebviewProvider DEBUG] Starting handleUserMessage. New OpID: ${this.currentOperationId}`);
+    console.log(`[WebviewProvider DEBUG] Starting handleUserMessage. ChatID: ${this.currentChatId}, New OpID: ${this.currentOperationId}`);
+
+    // Indicar a la UI que el procesamiento ha comenzado para esta operación
+    this.postMessage('processingStarted', { operationId: this.currentOperationId });
 
     try {
       const result = await this.appLogicService.processUserMessage(
-        this.currentChatId!,
+        this.currentChatId,
         payload.text,
         { files: payload.files || [] } 
       );
 
-      console.log(`[WebviewProvider DEBUG] appLogicService.processUserMessage result for OpID ${this.currentOperationId}:`, JSON.stringify(result));
+      console.log(`[WebviewProvider DEBUG] appLogicService.processUserMessage result for OpID ${this.currentOperationId}:`, JSON.stringify(result).substring(0, 200));
 
       if (result.success && result.finalResponse) {
         console.log(`[WebviewProvider DEBUG] Attempting to post 'assistantResponse'. OpID: ${this.currentOperationId}, Content: ${result.finalResponse.substring(0,50)}...`);
@@ -136,17 +168,20 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
           timestamp: Date.now(),
           operationId: this.currentOperationId 
         });
-        this.currentOperationId = null; 
-        console.log(`[WebviewProvider DEBUG] OpID ${this.currentOperationId} (was ${this.currentOperationId}) cleared after assistantResponse.`);
-      } else {
+      } else if (!result.success) { // Si falló explícitamente
         const errorMessage = result.error || 'Processing failed to produce a response.';
-        console.log(`[WebviewProvider DEBUG] Attempting to post 'systemError' (from processUserMessage). OpID: ${this.currentOperationId}, Message: ${errorMessage}`);
+        console.log(`[WebviewProvider DEBUG] Attempting to post 'systemError' (from processUserMessage failure). OpID: ${this.currentOperationId}, Message: ${errorMessage}`);
         this.postMessage('systemError', { 
           message: errorMessage,
           operationId: this.currentOperationId
         });
-        this.currentOperationId = null; 
-        console.log(`[WebviewProvider DEBUG] OpID ${this.currentOperationId} (was ${this.currentOperationId}) cleared after systemError from processUserMessage.`);
+      } else { // Si success es true pero no hay finalResponse (caso anómalo, o el agente necesita más pasos/input)
+        // Esto podría indicar que el agente está esperando un input del usuario (askUser)
+        // o que simplemente no generó una respuesta final en este ciclo.
+        // El feedback de 'askUser' se manejaría a través de eventos.
+        // Si no es askUser, y no hay error, pero no hay respuesta, es un poco ambiguo.
+        // Por ahora, si no hay error y no hay respuesta, no enviamos nada más que el 'processingFinished'.
+        console.log(`[WebviewProvider DEBUG] processUserMessage successful but no finalResponse. OpID: ${this.currentOperationId}. State: ${result.updatedState?.completionStatus}`);
       }
     } catch (error: any) {
       console.error('[WebviewProvider] Critical error processing message:', error);
@@ -156,112 +191,153 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
         message: criticalErrorMessage,
         operationId: this.currentOperationId 
       });
-      this.currentOperationId = null; 
-      console.log(`[WebviewProvider DEBUG] OpID ${this.currentOperationId} (was ${this.currentOperationId}) cleared after critical error.`);
+    } finally {
+        // Indicar a la UI que el procesamiento para esta operación ha terminado (incluso si falló)
+        // Esto es importante para que la UI pueda, por ejemplo, reactivar el input del usuario.
+        if (this.currentOperationId) { // Solo si había una operación activa
+            console.log(`[WebviewProvider DEBUG] Posting 'processingFinished'. OpID: ${this.currentOperationId}`);
+            this.postMessage('processingFinished', { operationId: this.currentOperationId });
+            this.currentOperationId = null; 
+            // console.log(`[WebviewProvider DEBUG] OpID cleared after processingFinished.`);
+        }
     }
   }
 
-    private subscribeToInternalEvents(): void {
-      this.dispatcherSubscriptions.forEach(s => s.unsubscribe());
-      this.dispatcherSubscriptions = [];
-  
-      const eventTypesToWatch: EventType[] = [
-        EventType.TOOL_EXECUTION_STARTED,
-        EventType.TOOL_EXECUTION_COMPLETED,
-        EventType.TOOL_EXECUTION_ERROR,
-        EventType.SYSTEM_ERROR, 
-      ];
-  
-      eventTypesToWatch.forEach(eventType => {
-        this.dispatcherSubscriptions.push(
-          this.internalEventDispatcher.subscribe(eventType, (event: WindsurfEvent) => this.handleInternalEvent(event))
-        );
-      });
-      console.log('[WebviewProvider] Subscribed to UI-relevant events (Tools, System Errors). Watched types:', eventTypesToWatch.join(', '));
-    }
-  
-    private handleInternalEvent(event: WindsurfEvent): void {
-      if (!this.view) return; // No view, no postMessage
-      // No filtrar por currentChatId aquí si queremos que SYSTEM_ERROR globales se muestren
-      // Pero para TOOL_*, sí es importante.
-      // if (event.payload.chatId && event.payload.chatId !== this.currentChatId) {
-      //     console.log(`[WebviewProvider DEBUG] Ignoring event for different chatId. Current: ${this.currentChatId}, Event ChatID: ${event.payload.chatId}, Event Type: ${event.type}`);
-      //     return;
-      // }
-      
-      console.log(`[WebviewProvider DEBUG] Received internal event: ${event.type}, CurrentOpID: ${this.currentOperationId}, Event ChatID: ${event.payload.chatId}, Current ChatID: ${this.currentChatId}`);
+  private subscribeToInternalEvents(): void {
+    this.dispatcherSubscriptions.forEach(s => s.unsubscribe());
+    this.dispatcherSubscriptions = [];
 
-      let messageText: string | undefined;
-      let status: 'info' | 'success' | 'error' | 'thinking' | 'tool_executing' = 'info'; 
-      let toolName: string | undefined; // Para logging y potencialmente para la UI
+    const eventTypesToWatch: EventType[] = [
+      EventType.TOOL_EXECUTION_STARTED,
+      EventType.TOOL_EXECUTION_COMPLETED,
+      EventType.TOOL_EXECUTION_ERROR,
+      EventType.SYSTEM_ERROR,
+      EventType.USER_INTERACTION_REQUIRED, // <--- AÑADIR para askUser
+      EventType.RESPONSE_GENERATED, // <--- AÑADIR para sendResponseToUser y respuestas del agente
+    ];
 
-      // Filtrar eventos de herramientas si no corresponden al chat activo
-      if (event.type.startsWith('tool:execution:') && event.payload.chatId && event.payload.chatId !== this.currentChatId) {
-        console.log(`[WebviewProvider DEBUG] Tool event ${event.type} for different chatId ${event.payload.chatId} ignored. Current is ${this.currentChatId}.`);
+    eventTypesToWatch.forEach(eventType => {
+      this.dispatcherSubscriptions.push(
+        this.internalEventDispatcher.subscribe(eventType, (event: WindsurfEvent) => this.handleInternalEvent(event))
+      );
+    });
+    console.log('[WebviewProvider] Subscribed to UI-relevant events. Watched types:', eventTypesToWatch.join(', '));
+  }
+
+  private handleInternalEvent(event: WindsurfEvent): void {
+    if (!this.view) return;
+    
+    const eventChatId = event.payload.chatId;
+    // console.log(`[WebviewProvider DEBUG] Received internal event: ${event.type}, CurrentOpID: ${this.currentOperationId}, EventChatID: ${eventChatId}, CurrentChatID: ${this.currentChatId}`);
+
+    // Filtrar eventos que no son para el chat actual, excepto errores de sistema globales
+    if (event.type !== EventType.SYSTEM_ERROR && eventChatId && eventChatId !== this.currentChatId) {
+        // console.log(`[WebviewProvider DEBUG] Event ${event.type} for different chatId ${eventChatId} ignored. Current is ${this.currentChatId}.`);
         return;
-      }
-
-      switch (event.type) {
-        case EventType.TOOL_EXECUTION_STARTED:
-          const toolExecStartPayload = event.payload as ToolExecutionEventPayload;
-          toolName = toolExecStartPayload.toolName || 'una herramienta';
-          messageText = `Ejecutando ${toolName}...`;
-          status = 'tool_executing';
-          console.log(`[WebviewProvider DEBUG] Matched TOOL_EXECUTION_STARTED. Tool: ${toolName}`);
-          break;
-
-        case EventType.TOOL_EXECUTION_COMPLETED:
-          const toolExecCompletedPayload = event.payload as ToolExecutionEventPayload;
-          toolName = toolExecCompletedPayload.toolName || 'La herramienta';
-          messageText = `${toolName} finalizó.`;
-          status = 'success';
-          console.log(`[WebviewProvider DEBUG] Matched TOOL_EXECUTION_COMPLETED. Tool: ${toolName}`);
-          break;
-
-        case EventType.TOOL_EXECUTION_ERROR:
-          const toolExecErrorPayload = event.payload as ToolExecutionEventPayload;
-          toolName = toolExecErrorPayload.toolName || 'una herramienta';
-          const errorMsg = toolExecErrorPayload.error || 'Error desconocido';
-          messageText = `Error ejecutando ${toolName}: ${errorMsg}`;
-          status = 'error';
-          console.log(`[WebviewProvider DEBUG] Matched TOOL_EXECUTION_ERROR. Tool: ${toolName}, Error: ${errorMsg}`);
-          break;
-
-        case EventType.SYSTEM_ERROR:
-          const systemErrorPayload = event.payload as SystemEventPayload | ErrorOccurredEventPayload;
-          messageText = 'message' in systemErrorPayload 
-            ? systemErrorPayload.message 
-            : systemErrorPayload.errorMessage || 'Ocurrió un error en el sistema.';
-          status = 'error';
-          // Para SYSTEM_ERROR, no necesariamente hay un currentOperationId si es un error global.
-          // La UI decidirá cómo mostrarlo.
-          console.log(`[WebviewProvider DEBUG] Matched SYSTEM_ERROR. Message: ${messageText}`);
-          break;
-        
-        default: 
-          console.log(`[WebviewProvider DEBUG] Event ${event.type} not explicitly handled for UI feedback by this switch.`);
-          return; 
-      }
-  
-      if (messageText) {
-        // Para eventos de herramientas, deben estar asociados a una operación.
-        // Para SYSTEM_ERROR, podría no haber operationId si es un error global.
-        if (event.type.startsWith('tool:execution:') && !this.currentOperationId) {
-          console.warn(`[WebviewProvider DEBUG] No currentOperationId for tool event ${event.type}. 'agentActionUpdate' NOT sent for: ${messageText.substring(0,50)}...`);
-          return; // No enviar feedback de herramienta si no hay operación activa
-        }
-
-        console.log(`[WebviewProvider DEBUG] Attempting to post 'agentActionUpdate'. OpID: ${this.currentOperationId}, Status: ${status}, Content: ${messageText.substring(0, 50)}...`);
-        this.postMessage('agentActionUpdate', {
-          id: `agent_event_${event.id || Date.now()}`,
-          content: messageText,
-          status: status,
-          timestamp: event.timestamp || Date.now(),
-          operationId: this.currentOperationId, // Será null para SYSTEM_ERROR globales si no hay op activa
-          toolName: toolName // Añadido para dar más contexto a la UI si lo necesita
-        });
-      }
     }
+
+    let uiMessagePayload: any = {
+        id: `event_${event.id || Date.now()}`,
+        timestamp: event.timestamp || Date.now(),
+        operationId: this.currentOperationId, // Asociar con la operación actual si existe
+    };
+    let uiMessageType: string | null = null;
+
+    switch (event.type) {
+      case EventType.TOOL_EXECUTION_STARTED:
+        const toolStart = event.payload as ToolExecutionEventPayload;
+        uiMessageType = 'agentActionUpdate';
+        uiMessagePayload.content = `Ejecutando ${toolStart.toolName || 'herramienta'}...`;
+        uiMessagePayload.status = 'tool_executing';
+        uiMessagePayload.toolName = toolStart.toolName;
+        break;
+
+      case EventType.TOOL_EXECUTION_COMPLETED:
+        const toolComplete = event.payload as ToolExecutionEventPayload;
+        uiMessageType = 'agentActionUpdate';
+        // Podríamos querer mostrar el resultado de la herramienta si es breve y útil
+        // let resultSummary = toolComplete.result ? `: ${JSON.stringify(toolComplete.result).substring(0,30)}...` : '.';
+        // uiMessagePayload.content = `${toolComplete.toolName || 'La herramienta'} finalizó${resultSummary}`;
+        uiMessagePayload.content = `${toolComplete.toolName || 'La herramienta'} finalizó.`;
+        uiMessagePayload.status = 'success';
+        uiMessagePayload.toolName = toolComplete.toolName;
+        break;
+
+      case EventType.TOOL_EXECUTION_ERROR:
+        const toolError = event.payload as ToolExecutionEventPayload;
+        uiMessageType = 'agentActionUpdate';
+        uiMessagePayload.content = `Error en ${toolError.toolName || 'herramienta'}: ${toolError.error || 'desconocido'}`;
+        uiMessagePayload.status = 'error';
+        uiMessagePayload.toolName = toolError.toolName;
+        break;
+
+      case EventType.SYSTEM_ERROR:
+        const sysError = event.payload as SystemEventPayload | ErrorOccurredEventPayload;
+        uiMessageType = 'systemError'; // Usar un tipo de mensaje UI diferente para errores del sistema
+        uiMessagePayload.message = 'message' in sysError ? sysError.message : sysError.errorMessage || 'Error inesperado del sistema.';
+        // operationId podría no ser relevante o ser null si es un error global
+        break;
+      
+      case EventType.USER_INPUT_RECEIVED: // Respuesta a askUser o a solicitudes de permisos
+        // Si es una respuesta a una solicitud de permiso, la manejamos en PermissionManager
+        // Si es una respuesta a askUser, se maneja directamente en el flujo que lo llamó
+        break;
+
+      case EventType.USER_INTERACTION_REQUIRED: // Para askUser y solicitudes de permisos
+        const interactionReq = event.payload as any; // UserInteractionRequiredPayload
+        
+        // Si es una solicitud de permiso (tiene title 'Permission Required')
+        if (interactionReq.interactionType === 'confirmation' && interactionReq.title === 'Permission Required') {
+          // Extraer información de la herramienta y el permiso del mensaje
+          const toolNameMatch = interactionReq.promptMessage.match(/Tool '([^']+)'/);
+          const permissionMatch = interactionReq.promptMessage.match(/permission: '([^']+)'/);
+          
+          this.postMessage('permissionRequest', {
+            toolName: toolNameMatch ? toolNameMatch[1] : 'Unknown Tool',
+            permission: permissionMatch ? permissionMatch[1] : 'Unknown Permission',
+            description: interactionReq.promptMessage,
+            params: interactionReq.options || [],
+            operationId: interactionReq.uiOperationId
+          });
+          return; // No enviar mensaje genérico de userInputRequired
+        }
+        
+        // Para otros tipos de interacción, usar el comportamiento normal
+        uiMessageType = 'userInputRequired'; // Mensaje específico para la UI
+        break;
+
+      case EventType.RESPONSE_GENERATED: // Para sendResponseToUser o respuestas finales del agente
+        const responseGen = event.payload as any; // ResponseEventPayload
+        // Solo mostrar si es una respuesta final y no la que ya manejamos en handleUserMessage
+        // Esto es útil si el agente genera múltiples mensajes o si sendResponseToUser se usa en medio de un flujo.
+        // Necesitamos una forma de distinguir si este evento es el mismo que el `finalResponse` de `processUserMessage`.
+        // Por ahora, si `currentOperationId` está activo, asumimos que la respuesta principal se maneja en `handleUserMessage`.
+        // Este evento sería para respuestas adicionales o si `sendResponseToUser` se usa independientemente.
+        if (responseGen.isFinal && responseGen.chatId === this.currentChatId) {
+            // Podríamos añadir una lógica para evitar duplicados si este evento
+            // es disparado por el mismo contenido que `result.finalResponse`
+            uiMessageType = 'assistantResponse';
+            uiMessagePayload.content = responseGen.responseContent;
+            // Si el evento RESPONSE_GENERATED tiene un operationId asociado por el agente, usarlo.
+            // uiMessagePayload.operationId = responseGen.operationId || this.currentOperationId;
+        }
+        break;
+      
+      default: 
+        return; 
+    }
+
+    if (uiMessageType) {
+      // Para eventos de herramientas, deben estar asociados a una operación.
+      if (uiMessageType === 'agentActionUpdate' && !uiMessagePayload.operationId && event.type.startsWith('tool:execution:')) {
+        console.warn(`[WebviewProvider DEBUG] No operationId for tool event ${event.type} in agentActionUpdate. Message: ${uiMessagePayload.content?.substring(0,50)}...`);
+        // No enviar si no hay operationId para un update de acción de agente
+        // a menos que sea un error de sistema que se quiera mostrar globalmente.
+        return; 
+      }
+      this.postMessage(uiMessageType, uiMessagePayload);
+    }
+  }
 
   public requestShowHistory(): void {
     console.log(`[WebviewProvider DEBUG] requestShowHistory called.`);
@@ -275,10 +351,19 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     console.log(`[WebviewProvider DEBUG] startNewChat called. Old Chat ID: ${oldChatId}, New Chat ID: ${this.currentChatId}. OpID cleared.`);
     this.postMessage('newChatStarted', { chatId: this.currentChatId });
   }
+  
+  /**
+   * Notifica a la UI sobre el cambio en el modo de prueba.
+   * @param enabled True si el modo de prueba está habilitado, false en caso contrario.
+   */
+  public notifyTestModeChange(enabled: boolean): void {
+    this.testModeEnabled = enabled;
+    console.log(`[WebviewProvider DEBUG] Test mode ${enabled ? 'enabled' : 'disabled'}. Notifying UI.`);
+    this.postMessage('testModeChanged', { enabled });
+  }
 
   private postMessage(type: string, payload: any): void {
     if (this.view) {
-      // console.log(`[WebviewProvider DEBUG] Posting message to UI: Type: ${type}, Payload: ${JSON.stringify(payload).substring(0,100)}...`);
       this.view.webview.postMessage({ type, payload });
     } else {
       console.warn(`[WebviewProvider DEBUG] View not available. Cannot post message: Type: ${type}`);
@@ -286,16 +371,11 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
   }
 
   private generateChatId(): string {
-    return `chat_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    return `chat_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
   }
 
   private getNonce(): string {
-    let text = '';
-    const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    for (let i = 0; i < 32; i++) {
-      text += possible.charAt(Math.floor(Math.random() * possible.length));
-    }
-    return text;
+    return crypto.randomBytes(16).toString('hex');
   }
 
   public dispose(): void {

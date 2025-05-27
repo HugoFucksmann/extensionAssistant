@@ -1,13 +1,33 @@
 import React from 'react';
+import { getThemeCSSVariables } from './theme/theme';
 
-// Componentes de la interfaz
 import ChatInput from './Components/InputChat/ChatInput';
 import ChatMessages from './Components/ChatMessages/ChatMessages';
 import ChatHistory from './Components/historical/ChatHistory';
 import EmptyChatView from './Components/EmptyChatView';
+import PermissionManager from './Components/Permissions/PermissionManager';
 import { useApp } from './context/AppContext';
 
-// A simple loading spinner or message
+
+const TestModeIndicator = ({ enabled }) => {
+  if (!enabled) return null;
+  
+  return (
+    <div style={{
+      backgroundColor: '#FF9800',
+      color: '#000',
+      padding: '4px 8px',
+      fontSize: '12px',
+      textAlign: 'center',
+      fontWeight: 'bold',
+      borderBottom: '1px solid #E65100'
+    }}>
+      MODO DE PRUEBA ACTIVADO - Los permisos de herramientas se aprueban automáticamente
+    </div>
+  );
+};
+
+
 const LoadingIndicator = () => {
   const { theme } = useApp();
   return (
@@ -18,23 +38,19 @@ const LoadingIndicator = () => {
 };
 
 const App = () => {
-  const { messages, isLoading, showHistory, theme, activeFeedbackOperationId } = useApp();
+  const { messages, isLoading, showHistory, theme, activeFeedbackOperationId, testModeEnabled } = useApp();
   const isEmpty = messages.length === 0;
 
-  // Main container styles
+  // Inyectar variables CSS del tema
   const appContainerStyle = {
     display: 'flex',
     flexDirection: 'column',
     height: '100vh',
+    ...getThemeCSSVariables(theme),
     backgroundColor: theme.colors.background,
     color: theme.colors.text,
     overflow: 'hidden', 
   };
-
-  // Header style (not used in this simplified layout, but kept for potential future use)
-  // const headerStyle = { ... };
-  // const titleStyle = { ... };
-  // const newChatButtonStyle = { ... };
 
   const chatAreaStyle = {
     flex: 1, 
@@ -57,13 +73,15 @@ const App = () => {
     );
   }
 
-  // Show top-level loading only if it's initial load, no messages, and no active feedback operation
+ 
   const showTopLevelLoading = isLoading && isEmpty && !activeFeedbackOperationId;
-  // Show empty view if no messages and no active feedback operation (and not loading)
+
   const showEmptyView = isEmpty && !activeFeedbackOperationId && !showTopLevelLoading;
 
   return (
     <div style={appContainerStyle}>
+      <TestModeIndicator enabled={testModeEnabled} />
+      <PermissionManager />
       <main style={chatAreaStyle}>
         {showTopLevelLoading ? (
           <LoadingIndicator />
@@ -71,7 +89,7 @@ const App = () => {
           <EmptyChatView />
         ) : (
           <>
-            <ChatMessages /> {/* ChatMessages now includes UnifiedFeedbackDisplay for active operations */}
+            <ChatMessages />
             <div style={chatInputContainerStyle}>
               <ChatInput />
             </div>

@@ -3,6 +3,7 @@ import React, { useRef, useLayoutEffect, memo } from "react";
 import { useApp } from "../../context/AppContext";
 import MessageRenderer from "./MessageRenderer";
 import FeedbackRenderer from "./FeedbackRenderer";
+import "./ChatMessages.css";
 
 const ChatMessages = ({ children }) => {
   const { theme, messages, activeFeedbackOperationId } = useApp();
@@ -12,50 +13,9 @@ const ChatMessages = ({ children }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length, activeFeedbackOperationId]);
 
-  const containerStyle = {
-    display: "flex",
-    flexDirection: "column",
-    flex: 1,
-    height: "100%",
-    backgroundColor: theme.colors.background,
-    overflow: "hidden",
-  };
-
-  const scrollableStyle = {
-    display: "flex",
-    flexDirection: "column",
-    height: "100%",
-    flex: 1,
-    overflow: "auto",
-    padding: `0 ${theme.spacing.small}`,
-  };
-
   return (
-    <div style={containerStyle}>
-      <style>{`
-        .message-fade-in {
-          animation: messageFadeIn 0.3s ease-out forwards;
-        }
-        @keyframes messageFadeIn {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        .chat-scrollbar::-webkit-scrollbar {
-          width: 8px;
-        }
-        .chat-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .chat-scrollbar::-webkit-scrollbar-thumb {
-          background-color: ${theme.colors.border};
-          border-radius: 4px;
-        }
-        .chat-scrollbar::-webkit-scrollbar-thumb:hover {
-          background-color: ${theme.colors.primary};
-        }
-      `}</style>
-      
-      <div className="chat-scrollbar" style={scrollableStyle}>
+    <div className="chat-messages-container">
+      <div className="chat-scrollbar chat-messages-scrollable">
         {messages.map((message, index) => {
           // Render user message
           if (message.sender === "user") {

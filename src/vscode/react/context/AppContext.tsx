@@ -2,7 +2,10 @@
 
 import React, { createContext, useContext, useEffect, useReducer } from 'react';
 import { ChatMessage, Chat } from '@shared/types';
-import { getTheme, ThemeType } from '../theme/theme';
+// @ts-ignore
+import { getTheme } from '../theme/theme.js';
+
+type ThemeType = any; // Tipo genérico para el tema
 
 declare global {
   interface Window {
@@ -23,9 +26,9 @@ interface AppState {
   currentModel: string;
   isDarkMode: boolean;
   theme: ThemeType;
-  // processingPhase: string; // Eliminado si no se usa en otro lugar
   activeFeedbackOperationId: string | null;
   feedbackMessages: { [operationId: string]: ChatMessage[] };
+  testModeEnabled: boolean;
 }
 
 type AppAction =
@@ -34,14 +37,14 @@ type AppAction =
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_CHAT_ID'; payload: string | null }
   | { type: 'SET_SHOW_HISTORY'; payload: boolean }
-  // | { type: 'SET_PROCESSING_PHASE'; payload: string } // Eliminado
   | { type: 'NEW_CHAT_STARTED'; payload: { chatId: string } }
   | { type: 'CLEAR_MESSAGES' }
   | { type: 'SET_CHAT_LIST'; payload: Chat[] }
   | { type: 'SET_CURRENT_MODEL'; payload: string }
   | { type: 'TOGGLE_DARK_MODE' }
   | { type: 'SET_THEME'; payload: ThemeType }
-  | { type: 'SESSION_READY'; payload: { chatId: string; messages: ChatMessage[]; model?: string; history?: Chat[] } }
+  | { type: 'SET_TEST_MODE'; payload: boolean }
+  | { type: 'SESSION_READY'; payload: { chatId: string; messages: ChatMessage[]; model?: string; history?: Chat[]; testMode?: boolean } }
   | { type: 'AGENT_ACTION_UPDATE'; payload: ChatMessage };
 
 const body = document.body;
@@ -56,9 +59,9 @@ const initialState: AppState = {
   currentModel: 'gemini',
   isDarkMode: initialIsDarkMode,
   theme: getTheme(initialIsDarkMode),
-  // processingPhase: '', // Eliminado
   activeFeedbackOperationId: null,
   feedbackMessages: {},
+  testModeEnabled: false,
 };
 
 function appReducer(state: AppState, action: AppAction): AppState {
@@ -73,6 +76,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         isLoading: false,
         activeFeedbackOperationId: null,
         feedbackMessages: {},
+        testModeEnabled: action.payload.testMode !== undefined ? action.payload.testMode : state.testModeEnabled,
       };
     case 'SET_MESSAGES':
       return { ...state, messages: action.payload, isLoading: false };
@@ -82,8 +86,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, currentChatId: action.payload };
     case 'SET_SHOW_HISTORY':
       return { ...state, showHistory: action.payload };
-    // case 'SET_PROCESSING_PHASE':  // Eliminado
-    //   return { ...state, processingPhase: action.payload };
     case 'NEW_CHAT_STARTED':
       return { 
         ...state, 
@@ -100,11 +102,14 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, chatList: action.payload };
     case 'SET_CURRENT_MODEL':
       return { ...state, currentModel: action.payload };
-    case 'TOGGLE_DARK_MODE':
+    case 'TOGGLE_DARK_MODE': {
       const newIsDarkMode = !state.isDarkMode;
       return { ...state, isDarkMode: newIsDarkMode, theme: getTheme(newIsDarkMode) };
+    }
     case 'SET_THEME':
         return { ...state, theme: action.payload };
+    case 'SET_TEST_MODE':
+        return { ...state, testModeEnabled: action.payload };
     
     case 'AGENT_ACTION_UPDATE': {
       const opId = action.payload.metadata?.operationId;
@@ -122,7 +127,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
         },
         isLoading: action.payload.metadata?.status === 'thinking' || 
                      action.payload.metadata?.status === 'tool_executing',
-        // processingPhase: action.payload.metadata?.status || state.processingPhase, // Eliminado si processingPhase se elimina del estado
       };
     }
     
@@ -135,7 +139,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
       const isAssistantFinalResponse = action.payload.sender === 'assistant';
       if (isAssistantFinalResponse) {
         newState.isLoading = false; 
-        // newState.processingPhase = action.payload.metadata?.status || 'completed'; // Eliminado si processingPhase se elimina
       }
       return newState;
     }
@@ -152,6 +155,7 @@ interface AppContextType extends AppState {
   loadChat: (chatId: string) => void;
   switchModel: (modelType: string) => void;
   toggleDarkMode: () => void;
+  toggleTestMode: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -193,15 +197,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         case 'newChatStarted':
           dispatch({ type: 'NEW_CHAT_STARTED', payload: { chatId: payload.chatId } });
           break;
-        // case 'processingUpdate': // Eliminado
-        //   dispatch({ type: 'SET_PROCESSING_PHASE', payload: payload.phase || '' });
-        //   if (payload.phase === 'processing' || payload.phase === 'thinking') {
-        //     dispatch({ type: 'SET_LOADING', payload: true });
-        //   } else if (payload.phase === 'completed' || payload.phase === 'error') {
-        //     dispatch({ type: 'SET_LOADING', payload: false });
-        //   }
-        //   break;
-        
         case 'agentActionUpdate':
           dispatch({
             type: 'AGENT_ACTION_UPDATE',
@@ -247,6 +242,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             if (state.isDarkMode !== newThemeIsDark) {
                 dispatch({ type: 'TOGGLE_DARK_MODE' });
             }
+            break;
+        case 'testModeChanged':
+            dispatch({ type: 'SET_TEST_MODE', payload: payload.enabled });
             break;
         case 'showHistory':
             dispatch({ type: 'SET_SHOW_HISTORY', payload: true });
@@ -309,6 +307,10 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       dispatch({ type: 'TOGGLE_DARK_MODE' });
   }
 
+  const toggleTestMode = () => {
+      postMessageToBackend('command', { command: 'toggleTestMode' });
+  }
+
   return (
     <AppContext.Provider value={{
       ...state,
@@ -319,6 +321,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       loadChat,
       switchModel,
       toggleDarkMode,
+      toggleTestMode,
     }}>
       {children}
     </AppContext.Provider>

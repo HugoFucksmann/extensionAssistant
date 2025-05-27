@@ -1,66 +1,72 @@
 // src/features/tools/definitions/terminal/executeShellCommand.ts
 import * as vscode from 'vscode';
-import { ToolDefinition, ToolPermission, ToolResult, ToolExecutionContext } from '../../types';
-import { exec } from 'child_process'; // Usaremos child_process para capturar salida directamente
+import { z } from 'zod';
+import { ToolDefinition, ToolResult, ToolExecutionContext, ToolPermission } from '../../types';
+import { exec } from 'child_process';
 import * as util from 'util';
 
 const execPromise = util.promisify(exec);
 
-export const executeShellCommand: ToolDefinition = {
+// Esquema Zod para los parámetros
+export const executeShellCommandParamsSchema = z.object({
+  command: z.string().min(1, { message: "Command to execute cannot be empty." }),
+  timeoutMs: z.number().int().positive().optional().default(30000).describe("Optional timeout in milliseconds for the command execution. Defaults to 30 seconds.")
+  // cwd: z.string().optional().describe("Optional current working directory relative to workspace. Defaults to workspace root.") // Omitido por simplicidad, siempre usa workspace root
+}).strict();
+
+type ShellCommandResultData = {
+  stdout: string;
+  stderr: string;
+  exitCode: number | null; // null si el proceso fue terminado por una señal
+  signal?: string; // Nombre de la señal si el proceso fue terminado por una
+};
+
+export const executeShellCommand: ToolDefinition<typeof executeShellCommandParamsSchema, ShellCommandResultData> = {
   name: 'executeShellCommand',
-  description: 'Executes a shell command silently in the background and captures its standard output and error. Runs in the workspace root by default. Use for non-interactive commands where output is needed.',
-  parameters: {
-    command: { type: 'string', description: 'The shell command to execute.', required: true },
-    // cwd: { type: 'string', description: 'Optional current working directory relative to workspace. Defaults to workspace root.', required: false } // Omitido por simplicidad
-    timeoutMs: { type: 'number', description: 'Optional timeout in milliseconds for the command execution.', default: 30000, required: false }
-  },
-  requiredPermissions: ['terminal.execute'], // Podría ser un permiso más granular si se diferencia de 'runInTerminal'
+  description: 'Executes a shell command silently in the background and captures its standard output and error. Runs in the workspace root by default. Use for non-interactive commands where output is needed by the AI.',
+  parametersSchema: executeShellCommandParamsSchema,
+  requiredPermissions: ['terminal.execute'],
   async execute(
-    params: { command: string; timeoutMs?: number },
-    context?: ToolExecutionContext
-  ): Promise<ToolResult<{ stdout: string; stderr: string; exitCode: number | null }>> {
-    if (!context?.vscodeAPI) {
-      return { success: false, error: 'VSCode API context not available.' };
-    }
-    const { command, timeoutMs = 30000 } = params;
+    params,
+    context
+  ): Promise<ToolResult<ShellCommandResultData>> {
+    const { command, timeoutMs } = params;
     const workspaceFolder = context.vscodeAPI.workspace.workspaceFolders?.[0]?.uri.fsPath;
 
     if (!workspaceFolder) {
-      return { success: false, error: 'No workspace folder found to determine current working directory.' };
+      return { success: false, error: 'No workspace folder found. Cannot determine current working directory for shell command.' };
     }
 
     try {
-      context?.dispatcher?.systemInfo(`Executing shell command: ${command}`, { toolName: 'executeShellCommand', command, cwd: workspaceFolder, timeoutMs }, context.chatId);
+      context.dispatcher.systemInfo(`Executing shell command: "${command}" in ${workspaceFolder}`, { toolName: 'executeShellCommand', command, cwd: workspaceFolder, timeoutMs }, context.chatId);
 
-      const { stdout, stderr } = await execPromise(command, { 
-        cwd: workspaceFolder, // Siempre ejecuta en la raíz del workspace
+      const { stdout, stderr } = await execPromise(command, {
+        cwd: workspaceFolder,
         timeout: timeoutMs,
-        shell: process.env.SHELL || undefined // Usa el shell del sistema para mejor compatibilidad con pipes, etc.
+        shell: process.env.SHELL || undefined // Usar el shell del sistema o un booleano para que Node elija
       });
-
-      // Incluso si hay stderr, el comando puede haber tenido éxito (código de salida 0)
-      // Algunas herramientas usan stderr para mensajes de progreso o advertencias.
-      return { 
-        success: true, // Asumimos éxito si no hay error de execPromise
-        data: { stdout: stdout.trim(), stderr: stderr.trim(), exitCode: 0 } // exitCode 0 si execPromise no falla
+      
+      // Si execPromise resuelve, el comando tuvo éxito (exit code 0)
+      return {
+        success: true,
+        data: { stdout: stdout.trim(), stderr: stderr.trim(), exitCode: 0 }
       };
 
     } catch (error: any) {
       // 'error' de execPromise suele ser un objeto con stdout, stderr, code, signal, etc.
+      // cuando el comando falla (exit code != 0) o hay otros errores de ejecución.
       const stdout = error.stdout?.toString().trim() || '';
       const stderr = error.stderr?.toString().trim() || '';
       const exitCode = typeof error.code === 'number' ? error.code : null;
+      const signal = error.signal?.toString() || undefined;
 
-      context?.dispatcher?.systemError('Error executing shell command', error, 
-        { toolName: 'executeShellCommand', command, cwd: workspaceFolder, stdout, stderr, exitCode, chatId: context.chatId }
-      );
+      const errorMessage = `Command "${command}" failed. Exit code: ${exitCode ?? 'N/A'}${signal ? `, Signal: ${signal}` : ''}. Stderr: ${stderr || 'N/A'}`;
       
-      // Devolvemos success: false porque el comando falló (exit code != 0 o error de ejecución)
-      // pero incluimos stdout/stderr porque pueden ser útiles para el LLM.
-      return { 
-        success: false, 
-        error: `Command "${command}" failed with exit code ${exitCode || 'unknown'}. Stderr: ${stderr || 'N/A'}`,
-        data: { stdout, stderr, exitCode }
+      // Aunque el comando falle (success: false), devolvemos stdout/stderr porque pueden ser útiles.
+      return {
+        success: false,
+        error: errorMessage,
+        data: { stdout, stderr, exitCode, signal }
       };
     }
   }

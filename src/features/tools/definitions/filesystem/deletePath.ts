@@ -1,45 +1,43 @@
 // src/features/tools/definitions/filesystem/deletePath.ts
 import * as vscode from 'vscode';
-import { ToolDefinition, ToolPermission, ToolResult, ToolExecutionContext } from '../../types';
-import { resolveWorkspacePath } from '../utils'; // Utilidad para resolver paths
+import { z } from 'zod';
+import { ToolDefinition, ToolResult, ToolExecutionContext, ToolPermission } from '../../types';
+import { resolveWorkspacePath } from '../utils';
 
-export const deletePath: ToolDefinition = {
+// Esquema Zod para los parámetros
+export const deletePathParamsSchema = z.object({
+  path: z.string().min(1, { message: "Path to delete cannot be empty." })
+  // useTrash: z.boolean().optional().default(true) // Podríamos añadirlo, pero VSCode usa trash por defecto si puede
+}).strict();
+
+export const deletePath: ToolDefinition<typeof deletePathParamsSchema, { path: string; deleted: boolean }> = {
   name: 'deletePath',
-  description: 'Deletes a file or directory recursively. Assumes path is relative to the workspace root. Uses trash by default if available.',
-  parameters: {
-    path: { type: 'string', description: 'Workspace-relative path to delete.', required: true }
-    // useTrash: { type: 'boolean', description: 'Move to trash instead of permanent delete.', default: true, required: false } // Omitido para simplicidad, siempre usa trash
-  },
+  description: 'Deletes a file or directory recursively. The path must be relative to the workspace root. Uses trash by default if available on the system.',
+  parametersSchema: deletePathParamsSchema,
   requiredPermissions: ['filesystem.write'],
   async execute(
-    params: { path: string },
-    context?: ToolExecutionContext
+    params, // Tipado como: { path: string }
+    context
   ): Promise<ToolResult<{ path: string; deleted: boolean }>> {
-    if (!context?.vscodeAPI) {
-      return { success: false, error: 'VSCode API context not available.' };
-    }
     const { path } = params;
     let targetUri: vscode.Uri | undefined;
 
     try {
-      targetUri   = resolveWorkspacePath(context.vscodeAPI, path) ;
+      targetUri = resolveWorkspacePath(context.vscodeAPI, path);
       if (!targetUri) {
-        return { success: false, error: 'Could not resolve path in workspace. No workspace folder open or path is invalid.' };
+        return { success: false, error: 'Could not resolve path in workspace. Ensure a workspace is open and the path is valid.' };
       }
 
-      // Verificar si existe antes de intentar borrar para dar un error más claro
       try {
         await context.vscodeAPI.workspace.fs.stat(targetUri);
       } catch (e) {
-        return { success: false, error: `Path not found: ${targetUri.fsPath}` };
+        return { success: false, error: `Path not found: ${context.vscodeAPI.workspace.asRelativePath(targetUri, false)}` };
       }
 
+      // { recursive: true, useTrash: true } son los defaults de vscode.workspace.fs.delete
       await context.vscodeAPI.workspace.fs.delete(targetUri, { recursive: true, useTrash: true });
-      return { success: true, data: { path: targetUri.fsPath, deleted: true } };
+      return { success: true, data: { path: context.vscodeAPI.workspace.asRelativePath(targetUri, false), deleted: true } };
     } catch (error: any) {
-      context?.dispatcher?.systemError('Error executing deletePath', error, 
-        { toolName: 'deletePath', params, chatId: context.chatId }
-      );
       return { success: false, error: `Failed to delete path "${path}": ${error.message}` };
     }
   }

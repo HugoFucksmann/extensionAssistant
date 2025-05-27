@@ -1,0 +1,108 @@
+.chat-messages-container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  height: 100%;
+  background-color: var(--background);
+  overflow: hidden;
+}
+
+.chat-messages-scrollable {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  flex: 1;
+  overflow: auto;
+  padding: 0 var(--spacing-small);
+}
+
+/* Message containers */
+.message-container {
+  margin-bottom: var(--spacing-large);
+  padding: var(--spacing-medium) var(--spacing-large);
+  border-radius: var(--border-radius-large);
+  max-width: 85%;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+.message-container-user {
+  align-self: flex-end;
+  background: var(--message-user-bg);
+  color: var(--message-user-text);
+}
+
+.message-container-assistant {
+  align-self: flex-start;
+  background: var(--message-assistant-bg);
+  color: var(--message-assistant-text);
+}
+
+/* Message content */
+.message-content {
+  font-size: var(--text-size);
+  line-height: 1.6;
+  letter-spacing: 0.01em;
+}
+
+/* Code blocks */
+.code-block-container {
+  margin: var(--spacing-medium) 0;
+  border-radius: var(--border-radius-small);
+  overflow: hidden;
+  background-color: var(--code-block-bg);
+  border: 1px solid var(--code-block-border);
+}
+
+.code-block-header {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: var(--spacing-small) var(--spacing-medium);
+  border-bottom: 1px solid var(--code-block-border);
+}
+
+/* Scrollbar */
+.chat-messages-scrollable::-webkit-scrollbar {
+  width: 8px;
+}
+
+.chat-messages-scrollable::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-messages-scrollable::-webkit-scrollbar-thumb {
+  background-color: var(--border);
+  border-radius: 4px;
+}
+
+.chat-messages-scrollable::-webkit-scrollbar-thumb:hover {
+  background-color: var(--primary);
+}
+
+/* Animations */
+@keyframes messageFadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.message-fade-in {
+  animation: messageFadeIn 0.3s ease-out forwards;
+}
+
+/* Hover Effects */
+.apply-hover-effect:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-medium);
+  transition: all var(--transition-fast) ease;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.apply-animation {
+  animation: fadeIn 0.3s ease-out forwards;
+}

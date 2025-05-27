@@ -1,80 +1,11 @@
 // src/vscode/react/theme/theme.ts
 
-export type ThemeColors = {
-  primary: string
-  secondary: string
-  text: string
-  background: string
-  border: string
-  chatInputBg: string
-  messageUserBg: string
-  messageAssistantBg: string
-  error: string
-
-  // --- NUEVOS COLORES PARA FEEDBACK ---
-  feedbackInfoText: string
-  feedbackSuccessText: string
-  feedbackErrorText: string
-  feedbackThinkingText: string
-
-  feedbackInfoBorder: string
-  feedbackSuccessBorder: string
-  feedbackErrorBorder: string
-  feedbackThinkingBorder: string
-
-  feedbackInfoBackground: string
-  feedbackSuccessBackground: string
-  feedbackErrorBackground: string
-  feedbackThinkingBackground: string
-
-  // --- COLORES PARA STATUS INDICATORS ---
-  statusInfo: string
-  statusSuccess: string
-  statusError: string
-  statusThinking: string
-
-  // --- COLORES PARA GLASSMORPHISM ---
-  glassBackground: string
-  glassBackgroundHover: string
-  glassBorder: string
-  glassBorderHover: string
-}
-
-export type ThemeType = {
-  colors: ThemeColors
-  spacing: {
-    small: string
-    medium: string
-    large: string
-    xlarge: string
-  }
-  borderRadius: {
-    small: string
-    medium: string
-    large: string
-    xlarge: string
-  }
-  typography: {
-    title: string
-    subtitle: string
-    text: string
-    small: string
-    large: string
-  }
-  shadows: {
-    small: string
-    medium: string
-    large: string
-    glow: string
-  }
-  transitions: {
-    fast: string
-    medium: string
-    slow: string
-  }
-}
-
-export const getTheme = (isDarkMode = true): ThemeType => {
+/**
+ * Gets the theme configuration
+ * @param {boolean} [isDarkMode] - Dark mode flag
+ * @returns {ThemeType}
+ */
+export const getTheme = (isDarkMode = true) => {
   const baseColors = {
     primary: isDarkMode ? "#2196F3" : "#006ab1",
     secondary: isDarkMode ? "#1A1A1A" : "#e9ebf0",
@@ -89,6 +20,10 @@ export const getTheme = (isDarkMode = true): ThemeType => {
       ? "linear-gradient(135deg, rgba(255, 255, 255, 0.02) 0%, rgba(255, 255, 255, 0.01) 100%)"
       : "#f0f0f0",
     error: isDarkMode ? "#F44336" : "#e51400",
+    attachmentBackground: isDarkMode ? "#2a2d2e" : "#f3f3f3",
+    attachmentHoverBackground: isDarkMode ? "#333333" : "#e9ebf0",
+    attachmentBorder: isDarkMode ? "rgba(255, 255, 255, 0.08)" : "#cccccc",
+    attachmentIcon: isDarkMode ? "#E8E8E8" : "#333333",
   }
 
   const feedbackColorsLight = {
@@ -185,6 +120,60 @@ export const getTheme = (isDarkMode = true): ThemeType => {
     },
   }
 }
+
+export const getThemeCSSVariables = (theme) => ({
+  '--spacing-small': theme.spacing.small,
+  '--spacing-medium': theme.spacing.medium,
+  '--spacing-large': theme.spacing.large,
+  '--spacing-xs': theme.spacing.xs,
+  '--border-radius-small': theme.borderRadius.small,
+  '--border-radius-large': theme.borderRadius.large,
+  '--shadow-medium': theme.shadows.medium,
+  '--text': theme.colors.text,
+  '--text-muted': theme.colors.textMuted,
+  '--background': theme.colors.background,
+  '--border': theme.colors.border,
+  '--primary': theme.colors.primary,
+  
+  // Variables para StatusIndicator
+  '--status-size-small': '10px',
+  '--status-size-medium': '14px',
+  '--status-size-large': '18px',
+  '--status-margin-small': theme.spacing.small,
+  '--status-margin-medium': theme.spacing.medium,
+  '--status-margin-large': theme.spacing.large,
+  '--status-color-thinking': theme.colors.statusThinking,
+  '--status-color-tool_executing': theme.colors.statusThinking,
+  '--status-color-success': theme.colors.statusSuccess,
+  '--status-color-error': theme.colors.statusError,
+  '--status-color-info': theme.colors.statusInfo,
+  '--status-border-radius': theme.borderRadius.small,
+  '--status-transition': theme.transitions.medium,
+  
+  // Nuevas variables para mensajes
+  '--glass-border': theme.colors.glassBorder,
+  '--message-user-bg': theme.colors.messageUserBg,
+  '--message-assistant-bg': theme.colors.messageAssistantBg,
+  '--secondary': theme.colors.secondary,
+  
+  // Variables para bloques de código
+  '--code-block-bg': theme.colors.codeBlockBg,
+  '--code-block-border': theme.colors.codeBlockBorder,
+  
+  // Tamaños de texto
+  '--text-size': theme.typography.text,
+  
+  // Nuevas variables para feedback
+  '--hover-bg': theme.colors.hoverBackground,
+  '--transition-fast': theme.transitions.fast,
+  '--transition-medium': theme.transitions.medium,
+  
+  // Variables para archivos adjuntos
+  '--attachment-bg': theme.colors.attachmentBackground,
+  '--attachment-hover-bg': theme.colors.attachmentHoverBackground,
+  '--attachment-border': theme.colors.attachmentBorder,
+  '--attachment-icon': theme.colors.attachmentIcon
+});
 
 // Mock theme para desarrollo
 export const mockTheme = getTheme(true)

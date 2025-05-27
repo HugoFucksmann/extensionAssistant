@@ -5,6 +5,7 @@ import { EventLogger } from '../features/events/EventLogger';
 import { ModelManager } from '../features/ai/ModelManager';
 import { PromptManager } from '../features/ai/promptManager';
 import { ToolRegistry } from '../features/tools/ToolRegistry'; // Asegúrate que la ruta sea correcta
+import { allToolDefinitions } from '../features/tools/definitions'; // Importar todas las definiciones de herramientas
 import { WindsurfGraph } from '../features/ai/ReActGraph'; 
 import { MemoryManager } from '../features/memory/MemoryManager';
 import { ConversationManager } from './ConversationManager';
@@ -34,7 +35,8 @@ export class ComponentFactory {
             extensionPath: extensionContext.extensionPath,
             subscriptions: extensionContext.subscriptions,
             outputChannel: vscode.window.createOutputChannel("Extension Assistant Log"),
-            state: extensionContext.globalState,
+            globalState: extensionContext.globalState,
+            workspaceState: extensionContext.workspaceState,
             // Añadir workspaceFolders y activeTextEditor si se actualizan dinámicamente
             // o se obtienen cuando se necesitan. Por ahora, los dejamos fuera del context almacenado
             // para evitar que se queden obsoletos, a menos que se actualicen activamente.
@@ -52,7 +54,10 @@ export class ComponentFactory {
       // No necesita el VSCodeContext directamente en su constructor si el ToolExecutionContext
       // se construye y pasa en el momento de la ejecución de la herramienta.
       this.toolRegistryInstance = new ToolRegistry(dispatcher);
-      console.log('[ComponentFactory] ToolRegistry instance created.');
+      
+      // Registrar todas las herramientas definidas
+      this.toolRegistryInstance.registerTools(allToolDefinitions);
+      console.log(`[ComponentFactory] ToolRegistry instance created with ${allToolDefinitions.length} tools.`);
     }
     return this.toolRegistryInstance;
   }

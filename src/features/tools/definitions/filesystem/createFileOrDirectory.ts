@@ -1,78 +1,77 @@
 // src/features/tools/definitions/filesystem/createFileOrDirectory.ts
 import * as vscode from 'vscode';
-import { ToolDefinition, ToolPermission, ToolResult, ToolExecutionContext } from '../../types';
-import { resolveWorkspacePath } from '../utils'; // Utilidad para resolver paths
+import { z } from 'zod';
+import { ToolDefinition, ToolResult, ToolExecutionContext, ToolPermission } from '../../types';
+import { resolveWorkspacePath } from '../utils';
 
-export const createFileOrDirectory: ToolDefinition = {
+// Esquema Zod para los parámetros
+export const createFileOrDirectoryParamsSchema = z.object({
+  path: z.string().min(1, { message: "Path cannot be empty." }),
+  type: z.enum(['file', 'directory']).describe("Specify 'file' to create a file (optionally with content) or 'directory' to create a directory."),
+  content: z.string().optional().describe("Content for the file. Only used if type is 'file'. If type is 'file' and content is omitted, an empty file is created.")
+}).strict() // Move strict() here
+.refine(data => {
+    if (data.type === 'directory' && data.content !== undefined) {
+        return false;
+    }
+    return true;
+}, {
+    message: "Content should not be provided when creating a directory. For files, content is optional.",
+    path: ['content']
+});
+
+
+type CreateResultType = { path: string; type: 'file' | 'directory'; operation: 'created' | 'overwritten' | 'exists' };
+
+export const createFileOrDirectory: ToolDefinition<typeof createFileOrDirectoryParamsSchema, CreateResultType> = {
   name: 'createFileOrDirectory',
-  description: 'Creates a new file or directory. If content is provided, a file is created. If content is empty or omitted, a directory is created. Assumes path is relative to the workspace root. Overwrites existing files if content is provided and it\'s a file.',
-  parameters: {
-    path: { type: 'string', description: 'Workspace-relative path for the new file or directory.', required: true },
-    content: { type: 'string', description: 'Content for the file. If omitted or empty, a directory will be created.', required: false, default: undefined } // default: undefined para distinguirlo de string vacío
-  },
+  description: 'Creates a new file or a new directory. Paths must be relative to the workspace root. Creates parent directories if they do not exist. Overwrites existing files if type is "file".',
+  parametersSchema: createFileOrDirectoryParamsSchema,
   requiredPermissions: ['filesystem.write'],
   async execute(
-    params: { path: string; content?: string },
-    context?: ToolExecutionContext
-  ): Promise<ToolResult<{ path: string; type: 'file' | 'directory'; operation: 'created' | 'overwritten' | 'exists' }>> {
-    if (!context?.vscodeAPI) {
-      return { success: false, error: 'VSCode API context not available.' };
-    }
-    const { path, content } = params; // content puede ser undefined aquí
+    params, // Tipado por Zod
+    context
+  ): Promise<ToolResult<CreateResultType>> {
+    const { path, type, content } = params;
     let targetUri: vscode.Uri | undefined;
 
     try {
       targetUri = resolveWorkspacePath(context.vscodeAPI, path);
       if (!targetUri) {
-        return { success: false, error: 'Could not resolve path in workspace. No workspace folder open or path is invalid.' };
+        return { success: false, error: 'Could not resolve path in workspace. Ensure a workspace is open and the path is valid.' };
       }
 
-      const createAsDirectory = content === undefined; // Si no se provee content, es directorio
-
-      // Asegurar que el directorio padre exista (createDirectory es recursivo por defecto)
       const parentDirUri = vscode.Uri.joinPath(targetUri, '..');
-      try {
-          await context.vscodeAPI.workspace.fs.stat(parentDirUri);
-      } catch (e) { // Directorio padre no existe
-          await context.vscodeAPI.workspace.fs.createDirectory(parentDirUri);
-      }
+      await context.vscodeAPI.workspace.fs.createDirectory(parentDirUri); // Crea recursivamente
       
-      let operation: 'created' | 'overwritten' | 'exists' = 'created';
-      let targetExists = false;
+      let operation: CreateResultType['operation'] = 'created';
       let existingStat: vscode.FileStat | undefined;
-
       try {
         existingStat = await context.vscodeAPI.workspace.fs.stat(targetUri);
-        targetExists = true;
-      } catch (e) {
-        targetExists = false;
-      }
+      } catch (e) { /* No existe, se creará */ }
 
-      if (createAsDirectory) {
-        if (targetExists) {
-          if (existingStat?.type === context.vscodeAPI.FileType.Directory) {
+      if (type === 'directory') {
+        if (existingStat) {
+          if (existingStat.type === context.vscodeAPI.FileType.Directory) {
             operation = 'exists';
-            return { success: true, data: { path: targetUri.fsPath, type: 'directory', operation } };
+            return { success: true, data: { path: context.vscodeAPI.workspace.asRelativePath(targetUri, false), type: 'directory', operation } };
           } else {
-            return { success: false, error: `Path ${targetUri.fsPath} exists and is not a directory.` };
+            return { success: false, error: `Path ${context.vscodeAPI.workspace.asRelativePath(targetUri, false)} exists and is not a directory.` };
           }
         }
         await context.vscodeAPI.workspace.fs.createDirectory(targetUri);
-        return { success: true, data: { path: targetUri.fsPath, type: 'directory', operation } };
-      } else { // Crear/Escribir archivo
-        if (targetExists) {
-          if (existingStat?.type === context.vscodeAPI.FileType.Directory) {
-            return { success: false, error: `Path ${targetUri.fsPath} exists and is a directory. Cannot overwrite with a file.` };
+        return { success: true, data: { path: context.vscodeAPI.workspace.asRelativePath(targetUri, false), type: 'directory', operation } };
+      } else { // type === 'file'
+        if (existingStat) {
+          if (existingStat.type === context.vscodeAPI.FileType.Directory) {
+            return { success: false, error: `Path ${context.vscodeAPI.workspace.asRelativePath(targetUri, false)} exists and is a directory. Cannot overwrite with a file.` };
           }
-          operation = 'overwritten'; // Sobrescribir si es archivo
+          operation = 'overwritten';
         }
-        await context.vscodeAPI.workspace.fs.writeFile(targetUri, new TextEncoder().encode(content || '')); // content puede ser string vacío
-        return { success: true, data: { path: targetUri.fsPath, type: 'file', operation } };
+        await context.vscodeAPI.workspace.fs.writeFile(targetUri, new TextEncoder().encode(content || ''));
+        return { success: true, data: { path: context.vscodeAPI.workspace.asRelativePath(targetUri, false), type: 'file', operation } };
       }
     } catch (error: any) {
-      context?.dispatcher?.systemError('Error executing createFileOrDirectory', error, 
-        { toolName: 'createFileOrDirectory', params: {path: params.path, content: params.content ? params.content.substring(0,100) + '...' : undefined}, chatId: context.chatId }
-      );
       return { success: false, error: `Failed to create/write "${path}": ${error.message}` };
     }
   }

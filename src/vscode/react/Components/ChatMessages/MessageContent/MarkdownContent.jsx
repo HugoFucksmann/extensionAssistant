@@ -1,11 +1,10 @@
 import React from 'react';
-
-import { styles } from '../styles';
 import Markdown from 'markdown-to-jsx';
+import './MarkdownContent.css';
 
 const MarkdownContent = ({ content }) => {
   return (
-    <div style={styles.markdownContent}>
+    <div className="markdown-content">
       <Markdown>{content}</Markdown>
     </div>
   );

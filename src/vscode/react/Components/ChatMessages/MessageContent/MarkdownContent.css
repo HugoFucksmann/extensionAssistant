@@ -1,0 +1,36 @@
+/* Markdown Content Styles */
+.markdown-content {
+  font-size: var(--text-size);
+  line-height: 1.6;
+  letter-spacing: 0.01em;
+}
+
+.markdown-content pre {
+  background-color: var(--code-block-bg);
+  border-radius: var(--border-radius-small);
+  padding: var(--spacing-medium);
+  overflow-x: auto;
+}
+
+.markdown-content code {
+  font-family: var(--font-family-mono);
+  font-size: var(--typography-small);
+}
+
+.markdown-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: var(--spacing-medium) 0;
+}
+
+.markdown-content th, .markdown-content td {
+  border: 1px solid var(--border);
+  padding: var(--spacing-small);
+}
+
+.markdown-content blockquote {
+  border-left: 3px solid var(--primary);
+  padding-left: var(--spacing-medium);
+  margin-left: 0;
+  color: var(--text-muted);
+}

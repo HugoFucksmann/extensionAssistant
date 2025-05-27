@@ -26,7 +26,8 @@
         {
           "type": "webview",
           "id": "aiChat.chatView",
-          "name": "AI Chat"
+          "name": "AI Chat",
+          "icon": "$(comment-discussion)"
         }
       ]
     },
@@ -35,7 +36,10 @@
       "properties": {
         "extensionAssistant.modelType": {
           "type": "string",
-          "enum": ["ollama", "gemini"],
+          "enum": [
+            "ollama",
+            "gemini"
+          ],
           "default": "gemini"
         },
         "extensionAssistant.persistChat": {
@@ -47,47 +51,94 @@
           "default": false
         },
         "extensionAssistant.toolPermissions.allowFilesystemRead": {
-          "type": ["boolean", "string"],
-          "enum": [true, false, "prompt", "prompt-session"],
+          "type": [
+            "boolean",
+            "string"
+          ],
+          "enum": [
+            true,
+            false,
+            "prompt",
+            "prompt-session"
+          ],
           "default": "prompt-session",
           "description": "Allow tools to read from the filesystem. 'true'=always, 'false'=never, 'prompt'=ask each time, 'prompt-session'=ask once per session."
         },
         "extensionAssistant.toolPermissions.allowFilesystemWrite": {
-          "type": ["boolean", "string"],
-          "enum": [true, false, "prompt", "prompt-session"],
+          "type": [
+            "boolean",
+            "string"
+          ],
+          "enum": [
+            true,
+            false,
+            "prompt",
+            "prompt-session"
+          ],
           "default": "prompt",
           "description": "Allow tools to write/create/delete files/directories. 'true'=always, 'false'=never, 'prompt'=ask each time, 'prompt-session'=ask once per session."
         },
         "extensionAssistant.toolPermissions.allowTerminalExecute": {
-          "type": ["boolean", "string"],
-          "enum": [true, false, "prompt", "prompt-session"],
+          "type": [
+            "boolean",
+            "string"
+          ],
+          "enum": [
+            true,
+            false,
+            "prompt",
+            "prompt-session"
+          ],
           "default": "prompt",
           "description": "Allow tools to execute commands in the terminal."
         },
         "extensionAssistant.toolPermissions.allowInteractionUserInput": {
-            "type": "boolean",
-            "default": true, 
-            "description": "Allow tools to request input from the user via the UI."
-          },
-          "extensionAssistant.toolPermissions.allowEditorRead": {
-              "type": ["boolean", "string"],
-              "enum": [true, false, "prompt", "prompt-session"],
-              "default": true,
-              "description": "Allow tools to read editor content and diagnostics."
-          },
-          "extensionAssistant.toolPermissions.allowEditorWrite": {
-              "type": ["boolean", "string"],
-              "enum": [true, false, "prompt", "prompt-session"],
-              "default": "prompt",
-              "description": "Allow tools to apply text edits to editors."
-          },
-          "extensionAssistant.toolPermissions.allowWorkspaceInfoRead": {
-              "type": ["boolean", "string"],
-              "enum": [true, false, "prompt", "prompt-session"],
-              "default": true,
-              "description": "Allow tools to read general workspace/project information (e.g., git status, project structure)."
-          }
-
+          "type": "boolean",
+          "default": true,
+          "description": "Allow tools to request input from the user via the UI."
+        },
+        "extensionAssistant.toolPermissions.allowEditorRead": {
+          "type": [
+            "boolean",
+            "string"
+          ],
+          "enum": [
+            true,
+            false,
+            "prompt",
+            "prompt-session"
+          ],
+          "default": true,
+          "description": "Allow tools to read editor content and diagnostics."
+        },
+        "extensionAssistant.toolPermissions.allowEditorWrite": {
+          "type": [
+            "boolean",
+            "string"
+          ],
+          "enum": [
+            true,
+            false,
+            "prompt",
+            "prompt-session"
+          ],
+          "default": "prompt",
+          "description": "Allow tools to apply text edits to editors."
+        },
+        "extensionAssistant.toolPermissions.allowWorkspaceInfoRead": {
+          "type": [
+            "boolean",
+            "string"
+          ],
+          "enum": [
+            true,
+            false,
+            "prompt",
+            "prompt-session"
+          ],
+          "default": true,
+          "description": "Allow tools to read general workspace/project information (e.g., git status, project structure)."
+        }
       }
     },
     "commands": [
@@ -109,6 +160,11 @@
         "command": "extensionAssistant.chat.history",
         "title": "Mostrar Historial de Chats",
         "icon": "$(history)"
+      },
+      {
+        "command": "extensionAssistant.toggleTestMode",
+        "title": "Alternar Modo de Prueba",
+        "icon": "$(beaker)"
       }
     ],
     "menus": {
@@ -127,6 +183,11 @@
           "command": "extensionAssistant.settings",
           "when": "view == aiChat.chatView",
           "group": "navigation@3"
+        },
+        {
+          "command": "extensionAssistant.toggleTestMode",
+          "when": "view == aiChat.chatView",
+          "group": "navigation@4"
         }
       ]
     }
@@ -161,6 +222,8 @@
     "webpack-cli": "^4.8.0"
   },
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
     "@google/generative-ai": "^0.21.0",
     "@langchain/core": "^0.3.56",
     "@langchain/google-gauth": "^0.2.9",

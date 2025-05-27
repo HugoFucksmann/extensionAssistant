@@ -1,63 +1,88 @@
 // src/features/tools/definitions/editor/getDocumentDiagnostics.ts
 import * as vscode from 'vscode';
-import { ToolDefinition, ToolPermission, ToolResult, ToolExecutionContext } from '../../types';
+import { z } from 'zod';
+import { ToolDefinition, ToolResult, ToolExecutionContext, ToolPermission } from '../../types';
+import { resolveWorkspacePath } from '../utils';
 
-export const getDocumentDiagnostics: ToolDefinition = {
+// Esquema Zod para los parámetros
+export const getDocumentDiagnosticsParamsSchema = z.object({
+  filePath: z.string().min(1).optional().describe("Optional workspace-relative path to the file. If omitted, uses the active editor.")
+}).strict();
+
+// Tipo para la data retornada
+type DiagnosticInfo = {
+  message: string;
+  severity: string; // "Error", "Warning", "Information", "Hint"
+  range: {
+    startLine: number;
+    startChar: number;
+    endLine: number;
+    endChar: number;
+  };
+  source?: string;
+  code?: string | number;
+};
+type DiagnosticsResult = {
+  documentPath: string; // Path relativo al workspace
+  diagnostics: DiagnosticInfo[];
+};
+
+export const getDocumentDiagnostics: ToolDefinition<typeof getDocumentDiagnosticsParamsSchema, DiagnosticsResult> = {
   name: 'getDocumentDiagnostics',
   description: 'Gets diagnostic errors and warnings for the active editor or a specified file. If filePath is omitted, uses the active editor.',
-  parameters: {
-    filePath: { type: 'string', description: 'Optional workspace-relative path to the file. If omitted, uses the active editor.', required: false }
-  },
+  parametersSchema: getDocumentDiagnosticsParamsSchema,
   requiredPermissions: ['editor.read'], // O un permiso más específico como 'diagnostics.read'
   async execute(
-    params: { filePath?: string },
-    context?: ToolExecutionContext
-  ): Promise<ToolResult> {
-    if (!context?.vscodeAPI) {
-      return { success: false, error: 'VSCode API context not available.' };
-    }
+    params, // Tipado por Zod
+    context
+  ): Promise<ToolResult<DiagnosticsResult>> {
     const { filePath } = params;
     let targetUri: vscode.Uri;
+    let documentPathForReturn: string;
 
     try {
       if (filePath) {
-        const workspaceFolders = context.vscodeAPI.workspace.workspaceFolders;
-        if (!workspaceFolders || workspaceFolders.length === 0) {
-          return { success: false, error: 'No workspace folder open to resolve relative file path.' };
+        const resolvedUri = resolveWorkspacePath(context.vscodeAPI, filePath);
+        if (!resolvedUri) {
+          return { success: false, error: `Could not resolve path in workspace: "${filePath}". Ensure a workspace is open and the path is valid.` };
         }
-        targetUri = vscode.Uri.joinPath(workspaceFolders[0].uri, filePath);
+        targetUri = resolvedUri;
+        documentPathForReturn = context.vscodeAPI.workspace.asRelativePath(targetUri, false);
+         // Asegurarse de que el documento esté "conocido" por VS Code para obtener diagnósticos
+        await context.vscodeAPI.workspace.openTextDocument(targetUri);
       } else {
         const activeEditor = context.vscodeAPI.window.activeTextEditor;
         if (!activeEditor) {
           return { success: false, error: 'No active text editor and no filePath provided.' };
         }
         targetUri = activeEditor.document.uri;
+        documentPathForReturn = activeEditor.document.isUntitled ? 
+            `untitled:${activeEditor.document.fileName}` : 
+            context.vscodeAPI.workspace.asRelativePath(targetUri, false);
       }
 
-      // Asegurarse de que el documento esté abierto para que los diagnósticos estén actualizados
-      // aunque getDiagnostics(uri) debería funcionar para cualquier URI, los proveedores pueden
-      // activarse al abrir el documento.
-      await context.vscodeAPI.workspace.openTextDocument(targetUri);
-
       const diagnostics = context.vscodeAPI.languages.getDiagnostics(targetUri);
-      const formattedDiagnostics = diagnostics.map(d => ({
+      const formattedDiagnostics: DiagnosticInfo[] = diagnostics.map(d => ({
         message: d.message,
-        severity: vscode.DiagnosticSeverity[d.severity], // Convierte enum a string: "Error", "Warning", etc.
-        range: { 
-          startLine: d.range.start.line, 
+        severity: vscode.DiagnosticSeverity[d.severity],
+        range: {
+          startLine: d.range.start.line,
           startChar: d.range.start.character,
           endLine: d.range.end.line,
           endChar: d.range.end.character,
         },
         source: d.source,
-        code: typeof d.code === 'object' ? d.code.value : d.code, // Maneja DiagnosticCode
+        code: typeof d.code === 'object' ? String(d.code.value) : d.code ? String(d.code) : undefined,
       }));
 
-      return { success: true, data: { documentUri: targetUri.toString(), diagnostics: formattedDiagnostics } };
+      return { 
+        success: true, 
+        data: { 
+          documentPath: documentPathForReturn, 
+          diagnostics: formattedDiagnostics 
+        } 
+      };
     } catch (error: any) {
-      context?.dispatcher?.systemError('Error executing getDocumentDiagnostics', error, 
-        { toolName: 'getDocumentDiagnostics', params, chatId: context.chatId }
-      );
       return { success: false, error: `Failed to get document diagnostics: ${error.message}` };
     }
   }

@@ -1,11 +1,9 @@
-
-
 import React, { useRef, useState, useEffect } from "react";
 import ModelDropdown from './ModelDropdown';
 import FileChip from './FileChip';
 import { useProjectFiles } from './useProjectFiles';
 import { useFileMention } from './useFileMention';
-import { getStyles } from './ChatInputStyles';
+import './ChatInput.css';
 import FileDropdown from "./fileDropdown";
 import { EnterIcon, FileIcon } from "./Icons";
 import { useApp } from "../../context/AppContext";
@@ -152,26 +150,94 @@ const ChatInput = () => {
   }, [messages]);
 
   // Aplicar estilos
-  const styles = getStyles(theme);
-  const containerStyle = {
-    ...styles.container,
-    borderRadius: messages.length === 0 ? theme.borderRadius.medium : `${theme.borderRadius.medium} ${theme.borderRadius.medium} 0 0`
-  };
-  
-  // Estilo para el contenedor de chips
-  const fileChipsContainerStyle = {
-    display: 'flex',
-    flexWrap: 'wrap',
-    padding: selectedFiles.length > 0 ? '8px 8px 0px 8px' : '0px',
-    borderBottom: selectedFiles.length > 0 ? `1px solid ${theme.colors.border}` : 'none',
-    gap: '4px'
+  const styles = {
+    container: {
+      display: 'flex',
+      flexDirection: 'column',
+      padding: '8px',
+      backgroundColor: theme.colors.background,
+      border: `1px solid ${theme.colors.border}`,
+      borderRadius: theme.borderRadius.medium,
+      boxShadow: '0px 0px 10px rgba(0, 0, 0, 0.1)',
+    },
+    inputContainer: {
+      display: 'flex',
+      alignItems: 'center',
+      padding: '8px',
+      borderBottom: `1px solid ${theme.colors.border}`,
+    },
+    input: {
+      flex: 1,
+      padding: '8px',
+      fontSize: '16px',
+      fontFamily: 'inherit',
+      color: theme.colors.text,
+      backgroundColor: 'transparent',
+      border: 'none',
+      outline: 'none',
+    },
+    sendButton: {
+      padding: '8px',
+      fontSize: '16px',
+      fontFamily: 'inherit',
+      color: theme.colors.primary,
+      backgroundColor: 'transparent',
+      border: 'none',
+      outline: 'none',
+      cursor: 'pointer',
+    },
+    controlsRow: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      padding: '8px',
+    },
+    leftControls: {
+      display: 'flex',
+      alignItems: 'center',
+    },
+    modelSelector: {
+      padding: '8px',
+      fontSize: '16px',
+      fontFamily: 'inherit',
+      color: theme.colors.text,
+      backgroundColor: 'transparent',
+      border: 'none',
+      outline: 'none',
+      cursor: 'pointer',
+    },
+    modelSelectorArrow: {
+      fontSize: '16px',
+      fontFamily: 'inherit',
+      color: theme.colors.text,
+      marginLeft: '8px',
+    },
+    rightControls: {
+      display: 'flex',
+      alignItems: 'center',
+    },
+    fileButton: {
+      padding: '8px',
+      fontSize: '16px',
+      fontFamily: 'inherit',
+      color: theme.colors.primary,
+      backgroundColor: 'transparent',
+      border: 'none',
+      outline: 'none',
+      cursor: 'pointer',
+    },
   };
 
   return (
-    <div style={containerStyle} ref={dropdownRef}> {/* dropdownRef de useFileMention */}
+    <div style={styles.container} ref={dropdownRef}> {/* dropdownRef de useFileMention */}
       {/* Contenedor para los FileChips */}
       {selectedFiles.length > 0 && (
-        <div style={fileChipsContainerStyle}>
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          padding: '8px 8px 0px 8px',
+          borderBottom: `1px solid ${theme.colors.border}`,
+          gap: '4px'
+        }}>
           {selectedFiles.map((filePath) => (
             <FileChip
               key={filePath}

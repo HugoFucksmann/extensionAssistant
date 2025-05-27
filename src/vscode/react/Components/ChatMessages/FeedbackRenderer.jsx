@@ -3,6 +3,7 @@ import React, { useState, memo, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import StatusIndicator from './StatusIndicator';
 import MarkdownContent from './MessageContent/MarkdownContent';
+import './FeedbackRenderer.css';
 
 const FeedbackRenderer = memo(({ operationId, isActive = false }) => {
   const { feedbackMessages, theme, processingPhase, activeFeedbackOperationId } = useApp();
@@ -11,6 +12,17 @@ const FeedbackRenderer = memo(({ operationId, isActive = false }) => {
   const [currentTitle, setCurrentTitle] = useState('Processing...');
   const [currentContent, setCurrentContent] = useState('');
   const [shouldRender, setShouldRender] = useState(false);
+
+  // Solo estilos que dependen de estado dinámico
+  const dynamicStyles = {
+    container: {
+      backgroundColor: theme.colors.glassBackground,
+      border: `1px solid ${theme.colors.glassBorder}`
+    },
+    content: {
+      maxHeight: isCollapsed ? '0' : '300px'
+    }
+  };
 
   // Process messages and determine if we should render anything
   useEffect(() => {
@@ -77,49 +89,6 @@ const FeedbackRenderer = memo(({ operationId, isActive = false }) => {
     setCurrentContent(content);
   }, [operationId, feedbackMessages, processingPhase, isActive, activeFeedbackOperationId]);
 
-  const containerStyle = {
-    padding: theme.spacing.medium,
-    margin: `${theme.spacing.medium} ${theme.spacing.large}`,
-    borderRadius: theme.borderRadius.large,
-    backgroundColor: theme.colors.glassBackground,
-    border: `1px solid ${theme.colors.glassBorder}`,
-    boxShadow: theme.shadows.medium,
-    backdropFilter: 'blur(10px)',
-    transition: 'all 0.3s ease',
-  };
-
-  const headerStyle = {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: isCollapsed ? 0 : theme.spacing.medium,
-    color: theme.colors.text,
-    cursor: 'pointer',
-  };
-
-  const collapseButtonStyle = {
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    color: theme.colors.textMuted,
-    fontSize: '12px',
-    padding: theme.spacing.xs,
-    borderRadius: theme.borderRadius.small,
-    transition: 'all 0.2s ease',
-  };
-
-  const contentStyle = {
-    maxHeight: isCollapsed ? '0' : '300px',
-    overflow: 'hidden',
-    transition: 'max-height 0.3s ease',
-  };
-
-  const scrollableContentStyle = {
-    maxHeight: '300px',
-    overflowY: 'auto',
-    paddingRight: theme.spacing.small,
-  };
-
   // If we shouldn't render, return null
   if (!shouldRender) return null;
 
@@ -127,16 +96,16 @@ const FeedbackRenderer = memo(({ operationId, isActive = false }) => {
   const operationMessages = feedbackMessages[operationId] || [];
 
   return (
-    <div className="message-fade-in" style={containerStyle}>
-      <div style={headerStyle} onClick={() => setIsCollapsed(!isCollapsed)}>
-        <div style={{ display: 'flex', alignItems: 'center' }}>
+    <div className="message-fade-in feedback-container" style={dynamicStyles.container}>
+      <div className="feedback-header" onClick={() => setIsCollapsed(!isCollapsed)}>
+        <div className="feedback-header-content">
           <StatusIndicator status={currentStatus} size="medium" />
-          <span style={{ marginLeft: theme.spacing.small, fontWeight: '600' }}>
+          <span className="feedback-title">
             {currentTitle}
           </span>
         </div>
         <button
-          style={collapseButtonStyle}
+          className="feedback-collapse-button"
           onClick={(e) => {
             e.stopPropagation();
             setIsCollapsed(!isCollapsed);
@@ -146,9 +115,8 @@ const FeedbackRenderer = memo(({ operationId, isActive = false }) => {
         </button>
       </div>
 
-      <div style={contentStyle}>
-        <div style={scrollableContentStyle}>
-          {/* Show step history if there are multiple messages */}
+      <div className="feedback-content" style={dynamicStyles.content}>
+        <div className="feedback-scrollable">
           {operationMessages.length > 0 && (
             <div>
               {operationMessages.map((msg, index) => (
@@ -200,19 +168,14 @@ const FeedbackHistoryItem = memo(({ message, stepNumber }) => {
 
   const colors = getStatusColors(status);
   const itemStyle = {
-    padding: `${theme.spacing.small} ${theme.spacing.medium}`,
-    marginBottom: theme.spacing.xs,
-    borderRadius: theme.borderRadius.small,
-    borderLeft: `2px solid ${colors.border}`,
     backgroundColor: colors.bg,
     color: colors.text,
-    fontSize: theme.typography.small,
-    opacity: 0.8,
+    borderLeft: `2px solid ${colors.border}`
   };
 
   return (
-    <div style={itemStyle}>
-      <div style={{ fontWeight: '500', marginBottom: theme.spacing.xs }}>
+    <div className="feedback-item" style={itemStyle}>
+      <div className="feedback-item-title">
         Step {stepNumber}: {message.metadata?.toolName || 'Processing'}
       </div>
       <MarkdownContent content={content} />

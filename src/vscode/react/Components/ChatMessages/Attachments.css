@@ -1,0 +1,28 @@
+/* Attachments Styles */
+.attached-files-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-small);
+  margin-top: var(--spacing-medium);
+}
+
+.attached-file {
+  display: flex;
+  align-items: center;
+  padding: var(--spacing-xs) var(--spacing-small);
+  border-radius: var(--border-radius-small);
+  background-color: var(--attachment-bg);
+  border: 1px solid var(--attachment-border);
+  font-size: var(--typography-small);
+  cursor: pointer;
+  transition: all var(--transition-fast) ease;
+}
+
+.attached-file:hover {
+  background-color: var(--attachment-hover-bg);
+}
+
+.attached-file-icon {
+  margin-right: var(--spacing-xs);
+  color: var(--attachment-icon);
+}
