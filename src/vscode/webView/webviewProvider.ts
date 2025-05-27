@@ -160,29 +160,27 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
 
       console.log(`[WebviewProvider DEBUG] appLogicService.processUserMessage result for OpID ${this.currentOperationId}:`, JSON.stringify(result).substring(0, 200));
 
-      if (result.success && result.finalResponse) {
-        console.log(`[WebviewProvider DEBUG] Attempting to post 'assistantResponse'. OpID: ${this.currentOperationId}, Content: ${result.finalResponse.substring(0,50)}...`);
-        this.postMessage('assistantResponse', {
-          id: `asst_${Date.now()}`,
-          content: result.finalResponse,
-          timestamp: Date.now(),
-          operationId: this.currentOperationId 
-        });
-      } else if (!result.success) { // Si falló explícitamente
+      // The final assistant response will be sent via the RESPONSE_GENERATED event, handled in handleInternalEvent.
+      // We no longer directly post 'assistantResponse' from here based on result.finalResponse.
+
+      if (!result.success) { // Si falló explícitamente
         const errorMessage = result.error || 'Processing failed to produce a response.';
         console.log(`[WebviewProvider DEBUG] Attempting to post 'systemError' (from processUserMessage failure). OpID: ${this.currentOperationId}, Message: ${errorMessage}`);
         this.postMessage('systemError', { 
           message: errorMessage,
           operationId: this.currentOperationId
         });
-      } else { // Si success es true pero no hay finalResponse (caso anómalo, o el agente necesita más pasos/input)
-        // Esto podría indicar que el agente está esperando un input del usuario (askUser)
-        // o que simplemente no generó una respuesta final en este ciclo.
-        // El feedback de 'askUser' se manejaría a través de eventos.
-        // Si no es askUser, y no hay error, pero no hay respuesta, es un poco ambiguo.
-        // Por ahora, si no hay error y no hay respuesta, no enviamos nada más que el 'processingFinished'.
-        console.log(`[WebviewProvider DEBUG] processUserMessage successful but no finalResponse. OpID: ${this.currentOperationId}. State: ${result.updatedState?.completionStatus}`);
-      }
+      } else if (result.success && !result.finalResponse) { // Si success es true pero no hay finalResponse (esperado, ya que se maneja por evento)
+        // Esto es ahora el flujo esperado si el procesamiento fue exitoso pero la respuesta final
+        // se enviará a través del evento RESPONSE_GENERATED.
+        // También cubre casos donde el agente podría estar esperando más input (askUser) o completó sin una respuesta textual directa.
+        console.log(`[WebviewProvider DEBUG] processUserMessage successful. Final response expected via event. OpID: ${this.currentOperationId}. State: ${result.updatedState?.completionStatus}`);
+      } else if (result.success && result.finalResponse) {
+        // Este caso (success y finalResponse presente) ahora es inesperado si ApplicationLogicService fue refactorizado
+        // para no devolver finalResponse directamente para la UI.
+        // Podríamos loguear una advertencia si esto ocurre.
+        console.warn(`[WebviewProvider WARN] processUserMessage returned success AND finalResponse. This might indicate an old flow. OpID: ${this.currentOperationId}. Response will be handled by event.`);
+      }  
     } catch (error: any) {
       console.error('[WebviewProvider] Critical error processing message:', error);
       const criticalErrorMessage = error.message || 'An unexpected critical error occurred';
@@ -306,20 +304,27 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
         uiMessageType = 'userInputRequired'; // Mensaje específico para la UI
         break;
 
-      case EventType.RESPONSE_GENERATED: // Para sendResponseToUser o respuestas finales del agente
-        const responseGen = event.payload as any; // ResponseEventPayload
-        // Solo mostrar si es una respuesta final y no la que ya manejamos en handleUserMessage
-        // Esto es útil si el agente genera múltiples mensajes o si sendResponseToUser se usa en medio de un flujo.
-        // Necesitamos una forma de distinguir si este evento es el mismo que el `finalResponse` de `processUserMessage`.
-        // Por ahora, si `currentOperationId` está activo, asumimos que la respuesta principal se maneja en `handleUserMessage`.
-        // Este evento sería para respuestas adicionales o si `sendResponseToUser` se usa independientemente.
+      case EventType.RESPONSE_GENERATED: // Handles final assistant responses
+        const responseGen = event.payload as any; // TODO: Replace 'any' with specific ResponseGeneratedEventPayload type
+        // Ensure this event is for the active chat and is a final response
         if (responseGen.isFinal && responseGen.chatId === this.currentChatId) {
-            // Podríamos añadir una lógica para evitar duplicados si este evento
-            // es disparado por el mismo contenido que `result.finalResponse`
             uiMessageType = 'assistantResponse';
             uiMessagePayload.content = responseGen.responseContent;
-            // Si el evento RESPONSE_GENERATED tiene un operationId asociado por el agente, usarlo.
-            // uiMessagePayload.operationId = responseGen.operationId || this.currentOperationId;
+            
+            // If the event payload carries a specific operationId, use it.
+            // Otherwise, uiMessagePayload.operationId retains this.currentOperationId (set at initialization).
+            if (responseGen.operationId) {
+                uiMessagePayload.operationId = responseGen.operationId;
+            }
+            
+            console.log(`[WebviewProvider DEBUG] Posting 'assistantResponse' from RESPONSE_GENERATED event. Event OpID: ${responseGen.operationId}, Current/Default OpID: ${this.currentOperationId}, Final OpID for UI: ${uiMessagePayload.operationId}`);
+        } else {
+            // Log if it's ignored for UI posting (e.g., not final or for a different chat)
+            if (responseGen.chatId !== this.currentChatId) {
+                console.log(`[WebviewProvider DEBUG] RESPONSE_GENERATED event for different chatId ${responseGen.chatId} (current: ${this.currentChatId}) ignored for UI 'assistantResponse'.`);
+            } else if (!responseGen.isFinal) {
+                console.log(`[WebviewProvider DEBUG] Non-final RESPONSE_GENERATED event for chatId ${responseGen.chatId} ignored for UI 'assistantResponse'.`);
+            }
         }
         break;
       

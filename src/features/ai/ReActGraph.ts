@@ -14,21 +14,24 @@ import {
   ToolExecution,
   PerformanceMetrics,
 } from '@shared/types';
-import { ToolRegistry } from '@features/tools/ToolRegistry'; // No se usa en el mock, pero se mantiene
+import { ToolRegistry } from '@features/tools/ToolRegistry'; // Now used
+import { ToolResult } from '../tools/types'; // Added import for ToolResult
 import { InternalEventDispatcher } from '../../core/events/InternalEventDispatcher';
 import { EventType } from '../events/eventTypes';
 
 export class WindsurfGraph {
   private dispatcher: InternalEventDispatcher;
+  private toolRegistry: ToolRegistry; // Added
 
   constructor(
     modelManager: ModelManager, // No usado en este mock
-    toolRegistry: ToolRegistry, // No usado en este mock
+    toolRegistry: ToolRegistry, // Now used
     promptManager: PromptManager, // No usado en este mock
     dispatcher: InternalEventDispatcher
   ) {
     this.dispatcher = dispatcher;
-    console.log('[WindsurfGraph] Initialized with MOCKED implementation and Event Dispatcher.');
+    this.toolRegistry = toolRegistry; // Added
+    console.log('[WindsurfGraph] Initialized with MOCKED implementation, Event Dispatcher, and ToolRegistry.');
   }
 
   async run(initialState: WindsurfState): Promise<WindsurfState> {
@@ -210,40 +213,6 @@ const mockPlanStep1: PlanStep = {
         source: 'ReActGraph.Mock'
       });
 
-      // --- Simulación Iteración 1: Reflexión ---
-      this.dispatcher.dispatch(EventType.REFLECTION_STARTED, {
-        chatId,
-        phase: `Reflection-${state.iterationCount}`,
-        nodeType: 'ReflectionNode',
-        source: 'ReActGraph.Mock'
-      });
-
-      addHistoryEntry('reflection', 'Starting reflection process...', state.iterationCount);
-      await this.timeout(150);
-      addHistoryEntry('reflection', 'Analyzing results of mockTool...', state.iterationCount);
-      await this.timeout(200);
-
-      // const mockInsight: Insight = { ... }; // Insight no está en WindsurfState.ReflectionResult
-      state.reflectionResult = {
-        reflection: 'The action was successful. The plan is proceeding as expected.',
-        isSuccessfulSoFar: true,
-        confidence: 0.95,
-        needsCorrection: false,
-        metrics: { reflectionTime: 350 } as PerformanceMetrics,
-      };
-      addHistoryEntry('reflection', `Reflection complete. Confidence: ${state.reflectionResult.confidence}`, state.iterationCount, 'success', {
-        reflection_summary: state.reflectionResult.reflection,
-        needs_correction: state.reflectionResult.needsCorrection
-      });
-      this.dispatcher.dispatch(EventType.REFLECTION_COMPLETED, {
-        chatId,
-        phase: `Reflection-${state.iterationCount}`,
-        nodeType: 'ReflectionNode',
-        output: { reflection: state.reflectionResult.reflection, needsCorrection: state.reflectionResult.needsCorrection },
-        duration: 350,
-        source: 'ReActGraph.Mock'
-      });
-
       // --- Simulación Iteración 2: Razonamiento ---
       state.iterationCount++; // Ahora es la iteración 2 del ciclo ReAct
       this.dispatcher.dispatch(EventType.REASONING_STARTED, {
@@ -291,134 +260,119 @@ const mockPlanStep1: PlanStep = {
         source: 'ReActGraph.Mock'
       });
 
-      // --- Simulación Iteración 2: Acción (getOpenEditors) ---
-      this.dispatcher.dispatch(EventType.ACTION_STARTED, {
-        chatId,
-        phase: `Action-${mockNextAction2.toolName}-${state.iterationCount}`,
-        nodeType: 'ActionNode',
-        input: { toolName: mockNextAction2.toolName, params: mockNextAction2.params },
-        source: 'ReActGraph.Mock'
+      // --- Simulación Iteración 2: Acción (getActiveEditorInfo) ---
+      state.nextAction = {
+        toolName: 'getActiveEditorInfo',
+        toolParams: {}, // No params for getActiveEditorInfo
+        reasoning: 'Decided to get active editor info to understand current context.',
+      };
+      addHistoryEntry('action_planning', `Selected action: ${state.nextAction.toolName}`, state.iterationCount, undefined, {
+        tool_name: state.nextAction.toolName,
+        tool_parameters: state.nextAction.toolParams
       });
-      
+
       this.dispatcher.dispatch(EventType.TOOL_EXECUTION_STARTED, {
         chatId,
-        toolName: mockNextAction2.toolName,
-        parameters: mockNextAction2.params,
-        source: 'ToolRegistry'
+        toolName: state.nextAction.toolName,
+        parameters: state.nextAction.toolParams,
+        source: 'ToolRegistry', // Source is now ToolRegistry via ReActGraph
+        uiOperationId: state.currentOperationId
+      });
+      addHistoryEntry('action', `Executing tool: ${state.nextAction.toolName}...`, state.iterationCount, undefined, {
+        tool_executions: [{ name: state.nextAction.toolName, status: 'started', parameters: state.nextAction.toolParams }]
       });
       
-      addHistoryEntry('action', `Executing tool: ${mockNextAction2.toolName}...`, state.iterationCount, undefined, {
-        tool_executions: [{ name: mockNextAction2.toolName, status: 'started', parameters: {} }]
-      });
+      // Actual tool call
+      const toolResult: ToolResult<any> = await this.toolRegistry.executeTool(
+        state.nextAction.toolName,
+        state.nextAction.toolParams,
+        { chatId, uiOperationId: state.currentOperationId } // Pass chatId and uiOperationId
+      );
       
-      await this.timeout(120);
-
-      const mockToolExecutionResult2: ToolExecution = {
-        name: mockNextAction2.toolName,
-        status: 'completed',
-        parameters: mockNextAction2.params,
-        result: [
-          { fileName: 'ReActGraph.ts', path: 'src/features/ai/ReActGraph.ts', language: 'typescript', isActive: true },
-          { fileName: 'ConversationManager.ts', path: 'src/core/ConversationManager.ts', language: 'typescript', isActive: false },
-          { fileName: 'ComponentFactory.ts', path: 'src/core/ComponentFactory.ts', language: 'typescript', isActive: false }
-        ],
-        startTime: Date.now() - 120,
+      const toolExecutionEntry: ToolExecution = {
+        name: state.nextAction.toolName,
+        status: toolResult.success ? 'completed' : 'error',
+        parameters: state.nextAction.toolParams,
+        result: toolResult.success ? toolResult.data : { error: toolResult.error },
+        startTime: Date.now() - (toolResult.executionTime || 0), // executionTime might be undefined if tool fails early
         endTime: Date.now(),
-        duration: 120,
+        duration: toolResult.executionTime || 0
       };
-      
-      this.dispatcher.dispatch(EventType.TOOL_EXECUTION_COMPLETED, {
-        chatId,
-        toolName: mockToolExecutionResult2.name,
-        parameters: mockToolExecutionResult2.parameters,
-        result: mockToolExecutionResult2.result,
-        duration: mockToolExecutionResult2.duration,
-        source: 'ToolRegistry'
-      });
+
+      if (toolResult.success) {
+        this.dispatcher.dispatch(EventType.TOOL_EXECUTION_COMPLETED, {
+          chatId,
+          toolName: toolExecutionEntry.name,
+          parameters: toolExecutionEntry.parameters,
+          result: toolExecutionEntry.result,
+          duration: toolExecutionEntry.duration,
+          source: 'ToolRegistry',
+          uiOperationId: state.currentOperationId
+        });
+      } else {
+        this.dispatcher.dispatch(EventType.TOOL_EXECUTION_ERROR, {
+          chatId,
+          toolName: toolExecutionEntry.name,
+          parameters: toolExecutionEntry.parameters,
+          error: toolResult.error || 'Unknown tool error',
+          duration: toolExecutionEntry.duration,
+          source: 'ToolRegistry',
+          uiOperationId: state.currentOperationId
+        });
+      }
 
       state.actionResult = {
-        toolName: mockNextAction2.toolName,
-        params: mockNextAction2.params,
-        success: true,
-        result: mockToolExecutionResult2.result,
-        timestamp: Date.now(),
-        metrics: { actionTime: 120 } as PerformanceMetrics,
-      };
-      
-      mockPlanStep2.status = 'completed';
-      mockPlanStep2.resultSummary = JSON.stringify(mockToolExecutionResult2.result);
-
-      addHistoryEntry('action', `Tool '${mockNextAction2.toolName}' executed.`, state.iterationCount, 'success', {
-        tool_executions: [mockToolExecutionResult2],
-        action_result_summary: state.actionResult.result
-      });
-      
-      this.dispatcher.dispatch(EventType.ACTION_COMPLETED, {
-        chatId,
-        phase: `Action-${mockNextAction2.toolName}-${state.iterationCount}`,
-        nodeType: 'ActionNode',
-        output: state.actionResult,
-        duration: 120,
-        source: 'ReActGraph.Mock'
-      });
-
-      // --- Simulación: Generación de Respuesta (usando una herramienta 'sendResponseToUser' o similar) ---
-      // Asumimos que la reflexión indica que la tarea está completa y se debe generar una respuesta.
-      // Esto podría ser otra acción decidida por un paso de razonamiento.
-      // Por simplicidad, lo hacemos directamente aquí.
-
-      const finalResponsePhaseIteration = state.iterationCount; // Puede ser la misma iteración o una nueva
-      const respondActionToolName = 'sendResponseToUser'; // Usar la herramienta real
-      const finalResponseMessage = `## Mocked Solution\n\nHe analizado (mock) y esta es la respuesta:\n\n\`\`\`javascript\n// Mocked code snippet\nfunction hello() { console.log("World!"); }\n\`\`\`\n\nEsto es un ejemplo de respuesta mockeada.`;
-
-      // Simular la llamada a ToolRegistry.executeTool para 'sendResponseToUser'
-      this.dispatcher.dispatch(EventType.TOOL_EXECUTION_STARTED, {
-        chatId,
-        toolName: respondActionToolName,
-        parameters: { message: finalResponseMessage }, // Parámetro real de sendResponseToUser
-        source: 'ToolRegistry'
-      });
-      addHistoryEntry('responseGeneration', `Generating final response with ${respondActionToolName}...`, finalResponsePhaseIteration, undefined, {
-        tool_executions: [{ name: respondActionToolName, status: 'started', parameters: { message: "..." } }]
-      });
-      await this.timeout(170);
-
-      const respondToolExecutionResult: ToolExecution = {
-        name: respondActionToolName, status: 'completed',
-        parameters: { message: finalResponseMessage },
-        result: { messageSentToChat: true, notificationShown: false, contentPreview: "## Mocked Solution..." }, // Resultado de sendResponseToUser
-        startTime: Date.now() - 170, endTime: Date.now(), duration: 170
-      };
-      this.dispatcher.dispatch(EventType.TOOL_EXECUTION_COMPLETED, {
-        chatId,
-        toolName: respondToolExecutionResult.name,
-        parameters: respondToolExecutionResult.parameters,
-        result: respondToolExecutionResult.result,
-        duration: respondToolExecutionResult.duration,
-        source: 'ToolRegistry'
-      });
-
-      // Actualizar el estado del grafo. El `actionResult` es importante si ApplicationLogicService lo usa.
-      state.actionResult = { // Este actionResult es el de la última acción (sendResponseToUser)
-        toolName: respondActionToolName, params: { message: finalResponseMessage },
-        success: true, result: respondToolExecutionResult.result,
+        toolName: state.nextAction.toolName,
+        params: state.nextAction.toolParams,
+        success: toolResult.success,
+        result: toolResult.data,
+        error: toolResult.error,
         timestamp: Date.now(),
       };
+      addHistoryEntry('action', `Tool ${state.nextAction.toolName} executed. Result: ${toolResult.success ? 'Success' : 'Failure'}`, state.iterationCount, toolResult.success ? 'success' : 'error', {
+        tool_executions: [toolExecutionEntry],
+        action_result_summary: toolResult.success && toolResult.data ? `Active editor info retrieved. Path: ${(toolResult.data as any).filePath}` : `Failed to get active editor info: ${toolResult.error}`
+      });
+
+      // --- Simulación Fase Final: Generar Respuesta ---
+      // En esta fase, se construye la respuesta final basada en el historial y los resultados.
+      // El evento RESPONSE_GENERATED se encargará de notificar a la UI.
+
+      const finalResponsePhaseIteration = state.iterationCount + 1; 
+      addHistoryEntry('responseGeneration', 'Formulating final response...', finalResponsePhaseIteration);
+      await this.timeout(100);
+
+      // Construct the final response message
+      let finalResponseMessage = `## Mocked Solution (Iteration ${state.iterationCount})\n\nBased on the analysis and tool executions, here's a summary:\n- Initial context: ${JSON.stringify(state.projectContext || {})}\n`;
+      if (state.actionResult) {
+        finalResponseMessage += `- Action taken: ${state.actionResult.toolName}\n`;
+        finalResponseMessage += `- Action result: ${state.actionResult.success ? 'Successful' : 'Failed'}\n`;
+        if (state.actionResult.success && state.actionResult.result) {
+          const resultString = JSON.stringify(state.actionResult.result);
+          finalResponseMessage += `- Tool Output: ${resultString.substring(0, 200)}${resultString.length > 200 ? '...' : ''}\n`;
+        } else if (state.actionResult.error) {
+          finalResponseMessage += `- Tool Error: ${state.actionResult.error}\n`;
+        }
+      }
+      finalResponseMessage += `- Observation: ${state.observation?.summary || 'N/A'}\n\nThis is a **mocked response** from WindsurfGraph, now using a real tool.`;
+      
       state.finalOutput = finalResponseMessage; // Guardar la respuesta final en el estado
 
-      addHistoryEntry('responseGeneration', `Final response sent via ${respondActionToolName}.`, finalResponsePhaseIteration, 'success', {
-        tool_executions: [respondToolExecutionResult],
-        final_response_preview: finalResponseMessage.substring(0, 50) + "..."
+      addHistoryEntry('responseGeneration', `Final response formulated.`, finalResponsePhaseIteration, 'success', {
+        final_response_preview: finalResponseMessage.substring(0, 100) + "..."
       });
 
-      // El evento RESPONSE_GENERATED es más semántico para la respuesta final al usuario.
+      // El evento RESPONSE_GENERATED es el mecanismo para la respuesta final al usuario.
       // Lo emite el ReActGraph cuando considera que tiene la respuesta final.
+      // El 'duration' aquí podría ser el tiempo que tomó esta fase de "formulación".
+      const responseFormulationDuration = 100; // El timeout usado arriba
       this.dispatcher.dispatch(EventType.RESPONSE_GENERATED, {
         chatId,
         responseContent: finalResponseMessage,
         isFinal: true,
-        duration: 170, // Tiempo que tomó generar/enviar esta respuesta específica
+        duration: responseFormulationDuration, 
         source: 'ReActGraph.Mock'
+        // operationId: state.currentOperationId // Temporarily removed to fix lint. Consider adding to EventType.RESPONSE_GENERATED payload later.
       });
 
       state.completionStatus = 'completed';
