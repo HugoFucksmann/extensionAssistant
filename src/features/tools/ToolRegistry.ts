@@ -3,11 +3,11 @@ import { ToolDefinition, ToolResult, ToolExecutionContext } from './types';
 import { InternalEventDispatcher } from '../../core/events/InternalEventDispatcher';
 import * as vscode from 'vscode';
 import { PermissionManager } from './PermissionManager';
-import { ToolValidator, ValidationResult } from './ToolValidator'; // <--- AÑADIDO
-import { EventType } from '../../features/events/eventTypes'; // <--- AÑADIDO
+import { ToolValidator, ValidationResult } from './ToolValidator';
+import { EventType, ToolExecutionEventPayload } from '../../features/events/eventTypes'; // <-- MODIFICADO
 
 export class ToolRegistry {
-  private tools = new Map<string, ToolDefinition<any, any>>(); // Especificar tipos genéricos
+  private tools = new Map<string, ToolDefinition<any, any>>();
 
   constructor(private dispatcher: InternalEventDispatcher) {
     this.log('info', 'ToolRegistry initialized. Ready to register tools.');
@@ -28,7 +28,7 @@ export class ToolRegistry {
     }
   }
 
-  public registerTools(toolsToRegister: ToolDefinition<any, any>[]): void { // Especificar tipos genéricos
+  public registerTools(toolsToRegister: ToolDefinition<any, any>[]): void {
     for (const tool of toolsToRegister) {
       if (this.tools.has(tool.name)) {
         this.log('warning', `Tool "${tool.name}" is already registered. Overwriting.`, { toolName: tool.name });
@@ -38,7 +38,7 @@ export class ToolRegistry {
     this.log('info', `Registered ${toolsToRegister.length} tools. Total tools: ${this.tools.size}.`, { registeredNow: toolsToRegister.map(t => t.name) });
   }
 
-  getTool(name: string): ToolDefinition<any, any> | undefined { // Especificar tipos genéricos
+  getTool(name: string): ToolDefinition<any, any> | undefined {
     return this.tools.get(name);
   }
 
@@ -46,91 +46,118 @@ export class ToolRegistry {
     return Array.from(this.tools.keys());
   }
 
-  getAllTools(): ToolDefinition<any, any>[] { // Especificar tipos genéricos
+  getAllTools(): ToolDefinition<any, any>[] {
     return Array.from(this.tools.values());
   }
 
+  private generateToolUIDescription(toolName: string, params: any, toolDefinition?: ToolDefinition<any,any>): string {
+    if (!toolDefinition) return `Ejecutando ${toolName}`;
+
+    // Intentar generar una descripción basada en el nombre y parámetros
+    if (toolName === 'getFileContents' && params.path) {
+      const fileName = typeof params.path === 'string' ? params.path.split(/[\\/]/).pop() : 'archivo';
+      return `Leyendo archivo: ${fileName}`;
+    } else if (toolName === 'searchInWorkspace' && params.query) {
+      return `Buscando en el espacio de trabajo: "${params.query}"`;
+    } else if (toolName === 'executeShellCommand' && params.command) {
+      return `Ejecutando comando: ${params.command}`;
+    } else if (toolName === 'writeToFile' && params.path) {
+      const fileName = typeof params.path === 'string' ? params.path.split(/[\\/]/).pop() : 'archivo';
+      return `Escribiendo archivo: ${fileName}`;
+    } else if (toolName === 'createFileOrDirectory' && params.path) {
+        const type = params.type || 'elemento';
+        const name = typeof params.path === 'string' ? params.path.split(/[\\/]/).pop() : 'elemento';
+        return `Creando ${type}: ${name}`;
+    } else if (toolName === 'deletePath' && params.path) {
+        const name = typeof params.path === 'string' ? params.path.split(/[\\/]/).pop() : 'elemento';
+        return `Eliminando: ${name}`;
+    } else if (toolName === 'applyEditorEdit' && params.filePath) {
+        const fileName = typeof params.filePath === 'string' ? params.filePath.split(/[\\/]/).pop() : 'editor activo';
+        return `Aplicando edición a: ${fileName}`;
+    } else if (toolName === 'applyEditorEdit' && !params.filePath) {
+        return `Aplicando edición al editor activo`;
+    }
+    // Descripción genérica basada en la descripción de la herramienta
+    return toolDefinition.description || `Ejecutando ${toolName}`;
+  }
+
+
   async executeTool(
     name: string,
-    rawParams: any, // Parámetros tal como vienen, antes de validar
+    rawParams: any,
     executionCtxArgs: { chatId?: string; uiOperationId?: string; [key: string]: any } = {}
   ): Promise<ToolResult> {
     const startTime = Date.now();
     const baseLogDetails = { toolName: name, rawParams, executionCtxArgs, chatId: executionCtxArgs.chatId };
 
-    this.dispatcher.dispatch(EventType.TOOL_EXECUTION_STARTED, {
-      toolName: name,
-      parameters: rawParams, // Enviar parámetros crudos
-      chatId: executionCtxArgs.chatId,
-      source: 'ToolRegistry'
-    });
+    const tool = this.getTool(name);
+    const toolDescriptionForUI = this.generateToolUIDescription(name, rawParams, tool);
+
+    const dispatchToolEvent = (type: EventType, payload: Partial<ToolExecutionEventPayload>) => {
+        this.dispatcher.dispatch(type, {
+            toolName: name,
+            parameters: payload.parameters || rawParams, // Usar rawParams si no se especifica
+            toolDescription: toolDescriptionForUI,
+            toolParams: payload.toolParams || rawParams, // Parámetros para mostrar en la UI
+            chatId: executionCtxArgs.chatId,
+            source: 'ToolRegistry',
+            ...payload
+        });
+    };
+    
+    dispatchToolEvent(EventType.TOOL_EXECUTION_STARTED, {});
     this.log('info', `Attempting to execute tool: ${name}`, baseLogDetails);
 
-    const tool = this.getTool(name);
     if (!tool) {
       const errorMsg = `Tool not found: ${name}`;
       this.log('warning', errorMsg, baseLogDetails);
-      this.dispatcher.dispatch(EventType.TOOL_EXECUTION_ERROR, {
-        toolName: name,
-        parameters: rawParams,
+      dispatchToolEvent(EventType.TOOL_EXECUTION_ERROR, {
         error: errorMsg,
         duration: Date.now() - startTime,
-        chatId: executionCtxArgs.chatId,
-        source: 'ToolRegistry'
       });
       return { success: false, error: errorMsg, executionTime: Date.now() - startTime };
     }
 
-    // 1. Validación de Parámetros usando Zod
     this.log('info', `Validating parameters for tool: ${name}`, baseLogDetails);
     const validationResult = ToolValidator.validate(tool.parametersSchema, rawParams);
 
     if (!validationResult.success) {
       this.log('warning', `Parameter validation failed for ${name}: ${validationResult.error}`, { ...baseLogDetails, issues: validationResult.issues });
-      this.dispatcher.dispatch(EventType.TOOL_EXECUTION_ERROR, {
-        toolName: name,
-        parameters: rawParams,
+      dispatchToolEvent(EventType.TOOL_EXECUTION_ERROR, {
         error: validationResult.error,
         duration: Date.now() - startTime,
-        chatId: executionCtxArgs.chatId,
-        source: 'ToolRegistry'
+        // toolParams: rawParams (ya se envían por defecto)
       });
       return { success: false, error: validationResult.error, executionTime: Date.now() - startTime };
     }
     const validatedParams = validationResult.data;
     const logDetailsWithValidatedParams = { ...baseLogDetails, validatedParams };
-    this.log('info', `Parameters validated for tool: ${name}`, logDetailsWithValidatedParams);
 
-
-    // 2. Construir Contexto de Ejecución Completo
     const executionContext: ToolExecutionContext = {
       vscodeAPI: vscode,
       dispatcher: this.dispatcher,
       chatId: executionCtxArgs.chatId,
       uiOperationId: executionCtxArgs.uiOperationId,
-      ...executionCtxArgs // Pasar cualquier otro argumento del contexto
+      ...executionCtxArgs
     };
 
-    // 3. Comprobación de Permisos
     if (tool.requiredPermissions && tool.requiredPermissions.length > 0) {
       this.log('info', `Checking permissions for tool: ${name}`, { ...logDetailsWithValidatedParams, permissions: tool.requiredPermissions });
       try {
         const permissionGranted = await PermissionManager.checkPermissions(
           tool.name,
           tool.requiredPermissions,
-          validatedParams, // Pasar parámetros validados para el contexto del prompt
-          executionContext // Pasar el contexto completo
+          validatedParams,
+          executionContext
         );
         if (!permissionGranted) {
           const errorMsg = `Permission denied for tool ${name}. Required: ${tool.requiredPermissions.join(', ')}`;
           this.log('warning', errorMsg, logDetailsWithValidatedParams);
-          this.dispatcher.dispatch(EventType.TOOL_EXECUTION_ERROR, {
-            toolName: name,
+          dispatchToolEvent(EventType.TOOL_EXECUTION_ERROR, {
             parameters: validatedParams,
+            toolParams: validatedParams,
             error: errorMsg,
             duration: Date.now() - startTime,
-            chatId: executionCtxArgs.chatId,
-            source: 'ToolRegistry'
           });
           return { success: false, error: errorMsg, executionTime: Date.now() - startTime };
         }
@@ -138,42 +165,35 @@ export class ToolRegistry {
       } catch (permError: any) {
         const errorMsg = `Error during permission check for ${name}: ${permError.message}`;
         this.log('error', errorMsg, logDetailsWithValidatedParams, permError);
-        this.dispatcher.dispatch(EventType.TOOL_EXECUTION_ERROR, {
-            toolName: name,
+        dispatchToolEvent(EventType.TOOL_EXECUTION_ERROR, {
             parameters: validatedParams,
+            toolParams: validatedParams,
             error: errorMsg,
             duration: Date.now() - startTime,
-            chatId: executionCtxArgs.chatId,
-            source: 'ToolRegistry'
-          });
+        });
         return { success: false, error: errorMsg, executionTime: Date.now() - startTime };
       }
     }
 
-    // 4. Ejecución de la Herramienta
     try {
       this.log('info', `Executing tool: ${name}`, logDetailsWithValidatedParams);
       const toolResult = await tool.execute(validatedParams, executionContext);
       const executionTime = Date.now() - startTime;
 
       if (toolResult.success) {
-        this.dispatcher.dispatch(EventType.TOOL_EXECUTION_COMPLETED, {
-          toolName: name,
-          parameters: validatedParams,
-          result: toolResult.data, // Solo el 'data' del resultado
-          duration: executionTime,
-          chatId: executionCtxArgs.chatId,
-          source: 'ToolRegistry'
+        dispatchToolEvent(EventType.TOOL_EXECUTION_COMPLETED, {
+            parameters: validatedParams,
+            toolParams: validatedParams,
+            result: toolResult.data,
+            duration: executionTime,
         });
         this.log('info', `Tool ${name} execution successful. Time: ${executionTime}ms`, { ...logDetailsWithValidatedParams, resultData: toolResult.data });
       } else {
-        this.dispatcher.dispatch(EventType.TOOL_EXECUTION_ERROR, {
-          toolName: name,
-          parameters: validatedParams,
-          error: toolResult.error,
-          duration: executionTime,
-          chatId: executionCtxArgs.chatId,
-          source: 'ToolRegistry'
+        dispatchToolEvent(EventType.TOOL_EXECUTION_ERROR, {
+            parameters: validatedParams,
+            toolParams: validatedParams,
+            error: toolResult.error,
+            duration: executionTime,
         });
         this.log('warning', `Tool ${name} execution failed: ${toolResult.error}. Time: ${executionTime}ms`, { ...logDetailsWithValidatedParams, error: toolResult.error });
       }
@@ -183,18 +203,13 @@ export class ToolRegistry {
       const executionTime = Date.now() - startTime;
       const errorMsg = `Unexpected error during execution of tool ${name}: ${error.message}`;
       this.log('error', errorMsg, logDetailsWithValidatedParams, error);
-      this.dispatcher.dispatch(EventType.TOOL_EXECUTION_ERROR, {
-        toolName: name,
-        parameters: validatedParams, // validatedParams debería estar definido aquí
+      dispatchToolEvent(EventType.TOOL_EXECUTION_ERROR, {
+        parameters: validatedParams,
+        toolParams: validatedParams,
         error: errorMsg,
         duration: executionTime,
-        chatId: executionCtxArgs.chatId,
-        source: 'ToolRegistry'
       });
       return { success: false, error: errorMsg, executionTime };
     }
   }
-
-  // Los métodos validateParameters y validateParameterValue se eliminan
-  // ya que Zod y ToolValidator se encargan de la validación.
 }

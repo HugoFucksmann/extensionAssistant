@@ -110,12 +110,17 @@ export type ReActEventPayload = AgentPhaseEventPayload;
 
 // ... (ToolExecutionEventPayload, ResponseEventPayload, NodeEventPayload, ErrorOccurredEventPayload, SystemEventPayload, UserInteractionRequiredPayload, UserInputReceivedPayload - keep as is or ensure they extend BaseEventPayload correctly) ...
 export interface ToolExecutionEventPayload extends BaseEventPayload {
-  toolName: string; 
-  parameters?: Record<string, any>; 
-  result?: any;     
-  error?: string;     
-  duration?: number;  
+  toolName: string;
+  parameters?: Record<string, any>; // Parámetros originales/validados
+  result?: any;
+  error?: string;
+  duration?: number;
+  toolDescription?: string; // Descripción amigable de la acción de la herramienta (NUEVO)
+  toolParams?: Record<string, any>; // Parámetros para mostrar en la UI (NUEVO)
+  isProcessingStep?: boolean; // Flag para identificar pasos de procesamiento
 }
+
+
 export interface ResponseEventPayload extends BaseEventPayload {
   responseContent: string; 
   isFinal?: boolean;      

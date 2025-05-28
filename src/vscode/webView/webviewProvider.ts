@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 import { getReactHtmlContent } from './htmlTemplate';
 import { ApplicationLogicService } from '../../core/ApplicationLogicService';
 import { InternalEventDispatcher } from '../../core/events/InternalEventDispatcher';
-import { EventType, WindsurfEvent, ToolExecutionEventPayload, SystemEventPayload, ErrorOccurredEventPayload } from '../../features/events/eventTypes';
+import { EventType, WindsurfEvent, ToolExecutionEventPayload, SystemEventPayload, ErrorOccurredEventPayload, UserInteractionRequiredPayload } from '../../features/events/eventTypes';
 import * as crypto from 'crypto';
 
 export class WebviewProvider implements vscode.WebviewViewProvider {
@@ -228,16 +228,14 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     const eventChatId = event.payload.chatId;
     // console.log(`[WebviewProvider DEBUG] Received internal event: ${event.type}, CurrentOpID: ${this.currentOperationId}, EventChatID: ${eventChatId}, CurrentChatID: ${this.currentChatId}`);
 
-    // Filtrar eventos que no son para el chat actual, excepto errores de sistema globales
     if (event.type !== EventType.SYSTEM_ERROR && eventChatId && eventChatId !== this.currentChatId) {
-        // console.log(`[WebviewProvider DEBUG] Event ${event.type} for different chatId ${eventChatId} ignored. Current is ${this.currentChatId}.`);
         return;
     }
 
     let uiMessagePayload: any = {
         id: `event_${event.id || Date.now()}`,
         timestamp: event.timestamp || Date.now(),
-        operationId: this.currentOperationId, // Asociar con la operación actual si existe
+        operationId: this.currentOperationId, 
     };
     let uiMessageType: string | null = null;
 
@@ -245,48 +243,49 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
       case EventType.TOOL_EXECUTION_STARTED:
         const toolStart = event.payload as ToolExecutionEventPayload;
         uiMessageType = 'agentActionUpdate';
-        uiMessagePayload.content = `Ejecutando ${toolStart.toolName || 'herramienta'}...`;
+        uiMessagePayload.content = toolStart.toolDescription || `Ejecutando ${toolStart.toolName || 'herramienta'}...`; // <-- USAR toolDescription
         uiMessagePayload.status = 'tool_executing';
         uiMessagePayload.toolName = toolStart.toolName;
+        uiMessagePayload.toolParams = toolStart.toolParams; // <-- AÑADIR toolParams
         break;
 
       case EventType.TOOL_EXECUTION_COMPLETED:
         const toolComplete = event.payload as ToolExecutionEventPayload;
         uiMessageType = 'agentActionUpdate';
+        uiMessagePayload.content = toolComplete.toolDescription ? 
+            `${toolComplete.toolDescription} finalizó.` : 
+            `${toolComplete.toolName || 'La herramienta'} finalizó.`; // <-- USAR toolDescription
         // Podríamos querer mostrar el resultado de la herramienta si es breve y útil
         // let resultSummary = toolComplete.result ? `: ${JSON.stringify(toolComplete.result).substring(0,30)}...` : '.';
-        // uiMessagePayload.content = `${toolComplete.toolName || 'La herramienta'} finalizó${resultSummary}`;
-        uiMessagePayload.content = `${toolComplete.toolName || 'La herramienta'} finalizó.`;
+        // uiMessagePayload.content += resultSummary;
         uiMessagePayload.status = 'success';
         uiMessagePayload.toolName = toolComplete.toolName;
+        uiMessagePayload.toolParams = toolComplete.toolParams; // <-- AÑADIR toolParams
+        uiMessagePayload.toolResult = toolComplete.result; // <-- Opcional: enviar el resultado si la UI lo necesita
         break;
 
       case EventType.TOOL_EXECUTION_ERROR:
         const toolError = event.payload as ToolExecutionEventPayload;
         uiMessageType = 'agentActionUpdate';
-        uiMessagePayload.content = `Error en ${toolError.toolName || 'herramienta'}: ${toolError.error || 'desconocido'}`;
+        uiMessagePayload.content = `Error en ${toolError.toolDescription || toolError.toolName || 'herramienta'}: ${toolError.error || 'desconocido'}`; // <-- USAR toolDescription
         uiMessagePayload.status = 'error';
         uiMessagePayload.toolName = toolError.toolName;
+        uiMessagePayload.toolParams = toolError.toolParams; // <-- AÑADIR toolParams
         break;
 
       case EventType.SYSTEM_ERROR:
         const sysError = event.payload as SystemEventPayload | ErrorOccurredEventPayload;
-        uiMessageType = 'systemError'; // Usar un tipo de mensaje UI diferente para errores del sistema
+        uiMessageType = 'systemError';
         uiMessagePayload.message = 'message' in sysError ? sysError.message : sysError.errorMessage || 'Error inesperado del sistema.';
-        // operationId podría no ser relevante o ser null si es un error global
         break;
       
-      case EventType.USER_INPUT_RECEIVED: // Respuesta a askUser o a solicitudes de permisos
-        // Si es una respuesta a una solicitud de permiso, la manejamos en PermissionManager
-        // Si es una respuesta a askUser, se maneja directamente en el flujo que lo llamó
+      case EventType.USER_INPUT_RECEIVED:
         break;
 
-      case EventType.USER_INTERACTION_REQUIRED: // Para askUser y solicitudes de permisos
-        const interactionReq = event.payload as any; // UserInteractionRequiredPayload
+      case EventType.USER_INTERACTION_REQUIRED:
+        const interactionReq = event.payload as UserInteractionRequiredPayload; // <-- CAST A TIPO ESPECÍFICO
         
-        // Si es una solicitud de permiso (tiene title 'Permission Required')
         if (interactionReq.interactionType === 'confirmation' && interactionReq.title === 'Permission Required') {
-          // Extraer información de la herramienta y el permiso del mensaje
           const toolNameMatch = interactionReq.promptMessage.match(/Tool '([^']+)'/);
           const permissionMatch = interactionReq.promptMessage.match(/permission: '([^']+)'/);
           
@@ -294,36 +293,37 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
             toolName: toolNameMatch ? toolNameMatch[1] : 'Unknown Tool',
             permission: permissionMatch ? permissionMatch[1] : 'Unknown Permission',
             description: interactionReq.promptMessage,
-            params: interactionReq.options || [],
+            // params: interactionReq.options || [], // 'options' no es para parámetros de herramienta, sino para opciones de UI
+            // Si necesitas pasar parámetros de la herramienta aquí, deberían estar en el payload de USER_INTERACTION_REQUIRED
             operationId: interactionReq.uiOperationId
           });
-          return; // No enviar mensaje genérico de userInputRequired
+          return; 
         }
         
-        // Para otros tipos de interacción, usar el comportamiento normal
-        uiMessageType = 'userInputRequired'; // Mensaje específico para la UI
+        // Para askUser
+        uiMessageType = 'userInputRequired';
+        uiMessagePayload.interactionType = interactionReq.interactionType;
+        uiMessagePayload.promptMessage = interactionReq.promptMessage;
+        uiMessagePayload.options = interactionReq.options;
+        uiMessagePayload.placeholder = interactionReq.placeholder;
+        uiMessagePayload.uiOperationId = interactionReq.uiOperationId; // Asegurar que el uiOperationId del evento se usa
+        uiMessagePayload.operationId = interactionReq.uiOperationId; // Sobrescribir el operationId general si el evento tiene uno específico
         break;
 
-      case EventType.RESPONSE_GENERATED: // Handles final assistant responses
-        const responseGen = event.payload as any; // TODO: Replace 'any' with specific ResponseGeneratedEventPayload type
-        // Ensure this event is for the active chat and is a final response
+      case EventType.RESPONSE_GENERATED:
+        const responseGen = event.payload as any; 
         if (responseGen.isFinal && responseGen.chatId === this.currentChatId) {
             uiMessageType = 'assistantResponse';
             uiMessagePayload.content = responseGen.responseContent;
-            
-            // If the event payload carries a specific operationId, use it.
-            // Otherwise, uiMessagePayload.operationId retains this.currentOperationId (set at initialization).
             if (responseGen.operationId) {
                 uiMessagePayload.operationId = responseGen.operationId;
             }
-            
             console.log(`[WebviewProvider DEBUG] Posting 'assistantResponse' from RESPONSE_GENERATED event. Event OpID: ${responseGen.operationId}, Current/Default OpID: ${this.currentOperationId}, Final OpID for UI: ${uiMessagePayload.operationId}`);
         } else {
-            // Log if it's ignored for UI posting (e.g., not final or for a different chat)
             if (responseGen.chatId !== this.currentChatId) {
-                console.log(`[WebviewProvider DEBUG] RESPONSE_GENERATED event for different chatId ${responseGen.chatId} (current: ${this.currentChatId}) ignored for UI 'assistantResponse'.`);
+                // console.log(`[WebviewProvider DEBUG] RESPONSE_GENERATED event for different chatId ${responseGen.chatId} (current: ${this.currentChatId}) ignored for UI 'assistantResponse'.`);
             } else if (!responseGen.isFinal) {
-                console.log(`[WebviewProvider DEBUG] Non-final RESPONSE_GENERATED event for chatId ${responseGen.chatId} ignored for UI 'assistantResponse'.`);
+                // console.log(`[WebviewProvider DEBUG] Non-final RESPONSE_GENERATED event for chatId ${responseGen.chatId} ignored for UI 'assistantResponse'.`);
             }
         }
         break;
@@ -333,12 +333,13 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     }
 
     if (uiMessageType) {
-      // Para eventos de herramientas, deben estar asociados a una operación.
       if (uiMessageType === 'agentActionUpdate' && !uiMessagePayload.operationId && event.type.startsWith('tool:execution:')) {
         console.warn(`[WebviewProvider DEBUG] No operationId for tool event ${event.type} in agentActionUpdate. Message: ${uiMessagePayload.content?.substring(0,50)}...`);
-        // No enviar si no hay operationId para un update de acción de agente
-        // a menos que sea un error de sistema que se quiera mostrar globalmente.
         return; 
+      }
+      // Si el evento tiene un uiOperationId (como USER_INTERACTION_REQUIRED), usarlo como operationId para la UI.
+      if ((event.payload as any).uiOperationId && uiMessageType === 'userInputRequired') {
+          uiMessagePayload.operationId = (event.payload as any).uiOperationId;
       }
       this.postMessage(uiMessageType, uiMessagePayload);
     }

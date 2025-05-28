@@ -1,4 +1,4 @@
-// src/features/ai/ReActGraph.ts
+/* // src/features/ai/ReActGraph.ts
 
 import { ModelManager } from './ModelManager'; // No se usa en el mock, pero se mantiene para la estructura
 import { PromptManager } from './promptManager'; // No se usa en el mock, pero se mantiene
@@ -415,4 +415,4 @@ const mockPlanStep1: PlanStep = {
     // En entorno real, usar el timeout solicitado. Solo acelerar en test.
     return new Promise(resolve => setTimeout(resolve, process.env.NODE_ENV === 'test' ? ms / 100 : ms));
   }
-}
+} */
