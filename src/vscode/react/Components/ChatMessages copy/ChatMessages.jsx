@@ -1,7 +1,7 @@
 // src/vscode/react/Components/ChatMessages/ChatMessages.jsx
 import React, { useRef, useLayoutEffect, memo, useMemo } from "react";
 import { useApp } from "../../context/AppContext";
-import ConversationGroup from "./new/ConversationGroup";
+import ConversationGroup from "./ConversationGroup";
 import "./ChatMessages.css"; // Tu CSS existente
 
 const ChatMessages = () => {

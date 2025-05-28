@@ -110,25 +110,25 @@ function appReducer(state: AppState, action: AppAction): AppState {
         return { ...state, theme: action.payload };
     case 'SET_TEST_MODE':
         return { ...state, testModeEnabled: action.payload };
-    
-    case 'AGENT_ACTION_UPDATE': {
-      const opId = action.payload.metadata?.operationId;
-      if (!opId) return state; 
-
-      const updatedMessages = [...state.messages, action.payload];
-      
-      return {
-        ...state,
-        messages: updatedMessages,
-        activeFeedbackOperationId: opId,
-        feedbackMessages: {
-          ...state.feedbackMessages,
-          [opId]: [...(state.feedbackMessages[opId] || []), action.payload]
-        },
-        isLoading: action.payload.metadata?.status === 'thinking' || 
-                     action.payload.metadata?.status === 'tool_executing',
-      };
-    }
+        case 'AGENT_ACTION_UPDATE': {
+          const opId = action.payload.metadata?.operationId;
+          if (!opId) return state;
+        
+          // AÑADE EL MENSAJE DE ACCIÓN AL ARRAY PRINCIPAL DE MENSAJES
+          const updatedMessages = [...state.messages, action.payload];
+        
+          return {
+            ...state,
+            messages: updatedMessages, // <--- ¡AQUÍ!
+            activeFeedbackOperationId: opId, // Sigue siendo útil para saber cuál está "activo"
+            feedbackMessages: { // Esto puede seguir existiendo si FeedbackRenderer lo usa directamente en otro lugar
+              ...state.feedbackMessages,
+              [opId]: [...(state.feedbackMessages[opId] || []), action.payload]
+            },
+            isLoading: action.payload.metadata?.status === 'thinking' ||
+                         action.payload.metadata?.status === 'tool_executing',
+          };
+        }
     
     case 'ADD_MESSAGE': {
       const newState = {
