@@ -124,24 +124,27 @@ export class OptimizedReActEngine {
     
     // Función para enviar eventos de fase del agente
     const agentPhaseDispatch = (
-      phase: string, // Usar string en lugar de AgentPhaseEventPayload['phase']
+      phase: string,
       status: 'started' | 'completed', 
       data?: any, 
       error?: string
-    ) => {
-      // Usar EventType.SYSTEM_INFO para compatibilidad
-      this.dispatcher.systemInfo(
-        `Fase del agente: ${phase} (${status})`,
-        {
-          phase,
-          status,
-          chatId: currentState.chatId,
-          data,
-          error,
-          source: 'OptimizedReActEngine'
-        }
-      );
+    ): void => {
+      const eventType = status === 'started' 
+        ? EventType.AGENT_PHASE_STARTED 
+        : EventType.AGENT_PHASE_COMPLETED;
+      
+      const payload: AgentPhaseEventPayload = {
+        phase,
+        chatId: currentState.chatId,
+        data,
+        error,
+        source: 'OptimizedReActEngine',
+        timestamp: Date.now()
+      };
+      
+      this.dispatcher.dispatch(eventType, payload);
     };
+    
 
     try {
       // --- Fase de análisis inicial ---

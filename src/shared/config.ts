@@ -103,24 +103,24 @@ export const getConfig = (env: Environment): {backend: BackendConfig; frontend: 
 /**
  * Tipos de nodos en el grafo ReAct
  */
-export enum ReActNodeType {
+/* export enum ReActNodeType {
   INITIAL_ANALYSIS = 'initialAnalysis',
   REASONING = 'reasoning',
   ACTION = 'action',
   REFLECTION = 'reflection',
   CORRECTION = 'correction',
   RESPONSE_GENERATION = 'responseGeneration'
-}
+} */
 
 /**
  * Tipos de transiciones en el grafo ReAct
  */
-export enum ReActTransitionType {
+/* export enum ReActTransitionType {
   TO_REASONING = 'toReasoning',
   TO_ACTION = 'toAction',
   TO_REFLECTION = 'toReflection',
   TO_CORRECTION = 'toCorrection',
   TO_RESPONSE = 'toResponse',
   TO_END = 'toEnd'
-}
+} */
 

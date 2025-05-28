@@ -13,17 +13,8 @@ export enum EventType {
   LLM_REQUEST_COMPLETED = 'llm:request:completed',
 
   // Agent/ReAct Cycle Events
-  AGENT_PHASE_STARTED = 'agent:phase:started', // More generic than specific react phases initially
+  AGENT_PHASE_STARTED = 'agent:phase:started',
   AGENT_PHASE_COMPLETED = 'agent:phase:completed',
-  // Old ReAct specific events (can be kept or removed if AGENT_PHASE_* is preferred)
-  REASONING_STARTED = 'react:reasoning:started',
-  REASONING_COMPLETED = 'react:reasoning:completed',
-  ACTION_STARTED = 'react:action:started', 
-  ACTION_COMPLETED = 'react:action:completed',
-  REFLECTION_STARTED = 'react:reflection:started',
-  REFLECTION_COMPLETED = 'react:reflection:completed',
-  CORRECTION_STARTED = 'react:correction:started',
-  CORRECTION_COMPLETED = 'react:correction:completed',
   
   // Tool execution
   TOOL_EXECUTION_STARTED = 'tool:execution:started',
@@ -35,13 +26,7 @@ export enum EventType {
   RESPONSE_GENERATED = 'response:generated',
   RESPONSE_DELIVERED = 'response:delivered',
   
-  // Node execution (for LangGraph or similar)
-  NODE_START = 'node:start',
-  NODE_COMPLETE = 'node:complete',
-  NODE_ERROR = 'node:error',
-  
   // System events
-  ERROR_OCCURRED = 'error:occurred',
   SYSTEM_INFO = 'system:info',
   SYSTEM_WARNING = 'system:warning',
   SYSTEM_ERROR = 'system:error',
@@ -104,7 +89,7 @@ export interface AgentPhaseEventPayload extends BaseEventPayload {
   error?: string;     // If the phase failed
 }
 
-// ReActEventPayload can be an alias or be replaced by AgentPhaseEventPayload
+// Alias para compatibilidad
 export type ReActEventPayload = AgentPhaseEventPayload;
 
 
@@ -173,13 +158,11 @@ export type EventPayload =
   | BaseEventPayload
   | ConversationEventPayload
   | ConversationEndedPayload
-  | LlmRequestStartedPayload        // <-- ADDED
-  | LlmRequestCompletedPayload      // <-- ADDED
-  | AgentPhaseEventPayload          // <-- ADDED (or ReActEventPayload if you keep that name)
+  | LlmRequestStartedPayload
+  | LlmRequestCompletedPayload
+  | AgentPhaseEventPayload
   | ToolExecutionEventPayload
   | ResponseEventPayload
-  | NodeEventPayload
-  | ErrorOccurredEventPayload
   | SystemEventPayload
   | UserInteractionRequiredPayload
   | UserInputReceivedPayload;

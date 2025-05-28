@@ -2,14 +2,14 @@
 import { VSCodeContext, WindsurfState } from '../shared/types';
 import { MemoryManager } from '../features/memory/MemoryManager';
 // import { WindsurfGraph } from '../features/ai/ReActGraph'; // <-- REMOVE or COMMENT OUT
-import { ReActEngine } from './ReActEngine';
+/* import { ReActEngine } from './ReActEngine'; */
 import { OptimizedReActEngine } from './OptimizedReActEngine';
 import { ToolRegistry } from '../features/tools/ToolRegistry';
 import { ConversationManager } from './ConversationManager';
 import { ToolResult } from '../features/tools/types';
 
 // Tipo unión para aceptar cualquiera de los dos motores ReAct
-type ReActEngineType = ReActEngine | OptimizedReActEngine;
+type ReActEngineType =  OptimizedReActEngine;
 
 export interface ProcessUserMessageResult {
   success: boolean;

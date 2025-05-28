@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 import { VSCodeContext } from '../shared/types';
 import { EventLogger } from '../features/events/EventLogger';
 import { ModelManager } from '../features/ai/ModelManager';
-import { PromptManager } from '../features/ai/promptManager';
+/* import { PromptManager } from '../features/ai/promptManager'; */
 import { ToolRegistry } from '../features/tools/ToolRegistry';
 import { allToolDefinitions } from '../features/tools/definitions';
 import { MemoryManager } from '../features/memory/MemoryManager';
@@ -11,9 +11,9 @@ import { ConversationManager } from './ConversationManager';
 import { ApplicationLogicService } from './ApplicationLogicService';
 import { InternalEventDispatcher } from './events/InternalEventDispatcher';
 // import { WindsurfGraph } from '../features/ai/ReActGraph'; // <-- REMOVE or COMMENT OUT
-
-import { LanguageModelService } from './LanguageModelService';
-import { ReActEngine } from './ReActEngine';
+/* 
+import { LanguageModelService } from './LanguageModelService'; */
+/* import { ReActEngine } from './ReActEngine'; */
 import { OptimizedReActEngine } from './OptimizedReActEngine';
 import { OptimizedPromptManager } from '../features/ai/OptimizedPromptManager';
 import { LongTermStorage } from '../features/memory/LongTermStorage';
@@ -27,9 +27,9 @@ export class ComponentFactory {
 
   // New singletons for core AI components
   private static modelManagerInstance: ModelManager;
-  private static promptManagerInstance: PromptManager;
+/*   private static promptManagerInstance: PromptManager;
   private static languageModelServiceInstance: LanguageModelService;
-  private static reActEngineInstance: ReActEngine;
+  private static reActEngineInstance: ReActEngine; */
   private static optimizedPromptManagerInstance: OptimizedPromptManager;
   private static optimizedReActEngineInstance: OptimizedReActEngine;
   private static longTermStorageInstance: LongTermStorage;
@@ -78,15 +78,15 @@ export class ComponentFactory {
     return this.modelManagerInstance;
   }
 
-  public static getPromptManager(): PromptManager { // <-- ADDED METHOD
+/*   public static getPromptManager(): PromptManager { // <-- ADDED METHOD
     if (!this.promptManagerInstance) {
       this.promptManagerInstance = new PromptManager();
       console.log('[ComponentFactory] PromptManager instance created.');
     }
     return this.promptManagerInstance;
-  }
+  } */
   
-  public static getLanguageModelService(extensionContext: vscode.ExtensionContext): LanguageModelService { // <-- ADDED METHOD
+ /*  public static getLanguageModelService(extensionContext: vscode.ExtensionContext): LanguageModelService { // <-- ADDED METHOD
     if (!this.languageModelServiceInstance) {
       const modelManager = this.getModelManager();
       const promptManager = this.getPromptManager();
@@ -95,9 +95,9 @@ export class ComponentFactory {
       console.log('[ComponentFactory] LanguageModelService instance created.');
     }
     return this.languageModelServiceInstance;
-  }
+  } */
 
-  public static getReActEngine(extensionContext: vscode.ExtensionContext): ReActEngine {
+ /*  public static getReActEngine(extensionContext: vscode.ExtensionContext): ReActEngine {
     if (!this.reActEngineInstance) {
       const languageModelService = this.getLanguageModelService(extensionContext);
       const toolRegistry = this.getToolRegistry(extensionContext);
@@ -106,7 +106,7 @@ export class ComponentFactory {
       console.log('[ComponentFactory] ReActEngine instance created.');
     }
     return this.reActEngineInstance;
-  }
+  } */
   
   public static getLongTermStorage(extensionContext: vscode.ExtensionContext): LongTermStorage {
     if (!this.longTermStorageInstance) {
