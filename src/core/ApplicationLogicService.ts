@@ -2,10 +2,14 @@
 import { VSCodeContext, WindsurfState } from '../shared/types';
 import { MemoryManager } from '../features/memory/MemoryManager';
 // import { WindsurfGraph } from '../features/ai/ReActGraph'; // <-- REMOVE or COMMENT OUT
-import { ReActEngine } from './ReActEngine';                   // <-- ADD
+import { ReActEngine } from './ReActEngine';
+import { OptimizedReActEngine } from './OptimizedReActEngine';
 import { ToolRegistry } from '../features/tools/ToolRegistry';
 import { ConversationManager } from './ConversationManager';
-import { ToolResult } from '../features/tools/types'; 
+import { ToolResult } from '../features/tools/types';
+
+// Tipo unión para aceptar cualquiera de los dos motores ReAct
+type ReActEngineType = ReActEngine | OptimizedReActEngine;
 
 export interface ProcessUserMessageResult {
   success: boolean;
@@ -18,7 +22,7 @@ export class ApplicationLogicService {
   constructor(
     private vscodeContext: VSCodeContext,
     private memoryManager: MemoryManager,
-    private reActEngine: ReActEngine, // <-- CHANGED from reactGraph to reActEngine
+    private reActEngine: ReActEngineType, // Acepta cualquiera de los dos motores
     private conversationManager: ConversationManager,
     private toolRegistry: ToolRegistry
   ) {

@@ -6,36 +6,55 @@ import { InternalEventDispatcher } from './events/InternalEventDispatcher';
 import { EventType, AgentPhaseEventPayload, ResponseEventPayload, SystemEventPayload } from '../features/events/eventTypes'; // Import specific payloads
 import { ToolResult } from '../features/tools/types';
 import { getConfig } from '../shared/config';
-import { z } from 'zod'; // For potential tool description generation
+import { z, ZodTypeAny, ZodFirstPartyTypeKind, ZodObject, ZodOptional, ZodDefault, ZodEnum } from 'zod';
 
 const config = getConfig(process.env.NODE_ENV === 'production' ? 'production' : 'development');
 
-// Helper to generate a string description of tool parameters from Zod schema
-// This is a simplified version. For complex schemas (e.g. nested objects, unions, etc.),
-// you might need a more robust Zod to JSON Schema or Zod to string description library.
-function zodSchemaToDescription(schema: z.ZodTypeAny): string {
+
+
+
+function zodSchemaToDescription(schema: ZodTypeAny, indentLevel: number = 0): string {
   if (!schema || !schema._def) return "No parameters defined.";
 
   const def = schema._def;
+  const indent = "  ".repeat(indentLevel);
+  let description = schema.description ? ` (${schema.description})` : '';
 
-  if (def.typeName === z.ZodFirstPartyTypeKind.ZodObject) {
-    const shape = def.shape();
-    const params = Object.entries(shape)
-      .map(([key, val]: [string, any]) => {
-        let typeDesc = val._def?.typeName || 'unknown';
-        if (val._def?.innerType?._def?.typeName) { // For ZodOptional, ZodDefault
-            typeDesc = val._def.innerType._def.typeName;
-        }
-        if (val._def?.typeName === z.ZodFirstPartyTypeKind.ZodEnum) {
-            typeDesc = `enum: [${val._def.values.join(', ')}]`;
-        }
-        const description = val.description || '';
-        return `  - ${key} (${typeDesc})${description ? ': ' + description : ''}`;
-      })
-      .join('\n');
-    return params.length > 0 ? `Parameters:\n${params}` : "No parameters.";
+  if (def.typeName === ZodFirstPartyTypeKind.ZodObject) {
+      const shape = (schema as ZodObject<any, any, any, any, any>).shape; // Type assertion
+      const params = Object.entries(shape)
+          .map(([key, val]: [string, any]) => {
+              const isOptional = val._def.typeName === ZodFirstPartyTypeKind.ZodOptional || val._def.typeName === ZodFirstPartyTypeKind.ZodDefault;
+              const innerType = (isOptional || val._def.typeName === ZodFirstPartyTypeKind.ZodDefault) ? val._def.innerType : val;
+              let typeDesc = innerType._def?.typeName || 'unknown';
+              
+              if (innerType._def?.typeName === ZodFirstPartyTypeKind.ZodEnum) {
+                  typeDesc = `enum: [${(innerType as ZodEnum<any>)._def.values.join(', ')}]`;
+              } else if (innerType._def?.typeName === ZodFirstPartyTypeKind.ZodLiteral) {
+                  typeDesc = `literal: ${JSON.stringify(innerType._def.value)}`;
+              } else if (innerType._def?.typeName === ZodFirstPartyTypeKind.ZodArray) {
+                  typeDesc = `array of ${zodSchemaToDescription(innerType._def.type, indentLevel + 2).trim()}`;
+              } else if (innerType._def?.typeName === ZodFirstPartyTypeKind.ZodObject) {
+                  typeDesc = `object:\n${zodSchemaToDescription(innerType, indentLevel + 1)}`;
+              } else {
+                  // Simplificar nombres de tipos Zod
+                  typeDesc = typeDesc.replace('Zod', '').toLowerCase();
+              }
+
+              const paramDescription = innerType.description ? ` - ${innerType.description}` : '';
+              return `${indent}  - ${key}${isOptional ? ' (optional)' : ' (required)'}: ${typeDesc}${paramDescription}`;
+          })
+          .join('\n');
+      return params.length > 0 ? `Parameters:\n${params}` : "No parameters.";
+  } else if (def.typeName === ZodFirstPartyTypeKind.ZodArray) {
+      return `array of ${zodSchemaToDescription(def.type, indentLevel + 1).trim()}`;
+  } else if (def.typeName === ZodFirstPartyTypeKind.ZodEnum) {
+      return `enum: [${(schema as ZodEnum<any>)._def.values.join(', ')}]${description}`;
+  } else if (def.typeName === ZodFirstPartyTypeKind.ZodLiteral) {
+      return `literal: ${JSON.stringify(def.value)}${description}`;
   }
-  return "Parameters schema is not a simple object.";
+  // Para tipos simples como ZodString, ZodNumber, etc.
+  return `${def.typeName.replace('Zod', '').toLowerCase()}${description}`;
 }
 
 
@@ -57,7 +76,8 @@ export class ReActEngine {
     this.toolsDescriptionCache = this.toolRegistry.getAllTools()
       .map(tool => {
         const paramDesc = zodSchemaToDescription(tool.parametersSchema);
-        return `Tool Name: ${tool.name}\nDescription: ${tool.description}\n${paramDesc}`;
+        // Formato más claro para el LLM
+        return `TOOL_NAME: ${tool.name}\nTOOL_DESCRIPTION: ${tool.description}\n${paramDesc.length > 0 ? `${paramDesc}` : 'PARAMETERS: None'}`;
       })
       .join('\n\n---\n\n');
     return this.toolsDescriptionCache;

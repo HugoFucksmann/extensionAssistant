@@ -4,21 +4,15 @@
  */
 
 import { ChatPromptTemplate, BasePromptTemplate } from '@langchain/core/prompts';
-import { initialAnalysisPrompt } from './prompts/initialAnalysisPrompt';
-import { reasoningPrompt } from './prompts/reasoningPrompt';
-import { reflectionPrompt } from './prompts/reflectionPrompt';
-import { correctionPrompt } from './prompts/correctionPrompt';
-import { responseGenerationPrompt } from './prompts/responseGenerationPrompt';
 
 /**
  * Tipo de prompts disponibles en el sistema
  */
 export type PromptType = 
-  | 'initialAnalysis'
+  | 'analysis'
   | 'reasoning'
-  | 'reflection'
-  | 'correction'
-  | 'responseGeneration';
+  | 'action'
+  | 'response';
 
 /**
  * Gestor centralizado de prompts
@@ -26,6 +20,7 @@ export type PromptType =
  */
 export class PromptManager {
   private prompts: Map<PromptType, BasePromptTemplate>;
+  private _promptGenerators: Record<PromptType, Function> = {} as Record<PromptType, Function>;
 
   constructor() {
     this.prompts = new Map();
@@ -37,20 +32,41 @@ export class PromptManager {
    * Registra todos los prompts disponibles en el sistema
    */
   private registerPrompts(): void {
+    // Importar dinámicamente para evitar dependencias circulares
+    const { generateAnalysisPrompt } = require('./prompts/optimized/analysisPrompt');
+    const { generateReasoningPrompt } = require('./prompts/optimized/reasoningPrompt');
+    const { generateActionPrompt } = require('./prompts/optimized/actionPrompt');
+    const { generateResponsePrompt } = require('./prompts/optimized/responsePrompt');
+    
     // Prompt para el análisis inicial
-    this.prompts.set('initialAnalysis', initialAnalysisPrompt);
+    this.prompts.set('analysis', ChatPromptTemplate.fromTemplate(
+      // Usamos un template simple que será reemplazado en tiempo de ejecución
+      // con los valores reales cuando se llame a formatPrompt
+      '{prompt}'
+    ));
     
     // Prompt para la fase de razonamiento
-    this.prompts.set('reasoning', reasoningPrompt);
+    this.prompts.set('reasoning', ChatPromptTemplate.fromTemplate(
+      '{prompt}'
+    ));
     
-    // Prompt para la fase de reflexión
-    this.prompts.set('reflection', reflectionPrompt);
-    
-    // Prompt para la fase de corrección
-    this.prompts.set('correction', correctionPrompt);
+    // Prompt para la fase de acción
+    this.prompts.set('action', ChatPromptTemplate.fromTemplate(
+      '{prompt}'
+    ));
     
     // Prompt para la generación de respuestas finales
-    this.prompts.set('responseGeneration', responseGenerationPrompt);
+    this.prompts.set('response', ChatPromptTemplate.fromTemplate(
+      '{prompt}'
+    ));
+    
+    // Guardamos las funciones generadoras para usarlas en formatPrompt
+    this._promptGenerators = {
+      analysis: generateAnalysisPrompt,
+      reasoning: generateReasoningPrompt,
+      action: generateActionPrompt,
+      response: generateResponsePrompt
+    };
   }
   
   /**
@@ -75,7 +91,55 @@ export class PromptManager {
   public async formatPrompt(type: PromptType, values: Record<string, any>): Promise<string> {
     const prompt = this.getPrompt(type);
     try {
-      return await prompt.format(values);
+      // Generamos el prompt real usando la función generadora correspondiente
+      const generator = this._promptGenerators[type];
+      if (!generator) {
+        throw new Error(`No se encontró un generador para el prompt de tipo: ${type}`);
+      }
+      
+      // Generamos el prompt usando los valores proporcionados
+      let generatedPrompt;
+      switch (type) {
+        case 'analysis':
+          generatedPrompt = generator(
+            values.userQuery || '',
+            values.availableTools || [],
+            values.codeContext,
+            values.memoryContext
+          );
+          break;
+        case 'reasoning':
+          generatedPrompt = generator(
+            values.userQuery || '',
+            values.analysisResult || {},
+            values.toolsDescription || '',
+            values.previousToolResults || [],
+            values.memoryContext
+          );
+          break;
+        case 'action':
+          generatedPrompt = generator(
+            values.userQuery || '',
+            values.toolName || '',
+            values.toolResult || {},
+            values.previousSteps || [],
+            values.memoryContext
+          );
+          break;
+        case 'response':
+          generatedPrompt = generator(
+            values.userQuery || '',
+            values.conversationHistory || '',
+            values.finalAnswer || '',
+            values.memoryContext
+          );
+          break;
+        default:
+          throw new Error(`Tipo de prompt no soportado: ${type}`);
+      }
+      
+      // Formateamos el prompt con el contenido generado
+      return await prompt.format({ prompt: generatedPrompt });
     } catch (error) {
       console.error(`[PromptManager] Error al formatear el prompt ${type}:`, error);
       throw new Error(`Error al formatear el prompt: ${error}`);

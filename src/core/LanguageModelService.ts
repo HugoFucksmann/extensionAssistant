@@ -1,7 +1,6 @@
 // src/core/LanguageModelService.ts
 import { ModelManager } from '../features/ai/ModelManager';
 import { PromptManager, PromptType } from '../features/ai/promptManager';
-import { responseParser } from '../features/ai/prompts/responseGenerationPrompt';
 import { InternalEventDispatcher } from './events/InternalEventDispatcher';
 import { WindsurfState } from '../shared/types';
 import { EventType } from '../features/events/eventTypes';
@@ -192,7 +191,7 @@ export class LanguageModelService {
   public async generateFinalResponse(
     currentState: WindsurfState,
   ): Promise<string> {
-    const llmRequestType = 'responseGeneration';
+    const llmRequestType = 'response';
     const dispatchPayload: LlmRequestStartedPayload = { 
         llmRequestType, 
         chatId: currentState.chatId, 
@@ -205,16 +204,17 @@ export class LanguageModelService {
     let startTime = Date.now();
 
     try {
-      const promptTemplate = this.promptManager.getPrompt('responseGeneration');
+      const promptTemplate = this.promptManager.getPrompt('response');
       const historySummary = currentState.history
         .slice(-7) // More history might be relevant for final response
         .map(h => `Phase: ${h.phase}\nContent: ${typeof h.content === 'string' ? h.content.substring(0, 300) + (h.content.length > 300 ? "..." : "") : JSON.stringify(h.content).substring(0, 300) + "..."}`)
         .join('\n---\n');
 
       const formattedPrompt = await promptTemplate.format({
-        objective: currentState.objective,
-        history: historySummary,
-        format_instructions: responseParser.getFormatInstructions()
+        userQuery: currentState.userMessage || '',
+        conversationHistory: historySummary,
+        finalAnswer: '',
+        memoryContext: currentState.memorySummary || ''
       });
 
       dispatchPayload.promptLength = formattedPrompt.length;

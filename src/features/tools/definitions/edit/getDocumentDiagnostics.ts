@@ -53,7 +53,20 @@ export const getDocumentDiagnostics: ToolDefinition<typeof getDocumentDiagnostic
       } else {
         const activeEditor = context.vscodeAPI.window.activeTextEditor;
         if (!activeEditor) {
-          return { success: false, error: 'No active text editor and no filePath provided.' };
+          // Buscar archivos en el workspace y sugerir algunos
+          try {
+            const files = await context.vscodeAPI.workspace.findFiles('**/*.{js,ts,jsx,tsx,html,css,json}', '**/node_modules/**', 10);
+            if (files.length > 0) {
+              const filesList = files.map(f => context.vscodeAPI.workspace.asRelativePath(f, false)).join('\n- ');
+              return { 
+                success: false, 
+                error: `No active text editor and no filePath provided. Please specify a file path. Here are some files you could check:\n- ${filesList}` 
+              };
+            }
+          } catch (e) {
+            // Si falla la búsqueda, usar el mensaje original
+          }
+          return { success: false, error: 'No active text editor and no filePath provided. Please specify a filePath parameter.' };
         }
         targetUri = activeEditor.document.uri;
         documentPathForReturn = activeEditor.document.isUntitled ? 

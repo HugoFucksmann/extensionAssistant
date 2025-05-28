@@ -12,8 +12,11 @@ import { ApplicationLogicService } from './ApplicationLogicService';
 import { InternalEventDispatcher } from './events/InternalEventDispatcher';
 // import { WindsurfGraph } from '../features/ai/ReActGraph'; // <-- REMOVE or COMMENT OUT
 
-import { LanguageModelService } from './LanguageModelService'; // <-- ADD
-import { ReActEngine } from './ReActEngine';             // <-- ADD
+import { LanguageModelService } from './LanguageModelService';
+import { ReActEngine } from './ReActEngine';
+import { OptimizedReActEngine } from './OptimizedReActEngine';
+import { OptimizedPromptManager } from '../features/ai/OptimizedPromptManager';
+import { LongTermStorage } from '../features/memory/LongTermStorage';
 
 export class ComponentFactory {
   private static applicationLogicServiceInstance: ApplicationLogicService;
@@ -23,10 +26,13 @@ export class ComponentFactory {
   private static vscodeContextInstance: VSCodeContext;
 
   // New singletons for core AI components
-  private static modelManagerInstance: ModelManager;             // <-- ADD
-  private static promptManagerInstance: PromptManager;           // <-- ADD
-  private static languageModelServiceInstance: LanguageModelService; // <-- ADD
-  private static reActEngineInstance: ReActEngine;               // <-- ADD
+  private static modelManagerInstance: ModelManager;
+  private static promptManagerInstance: PromptManager;
+  private static languageModelServiceInstance: LanguageModelService;
+  private static reActEngineInstance: ReActEngine;
+  private static optimizedPromptManagerInstance: OptimizedPromptManager;
+  private static optimizedReActEngineInstance: OptimizedReActEngine;
+  private static longTermStorageInstance: LongTermStorage;
 
   public static getInternalEventDispatcher(): InternalEventDispatcher {
     if (!this.internalEventDispatcherInstance) {
@@ -91,7 +97,7 @@ export class ComponentFactory {
     return this.languageModelServiceInstance;
   }
 
-  public static getReActEngine(extensionContext: vscode.ExtensionContext): ReActEngine { // <-- ADDED METHOD
+  public static getReActEngine(extensionContext: vscode.ExtensionContext): ReActEngine {
     if (!this.reActEngineInstance) {
       const languageModelService = this.getLanguageModelService(extensionContext);
       const toolRegistry = this.getToolRegistry(extensionContext);
@@ -100,6 +106,40 @@ export class ComponentFactory {
       console.log('[ComponentFactory] ReActEngine instance created.');
     }
     return this.reActEngineInstance;
+  }
+  
+  public static getLongTermStorage(extensionContext: vscode.ExtensionContext): LongTermStorage {
+    if (!this.longTermStorageInstance) {
+      this.longTermStorageInstance = new LongTermStorage(extensionContext);
+      console.log('[ComponentFactory] LongTermStorage instance created.');
+    }
+    return this.longTermStorageInstance;
+  }
+  
+  public static getOptimizedPromptManager(): OptimizedPromptManager {
+    if (!this.optimizedPromptManagerInstance) {
+      const modelManager = this.getModelManager();
+      this.optimizedPromptManagerInstance = new OptimizedPromptManager(modelManager);
+      console.log('[ComponentFactory] OptimizedPromptManager instance created.');
+    }
+    return this.optimizedPromptManagerInstance;
+  }
+  
+  public static getOptimizedReActEngine(extensionContext: vscode.ExtensionContext): OptimizedReActEngine {
+    if (!this.optimizedReActEngineInstance) {
+      const promptManager = this.getOptimizedPromptManager();
+      const toolRegistry = this.getToolRegistry(extensionContext);
+      const dispatcher = this.getInternalEventDispatcher();
+      const longTermStorage = this.getLongTermStorage(extensionContext);
+      this.optimizedReActEngineInstance = new OptimizedReActEngine(
+        promptManager,
+        toolRegistry,
+        dispatcher,
+        longTermStorage
+      );
+      console.log('[ComponentFactory] OptimizedReActEngine instance created.');
+    }
+    return this.optimizedReActEngineInstance;
   }
   
   // --- UPDATED getApplicationLogicService ---
@@ -121,7 +161,8 @@ export class ComponentFactory {
       const toolRegistry = this.getToolRegistry(extensionContext);
       const conversationManager = new ConversationManager();
       
-      const reActEngine = this.getReActEngine(extensionContext); // <-- USE NEW METHOD
+      // Usar el motor ReAct optimizado en lugar del estándar
+      const reActEngine = this.getOptimizedReActEngine(extensionContext);
 
       this.applicationLogicServiceInstance = new ApplicationLogicService(
         vscodeContext,
@@ -171,7 +212,13 @@ export class ComponentFactory {
     // @ts-ignore
     this.languageModelServiceInstance = undefined; // <-- ADD
     // @ts-ignore
-    this.reActEngineInstance = undefined; // <-- ADD
+    this.reActEngineInstance = undefined;
+    // @ts-ignore
+    this.optimizedPromptManagerInstance = undefined;
+    // @ts-ignore
+    this.optimizedReActEngineInstance = undefined;
+    // @ts-ignore
+    this.longTermStorageInstance = undefined;
     console.log('[ComponentFactory] All instances disposed.');
   }
 }

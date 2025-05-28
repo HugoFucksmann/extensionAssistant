@@ -1,9 +1,7 @@
-import { analysisOutputSchema } from './initialAnalysisPrompt';
-import { reasoningOutputSchema } from './reasoningPrompt';
-import { reflectionOutputSchema } from './reflectionPrompt';
-import { correctionOutputSchema } from './correctionPrompt';
-import { responseOutputSchema } from './responseGenerationPrompt';
 import { z } from 'zod';
+import { analysisOutputSchema } from './optimized/analysisPrompt';
+import { reasoningOutputSchema } from './optimized/reasoningPrompt';
+import { actionOutputSchema } from './optimized/actionPrompt';
 
 /**
  * Tipos de salida de los parsers
@@ -11,9 +9,8 @@ import { z } from 'zod';
 export type ParserOutput = 
   | ReturnType<typeof analysisOutputSchema.parse>
   | ReturnType<typeof reasoningOutputSchema.parse>
-  | ReturnType<typeof reflectionOutputSchema.parse>
-  | ReturnType<typeof correctionOutputSchema.parse>
-  | ReturnType<typeof responseOutputSchema.parse>;
+  | ReturnType<typeof actionOutputSchema.parse>
+  | Record<string, any>; // Para cualquier otro tipo de salida
 
 /**
  * Valida la salida de un parser contra su esquema correspondiente
@@ -48,9 +45,20 @@ export function combineMessages(
 /**
  * Formatea un objeto para mostrarlo en un prompt
  */
-export function formatForPrompt(obj: unknown): string {
-  if (typeof obj === 'string') return obj;
-  return JSON.stringify(obj, null, 2);
+export function formatForPrompt(obj: unknown): string { // <--- BUENO
+  return typeof obj === 'string' ? obj : JSON.stringify(obj);
+}
+
+export function validateOutput<T>(output: unknown, schema: z.ZodSchema<T>): T { // <--- BUENO
+  return schema.parse(output);
+}
+
+export function extractContent(message: unknown): string { // <--- BUENO, pero el nombre podría ser más genérico si no siempre es 'content'
+  if (typeof message === 'string') return message;
+  if (message && typeof message === 'object' && 'content' in message) { // Asume que el campo es 'content'
+    return String((message as any).content);
+  }
+  return String(message);
 }
 
 /**

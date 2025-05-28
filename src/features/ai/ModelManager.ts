@@ -60,15 +60,15 @@ export class ModelManager {
     return {
       gemini: {
         provider: 'gemini',
-        modelName: vsCodeConfig.get<string>('google.modelName') || 'gemini-pro',
-        temperature: vsCodeConfig.get<number>('google.temperature') ?? 0.2,
+        modelName: vsCodeConfig.get<string>('google.modelName') || 'gemini-2.0-flash-exp',
+        temperature: vsCodeConfig.get<number>('google.temperature') ?? 0.3,
         maxTokens: vsCodeConfig.get<number>('google.maxTokens') || 4096,
-        apiKey: vsCodeConfig.get<string>('google.apiKey') || process.env.GOOGLE_API_KEY,
+        apiKey: vsCodeConfig.get<string>('google.apiKey') || "AIzaSyBXGZbSj099c4bUOpLxbXKJgysGKKF3sR0",
       },
       ollama: {
         provider: 'ollama',
         modelName: vsCodeConfig.get<string>('ollama.modelName') || 'gemma3:4b',
-        temperature: vsCodeConfig.get<number>('ollama.temperature') ?? 0.2,
+        temperature: vsCodeConfig.get<number>('ollama.temperature') ?? 0.3,
         baseUrl: vsCodeConfig.get<string>('ollama.baseUrl') || 'http://localhost:11434',
         maxTokens: vsCodeConfig.get<number>('ollama.maxTokens') || 4096,
       }
@@ -167,7 +167,11 @@ export class ModelManager {
   public async generateText(promptText: string): Promise<string> {
     try {
       const model = this.getActiveModel();
-      const messages = [new SystemMessage(promptText)];
+      const messages = [
+        new HumanMessage({
+          content: promptText
+        })
+      ];
       const response = await model.invoke(messages);
       return response.content as string;
     } catch (error: any) {
