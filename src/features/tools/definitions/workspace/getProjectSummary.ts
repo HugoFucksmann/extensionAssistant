@@ -41,7 +41,6 @@ export const getProjectSummary: ToolDefinition<typeof getProjectSummaryParamsSch
   name: 'getProjectSummary',
   description: 'Gets a summary of the current VS Code workspace: root path, project name (from package.json or folder name), primary language (heuristic), and basic top-level file/folder structure. Returns null if no workspace is open.',
   parametersSchema: getProjectSummaryParamsSchema,
-  requiredPermissions: ['workspace.info.read', 'filesystem.read'],
   async execute(
     _params,
     context

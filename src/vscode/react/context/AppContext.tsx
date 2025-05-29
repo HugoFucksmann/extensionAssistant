@@ -155,7 +155,6 @@ interface AppContextType extends AppState {
   loadChat: (chatId: string) => void;
   switchModel: (modelType: string) => void;
   toggleDarkMode: () => void;
-  toggleTestMode: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -307,9 +306,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       dispatch({ type: 'TOGGLE_DARK_MODE' });
   }
 
-  const toggleTestMode = () => {
-      postMessageToBackend('command', { command: 'toggleTestMode' });
-  }
+  
 
   return (
     <AppContext.Provider value={{
@@ -321,7 +318,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       loadChat,
       switchModel,
       toggleDarkMode,
-      toggleTestMode,
     }}>
       {children}
     </AppContext.Provider>

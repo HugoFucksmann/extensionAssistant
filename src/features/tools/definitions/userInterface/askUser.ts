@@ -37,7 +37,6 @@ export const askUser: ToolDefinition<typeof askUserParamsSchema, AskUserToolResu
   name: 'askUser',
   description: 'Prompts the user for input via the chat UI or a VS Code input dialog. The AI task will pause and wait for an event containing the user\'s response, correlated by the returned uiOperationId.',
   parametersSchema: askUserParamsSchema,
-  requiredPermissions: ['interaction.userInput'],
   async execute(
     params, // Tipado por Zod
     context // context.dispatcher y context.chatId son obligatorios

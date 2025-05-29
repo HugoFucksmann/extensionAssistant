@@ -125,7 +125,6 @@ export const getGitStatus: ToolDefinition<typeof getGitStatusParamsSchema, GitSt
   name: 'getGitStatus',
   description: 'Gets the current Git status for the workspace: current branch, remote tracking (ahead/behind), and a list of changed/staged/untracked files. Returns an error reason if not a Git repository or Git is not found.',
   parametersSchema: getGitStatusParamsSchema,
-  requiredPermissions: ['workspace.info.read', 'terminal.execute'], // terminal.execute porque ejecuta 'git'
   async execute(
     _params,
     context

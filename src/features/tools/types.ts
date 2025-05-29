@@ -62,5 +62,4 @@ export interface ToolDefinition<P_SCHEMA extends ZodSchemaType = ZodSchemaType, 
   description: string;
   parametersSchema: P_SCHEMA; // Esquema Zod para los parámetros
   execute: (params: z.infer<P_SCHEMA>, context: ToolExecutionContext) => Promise<ToolResult<R>>;
-  requiredPermissions?: ToolPermission[];
 }

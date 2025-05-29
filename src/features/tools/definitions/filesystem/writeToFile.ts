@@ -14,7 +14,6 @@ export const writeToFile: ToolDefinition<typeof writeToFileParamsSchema, { fileP
   name: 'writeToFile',
   description: 'Writes or overwrites content to a specified file. Creates parent directories if they do not exist. The path must be relative to the workspace root.',
   parametersSchema: writeToFileParamsSchema,
-  requiredPermissions: ['filesystem.write'],
   async execute(
     params, // Tipado como: { path: string; content: string }
     context

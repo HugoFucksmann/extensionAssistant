@@ -79,11 +79,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     this.postMessage('newChatStarted', { chatId: this.stateManager.getCurrentChatId() });
   }
 
-  public notifyTestModeChange(enabled: boolean): void {
-    this.stateManager.setTestMode(enabled);
-    console.log(`[WebviewProvider DEBUG] Test mode ${enabled ? 'enabled' : 'disabled'}. Notifying UI.`);
-    this.postMessage('testModeChanged', { enabled });
-  }
+
 
   private postMessage(type: string, payload: any): void {
     if (this.view) {

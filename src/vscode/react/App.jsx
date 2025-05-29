@@ -5,27 +5,10 @@ import ChatInput from './Components/InputChat/ChatInput';
 import ChatMessages from './Components/ChatMessages/ChatMessages';
 import ChatHistory from './Components/historical/ChatHistory';
 import EmptyChatView from './Components/EmptyChatView';
-import PermissionManager from './Components/Permissions/PermissionManager';
 import { useApp } from './context/AppContext';
 
 
-const TestModeIndicator = ({ enabled }) => {
-  if (!enabled) return null;
-  
-  return (
-    <div style={{
-      backgroundColor: '#FF9800',
-      color: '#000',
-      padding: '4px 8px',
-      fontSize: '12px',
-      textAlign: 'center',
-      fontWeight: 'bold',
-      borderBottom: '1px solid #E65100'
-    }}>
-      MODO DE PRUEBA ACTIVADO - Los permisos de herramientas se aprueban automáticamente
-    </div>
-  );
-};
+
 
 
 const LoadingIndicator = () => {
@@ -38,7 +21,7 @@ const LoadingIndicator = () => {
 };
 
 const App = () => {
-  const { messages, isLoading, showHistory, theme, activeFeedbackOperationId, testModeEnabled } = useApp();
+  const { messages, isLoading, showHistory, theme, activeFeedbackOperationId } = useApp();
   const isEmpty = messages.length === 0;
 
   // Inyectar variables CSS del tema
@@ -80,8 +63,6 @@ const App = () => {
 
   return (
     <div style={appContainerStyle}>
-      <TestModeIndicator enabled={testModeEnabled} />
-      <PermissionManager />
       <main style={chatAreaStyle}>
         {showTopLevelLoading ? (
           <LoadingIndicator />

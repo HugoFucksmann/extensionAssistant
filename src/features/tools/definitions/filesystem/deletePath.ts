@@ -14,7 +14,6 @@ export const deletePath: ToolDefinition<typeof deletePathParamsSchema, { path: s
   name: 'deletePath',
   description: 'Deletes a file or directory recursively. The path must be relative to the workspace root. Uses trash by default if available on the system.',
   parametersSchema: deletePathParamsSchema,
-  requiredPermissions: ['filesystem.write'],
   async execute(
     params, // Tipado como: { path: string }
     context

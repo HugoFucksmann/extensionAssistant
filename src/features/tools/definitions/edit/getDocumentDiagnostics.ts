@@ -31,7 +31,6 @@ export const getDocumentDiagnostics: ToolDefinition<typeof getDocumentDiagnostic
   name: 'getDocumentDiagnostics',
   description: 'Gets diagnostic errors and warnings for the active editor or a specified file. If filePath is omitted, uses the active editor.',
   parametersSchema: getDocumentDiagnosticsParamsSchema,
-  requiredPermissions: ['editor.read'], // O un permiso más específico como 'diagnostics.read'
   async execute(
     params, // Tipado por Zod
     context

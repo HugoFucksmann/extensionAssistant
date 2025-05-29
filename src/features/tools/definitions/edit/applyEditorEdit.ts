@@ -20,7 +20,6 @@ export const applyEditorEdit: ToolDefinition<typeof applyEditorEditParamsSchema,
   name: 'applyEditorEdit',
   description: 'Replaces the entire content of the active editor or a specified file with new text. If filePath is omitted, applies to the active editor. The document is saved after the edit.',
   parametersSchema: applyEditorEditParamsSchema,
-  requiredPermissions: ['editor.write'],
   async execute(
     params, // Tipado por Zod
     context

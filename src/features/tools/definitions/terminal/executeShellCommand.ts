@@ -25,7 +25,6 @@ export const executeShellCommand: ToolDefinition<typeof executeShellCommandParam
   name: 'executeShellCommand',
   description: 'Executes a shell command silently in the background and captures its standard output and error. Runs in the workspace root by default. Use for non-interactive commands where output is needed by the AI.',
   parametersSchema: executeShellCommandParamsSchema,
-  requiredPermissions: ['terminal.execute'],
   async execute(
     params,
     context

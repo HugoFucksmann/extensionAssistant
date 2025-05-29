@@ -31,7 +31,6 @@ export const searchInWorkspace: ToolDefinition<typeof searchInWorkspaceParamsSch
   name: 'searchInWorkspace',
   description: 'Searches for a text query or regular expression in workspace files. Respects .gitignore and files.exclude settings. Returns file paths and line numbers of matches.',
   parametersSchema: searchInWorkspaceParamsSchema,
-  requiredPermissions: ['workspace.info.read', 'filesystem.read'], // Necesita leer archivos para buscar contenido
   async execute(
     params,
     context

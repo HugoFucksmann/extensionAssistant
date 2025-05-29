@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import { WebviewProvider } from './vscode/webView/webviewProvider';
-import { PermissionManager } from './features/tools/PermissionManager';
 
 export class CommandManager {
   constructor(private readonly webviewProvider: WebviewProvider) {}
@@ -11,7 +10,6 @@ export class CommandManager {
       this.createHistoryCommand(),
       this.createNewChatCommand(),
       this.createSettingsCommand(),
-      this.createToggleTestModeCommand(),
     ];
   }
 
@@ -39,21 +37,5 @@ export class CommandManager {
     });
   }
 
-  private createToggleTestModeCommand(): vscode.Disposable {
-    return vscode.commands.registerCommand('extensionAssistant.toggleTestMode', () => {
-      const currentTestMode = PermissionManager.isTestModeEnabled();
-      const newTestMode = !currentTestMode;
-      
-      PermissionManager.setTestMode(newTestMode);
-      this.webviewProvider.notifyTestModeChange(newTestMode);
-      
-      vscode.window.showInformationMessage(
-        `Modo de prueba ${newTestMode ? 'habilitado' : 'deshabilitado'}. ${
-          newTestMode 
-            ? 'Todos los permisos serán aprobados automáticamente.' 
-            : 'Los permisos serán verificados normalmente.'
-        }`
-      );
-    });
-  }
+ 
 }

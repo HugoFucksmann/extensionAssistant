@@ -23,7 +23,6 @@ export const getFileContents: ToolDefinition<typeof getFileContentsParamsSchema,
   name: 'getFileContents',
   description: 'Gets the content of a specified file. The path can be absolute or relative to the workspace root. If the file is not found, the tool will attempt to search for it in the workspace. You can also search by filename using the searchByName parameter.',
   parametersSchema: getFileContentsParamsSchema,
-  requiredPermissions: ['filesystem.read'],
   async execute(
     params, // Tipado como: { path: string, searchByName?: boolean, fuzzyMatch?: boolean }
     context // Tipado como: ToolExecutionContext

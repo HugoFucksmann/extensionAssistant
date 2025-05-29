@@ -26,7 +26,6 @@ export const getActiveEditorInfo: ToolDefinition<typeof getActiveEditorInfoParam
   name: 'getActiveEditorInfo',
   description: 'Gets information from the currently active text editor, including its content, file path (if any), language, and current selection. Returns null if no text editor is active.',
   parametersSchema: getActiveEditorInfoParamsSchema,
-  requiredPermissions: ['editor.read'],
   async execute(
     _params, // No se usan parámetros
     context

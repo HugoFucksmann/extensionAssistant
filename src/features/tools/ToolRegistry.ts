@@ -2,8 +2,7 @@
 import { ToolDefinition, ToolResult, ToolExecutionContext } from './types';
 import { InternalEventDispatcher } from '../../core/events/InternalEventDispatcher';
 import * as vscode from 'vscode';
-import { PermissionManager } from './PermissionManager';
-import { ToolValidator, ValidationResult } from './ToolValidator';
+import { ToolValidator } from './ToolValidator';
 import { EventType, ToolExecutionEventPayload } from '../../features/events/eventTypes'; // <-- MODIFICADO
 
 import { createDynamicTool, createDynamicToolsFromDefinitions } from '../ai/lcel/DynamicToolAdapter';
@@ -144,39 +143,7 @@ export class ToolRegistry {
       ...executionCtxArgs
     };
 
-    if (tool.requiredPermissions && tool.requiredPermissions.length > 0) {
-      this.log('info', `Checking permissions for tool: ${name}`, { ...logDetailsWithValidatedParams, permissions: tool.requiredPermissions });
-      try {
-        const permissionGranted = await PermissionManager.checkPermissions(
-          tool.name,
-          tool.requiredPermissions,
-          validatedParams,
-          executionContext
-        );
-        if (!permissionGranted) {
-          const errorMsg = `Permission denied for tool ${name}. Required: ${tool.requiredPermissions.join(', ')}`;
-          this.log('warning', errorMsg, logDetailsWithValidatedParams);
-          dispatchToolEvent(EventType.TOOL_EXECUTION_ERROR, {
-            parameters: validatedParams,
-            toolParams: validatedParams,
-            error: errorMsg,
-            duration: Date.now() - startTime,
-          });
-          return { success: false, error: errorMsg, executionTime: Date.now() - startTime };
-        }
-        this.log('info', `Permissions granted for tool: ${name}`, logDetailsWithValidatedParams);
-      } catch (permError: any) {
-        const errorMsg = `Error during permission check for ${name}: ${permError.message}`;
-        this.log('error', errorMsg, logDetailsWithValidatedParams, permError);
-        dispatchToolEvent(EventType.TOOL_EXECUTION_ERROR, {
-            parameters: validatedParams,
-            toolParams: validatedParams,
-            error: errorMsg,
-            duration: Date.now() - startTime,
-        });
-        return { success: false, error: errorMsg, executionTime: Date.now() - startTime };
-      }
-    }
+  
 
     try {
       this.log('info', `Executing tool: ${name}`, logDetailsWithValidatedParams);

@@ -41,7 +41,6 @@ export class WebviewMessageHandler {
     this.postMessage('sessionReady', {
       chatId: this.stateManager.getCurrentChatId(),
       messages: [],
-      testMode: this.stateManager.isTestModeEnabled()
     });
   }
 
@@ -113,9 +112,7 @@ export class WebviewMessageHandler {
   private async handleCommand(payload: any): Promise<void> {
     console.log(`[WebviewMessageHandler DEBUG] Received command:`, payload?.command);
 
-    if (payload?.command === 'toggleTestMode') {
-      console.log(`[WebviewMessageHandler DEBUG] toggleTestMode command received from UI`);
-    } else if (payload?.command === 'getProjectFiles') {
+    if (payload?.command === 'getProjectFiles') {
       await this.handleGetProjectFiles();
     }
   }

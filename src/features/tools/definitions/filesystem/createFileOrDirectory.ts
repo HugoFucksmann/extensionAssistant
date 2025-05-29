@@ -27,7 +27,6 @@ export const createFileOrDirectory: ToolDefinition<typeof createFileOrDirectoryP
   name: 'createFileOrDirectory',
   description: 'Creates a new file or a new directory. Paths must be relative to the workspace root. Creates parent directories if they do not exist. Overwrites existing files if type is "file".',
   parametersSchema: createFileOrDirectoryParamsSchema,
-  requiredPermissions: ['filesystem.write'],
   async execute(
     params, // Tipado por Zod
     context

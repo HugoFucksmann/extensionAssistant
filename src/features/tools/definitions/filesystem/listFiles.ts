@@ -15,7 +15,6 @@ export const listFiles: ToolDefinition<typeof listFilesParamsSchema, { files: Li
   name: 'listFiles',
   description: 'Lists files and directories matching a glob pattern within the current workspace. Respects .gitignore and files.exclude settings.',
   parametersSchema: listFilesParamsSchema,
-  requiredPermissions: ['filesystem.read'], // Aunque usa findFiles, conceptualmente es una lectura del sistema de archivos
   async execute(
     params, // Tipado como: { pattern?: string }
     context

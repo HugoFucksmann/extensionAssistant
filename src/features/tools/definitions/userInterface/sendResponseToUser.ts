@@ -22,7 +22,6 @@ export const sendResponseToUser: ToolDefinition<typeof sendResponseToUserParamsS
   name: 'sendResponseToUser',
   description: 'Sends a message to the user in the chat interface. This is typically used for final answers or important status updates from the AI. Can optionally also show a VS Code notification.',
   parametersSchema: sendResponseToUserParamsSchema,
-  requiredPermissions: [], // No requiere permisos especiales más allá de la interacción básica con la UI
   async execute(
     params, // Tipado por Zod
     context

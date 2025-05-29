@@ -19,7 +19,6 @@ export const runInTerminal: ToolDefinition<typeof runInTerminalParamsSchema, Run
   name: 'runInTerminal',
   description: 'Opens a new VS Code terminal (or uses/creates one with the specified name) and runs the given command. Does not capture output for the AI. Use for interactive commands, long-running tasks, or when output capture by the AI is not needed.',
   parametersSchema: runInTerminalParamsSchema,
-  requiredPermissions: ['terminal.execute'],
   async execute(
     params,
     context

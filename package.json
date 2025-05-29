@@ -160,12 +160,8 @@
         "command": "extensionAssistant.chat.history",
         "title": "Mostrar Historial de Chats",
         "icon": "$(history)"
-      },
-      {
-        "command": "extensionAssistant.toggleTestMode",
-        "title": "Alternar Modo de Prueba",
-        "icon": "$(beaker)"
       }
+     
     ],
     "menus": {
       "view/title": [
@@ -183,11 +179,6 @@
           "command": "extensionAssistant.settings",
           "when": "view == aiChat.chatView",
           "group": "navigation@3"
-        },
-        {
-          "command": "extensionAssistant.toggleTestMode",
-          "when": "view == aiChat.chatView",
-          "group": "navigation@4"
         }
       ]
     }
