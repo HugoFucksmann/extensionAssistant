@@ -1,11 +1,6 @@
-/**
- * Fábrica para crear instancias del motor ReAct optimizado
- * Configura todas las dependencias necesarias
- */
-
+// src/core/OptimizedReActFactory.ts
 import * as vscode from 'vscode';
 import { OptimizedReActEngine } from './OptimizedReActEngine';
-import { OptimizedPromptManager } from '../features/ai/OptimizedPromptManager';
 import { ModelManager } from '../features/ai/ModelManager';
 import { ToolRegistry } from '../features/tools/ToolRegistry';
 import { InternalEventDispatcher } from './events/InternalEventDispatcher';

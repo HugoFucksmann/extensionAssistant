@@ -3,17 +3,12 @@ import * as vscode from 'vscode';
 import { VSCodeContext } from '../shared/types';
 import { EventLogger } from '../features/events/EventLogger';
 import { ModelManager } from '../features/ai/ModelManager';
-/* import { PromptManager } from '../features/ai/promptManager'; */
 import { ToolRegistry } from '../features/tools/ToolRegistry';
 import { allToolDefinitions } from '../features/tools/definitions';
 import { MemoryManager } from '../features/memory/MemoryManager';
 import { ConversationManager } from './ConversationManager';
 import { ApplicationLogicService } from './ApplicationLogicService';
 import { InternalEventDispatcher } from './events/InternalEventDispatcher';
-// import { WindsurfGraph } from '../features/ai/ReActGraph'; // <-- REMOVE or COMMENT OUT
-/* 
-import { LanguageModelService } from './LanguageModelService'; */
-/* import { ReActEngine } from './ReActEngine'; */
 import { OptimizedReActEngine } from './OptimizedReActEngine';
 import { OptimizedPromptManager } from '../features/ai/OptimizedPromptManager';
 import { LongTermStorage } from '../features/memory/LongTermStorage';
@@ -24,12 +19,7 @@ export class ComponentFactory {
   private static eventLoggerInstance: EventLogger;
   private static toolRegistryInstance: ToolRegistry;
   private static vscodeContextInstance: VSCodeContext;
-
-  // New singletons for core AI components
   private static modelManagerInstance: ModelManager;
-/*   private static promptManagerInstance: PromptManager;
-  private static languageModelServiceInstance: LanguageModelService;
-  private static reActEngineInstance: ReActEngine; */
   private static optimizedPromptManagerInstance: OptimizedPromptManager;
   private static optimizedReActEngineInstance: OptimizedReActEngine;
   private static longTermStorageInstance: LongTermStorage;
@@ -37,7 +27,7 @@ export class ComponentFactory {
   public static getInternalEventDispatcher(): InternalEventDispatcher {
     if (!this.internalEventDispatcherInstance) {
       this.internalEventDispatcherInstance = new InternalEventDispatcher();
-      console.log('[ComponentFactory] InternalEventDispatcher instance created.');
+      
     }
     return this.internalEventDispatcherInstance;
   }
@@ -48,7 +38,7 @@ export class ComponentFactory {
             extensionUri: extensionContext.extensionUri,
             extensionPath: extensionContext.extensionPath,
             subscriptions: extensionContext.subscriptions,
-            outputChannel: vscode.window.createOutputChannel("Extension Assistant Log"), // Ensure this is used by EventLogger
+            outputChannel: vscode.window.createOutputChannel("Extension Assistant Log"), 
             globalState: extensionContext.globalState,
             workspaceState: extensionContext.workspaceState,
         };
@@ -57,7 +47,7 @@ export class ComponentFactory {
     return this.vscodeContextInstance;
   }
 
-  public static getToolRegistry(extensionContext: vscode.ExtensionContext): ToolRegistry {
+  public static getToolRegistry(): ToolRegistry {
     if (!this.toolRegistryInstance) {
       const dispatcher = this.getInternalEventDispatcher();
       this.toolRegistryInstance = new ToolRegistry(dispatcher);
@@ -67,46 +57,16 @@ export class ComponentFactory {
     return this.toolRegistryInstance;
   }
   
-  // --- NEW SINGLETON GETTERS ---
 
-  public static getModelManager(): ModelManager { // <-- ADDED METHOD
+
+  public static getModelManager(): ModelManager {
     if (!this.modelManagerInstance) {
-      // Pass any necessary initial config if ModelManager constructor changes
+    
       this.modelManagerInstance = new ModelManager(); 
       console.log('[ComponentFactory] ModelManager instance created.');
     }
     return this.modelManagerInstance;
   }
-
-/*   public static getPromptManager(): PromptManager { // <-- ADDED METHOD
-    if (!this.promptManagerInstance) {
-      this.promptManagerInstance = new PromptManager();
-      console.log('[ComponentFactory] PromptManager instance created.');
-    }
-    return this.promptManagerInstance;
-  } */
-  
- /*  public static getLanguageModelService(extensionContext: vscode.ExtensionContext): LanguageModelService { // <-- ADDED METHOD
-    if (!this.languageModelServiceInstance) {
-      const modelManager = this.getModelManager();
-      const promptManager = this.getPromptManager();
-      const dispatcher = this.getInternalEventDispatcher();
-      this.languageModelServiceInstance = new LanguageModelService(modelManager, promptManager, dispatcher);
-      console.log('[ComponentFactory] LanguageModelService instance created.');
-    }
-    return this.languageModelServiceInstance;
-  } */
-
- /*  public static getReActEngine(extensionContext: vscode.ExtensionContext): ReActEngine {
-    if (!this.reActEngineInstance) {
-      const languageModelService = this.getLanguageModelService(extensionContext);
-      const toolRegistry = this.getToolRegistry(extensionContext);
-      const dispatcher = this.getInternalEventDispatcher();
-      this.reActEngineInstance = new ReActEngine(languageModelService, toolRegistry, dispatcher);
-      console.log('[ComponentFactory] ReActEngine instance created.');
-    }
-    return this.reActEngineInstance;
-  } */
   
   public static getLongTermStorage(extensionContext: vscode.ExtensionContext): LongTermStorage {
     if (!this.longTermStorageInstance) {
@@ -128,8 +88,8 @@ export class ComponentFactory {
   public static getOptimizedReActEngine(extensionContext: vscode.ExtensionContext): OptimizedReActEngine {
     if (!this.optimizedReActEngineInstance) {
       const modelManager = this.getModelManager();
-      const toolRegistry = this.getToolRegistry(extensionContext);
       const dispatcher = this.getInternalEventDispatcher();
+      const toolRegistry = this.getToolRegistry();
       const longTermStorage = this.getLongTermStorage(extensionContext);
       this.optimizedReActEngineInstance = new OptimizedReActEngine(
         modelManager,
@@ -142,28 +102,27 @@ export class ComponentFactory {
     return this.optimizedReActEngineInstance;
   }
   
-  // --- UPDATED getApplicationLogicService ---
+
   public static getApplicationLogicService(extensionContext: vscode.ExtensionContext): ApplicationLogicService {
     if (!this.applicationLogicServiceInstance) {
       const vscodeContext = this.getVSCodeContext(extensionContext);
       const dispatcher = this.getInternalEventDispatcher();
 
       if (!this.eventLoggerInstance) {
-        // Ensure EventLogger uses the outputChannel from vscodeContext
+       
         this.eventLoggerInstance = new EventLogger(vscodeContext, dispatcher);
         console.log('[ComponentFactory] EventLogger instance created and subscribed.');
       }
 
-      const longTermStorage = this.getLongTermStorage(extensionContext); // Obtener singleton
-      const memoryManager = new MemoryManager(longTermStorage); // Inyectar
-      const toolRegistry = this.getToolRegistry(extensionContext);
+      const longTermStorage = this.getLongTermStorage(extensionContext); 
+      const memoryManager = new MemoryManager(longTermStorage); 
       const conversationManager = new ConversationManager();
+      const toolRegistry = this.getToolRegistry();
       
-      // Usar el motor ReAct optimizado en lugar del estándar
+     
       const reActEngine = this.getOptimizedReActEngine(extensionContext);
 
       this.applicationLogicServiceInstance = new ApplicationLogicService(
-        vscodeContext,
         memoryManager,
         reActEngine,
         conversationManager,
@@ -178,12 +137,11 @@ export class ComponentFactory {
     if (this.applicationLogicServiceInstance && typeof (this.applicationLogicServiceInstance as any).dispose === 'function') {
         (this.applicationLogicServiceInstance as any).dispose();
     }
-    // Dispose new singletons if they have dispose methods
+  
     if (this.modelManagerInstance && typeof (this.modelManagerInstance as any).dispose === 'function') {
-        (this.modelManagerInstance as any).dispose(); // ModelManager has a dispose
+        (this.modelManagerInstance as any).dispose();
     }
-    // PromptManager, LanguageModelService, ReActEngine currently don't have dispose methods.
-    // ToolRegistry also doesn't have one.
+  
     if (this.internalEventDispatcherInstance && typeof this.internalEventDispatcherInstance.dispose === 'function') {
         this.internalEventDispatcherInstance.dispose();
     }
@@ -203,11 +161,11 @@ export class ComponentFactory {
     // @ts-ignore
     this.vscodeContextInstance = undefined;
     // @ts-ignore
-    this.modelManagerInstance = undefined; // <-- ADD
+    this.modelManagerInstance = undefined;
     // @ts-ignore
-    this.promptManagerInstance = undefined; // <-- ADD
+    this.promptManagerInstance = undefined;
     // @ts-ignore
-    this.languageModelServiceInstance = undefined; // <-- ADD
+    this.languageModelServiceInstance = undefined; 
     // @ts-ignore
     this.reActEngineInstance = undefined;
     // @ts-ignore

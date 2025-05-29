@@ -6,11 +6,10 @@ import {
   ToolExecutionEventPayload,
   SystemEventPayload,
   ErrorOccurredEventPayload,
-  UserInteractionRequiredPayload, // Se mantiene por si hay otros usos, pero no para permisos
-  ResponseEventPayload, // Asumiendo que ResponseEventPayload tiene responseContent
+  ResponseEventPayload,
 } from '../../features/events/eventTypes';
 import { WebviewStateManager } from './WebviewStateManager';
-import { ChatMessage } from '../../shared/types'; // Asegúrate que la ruta sea correcta
+import { ChatMessage } from '../../shared/types';
 
 export class WebviewEventHandler {
   private dispatcherSubscriptions: { unsubscribe: () => void }[] = [];
@@ -29,9 +28,9 @@ export class WebviewEventHandler {
       EventType.TOOL_EXECUTION_STARTED,
       EventType.TOOL_EXECUTION_COMPLETED,
       EventType.TOOL_EXECUTION_ERROR,
-      EventType.SYSTEM_ERROR, // Para errores generales del sistema
-      // EventType.USER_INTERACTION_REQUIRED, // Eliminado si askUser usa diálogos nativos
-      EventType.RESPONSE_GENERATED, // Para respuestas del asistente
+      EventType.SYSTEM_ERROR, 
+     
+      EventType.RESPONSE_GENERATED, 
     ];
 
     eventTypesToWatch.forEach(eventType => {
@@ -49,7 +48,7 @@ export class WebviewEventHandler {
     const eventChatId = event.payload.chatId;
     const currentChatId = this.stateManager.getCurrentChatId();
 
-    // Solo procesar eventos para el chat actual, excepto errores del sistema que son globales
+
     if (event.type !== EventType.SYSTEM_ERROR && eventChatId && eventChatId !== currentChatId) {
       console.log(`[WebviewEventHandler] Ignoring event for different chat. Event ChatID: ${eventChatId}, Current ChatID: ${currentChatId}`);
       return;
@@ -79,17 +78,11 @@ export class WebviewEventHandler {
         messageType = 'systemError';
         break;
 
-      // case EventType.USER_INTERACTION_REQUIRED:
-      //   // Si askUser usa diálogos nativos, no necesitamos enviar un mensaje de chat aquí.
-      //   // Si askUser AÚN necesita interactuar con la UI del chat, este caso se reactivaría
-      //   // para enviar un ChatMessage de sender: 'assistant' con la pregunta.
-      //   // Por ahora, lo comentamos asumiendo la simplificación.
-      //   // chatMessage = this.handleUserInteractionRequired(event.payload as UserInteractionRequiredPayload, event.id);
-      //   break;
+     
 
       case EventType.RESPONSE_GENERATED:
-        // Solo procesar si es una respuesta final para el chat actual
-        const responsePayload = event.payload as ResponseEventPayload; // Asumiendo que tiene responseContent, isFinal
+      
+        const responsePayload = event.payload as ResponseEventPayload;
         if (responsePayload.isFinal && responsePayload.chatId === currentChatId) {
           chatMessage = this.handleResponseGenerated(responsePayload, event.id);
           messageType = 'assistantResponse';
@@ -145,7 +138,7 @@ export class WebviewEventHandler {
         status: 'success',
         toolName: payload.toolName,
         toolInput: payload.toolParams,
-        toolOutput: payload.result, // Puede ser útil para la UI mostrar detalles
+        toolOutput: payload.result, 
       },
     } as ChatMessage;
   }
@@ -180,9 +173,9 @@ export class WebviewEventHandler {
       ...this.createBaseChatMessage(eventId, 'assistant'),
       content: payload.responseContent,
       metadata: {
-        status: 'success', // O el estado que venga en el payload.metadata
-        isFinalToolResponse: payload.metadata?.isFinalToolResponse, // Si este metadato es relevante
-        ...(payload.metadata || {}), // Incluir otros metadatos del payload de respuesta
+        status: 'success', 
+        isFinalToolResponse: payload.metadata?.isFinalToolResponse, 
+        ...(payload.metadata || {}), 
       },
     } as ChatMessage;
   }

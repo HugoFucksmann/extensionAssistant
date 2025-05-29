@@ -104,44 +104,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         return { ...state, testModeEnabled: action.payload };
     case 'ADD_MESSAGE': {
       const msg = action.payload;
-      // Si es un mensaje de tool con operationId, actualizar o agregar
-      if (msg.sender === 'system' && msg.metadata && msg.metadata.operationId) {
-        const idx = state.messages.findIndex(
-          m => m.sender === 'system' &&
-            m.metadata &&
-            typeof m.metadata.operationId !== 'undefined' &&
-            msg.metadata &&
-            typeof msg.metadata.operationId !== 'undefined' &&
-            m.metadata.operationId === msg.metadata.operationId
-        );
-        let newMessages;
-        if (idx !== -1) {
-          // Reemplazar el mensaje existente
-          newMessages = [
-            ...state.messages.slice(0, idx),
-            msg,
-            ...state.messages.slice(idx + 1)
-          ];
-        } else {
-          // Agregar como nuevo
-          newMessages = [...state.messages, msg];
-        }
-        return {
-          ...state,
-          messages: newMessages,
-          isLoading: msg.metadata.status === 'thinking' || msg.metadata.status === 'tool_executing',
-        };
-      }
-      // Para otros mensajes, agregar normalmente
-      const newState = {
-        ...state,
-        messages: [...state.messages, msg],
-      };
-      const isAssistantFinalResponse = msg.sender === 'assistant';
-      if (isAssistantFinalResponse) {
-        newState.isLoading = false;
-      }
-      return newState;
+      return { ...state, messages: [...state.messages, msg] };
     }
     default:
       return state;
@@ -176,7 +139,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       const { type, payload } = event.data;
-      // console.log('[AppContext] Received from backend:', type, payload); // Opcional para depuración
+   
 
       switch (type) {
         case 'sessionReady':

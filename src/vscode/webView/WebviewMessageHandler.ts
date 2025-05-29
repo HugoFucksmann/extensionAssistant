@@ -1,12 +1,9 @@
 import { ApplicationLogicService } from '../../core/ApplicationLogicService';
-import { InternalEventDispatcher } from '../../core/events/InternalEventDispatcher';
-import { EventType } from '../../features/events/eventTypes';
 import { WebviewStateManager } from './WebviewStateManager';
 
 export class WebviewMessageHandler {
   constructor(
     private readonly appLogicService: ApplicationLogicService,
-    private readonly internalEventDispatcher: InternalEventDispatcher,
     private readonly stateManager: WebviewStateManager,
     private readonly postMessage: (type: string, payload: any) => void
   ) {}
@@ -56,19 +53,12 @@ export class WebviewMessageHandler {
       return;
     }
 
-   
-    
-
-   
-
     try {
       const result = await this.appLogicService.processUserMessage(
         chatId,
         payload.text,
         { files: payload.files || [] }
       );
-
-    
 
       if (!result.success) {
         const errorMessage = result.error || 'Processing failed to produce a response.';
@@ -83,8 +73,6 @@ export class WebviewMessageHandler {
       });
     }
   }
-
-
 
   private handleNewChatRequest(): void {
     this.stateManager.startNewChat();
@@ -108,7 +96,7 @@ export class WebviewMessageHandler {
     }
 
     try {
-      // Importación dinámica para evitar problemas de dependencias circulares
+    
       const { listFilesUtil } = await import('../../features/tools/definitions/filesystem/listFiles');
       const files = await listFilesUtil(require('vscode'), '**/*');
       const filePaths = files.filter(f => f.type === 'file').map(f => f.path);
@@ -126,11 +114,11 @@ export class WebviewMessageHandler {
         this.postMessage('systemError', { message: 'No model type specified' });
         return;
       }
-      // Cambiar el modelo realmente usado por el backend
+    
       const { ComponentFactory } = await import('../../core/ComponentFactory');
       const modelManager = ComponentFactory.getModelManager();
       modelManager.setActiveProvider(payload.modelType as 'gemini' | 'ollama');
-      // Persistir en stateManager para la UI
+    
       if (typeof this.stateManager.setCurrentModel === 'function') {
         this.stateManager.setCurrentModel(payload.modelType);
       }

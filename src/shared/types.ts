@@ -1,7 +1,5 @@
 // src/shared/types.ts
-
 import * as vscode from 'vscode';
-
 
 export interface WindsurfState {
   objective: string;
@@ -9,8 +7,8 @@ export interface WindsurfState {
   chatId: string;
   iterationCount: number;
   maxIterations: number;
-  completionStatus: 'in_progress' | 'completed' | 'failed'; // Añadido 'error' para más claridad
-  error?: string; // Para almacenar mensajes de error en el estado
+  completionStatus: 'in_progress' | 'completed' | 'failed'; 
+  error?: string; 
   reasoningResult?: ReasoningResult;
   actionResult?: ActionResult;
   reflectionResult?: ReflectionResult;
@@ -18,8 +16,7 @@ export interface WindsurfState {
   history: HistoryEntry[];
   projectContext?: any;
   editorContext?: any;
-  metrics?: PerformanceMetrics;
-  finalOutput?: any; // Campo para la salida final del grafo/agente
+  finalOutput?: any; 
   [key: string]: any;
 }
 
@@ -27,24 +24,24 @@ export interface WindsurfState {
 export interface ChatMessage {
   id: string;
   content: string;
-  sender: 'user' | 'assistant' | 'system' | 'tool';
+  sender: 'user' | 'assistant' | 'system';
   timestamp: number;
-  files?: string[]; // Rutas a archivos adjuntos
+  files?: string[]; 
   metadata?: {
     processingTime?: number;
     success?: boolean;
-    toolName?: string; // Si el mensaje es resultado de una herramienta
-    toolInput?: any; // Input de la herramienta
-    toolOutput?: any; // Output de la herramienta (para mensajes de 'tool')
-    isFinalToolResponse?: boolean; // Para sendResponseToUser
-    metrics?: PerformanceMetrics;
+    toolName?: string; 
+    toolInput?: any; 
+    toolOutput?: any; 
+    isFinalToolResponse?: boolean; 
+ 
     status?: 'info' | 'success' | 'error' | 'thinking' | 'tool_executing' | 'user_input_pending' | 'skipped';
     [key: string]: any;
   };
 }
 
 
-export interface ToolExecution { // Usado en WindsurfState.history.metadata.tools
+export interface ToolExecution { 
   name: string;
   status: 'started' | 'completed' | 'error' | 'permission_denied';
   parameters?: Record<string, any>;
@@ -55,86 +52,66 @@ export interface ToolExecution { // Usado en WindsurfState.history.metadata.tool
   duration?: number;
 }
 
-
-export interface PerformanceMetrics {
-  totalDuration?: number; // ms
-  llmCallCount?: number;
-  llmTokenUsage?: { promptTokens: number; completionTokens: number; totalTokens: number };
-  reasoningTime?: number;
-  actionTime?: number;
-  reflectionTime?: number;
-  toolExecutionCount?: number;
-  averageToolTime?: number;
-  memoryUsage?: number; // MB
-  [key: string]: any;
-}
-
-
-// No se usa directamente en WindsurfState, pero define la estructura de los nodos del grafo
 export interface ProcessingStatus {
-  phase: string; // Nombre del nodo/fase actual
+  phase: string; 
   status: 'active' | 'completed' | 'inactive' | 'error';
   startTime?: number;
   endTime?: number;
-  tools?: ToolExecution[]; // Herramientas ejecutadas en esta fase
-  metrics?: PerformanceMetrics;
+  tools?: ToolExecution[]; 
+
   error?: string;
 }
 
 
 export interface ReasoningResult {
-  reasoning: string; // Pensamiento del LLM
-  plan: PlanStep[]; // Plan detallado
-  nextAction: NextAction; // Siguiente acción a tomar
-  metrics?: PerformanceMetrics;
+  reasoning: string; 
+  plan: PlanStep[];
+  nextAction: NextAction; 
+
 }
 
 
 export interface PlanStep {
   id: string;
-  stepDescription: string; // Descripción de lo que se hará
-  toolToUse?: string; // Herramienta a usar para este paso (opcional)
+  stepDescription: string; 
+  toolToUse?: string;
   expectedOutcome: string;
   status?: 'pending' | 'in_progress' | 'completed' | 'failed' | 'skipped';
-  resultSummary?: string; // Resumen del resultado del paso
+  resultSummary?: string; 
   startTime?: number;
   endTime?: number;
 }
 
 export interface NextAction {
-  toolName: string; // Nombre de la herramienta a ejecutar
-  params: Record<string, any>; // Parámetros para la herramienta
-  thought?: string; // Pensamiento breve sobre por qué esta acción
-  // expectedOutcome: string; // Ya está en PlanStep
-  // requiredContext?: string[]; // Podría ser útil para el LLM
+  toolName: string; 
+  params: Record<string, any>;
+  thought?: string;
 }
 
 
-export interface ActionResult { // Resultado de la ejecución de una herramienta
+export interface ActionResult { 
   toolName: string;
   params: Record<string, any>;
   success: boolean;
-  result?: any; // Datos retornados por la herramienta
+  result?: any; 
   error?: string;
   timestamp: number;
-  metrics?: PerformanceMetrics;
-  // execution?: ToolExecution; // Duplicaría la info si ya está en history.metadata.tools
+ 
 }
 
 
 export interface ReflectionResult {
-  reflection: string; // Evaluación del LLM sobre el paso anterior
-  isSuccessfulSoFar: boolean; // ¿El progreso general es bueno?
+  reflection: string; 
+  isSuccessfulSoFar: boolean; 
   confidence?: number; // 0-1
-  // evaluationReasons: string[];
+
   needsCorrection: boolean;
-  correctionSuggestion?: string; // Sugerencia para la corrección
-  // insights: Insight[];
-  metrics?: PerformanceMetrics;
+  correctionSuggestion?: string; 
+
 }
 
 
-// No se usa directamente en WindsurfState, pero define la estructura
+
 export interface Insight {
   id: string;
   type: 'observation' | 'learning' | 'warning' | 'suggestion';
@@ -145,27 +122,25 @@ export interface Insight {
 
 
 export interface CorrectionResult {
-  // needsCorrection: boolean; // Ya está en ReflectionResult
-  correctionDescription: string; // Descripción de la corrección aplicada
-  // rootCause?: string;
-  updatedPlan?: PlanStep[]; // Si el plan cambió
-  nextActionAfterCorrection?: NextAction; // Siguiente acción después de corregir
-  metrics?: PerformanceMetrics;
+  correctionDescription: string; 
+  updatedPlan?: PlanStep[]; 
+  nextActionAfterCorrection?: NextAction; 
+
 }
 
 
 export interface HistoryEntry extends Omit<ChatMessage, 'id' | 'sender' | 'timestamp' | 'files'> { // Omitir campos que ya están o se manejan diferente
   phase: 'user_input' | 'reasoning' | 'action_planning' | 'action' | 'reflection' | 'correction' | 'responseGeneration' | 'system_message'; // <--- 'responseGeneration' AÑADIDO, 'action_planning' y 'system_message' añadidos para más granularidad
-  iteration?: number; // Iteración del ciclo ReAct
-  content: string; // Puede ser el input del usuario, el pensamiento del LLM, el resultado de la herramienta, etc.
-  timestamp: number; // Sobrescribe el de ChatMessage para asegurar que esté
+  iteration?: number;
+  content: string; 
+  timestamp: number; 
   metadata: {
-    tool_executions?: ToolExecution[]; // Para la fase 'action', lista de herramientas ejecutadas
-    llm_metrics?: PerformanceMetrics['llmTokenUsage']; // Métricas específicas del LLM para esta fase
-    processingTime?: number; // Tiempo que tomó esta fase específica
-    status?: 'success' | 'error' | 'skipped'; // Estado de esta fase
-    error_message?: string; // Si la fase tuvo un error
-    [key: string]: any; // Para flexibilidad
+    tool_executions?: ToolExecution[]; 
+  
+    processingTime?: number; 
+    status?: 'success' | 'error' | 'skipped';
+    error_message?: string; 
+    [key: string]: any;
   };
 }
 
@@ -174,26 +149,26 @@ export interface VSCodeContext {
   extensionUri: vscode.Uri;
   extensionPath: string;
   subscriptions: vscode.Disposable[];
-  outputChannel: vscode.OutputChannel; // Asegúrate que esto se inicialice y pase
-  workspaceFolders?: readonly vscode.WorkspaceFolder[]; // Hacerlo readonly como en la API de VS Code
+  outputChannel: vscode.OutputChannel; 
+  workspaceFolders?: readonly vscode.WorkspaceFolder[]; 
   activeTextEditor?: vscode.TextEditor;
-  globalState: vscode.Memento; // Para estado global de la extensión
-  workspaceState: vscode.Memento; // Para estado del workspace
+  globalState: vscode.Memento; 
+  workspaceState: vscode.Memento; 
 }
 
 export interface Chat {
   id: string;
   title: string;
-  messages: ChatMessage[]; // Historial de mensajes visibles al usuario
+  messages: ChatMessage[]; 
   createdAt: number;
   updatedAt: number;
   metadata?: {
-    windsurfState?: WindsurfState; // El estado completo del agente para esta conversación
+    windsurfState?: WindsurfState;
     [key: string]: any;
   };
 }
 
-// No parece usarse directamente, pero es una buena estructura si se necesita
+
 export interface ChatHistory {
   chats: Chat[];
   currentChatId?: string;

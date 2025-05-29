@@ -36,7 +36,7 @@ export class OptimizedReActIntegration {
   public static getInstance(context?: vscode.ExtensionContext): OptimizedReActEngine {
     if (!this.instance && context) {
       const dispatcher = ComponentFactory.getInternalEventDispatcher();
-      const toolRegistry = ComponentFactory.getToolRegistry(context);
+      const toolRegistry = ComponentFactory.getToolRegistry();
       return this.initialize(context, dispatcher, toolRegistry);
     }
     

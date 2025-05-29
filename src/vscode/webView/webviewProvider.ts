@@ -22,7 +22,6 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     this.stateManager = new WebviewStateManager();
     this.messageHandler = new WebviewMessageHandler(
       this.appLogicService,
-      this.internalEventDispatcher,
       this.stateManager,
       this.postMessage.bind(this)
     );

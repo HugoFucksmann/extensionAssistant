@@ -1,12 +1,10 @@
 // src/features/tools/definitions/filesystem/listFiles.ts
-import * as vscode from 'vscode';
 import { z } from 'zod';
-import { ToolDefinition, ToolResult, ToolExecutionContext, ToolPermission } from '../../types';
 
 // Esquema Zod para los parámetros
 export const listFilesParamsSchema = z.object({
   pattern: z.string().optional().default('**/*').describe('Glob pattern (e.g., "src/**/*.ts"). Defaults to all files in the workspace, respecting .gitignore and files.exclude settings.'),
-  // maxResults: z.number().int().positive().optional().default(1000) // Podríamos añadirlo si es muy necesario
+  
 }).strict();
 
 type ListedFile = { path: string; type: 'file' | 'directory' | 'symbolicLink' | 'unknown' };

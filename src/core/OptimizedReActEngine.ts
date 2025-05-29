@@ -1,26 +1,18 @@
-/**
- * Motor ReAct optimizado
- * Implementa el flujo ReAct con prompts optimizados y gestión de memoria
- */
-
+// src/core/OptimizedReActEngine.ts
 import { WindsurfState, HistoryEntry } from '../shared/types';
-// Los tipos de fase se manejan directamente como string en lugar de usar extensiones de tipos
 import { ToolRegistry } from '../features/tools/ToolRegistry';
 import { InternalEventDispatcher } from './events/InternalEventDispatcher';
-import { EventType, AgentPhaseEventPayload, ResponseEventPayload, SystemEventPayload } from '../features/events/eventTypes';
-import { ToolResult } from '../features/tools/types';
+import { EventType, AgentPhaseEventPayload, ResponseEventPayload } from '../features/events/eventTypes';
 import { ModelManager } from '../features/ai/ModelManager';
 import { runOptimizedAnalysisChain } from '../features/ai/lcel/OptimizedAnalysisChain';
 import { runOptimizedReasoningChain } from '../features/ai/lcel/OptimizedReasoningChain';
 import { runOptimizedActionChain } from '../features/ai/lcel/OptimizedActionChain';
 import { runOptimizedResponseChain } from '../features/ai/lcel/OptimizedResponseChain';
-import { AnalysisOutput } from '../features/ai/prompts/optimized/analysisPrompt';
 import { ReasoningOutput } from '../features/ai/prompts/optimized/reasoningPrompt';
 import { ActionOutput } from '../features/ai/prompts/optimized/actionPrompt';
 import { ResponseOutput } from '../features/ai/prompts/optimized/responsePrompt';
 import { AgentMemory } from '../features/memory/AgentMemory';
 import { LongTermStorage } from '../features/memory/LongTermStorage';
-import { formatToolResults } from '../features/ai/prompts/optimizedPromptUtils';
 import { z } from 'zod';
 
 export class OptimizedReActEngine {
@@ -94,14 +86,14 @@ export class OptimizedReActEngine {
    */
   private addHistoryEntry(
     state: WindsurfState, 
-    phase: string, // Usar string en lugar de HistoryEntry['phase'] para permitir nuevos tipos
+    phase: string,
     content: string | Record<string, any>,
     metadata: Partial<HistoryEntry['metadata']> = {}
   ): void {
-    // Crear entrada con los campos estándar (sin id personalizado)
+
     const entry: HistoryEntry = {
       timestamp: Date.now(),
-      phase: phase as any, // Forzar el tipo para permitir nuevos valores
+      phase: phase as any, 
       content: typeof content === 'string' ? content : JSON.stringify(content),
       metadata: {
         ...metadata,
@@ -116,12 +108,12 @@ export class OptimizedReActEngine {
    * Ejecuta el flujo ReAct optimizado
    */
   public async run(initialState: WindsurfState): Promise<WindsurfState> {
-    // Inicializar estado y memoria
+  
     const currentState = { ...initialState };
     currentState.iterationCount = currentState.iterationCount || 0;
     currentState.history = currentState.history || [];
     
-    // Crear sistema de memoria para esta conversación
+  
     const memory = new AgentMemory(
       this.longTermStorage,
       currentState.chatId,
@@ -173,7 +165,7 @@ export class OptimizedReActEngine {
          model
        });
       
-      this.addHistoryEntry(currentState, 'reasoning', analysisResult); // Usar 'reasoning' en lugar de 'analysis'
+      this.addHistoryEntry(currentState, 'reasoning', analysisResult); 
       agentPhaseDispatch('initialAnalysis', 'completed', { analysis: analysisResult });
       
       // Guardar comprensión en memoria
