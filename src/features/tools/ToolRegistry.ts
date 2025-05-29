@@ -61,9 +61,7 @@ export class ToolRegistry {
       return `Leyendo archivo: ${fileName}`;
     } else if (toolName === 'searchInWorkspace' && params.query) {
       return `Buscando en el espacio de trabajo: "${params.query}"`;
-    } else if (toolName === 'executeShellCommand' && params.command) {
-      return `Ejecutando comando: ${params.command}`;
-    } else if (toolName === 'writeToFile' && params.path) {
+    }  else if (toolName === 'writeToFile' && params.path) {
       const fileName = typeof params.path === 'string' ? params.path.split(/[\\/]/).pop() : 'archivo';
       return `Escribiendo archivo: ${fileName}`;
     } else if (toolName === 'createFileOrDirectory' && params.path) {

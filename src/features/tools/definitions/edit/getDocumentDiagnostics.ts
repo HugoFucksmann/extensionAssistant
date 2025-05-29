@@ -28,6 +28,7 @@ type DiagnosticsResult = {
 };
 
 export const getDocumentDiagnostics: ToolDefinition<typeof getDocumentDiagnosticsParamsSchema, DiagnosticsResult> = {
+  uiFeedback: true,
   name: 'getDocumentDiagnostics',
   description: 'Gets diagnostic errors and warnings for the active editor or a specified file. If filePath is omitted, uses the active editor.',
   parametersSchema: getDocumentDiagnosticsParamsSchema,

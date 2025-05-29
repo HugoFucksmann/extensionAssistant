@@ -28,6 +28,7 @@ type SearchResultData = {
 };
 
 export const searchInWorkspace: ToolDefinition<typeof searchInWorkspaceParamsSchema, SearchResultData> = {
+  uiFeedback: true,
   name: 'searchInWorkspace',
   description: 'Searches for a text query or regular expression in workspace files. Respects .gitignore and files.exclude settings. Returns file paths and line numbers of matches.',
   parametersSchema: searchInWorkspaceParamsSchema,

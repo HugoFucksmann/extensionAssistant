@@ -5,7 +5,6 @@ import { filesystemToolDefinitions } from './filesystem';
 import { gitToolDefinitions } from './git';
 import { terminalToolDefinitions } from './terminal';
 
-// Exportar todas las definiciones de herramientas
 export const allToolDefinitions = [
   ...workspaceToolDefinitions,
   ...editorToolDefinitions,
@@ -14,7 +13,6 @@ export const allToolDefinitions = [
   ...terminalToolDefinitions,
 ];
 
-// Exportar también las categorías individuales para permitir registro selectivo
 export {
   workspaceToolDefinitions,
   editorToolDefinitions,

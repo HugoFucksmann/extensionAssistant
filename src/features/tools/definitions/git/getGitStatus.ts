@@ -118,6 +118,7 @@ function parseGitPorcelainStatus(porcelainOutput: string): {
 
 
 export const getGitStatus: ToolDefinition<typeof getGitStatusParamsSchema, GitStatusData | { errorReason: string, stderr?: string }> = {
+  uiFeedback: true,
   name: 'getGitStatus',
   description: 'Gets the current Git status for the workspace: current branch, remote tracking (ahead/behind), and a list of changed/staged/untracked files. Returns an error reason if not a Git repository or Git is not found.',
   parametersSchema: getGitStatusParamsSchema,

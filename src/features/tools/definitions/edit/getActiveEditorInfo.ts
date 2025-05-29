@@ -22,6 +22,7 @@ type ActiveEditorInfo = {
 };
 
 export const getActiveEditorInfo: ToolDefinition<typeof getActiveEditorInfoParamsSchema, ActiveEditorInfo | null> = {
+  uiFeedback: true,
   name: 'getActiveEditorInfo',
   description: 'Gets information from the currently active text editor, including its content, file path (if any), language, and current selection. Returns null if no text editor is active.',
   parametersSchema: getActiveEditorInfoParamsSchema,

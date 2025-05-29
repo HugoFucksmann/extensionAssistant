@@ -24,6 +24,7 @@ export const createFileOrDirectoryParamsSchema = z.object({
 type CreateResultType = { path: string; type: 'file' | 'directory'; operation: 'created' | 'overwritten' | 'exists' };
 
 export const createFileOrDirectory: ToolDefinition<typeof createFileOrDirectoryParamsSchema, CreateResultType> = {
+  uiFeedback: true,
   name: 'createFileOrDirectory',
   description: 'Creates a new file or a new directory. Paths must be relative to the workspace root. Creates parent directories if they do not exist. Overwrites existing files if type is "file".',
   parametersSchema: createFileOrDirectoryParamsSchema,

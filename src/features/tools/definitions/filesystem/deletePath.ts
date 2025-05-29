@@ -11,6 +11,7 @@ export const deletePathParamsSchema = z.object({
 }).strict();
 
 export const deletePath: ToolDefinition<typeof deletePathParamsSchema, { path: string; deleted: boolean }> = {
+  uiFeedback: true,
   name: 'deletePath',
   description: 'Deletes a file or directory recursively. The path must be relative to the workspace root. Uses trash by default if available on the system.',
   parametersSchema: deletePathParamsSchema,

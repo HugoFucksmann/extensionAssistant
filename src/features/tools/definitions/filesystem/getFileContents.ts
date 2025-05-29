@@ -19,12 +19,13 @@ export const getFileContentsParamsSchema = z.object({
 }).strict(); 
 
 export const getFileContents: ToolDefinition<typeof getFileContentsParamsSchema, { filePath: string; content: string; availableFiles?: string[] }> = {
+  uiFeedback: true,
   name: 'getFileContents',
   description: 'Gets the content of a specified file. The path can be absolute or relative to the workspace root. If the file is not found, the tool will attempt to search for it in the workspace. You can also search by filename using the searchByName parameter.',
   parametersSchema: getFileContentsParamsSchema,
   async execute(
-    params, // Tipado como: { path: string, searchByName?: boolean, fuzzyMatch?: boolean }
-    context // Tipado como: ToolExecutionContext
+    params, 
+    context 
   ): Promise<ToolResult<{ filePath: string; content: string; availableFiles?: string[] }>> {
     const { path: requestedPath, searchByName = false, fuzzyMatch = false } = params;
     let fileUri: vscode.Uri | undefined;
