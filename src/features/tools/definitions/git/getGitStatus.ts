@@ -1,13 +1,13 @@
 // src/features/tools/definitions/git/getGitStatus.ts
 import * as vscode from 'vscode';
 import { z } from 'zod';
-import { ToolDefinition, ToolResult, ToolExecutionContext, ToolPermission } from '../../types';
+import { ToolDefinition, ToolResult,  } from '../../types';
 import { exec } from 'child_process';
 import * as util from 'util';
 
 const execPromise = util.promisify(exec);
 
-// Esquema Zod para los parámetros (vacío)
+
 export const getGitStatusParamsSchema = z.object({}).strict();
 
 // Tipos para la data retornada
@@ -28,11 +28,10 @@ interface GitStatusData {
   unstagedFilesCount: number;
   untrackedFilesCount: number;
   conflictedFilesCount: number;
-  files: GitFileStatus[]; // Lista de archivos con su estado (limitada)
+  files: GitFileStatus[];
 }
 
-// Función para parsear la salida de 'git status --porcelain=v1 -b'
-// (Esta función se mantiene igual que en tu versión original)
+
 function parseGitPorcelainStatus(porcelainOutput: string): {
   branch: string | null;
   ahead: number;
@@ -93,9 +92,6 @@ function parseGitPorcelainStatus(porcelainOutput: string): {
 
     if (Y === 'M') description += 'WorkTree: Modified. ';
     if (Y === 'D') description += 'WorkTree: Deleted. ';
-    // 'A ' (A en X, espacio en Y) es un archivo nuevo añadido al índice.
-    // '?A' no es un estado válido. 'A?' tampoco.
-    // ' A' (espacio en X, A en Y) no es un estado válido.
     if (X === '?' && Y === '?') description = 'Untracked. ';
     else if (X === ' ' && Y === 'A') description += 'WorkTree: Added (Intent-to-add, not staged). '; // Raro, pero posible
     else if (X === 'A' && Y === 'A') description = 'Index & WorkTree: Added (Unmerged or new and staged). '; // Conflicto de adición o nuevo y staged
@@ -105,7 +101,7 @@ function parseGitPorcelainStatus(porcelainOutput: string): {
         if (X === 'A' && Y === 'A') description += "Both added. ";
         if (X === 'D' && Y === 'D') description += "Both deleted. ";
         if (X === 'U' && Y === 'U') description += "Both modified. ";
-        // Otros casos de U: AU, UA, DU, UD, etc.
+      
     }
 
 

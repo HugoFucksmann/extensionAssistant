@@ -1,7 +1,6 @@
 // src/features/tools/definitions/editor/getActiveEditorInfo.ts
-import * as vscode from 'vscode';
 import { z } from 'zod';
-import { ToolDefinition, ToolResult, ToolExecutionContext, ToolPermission } from '../../types';
+import { ToolDefinition, ToolResult,  } from '../../types';
 
 // Esquema Zod para los parámetros (vacío ya que no hay parámetros)
 export const getActiveEditorInfoParamsSchema = z.object({}).strict();

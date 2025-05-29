@@ -1,7 +1,7 @@
 // src/features/tools/definitions/filesystem/createFileOrDirectory.ts
 import * as vscode from 'vscode';
 import { z } from 'zod';
-import { ToolDefinition, ToolResult, ToolExecutionContext, ToolPermission } from '../../types';
+import { ToolDefinition, ToolResult,  } from '../../types';
 import { resolveWorkspacePath } from '../utils';
 
 // Esquema Zod para los parámetros
@@ -9,7 +9,7 @@ export const createFileOrDirectoryParamsSchema = z.object({
   path: z.string().min(1, { message: "Path cannot be empty." }),
   type: z.enum(['file', 'directory']).describe("Specify 'file' to create a file (optionally with content) or 'directory' to create a directory."),
   content: z.string().optional().describe("Content for the file. Only used if type is 'file'. If type is 'file' and content is omitted, an empty file is created.")
-}).strict() // Move strict() here
+}).strict() 
 .refine(data => {
     if (data.type === 'directory' && data.content !== undefined) {
         return false;

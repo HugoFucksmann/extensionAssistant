@@ -88,14 +88,13 @@ export class ApplicationLogicService {
           } else {
              
               const lastMeaningfulEntry = resultState.history?.slice().reverse().find(
-                  h => (h.phase === 'responseGeneration' && h.content) || 
-                       (h.phase === 'action' && h.metadata?.toolName && ['sendResponseToUser', 'respond'].includes(h.metadata.toolName) && h.content)
+                  h => h.phase === 'responseGeneration' && h.content
               );
               if (lastMeaningfulEntry?.content) {
                   try {
                   
                       const contentObj = JSON.parse(lastMeaningfulEntry.content);
-                      finalResponseText = contentObj.message || contentObj.response || lastMeaningfulEntry.content;
+                      finalResponseText = contentObj.message || lastMeaningfulEntry.content;
                   } catch (e) {
                       finalResponseText = lastMeaningfulEntry.content;
                   }
@@ -170,7 +169,7 @@ export class ApplicationLogicService {
   public async invokeTool(
     toolName: string,
     params: any,
-    executionContextArgs: { chatId?: string; uiOperationId?: string; [key: string]: any } = {}
+    executionContextArgs: { chatId?: string; [key: string]: any } = {}
   ): Promise<ToolResult> {
     if (!this.toolRegistry) {
       console.error('[ApplicationLogicService] ToolRegistry not available to invokeTool.');

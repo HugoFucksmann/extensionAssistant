@@ -1,13 +1,13 @@
 // src/features/tools/definitions/filesystem/writeToFile.ts
 import * as vscode from 'vscode';
 import { z } from 'zod';
-import { ToolDefinition, ToolResult, ToolExecutionContext, ToolPermission } from '../../types';
+import { ToolDefinition, ToolResult,  } from '../../types';
 import { resolveWorkspacePath } from '../utils';
 
 // Esquema Zod para los parámetros
 export const writeToFileParamsSchema = z.object({
   path: z.string().min(1, { message: "File path cannot be empty." }),
-  content: z.string() // El contenido puede ser un string vacío
+  content: z.string() 
 }).strict();
 
 export const writeToFile: ToolDefinition<typeof writeToFileParamsSchema, { filePath: string }> = {
@@ -28,8 +28,7 @@ export const writeToFile: ToolDefinition<typeof writeToFileParamsSchema, { fileP
       }
       
       const dirUri = vscode.Uri.joinPath(targetUri, '..');
-      // Intentar crear el directorio padre. Si ya existe, no hace nada.
-      // fs.createDirectory es recursivo por defecto, así que creará toda la ruta si es necesario.
+   
       await context.vscodeAPI.workspace.fs.createDirectory(dirUri);
 
       await context.vscodeAPI.workspace.fs.writeFile(targetUri, new TextEncoder().encode(content));

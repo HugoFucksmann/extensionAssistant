@@ -1,7 +1,6 @@
 // src/features/tools/definitions/terminal/runInTerminal.ts
-import * as vscode from 'vscode';
 import { z } from 'zod';
-import { ToolDefinition, ToolResult, ToolExecutionContext, ToolPermission } from '../../types';
+import { ToolDefinition, ToolResult,  } from '../../types';
 
 // Esquema Zod para los parámetros
 export const runInTerminalParamsSchema = z.object({
@@ -33,13 +32,13 @@ export const runInTerminal: ToolDefinition<typeof runInTerminalParamsSchema, Run
       if (!term) {
         term = context.vscodeAPI.window.createTerminal({
           name: terminalName,
-          cwd: workspaceFolderUri // undefined si no hay workspace, el terminal se abrirá en el home del usuario
+          cwd: workspaceFolderUri 
         });
       }
       
-      term.sendText(command); // sendText se encarga de añadir el salto de línea si es necesario para ejecutar
+      term.sendText(command);
       if (focus) {
-        term.show(false); // false para no robar el foco del editor de texto, solo mostrar el panel
+        term.show(false); 
       }
       
       return { success: true, data: { terminalName: term.name, commandSent: true } };

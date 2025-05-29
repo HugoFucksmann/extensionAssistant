@@ -87,7 +87,7 @@ export class ToolRegistry {
   async executeTool(
     name: string,
     rawParams: any,
-    executionCtxArgs: { chatId?: string; uiOperationId?: string; [key: string]: any } = {}
+    executionCtxArgs: { chatId?: string; [key: string]: any } = {}
   ): Promise<ToolResult> {
     const startTime = Date.now();
     const baseLogDetails = { toolName: name, rawParams, executionCtxArgs, chatId: executionCtxArgs.chatId };
@@ -139,7 +139,6 @@ export class ToolRegistry {
       vscodeAPI: vscode,
       dispatcher: this.dispatcher,
       chatId: executionCtxArgs.chatId,
-      uiOperationId: executionCtxArgs.uiOperationId,
       ...executionCtxArgs
     };
 

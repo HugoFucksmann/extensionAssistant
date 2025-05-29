@@ -1,7 +1,7 @@
 // src/features/tools/definitions/terminal/executeShellCommand.ts
 import * as vscode from 'vscode';
 import { z } from 'zod';
-import { ToolDefinition, ToolResult, ToolExecutionContext, ToolPermission } from '../../types';
+import { ToolDefinition, ToolResult, } from '../../types';
 import { exec } from 'child_process';
 import * as util from 'util';
 
@@ -11,14 +11,14 @@ const execPromise = util.promisify(exec);
 export const executeShellCommandParamsSchema = z.object({
   command: z.string().min(1, { message: "Command to execute cannot be empty." }),
   timeoutMs: z.number().int().positive().optional().default(30000).describe("Optional timeout in milliseconds for the command execution. Defaults to 30 seconds.")
-  // cwd: z.string().optional().describe("Optional current working directory relative to workspace. Defaults to workspace root.") // Omitido por simplicidad, siempre usa workspace root
+  
 }).strict();
 
 type ShellCommandResultData = {
   stdout: string;
   stderr: string;
-  exitCode: number | null; // null si el proceso fue terminado por una señal
-  signal?: string; // Nombre de la señal si el proceso fue terminado por una
+  exitCode: number | null; 
+  signal?: string; 
 };
 
 export const executeShellCommand: ToolDefinition<typeof executeShellCommandParamsSchema, ShellCommandResultData> = {
@@ -42,18 +42,17 @@ export const executeShellCommand: ToolDefinition<typeof executeShellCommandParam
       const { stdout, stderr } = await execPromise(command, {
         cwd: workspaceFolder,
         timeout: timeoutMs,
-        shell: process.env.SHELL || undefined // Usar el shell del sistema o un booleano para que Node elija
+        shell: process.env.SHELL || undefined 
       });
       
-      // Si execPromise resuelve, el comando tuvo éxito (exit code 0)
+     
       return {
         success: true,
         data: { stdout: stdout.trim(), stderr: stderr.trim(), exitCode: 0 }
       };
 
     } catch (error: any) {
-      // 'error' de execPromise suele ser un objeto con stdout, stderr, code, signal, etc.
-      // cuando el comando falla (exit code != 0) o hay otros errores de ejecución.
+     
       const stdout = error.stdout?.toString().trim() || '';
       const stderr = error.stderr?.toString().trim() || '';
       const exitCode = typeof error.code === 'number' ? error.code : null;
@@ -61,7 +60,7 @@ export const executeShellCommand: ToolDefinition<typeof executeShellCommandParam
 
       const errorMessage = `Command "${command}" failed. Exit code: ${exitCode ?? 'N/A'}${signal ? `, Signal: ${signal}` : ''}. Stderr: ${stderr || 'N/A'}`;
       
-      // Aunque el comando falle (success: false), devolvemos stdout/stderr porque pueden ser útiles.
+   
       return {
         success: false,
         error: errorMessage,

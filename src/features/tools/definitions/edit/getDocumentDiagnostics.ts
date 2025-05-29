@@ -1,7 +1,7 @@
 // src/features/tools/definitions/editor/getDocumentDiagnostics.ts
 import * as vscode from 'vscode';
 import { z } from 'zod';
-import { ToolDefinition, ToolResult, ToolExecutionContext, ToolPermission } from '../../types';
+import { ToolDefinition, ToolResult,  } from '../../types';
 import { resolveWorkspacePath } from '../utils';
 
 // Esquema Zod para los parámetros
@@ -12,7 +12,7 @@ export const getDocumentDiagnosticsParamsSchema = z.object({
 // Tipo para la data retornada
 type DiagnosticInfo = {
   message: string;
-  severity: string; // "Error", "Warning", "Information", "Hint"
+  severity: string; 
   range: {
     startLine: number;
     startChar: number;
@@ -23,7 +23,7 @@ type DiagnosticInfo = {
   code?: string | number;
 };
 type DiagnosticsResult = {
-  documentPath: string; // Path relativo al workspace
+  documentPath: string; 
   diagnostics: DiagnosticInfo[];
 };
 
@@ -47,12 +47,12 @@ export const getDocumentDiagnostics: ToolDefinition<typeof getDocumentDiagnostic
         }
         targetUri = resolvedUri;
         documentPathForReturn = context.vscodeAPI.workspace.asRelativePath(targetUri, false);
-         // Asegurarse de que el documento esté "conocido" por VS Code para obtener diagnósticos
+       
         await context.vscodeAPI.workspace.openTextDocument(targetUri);
       } else {
         const activeEditor = context.vscodeAPI.window.activeTextEditor;
         if (!activeEditor) {
-          // Buscar archivos en el workspace y sugerir algunos
+         
           try {
             const files = await context.vscodeAPI.workspace.findFiles('**/*.{js,ts,jsx,tsx,html,css,json}', '**/node_modules/**', 10);
             if (files.length > 0) {

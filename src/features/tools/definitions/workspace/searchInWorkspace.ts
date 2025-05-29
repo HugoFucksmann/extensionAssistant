@@ -1,13 +1,13 @@
 // src/features/tools/definitions/workspace/searchInWorkspace.ts
-import * as vscode from 'vscode';
+
 import { z } from 'zod';
-import { ToolDefinition, ToolResult, ToolExecutionContext, ToolPermission } from '../../types';
+import { ToolDefinition, ToolResult, } from '../../types';
 
 // Esquema Zod para los parámetros
 export const searchInWorkspaceParamsSchema = z.object({
   query: z.string().min(1, { message: "Search query cannot be empty." }),
   isRegex: z.boolean().optional().default(false).describe("Set to true if the query is a regular expression."),
-  // filePattern: z.string().optional().describe("Glob pattern for files to include (e.g., \"*.ts\"). Defaults to all relevant files."), // Omitido por simplicidad, LLM puede filtrar resultados si es necesario
+ 
   maxResultsPerFile: z.number().int().positive().optional().default(5).describe("Maximum results to return per file."),
   maxTotalResults: z.number().int().positive().optional().default(50).describe("Maximum total results to return across all files.")
 }).strict();
@@ -51,8 +51,7 @@ export const searchInWorkspace: ToolDefinition<typeof searchInWorkspaceParamsSch
     let searchLimited = false;
 
     try {
-      // Usar un patrón de búsqueda amplio, vscode.workspace.findFiles respeta .gitignore y files.exclude
-      // Podríamos añadir un filePattern si el LLM lo necesitara, pero por ahora lo omitimos.
+    
       const filesToSearch = await context.vscodeAPI.workspace.findFiles(
         '**/*', // Buscar en todos los archivos
         undefined, // exclude (ya maneja .gitignore y files.exclude por defecto)
@@ -102,7 +101,7 @@ export const searchInWorkspace: ToolDefinition<typeof searchInWorkspaceParamsSch
           }
         } catch (readError) {
           // Ignorar archivos que no se pueden leer (binarios, permisos, etc.)
-          // context.dispatcher.systemWarning(`Could not read file ${fileUri.fsPath} during search.`, { error: readError, toolName: 'searchInWorkspace' }, context.chatId);
+         
         }
       }
       

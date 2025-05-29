@@ -1,7 +1,7 @@
 // src/features/tools/definitions/editor/applyEditorEdit.ts
 import * as vscode from 'vscode';
 import { z } from 'zod';
-import { ToolDefinition, ToolResult, ToolExecutionContext, ToolPermission } from '../../types';
+import { ToolDefinition, ToolResult,  } from '../../types';
 import { resolveWorkspacePath } from '../utils';
 
 // Esquema Zod para los parámetros

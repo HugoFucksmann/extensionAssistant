@@ -134,7 +134,7 @@ export interface SystemEventPayload extends BaseEventPayload {
 }
 export interface UserInteractionRequiredPayload extends BaseEventPayload {
   interactionType: 'requestInput' | 'confirmation' | 'choiceSelection';
-  uiOperationId: string; 
+
   promptMessage: string;
   inputType?: 'text' | 'password' | 'number'; 
   placeholder?: string;
@@ -145,7 +145,6 @@ export interface UserInteractionRequiredPayload extends BaseEventPayload {
   title?: string; 
 }
 export interface UserInputReceivedPayload extends BaseEventPayload {
-  uiOperationId: string; 
   value?: any; 
   wasCancelled?: boolean; 
 }

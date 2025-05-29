@@ -1,7 +1,6 @@
 // src/features/ai/lcel/DynamicToolAdapter.ts
 import { DynamicStructuredTool } from "@langchain/core/tools";
 import { ToolDefinition, ToolExecutionContext } from "../../tools/types";
-import { z } from "zod";
 
 /**
  * Adapta una ToolDefinition existente al formato DynamicTool de LangChain.

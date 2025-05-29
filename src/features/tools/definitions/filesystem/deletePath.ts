@@ -1,13 +1,13 @@
 // src/features/tools/definitions/filesystem/deletePath.ts
 import * as vscode from 'vscode';
 import { z } from 'zod';
-import { ToolDefinition, ToolResult, ToolExecutionContext, ToolPermission } from '../../types';
+import { ToolDefinition, ToolResult,  } from '../../types';
 import { resolveWorkspacePath } from '../utils';
 
 // Esquema Zod para los parámetros
 export const deletePathParamsSchema = z.object({
   path: z.string().min(1, { message: "Path to delete cannot be empty." })
-  // useTrash: z.boolean().optional().default(true) // Podríamos añadirlo, pero VSCode usa trash por defecto si puede
+
 }).strict();
 
 export const deletePath: ToolDefinition<typeof deletePathParamsSchema, { path: string; deleted: boolean }> = {
