@@ -3,12 +3,15 @@
  * Centraliza la gestión de prompts optimizados para reducir tokens y mejorar la estructura
  */
 
-import { generateAnalysisPrompt, analysisOutputSchema, AnalysisOutput } from './prompts/optimized/analysisPrompt';
-import { generateReasoningPrompt, reasoningOutputSchema, ReasoningOutput } from './prompts/optimized/reasoningPrompt';
-import { generateActionPrompt, actionOutputSchema, ActionOutput } from './prompts/optimized/actionPrompt';
-import { generateResponsePrompt, responseOutputSchema, ResponseOutput } from './prompts/optimized/responsePrompt';
-import { extractStructuredResponse } from './prompts/optimizedPromptUtils';
+import { runOptimizedAnalysisChain } from './lcel/OptimizedAnalysisChain';
+import { runOptimizedReasoningChain } from './lcel/OptimizedReasoningChain';
+import { runOptimizedActionChain } from './lcel/OptimizedActionChain';
+import { runOptimizedResponseChain } from './lcel/OptimizedResponseChain';
 import { ModelManager } from './ModelManager';
+import { AnalysisOutput } from './prompts/optimized/analysisPrompt';
+import { ReasoningOutput } from './prompts/optimized/reasoningPrompt';
+import { ActionOutput } from './prompts/optimized/actionPrompt';
+import { ResponseOutput } from './prompts/optimized/responsePrompt';
 
 // Tipos de prompts optimizados disponibles
 export type OptimizedPromptType = 
@@ -75,193 +78,86 @@ export class OptimizedPromptManager {
   }
 
   /**
-   * Genera un análisis inicial de la consulta del usuario
-   */
-  public async generateAnalysis(
-    userQuery: string,
-    availableTools: string[],
-    codeContext?: string,
-    memoryContext?: string
-  ): Promise<AnalysisOutput> {
-    console.log('[OptimizedPromptManager] Generando análisis inicial');
-    
-    // Limitar la cantidad de herramientas para reducir tokens
-    const limitedTools = availableTools.slice(0, 15); // Solo las primeras 15 herramientas
-    
-    // Truncar el contexto de código si es muy largo
-    const truncatedCodeContext = codeContext && codeContext.length > 1000 ? 
-      codeContext.substring(0, 1000) + '...' : codeContext;
-    
-    const prompt = generateAnalysisPrompt(
-      userQuery,
-      limitedTools,
-      truncatedCodeContext,
-      memoryContext ? this.truncateMemoryContext(memoryContext) : undefined
-    );
-    
-    const response = await this.modelManager.generateText(prompt);
-    
-    // Valor por defecto en caso de error
-    const defaultValue: AnalysisOutput = {
-      understanding: 'No se pudo analizar correctamente la consulta del usuario',
-      taskType: 'information_request',
-      requiredTools: [],
-      requiredContext: [],
-      initialPlan: ['Solicitar más información al usuario']
-    };
-    
-    try {
-      // Usar el valor por defecto si hay un error
-      return extractStructuredResponse(response, analysisOutputSchema, defaultValue);
-    } catch (error) {
-      console.error('[OptimizedPromptManager] Error al extraer análisis:', error);
-      return defaultValue;
-    }
-  }
+ * Genera un análisis inicial de la consulta del usuario usando la cadena LCEL
+ */
+public async generateAnalysis(
+  userQuery: string,
+  availableTools: string[],
+  codeContext?: string,
+  memoryContext?: string
+): Promise<AnalysisOutput> {
+  console.log('[OptimizedPromptManager] Generando análisis inicial (LCEL)');
+  const model = this.modelManager.getActiveModel();
+  return await runOptimizedAnalysisChain({
+    userQuery,
+    availableTools,
+    codeContext,
+    memoryContext,
+    model
+  }) as AnalysisOutput;
+}
 
-  /**
-   * Genera razonamiento sobre qué herramienta usar
-   */
-  public async generateReasoning(
-    userQuery: string,
-    analysisResult: any,
-    toolsDescription: string,
-    previousToolResults: Array<{name: string, result: any}> = [],
-    memoryContext?: string
-  ): Promise<ReasoningOutput> {
-    console.log('[OptimizedPromptManager] Generando razonamiento');
-    
-    // Simplificar el resultado del análisis
-    const simplifiedAnalysis = this.simplifyToolResult(analysisResult);
-    
-    // Truncar la descripción de herramientas si es muy larga
-    const truncatedToolsDescription = toolsDescription.length > 1000 ? 
-      toolsDescription.substring(0, 1000) + '...' : toolsDescription;
-    
-    // Simplificar y limitar los resultados previos
-    const simplifiedPreviousResults = previousToolResults
-      .slice(-2) // Solo los últimos 2 resultados
-      .map(item => ({
-        name: item.name,
-        result: this.simplifyToolResult(item.result)
-      }));
-    
-    const prompt = generateReasoningPrompt(
-      userQuery,
-      simplifiedAnalysis,
-      truncatedToolsDescription,
-      simplifiedPreviousResults,
-      memoryContext ? this.truncateMemoryContext(memoryContext) : undefined
-    );
-    
-    const response = await this.modelManager.generateText(prompt);
-    
-    // Valor por defecto en caso de error
-    const defaultValue: ReasoningOutput = {
-      reasoning: 'No se pudo generar un razonamiento válido',
-      action: 'respond',
-      response: 'No pude procesar correctamente tu consulta. ¿Podrías reformularla?'
-    };
-    
-    try {
-      // Usar el valor por defecto si hay un error
-      return extractStructuredResponse(response, reasoningOutputSchema, defaultValue);
-    } catch (error) {
-      console.error('[OptimizedPromptManager] Error al extraer razonamiento:', error);
-      return defaultValue;
-    }
-  }
+/**
+ * Genera razonamiento sobre qué herramienta usar usando la cadena LCEL
+ */
+public async generateReasoning(
+  userQuery: string,
+  analysisResult: any,
+  toolsDescription: string,
+  previousToolResults: Array<{name: string, result: any}> = [],
+  memoryContext?: string
+): Promise<ReasoningOutput> {
+  console.log('[OptimizedPromptManager] Generando razonamiento (LCEL)');
+  const model = this.modelManager.getActiveModel();
+  return await runOptimizedReasoningChain({
+    userQuery,
+    analysisResult,
+    toolsDescription,
+    previousToolResults,
+    memoryContext,
+    model
+  }) as ReasoningOutput;
+}
 
-  /**
-   * Genera interpretación de los resultados de una herramienta
-   */
-  public async generateAction(
-    userQuery: string,
-    lastToolName: string,
-    lastToolResult: any,
-    previousActions: Array<{tool: string, result: any}> = [],
-    memoryContext?: string
-  ): Promise<ActionOutput> {
-    console.log('[OptimizedPromptManager] Generando acción');
-    
-    // Simplificar y limitar los datos que se pasan al prompt
-    const simplifiedLastResult = this.simplifyToolResult(lastToolResult);
-    const simplifiedPreviousActions = previousActions.map(action => ({
-      tool: action.tool,
-      result: this.simplifyToolResult(action.result)
-    }));
-    
-    // Limitar la cantidad de acciones previas para reducir tokens
-    const limitedPreviousActions = simplifiedPreviousActions.slice(-2); // Solo las últimas 2 acciones
-    
-    const prompt = generateActionPrompt(
-      userQuery,
-      lastToolName,
-      simplifiedLastResult,
-      limitedPreviousActions,
-      memoryContext ? this.truncateMemoryContext(memoryContext) : undefined
-    );
-    
-    const response = await this.modelManager.generateText(prompt);
-    
-    // Valor por defecto en caso de error
-    const defaultValue: ActionOutput = {
-      interpretation: 'No se pudo interpretar correctamente el resultado de la herramienta',
-      nextAction: 'respond',
-      response: 'No pude procesar correctamente los resultados. ¿Podrías intentar con una consulta diferente?'
-    };
-    
-    try {
-      // Usar el valor por defecto si hay un error
-      return extractStructuredResponse(response, actionOutputSchema, defaultValue);
-    } catch (error) {
-      console.error('[OptimizedPromptManager] Error al extraer acción:', error);
-      return defaultValue;
-    }
-  }
+/**
+ * Genera interpretación de los resultados de una herramienta usando la cadena LCEL
+ */
+public async generateAction(
+  userQuery: string,
+  lastToolName: string,
+  lastToolResult: any,
+  previousActions: Array<{tool: string, result: any}> = [],
+  memoryContext?: string
+): Promise<ActionOutput> {
+  console.log('[OptimizedPromptManager] Generando acción (LCEL)');
+  const model = this.modelManager.getActiveModel();
+  return await runOptimizedActionChain({
+    userQuery,
+    lastToolName,
+    lastToolResult,
+    previousActions,
+    memoryContext,
+    model
+  }) as ActionOutput;
+}
 
-  /**
-   * Genera la respuesta final para el usuario
-   */
-  public async generateResponse(
-    userQuery: string,
-    toolResults: Array<{tool: string, result: any}>,
-    analysisResult: any,
-    memoryContext?: string
-  ): Promise<ResponseOutput> {
-    console.log('[OptimizedPromptManager] Generando respuesta final');
-    
-    // Simplificar el resultado del análisis
-    const simplifiedAnalysis = this.simplifyToolResult(analysisResult);
-    
-    // Simplificar y limitar los resultados de herramientas
-    const simplifiedToolResults = toolResults
-      .slice(-5) // Solo los últimos 5 resultados
-      .map(item => ({
-        tool: item.tool,
-        result: this.simplifyToolResult(item.result)
-      }));
-    
-    const prompt = generateResponsePrompt(
-      userQuery,
-      simplifiedToolResults,
-      simplifiedAnalysis,
-      memoryContext ? this.truncateMemoryContext(memoryContext) : undefined
-    );
-    
-    const response = await this.modelManager.generateText(prompt);
-    
-    // Valor por defecto en caso de error
-    const defaultValue: ResponseOutput = {
-      response: 'No pude generar una respuesta adecuada. Por favor, intenta con una consulta diferente.'
-    };
-    
-    try {
-      // Usar el valor por defecto si hay un error
-      return extractStructuredResponse(response, responseOutputSchema, defaultValue);
-    } catch (error) {
-      console.error('[OptimizedPromptManager] Error al extraer respuesta:', error);
-      return defaultValue;
-    }
-  }
+/**
+ * Genera la respuesta final para el usuario usando la cadena LCEL
+ */
+public async generateResponse(
+  userQuery: string,
+  toolResults: Array<{tool: string, result: any}>,
+  analysisResult: any,
+  memoryContext?: string
+): Promise<ResponseOutput> {
+  console.log('[OptimizedPromptManager] Generando respuesta final (LCEL)');
+  const model = this.modelManager.getActiveModel();
+  return await runOptimizedResponseChain({
+    userQuery,
+    toolResults,
+    analysisResult,
+    memoryContext,
+    model
+  }) as ResponseOutput;
+}
 }

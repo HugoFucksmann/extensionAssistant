@@ -127,12 +127,12 @@ export class ComponentFactory {
   
   public static getOptimizedReActEngine(extensionContext: vscode.ExtensionContext): OptimizedReActEngine {
     if (!this.optimizedReActEngineInstance) {
-      const promptManager = this.getOptimizedPromptManager();
+      const modelManager = this.getModelManager();
       const toolRegistry = this.getToolRegistry(extensionContext);
       const dispatcher = this.getInternalEventDispatcher();
       const longTermStorage = this.getLongTermStorage(extensionContext);
       this.optimizedReActEngineInstance = new OptimizedReActEngine(
-        promptManager,
+        modelManager,
         toolRegistry,
         dispatcher,
         longTermStorage

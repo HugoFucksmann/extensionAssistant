@@ -6,6 +6,9 @@ import { PermissionManager } from './PermissionManager';
 import { ToolValidator, ValidationResult } from './ToolValidator';
 import { EventType, ToolExecutionEventPayload } from '../../features/events/eventTypes'; // <-- MODIFICADO
 
+import { createDynamicTool, createDynamicToolsFromDefinitions } from '../ai/lcel/DynamicToolAdapter';
+import { DynamicStructuredTool } from '@langchain/core/tools';
+
 export class ToolRegistry {
   private tools = new Map<string, ToolDefinition<any, any>>();
 
@@ -211,5 +214,26 @@ export class ToolRegistry {
       });
       return { success: false, error: errorMsg, executionTime };
     }
+  }
+
+  /**
+   * Devuelve una instancia DynamicTool de LangChain para la herramienta dada.
+   * El ejecutor llama a executeTool para mantener validación y permisos.
+   */
+  public asDynamicTool(toolName: string, contextDefaults: Record<string, any> = {}): DynamicStructuredTool | undefined {
+    const toolDef = this.getTool(toolName);
+    if (!toolDef) return undefined;
+    return createDynamicTool(toolDef, this.executeTool.bind(this), contextDefaults);
+  }
+
+  /**
+   * Devuelve todas las herramientas como DynamicStructuredTool[] para integración con LangChain.
+   */
+  public asDynamicTools(contextDefaults: Record<string, any> = {}): DynamicStructuredTool[] {
+    return createDynamicToolsFromDefinitions(
+      this.getAllTools(),
+      this.executeTool.bind(this),
+      contextDefaults
+    );
   }
 }

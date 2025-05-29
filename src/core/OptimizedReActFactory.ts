@@ -23,15 +23,12 @@ export class OptimizedReActFactory {
     // Crear instancia de ModelManager
     const modelManager = new ModelManager();
     
-    // Crear instancia de OptimizedPromptManager
-    const promptManager = new OptimizedPromptManager(modelManager);
-    
     // Crear instancia de LongTermStorage
     const longTermStorage = new LongTermStorage(context);
     
     // Crear instancia de OptimizedReActEngine
     const reactEngine = new OptimizedReActEngine(
-      promptManager,
+      modelManager,
       toolRegistry,
       dispatcher,
       longTermStorage

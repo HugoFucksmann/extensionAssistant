@@ -4,13 +4,13 @@
  */
 
 import { z } from 'zod';
-import { createStructuredPrompt } from '../optimizedPromptUtils';
+import { ChatPromptTemplate } from "@langchain/core/prompts";
+import { JsonMarkdownStructuredOutputParser } from "langchain/output_parsers";
 
 // Esquema para validar la salida del modelo
 export const analysisOutputSchema = z.object({
   // Comprensión de la consulta del usuario
   understanding: z.string().describe('Comprensión clara de lo que pide el usuario'),
-  
   // Tipo de tarea a realizar
   taskType: z.enum([
     'code_explanation', 
@@ -20,13 +20,10 @@ export const analysisOutputSchema = z.object({
     'information_request',
     'tool_execution'
   ]).describe('Categoría de la tarea solicitada'),
-  
   // Herramientas que podrían ser necesarias
   requiredTools: z.array(z.string()).describe('Nombres de herramientas que podrían ser útiles'),
-  
   // Contexto adicional necesario
   requiredContext: z.array(z.string()).describe('Información adicional necesaria para resolver la tarea'),
-  
   // Plan de acción inicial
   initialPlan: z.array(z.string()).describe('Pasos iniciales para abordar la tarea')
 });
@@ -35,74 +32,34 @@ export const analysisOutputSchema = z.object({
 export type AnalysisOutput = z.infer<typeof analysisOutputSchema>;
 
 /**
- * Genera el prompt para la fase de análisis inicial
+ * Prompt LangChain para la fase de análisis inicial
+ * Usa variables: userQuery, availableTools, codeContext, memoryContext
  */
-export function generateAnalysisPrompt(
-  userQuery: string,
-  availableTools: string[],
-  codeContext?: string,
-  memoryContext?: string
-): string {
-  const systemInstruction = 
-    'Eres un asistente de programación experto que analiza consultas de usuarios para determinar el mejor enfoque.';
-  
-  let context = '';
-  
-  if (memoryContext) {
-    context += `MEMORIA RELEVANTE:\n${memoryContext}\n\n`;
-  }
-  
-  if (codeContext) {
-    context += `CONTEXTO DE CÓDIGO:\n${codeContext}\n\n`;
-  }
-  
-  context += `HERRAMIENTAS DISPONIBLES:\n${availableTools.join(', ')}\n`;
-  
-  const task = 
-    `Analiza la siguiente consulta del usuario y determina el mejor enfoque para resolverla:\n"${userQuery}"`;
-  
-  const format = 
-    `Responde con un objeto JSON que contenga los siguientes campos:
-    {
-      "understanding": "Comprensión clara de lo que pide el usuario",
-      "taskType": "Una de: code_explanation, code_generation, code_modification, debugging, information_request, tool_execution",
-      "requiredTools": ["herramienta1", "herramienta2"],
-      "requiredContext": ["información adicional necesaria"],
-      "initialPlan": ["paso1", "paso2", "paso3"]
-    }`;
-  
-  const examples = 
-    `Ejemplo 1:
-    Usuario: "¿Puedes explicarme cómo funciona este código?"
-    Respuesta:
-    \`\`\`json
-    {
-      "understanding": "El usuario quiere entender el funcionamiento de un fragmento de código",
-      "taskType": "code_explanation",
-      "requiredTools": ["getFileContents", "searchInWorkspace"],
-      "requiredContext": ["código completo", "contexto de uso"],
-      "initialPlan": ["examinar el código", "identificar patrones y estructuras", "explicar la funcionalidad"]
-    }
-    \`\`\`
-    
-    Ejemplo 2:
-    Usuario: "Crea un componente React para mostrar una lista de tareas"
-    Respuesta:
-    \`\`\`json
-    {
-      "understanding": "El usuario quiere generar un componente React para visualizar tareas",
-      "taskType": "code_generation",
-      "requiredTools": ["writeToFile", "createFileOrDirectory"],
-      "requiredContext": ["estructura del proyecto", "convenciones de estilo"],
-      "initialPlan": ["crear archivo de componente", "implementar estructura básica", "añadir estilos"]
-    }
-    \`\`\``;
-  
-  return createStructuredPrompt(
-    systemInstruction,
-    context,
-    task,
-    format,
-    examples
-  );
-}
+// Versión simplificada para depuración
+export const analysisPromptLC = ChatPromptTemplate.fromMessages([
+  ["system", `Eres un asistente de programación. Debes analizar la consulta del usuario y responder SOLO con un JSON válido que cumpla exactamente con el esquema proporcionado. 
+
+INSTRUCCIONES IMPORTANTES:
+1. No incluyas texto adicional, explicaciones ni bloques de código markdown.
+2. Devuelve ÚNICAMENTE el objeto JSON sin ningún texto alrededor.
+3. Para el campo "taskType" DEBES usar uno de estos valores EXACTOS (no inventes ni traduzcas):
+   - "code_explanation" (para explicar código)
+   - "code_generation" (para generar código nuevo)
+   - "code_modification" (para modificar código existente)
+   - "debugging" (para depurar problemas)
+   - "information_request" (para preguntas generales o de información)
+   - "tool_execution" (para ejecutar herramientas específicas)
+
+Si el usuario solo saluda o inicia una conversación, usa "information_request" como taskType.`],
+  ["user", "Analiza la consulta del usuario."]
+]);
+
+// OutputParser basado en Zod y LangChain
+export const analysisOutputParser = new JsonMarkdownStructuredOutputParser(analysisOutputSchema);
+
+/**
+ * Ejemplo de uso:
+ * const result = await analysisPromptLC.pipe(llm).pipe(analysisOutputParser).invoke({
+ *   userQuery, availableTools, codeContext, memoryContext
+ * });
+ */

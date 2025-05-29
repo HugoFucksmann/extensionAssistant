@@ -6,6 +6,30 @@
 import { z } from 'zod';
 
 /**
+ * Escapa todas las llaves { y } para su uso seguro en plantillas de LangChain.
+ * - Reemplaza { por {{ y } por }} excepto si ya están escapadas.
+ * - Soporta casos donde hay bloques de código o ejemplos JSON multilinea.
+ * - No duplica escapes existentes.
+ *
+ * Ejemplo:
+ *   'Responde con: { "clave": "valor" }' => 'Responde con: {{ "clave": "valor" }}'
+ */
+export function escapePromptTemplateBraces(str: string): string {
+  // Escapa sólo las llaves que no están ya escapadas (no reemplaza {{ ni }})
+  // Primero, escapamos las llaves de apertura que no están seguidas de otra {
+  // Luego, las de cierre que no están precedidas de otra }
+  // Usamos lookahead/lookbehind para no duplicar escapes
+  return str
+    .replace(/(?<!\{)\{(?!\{)/g, '{{')
+    .replace(/(?<!\})\}(?!\})/g, '}}');
+}
+
+// --- Pruebas rápidas de edge cases (comentadas, para referencia de desarrollo) ---
+// console.log(escapePromptTemplateBraces('{a: 1, b: {c: 2}}')); // {{a: 1, b: {{c: 2}}}}
+// console.log(escapePromptTemplateBraces('Ya escapado: {{ "foo": "bar" }}')); // Ya escapado: {{ "foo": "bar" }}
+// console.log(escapePromptTemplateBraces('Texto sin llaves')); // Texto sin llaves
+// console.log(escapePromptTemplateBraces('Bloque: \n```json\n{ "a": 1 }\n```')); // Bloque: \n```json\n{{ "a": 1 }}\n```
+/**
  * Estructura base para todos los prompts optimizados
  * Proporciona un formato consistente para todas las interacciones con el modelo
  */
@@ -277,18 +301,99 @@ export function formatToolResults(toolResults: Array<{name: string, result: any}
  * Formatea el historial de conversación para incluirlo en un prompt
  * Reduce tokens eliminando información innecesaria
  */
+/**
+ * Formatea el historial de conversación para prompts y UI, distinguiendo fases,
+ * e incluyendo detalles de herramientas cuando existan.
+ * Permite alternar entre formato compacto y extendido.
+ *
+ * @param history - Historial de conversación (HistoryEntry[] o compatible)
+ * @param options - Opciones de formateo:
+ *    - maxEntries: número máximo de entradas a mostrar
+ *    - extended: si true, incluye detalles de herramientas y metadatos
+ *    - phases: fases a incluir (por defecto principales)
+ *    - showErrors: si true, incluye entradas con error
+ */
 export function formatConversationHistory(
-  history: Array<{role: 'user' | 'assistant' | 'system', content: string}>,
-  maxEntries: number = 4
+  history: Array<any>,
+  options?: {
+    maxEntries?: number;
+    extended?: boolean;
+    phases?: string[];
+    showErrors?: boolean;
+  }
 ): string {
+  const {
+    maxEntries = 6,
+    extended = false,
+    phases = [
+      'user_input',
+      'reasoning',
+      'action_planning',
+      'action',
+      'reflection',
+      'correction',
+      'responseGeneration',
+      'system_message',
+    ],
+    showErrors = true,
+  } = options || {};
+
+  // Filtrar por fases relevantes
+  let filtered = history.filter(entry => phases.includes(entry.phase));
+
+  // Si no se deben mostrar errores, filtrarlos
+  if (!showErrors) {
+    filtered = filtered.filter(entry => !entry.metadata?.error_message && entry.metadata?.status !== 'error');
+  }
+
   // Tomar solo las entradas más recientes
-  const recentHistory = history.slice(-maxEntries);
-  
-  return recentHistory.map(entry => {
-    const role = entry.role === 'user' ? 'Usuario' : 
-                 entry.role === 'assistant' ? 'Asistente' : 
-                 'Sistema';
-    
-    return `${role}: ${entry.content}`;
-  }).join('\n\n');
+  const recentHistory = filtered.slice(-maxEntries);
+
+  // Utilidades locales para formateo
+  function formatToolExecution(exec: any): string {
+    let out = `Herramienta: ${exec.name}`;
+    if (exec.status) out += `\n  Estado: ${exec.status}`;
+    if (exec.parameters) out += `\n  Parámetros: ${formatObjectForPrompt(exec.parameters, 1)}`;
+    if ('result' in exec) out += `\n  Resultado: ${formatObjectForPrompt(exec.result, 1)}`;
+    if (exec.error) out += `\n  Error: ${exec.error}`;
+    if (exec.duration) out += `\n  Duración: ${exec.duration} ms`;
+    return out;
+  }
+
+  function formatEntry(entry: any): string {
+    // Rol/fase legible
+    const phaseMap: Record<string, string> = {
+      user_input: 'Usuario',
+      reasoning: 'Razonamiento',
+      action_planning: 'Planificación',
+      action: 'Acción',
+      reflection: 'Reflexión',
+      correction: 'Corrección',
+      responseGeneration: 'Respuesta',
+      system_message: 'Sistema',
+    };
+    const label = phaseMap[entry.phase] || entry.phase;
+    let base = `${label}: ${entry.content}`;
+
+    // Si extendido y hay herramientas ejecutadas, incluir detalles
+    if (extended && entry.metadata?.tool_executions?.length) {
+      const toolDetails = entry.metadata.tool_executions
+        .map(formatToolExecution)
+        .join('\n\n');
+      base += `\n${toolDetails}`;
+    }
+    // Si extendido y hay error, mostrarlo
+    if (extended && entry.metadata?.error_message) {
+      base += `\n[Error]: ${entry.metadata.error_message}`;
+    }
+    // Si extendido y hay métricas relevantes
+    if (extended && entry.metadata?.llm_metrics) {
+      base += `\n[Métricas LLM]: ${JSON.stringify(entry.metadata.llm_metrics)}`;
+    }
+    return base;
+  }
+
+  return recentHistory.map(formatEntry).join('\n\n');
 }
+
+

@@ -61,9 +61,9 @@ export function activate(context: vscode.ExtensionContext) {
         // Notificar al webview sobre el cambio de modo
         webviewProvider?.notifyTestModeChange(newTestMode);
         
-        vscode.window.showInformationMessage(
+        /* vscode.window.showInformationMessage(
           `Modo de prueba ${newTestMode ? 'habilitado' : 'deshabilitado'}. ${newTestMode ? 'Todos los permisos serán aprobados automáticamente.' : 'Los permisos serán verificados normalmente.'}`
-        );
+        ); */
       })
     );
 

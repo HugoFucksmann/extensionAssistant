@@ -132,11 +132,9 @@ export class ModelManager {
     this.configChangeDisposable.dispose();
   }
 
-  private getActiveModel(): BaseChatModel {
-   
+  public getActiveModel(): BaseChatModel {
     const model = this.models.get(this.activeProvider);
     if (!model) {
-      
       throw new Error(`Modelo para el proveedor activo '${this.activeProvider}' no está disponible o no hay modelos configurados.`);
     }
     return model;

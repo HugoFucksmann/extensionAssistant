@@ -4,7 +4,8 @@
  */
 
 import { z } from 'zod';
-import { createStructuredPrompt } from '../optimizedPromptUtils';
+import { ChatPromptTemplate } from "@langchain/core/prompts";
+import { JsonMarkdownStructuredOutputParser } from "langchain/output_parsers";
 
 // Esquema para validar la salida del modelo
 export const responseOutputSchema = z.object({
@@ -25,91 +26,21 @@ export const responseOutputSchema = z.object({
 export type ResponseOutput = z.infer<typeof responseOutputSchema>;
 
 /**
- * Genera el prompt para la fase de respuesta
+ * Prompt LangChain para la fase de respuesta final
+ * Usa variables: userQuery, toolResults, analysisResult, memoryContext
  */
-export function generateResponsePrompt(
-  userQuery: string,
-  toolResults: Array<{tool: string, result: any}>,
-  analysisResult: any,
-  memoryContext?: string
-): string {
-  const systemInstruction = 
-    'Eres un asistente de programación experto que genera respuestas claras, concisas y útiles basadas en la información recopilada.';
-  
-  let context = '';
-  
-  if (memoryContext) {
-    context += `MEMORIA RELEVANTE:\n${memoryContext}\n\n`;
-  }
-  
-  context += `ANÁLISIS INICIAL:\n${JSON.stringify(analysisResult, null, 2)}\n\n`;
-  
-  if (toolResults.length > 0) {
-    context += 'RESULTADOS DE HERRAMIENTAS:\n';
-    toolResults.forEach(({ tool, result }) => {
-      context += `## ${tool}\n${JSON.stringify(result, null, 2)}\n\n`;
-    });
-  }
-  
-  const task = 
-    `Basándote en la consulta del usuario: "${userQuery}" y la información recopilada, genera una respuesta clara y concisa. También identifica información importante que debería recordarse para futuras interacciones.`;
-  
-  const format = 
-    `Responde con un objeto JSON que contenga los siguientes campos:
-    {
-      "response": "Tu respuesta completa para el usuario",
-      "memoryItems": [
-        {
-          "type": "context|codebase|user|tools",
-          "content": "Información a recordar",
-          "relevance": 0.8 // Valor entre 0 y 1
-        }
-      ]
-    }`;
-  
-  const examples = 
-    `Ejemplo 1:
-    Usuario: "¿Cuántas líneas de código tiene el archivo main.js?"
-    Respuesta:
-    \`\`\`json
-    {
-      "response": "El archivo main.js tiene 42 líneas de código.",
-      "memoryItems": [
-        {
-          "type": "codebase",
-          "content": "El archivo main.js tiene 42 líneas de código",
-          "relevance": 0.7
-        }
-      ]
-    }
-    \`\`\`
-    
-    Ejemplo 2:
-    Usuario: "Explícame cómo funciona la función calculateTotal"
-    Respuesta:
-    \`\`\`json
-    {
-      "response": "La función calculateTotal recibe un array de productos y devuelve la suma de sus precios. Primero filtra los productos activos, luego aplica descuentos si corresponde, y finalmente suma todos los precios.",
-      "memoryItems": [
-        {
-          "type": "codebase",
-          "content": "La función calculateTotal suma precios de productos, filtra por activos y aplica descuentos",
-          "relevance": 0.9
-        },
-        {
-          "type": "user",
-          "content": "El usuario está interesado en entender la lógica de cálculo de precios",
-          "relevance": 0.8
-        }
-      ]
-    }
-    \`\`\``;
-  
-  return createStructuredPrompt(
-    systemInstruction,
-    context,
-    task,
-    format,
-    examples
-  );
-}
+// Versión simplificada para depuración
+export const responsePromptLC = ChatPromptTemplate.fromMessages([
+  ["system", "Eres un asistente de programación. Debes generar una respuesta basada en la información recopilada y responder SOLO con un JSON válido que cumpla exactamente con el esquema proporcionado. No incluyas texto adicional, explicaciones ni bloques de código markdown. Devuelve únicamente el objeto JSON."],
+  ["user", "Genera una respuesta basada en la información recopilada."]
+]);
+
+// OutputParser basado en Zod y LangChain
+export const responseOutputParser = new JsonMarkdownStructuredOutputParser(responseOutputSchema);
+
+/**
+ * Ejemplo de uso:
+ * const result = await responsePromptLC.pipe(llm).pipe(responseOutputParser).invoke({
+ *   userQuery, toolResults, analysisResult, memoryContext
+ * });
+ */

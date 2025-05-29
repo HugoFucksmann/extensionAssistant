@@ -9,7 +9,15 @@ import { ToolRegistry } from '../features/tools/ToolRegistry';
 import { InternalEventDispatcher } from './events/InternalEventDispatcher';
 import { EventType, AgentPhaseEventPayload, ResponseEventPayload, SystemEventPayload } from '../features/events/eventTypes';
 import { ToolResult } from '../features/tools/types';
-import { OptimizedPromptManager } from '../features/ai/OptimizedPromptManager';
+import { ModelManager } from '../features/ai/ModelManager';
+import { runOptimizedAnalysisChain } from '../features/ai/lcel/OptimizedAnalysisChain';
+import { runOptimizedReasoningChain } from '../features/ai/lcel/OptimizedReasoningChain';
+import { runOptimizedActionChain } from '../features/ai/lcel/OptimizedActionChain';
+import { runOptimizedResponseChain } from '../features/ai/lcel/OptimizedResponseChain';
+import { AnalysisOutput } from '../features/ai/prompts/optimized/analysisPrompt';
+import { ReasoningOutput } from '../features/ai/prompts/optimized/reasoningPrompt';
+import { ActionOutput } from '../features/ai/prompts/optimized/actionPrompt';
+import { ResponseOutput } from '../features/ai/prompts/optimized/responsePrompt';
 import { AgentMemory } from '../features/memory/AgentMemory';
 import { LongTermStorage } from '../features/memory/LongTermStorage';
 import { formatToolResults } from '../features/ai/prompts/optimizedPromptUtils';
@@ -20,7 +28,7 @@ export class OptimizedReActEngine {
   private MAX_ITERATIONS = 10;
 
   constructor(
-    private promptManager: OptimizedPromptManager,
+    private modelManager: ModelManager,
     private toolRegistry: ToolRegistry,
     private dispatcher: InternalEventDispatcher,
     private longTermStorage: LongTermStorage
@@ -149,13 +157,15 @@ export class OptimizedReActEngine {
     try {
       // --- Fase de análisis inicial ---
       agentPhaseDispatch('initialAnalysis', 'started');
-      
-      const analysisResult = await this.promptManager.generateAnalysis(
-        currentState.userMessage || '',
-        this.toolRegistry.getToolNames(),
-        JSON.stringify(currentState.context || {}),
-        memorySummary
-      );
+            // --- LCEL: Fase de análisis ---
+       const model = this.modelManager.getActiveModel();
+       const analysisResult = await runOptimizedAnalysisChain({
+         userQuery: currentState.userMessage || '',
+         availableTools: this.toolRegistry.getToolNames(),
+         codeContext: JSON.stringify(currentState.context || {}),
+         memoryContext: memorySummary,
+         model
+       });
       
       this.addHistoryEntry(currentState, 'reasoning', analysisResult); // Usar 'reasoning' en lugar de 'analysis'
       agentPhaseDispatch('initialAnalysis', 'completed', { analysis: analysisResult });
@@ -176,14 +186,15 @@ export class OptimizedReActEngine {
         
         // Fase de razonamiento
         agentPhaseDispatch('reasoning', 'started');
-        
-        const reasoningResult = await this.promptManager.generateReasoning(
-          currentState.userMessage || '',
-          analysisResult,
-          this.getToolsDescription(),
-          toolResults.map(tr => ({ name: tr.tool, result: tr.result })),
-          memory.getMemorySummary()
-        );
+                // --- LCEL: Fase de razonamiento ---
+         const reasoningResult: ReasoningOutput = await runOptimizedReasoningChain({
+           userQuery: currentState.userMessage || '',
+           analysisResult,
+           toolsDescription: this.getToolsDescription(),
+           previousToolResults: toolResults.map(tr => ({ name: tr.tool, result: tr.result })),
+           memoryContext: memory.getMemorySummary(),
+           model
+         });
         
         this.addHistoryEntry(currentState, 'reasoning', reasoningResult);
         agentPhaseDispatch('reasoning', 'completed', { reasoning: reasoningResult });
@@ -191,7 +202,7 @@ export class OptimizedReActEngine {
         // Decidir siguiente acción
         if (reasoningResult.action === 'respond') {
           // Generar respuesta final
-          currentState.finalOutput = reasoningResult.response;
+          currentState.finalOutput = reasoningResult.response || '';
           isCompleted = true;
           continue;
         }
@@ -240,21 +251,22 @@ export class OptimizedReActEngine {
             
             // Fase de acción (interpretar resultado y decidir siguiente paso)
             agentPhaseDispatch('action', 'started');
-            
-            const actionResult = await this.promptManager.generateAction(
-              currentState.userMessage || '',
-              reasoningResult.tool,
-              toolResult,
-              toolResults.slice(0, -1).map(tr => ({ tool: tr.tool, result: tr.result })),
-              memory.getMemorySummary()
-            );
+                        // --- LCEL: Fase de acción ---
+             const actionResult: ActionOutput = await runOptimizedActionChain({
+               userQuery: currentState.userMessage || '',
+               lastToolName: reasoningResult.tool!,
+               lastToolResult: toolResult,
+               previousActions: toolResults.slice(0, -1).map(tr => ({ tool: tr.tool, result: tr.result })),
+               memoryContext: memory.getMemorySummary(),
+               model
+             });
             
             this.addHistoryEntry(currentState, 'action', actionResult);
             agentPhaseDispatch('action', 'completed', { action: actionResult });
             
             // Decidir siguiente acción basada en la interpretación
             if (actionResult.nextAction === 'respond') {
-              currentState.finalOutput = actionResult.response;
+              currentState.finalOutput = actionResult.response || '';
               isCompleted = true;
             }
             // La opción 'reflect' se ha eliminado del esquema para simplificar el flujo
@@ -275,13 +287,14 @@ export class OptimizedReActEngine {
       // --- Fase de respuesta final ---
       if (!currentState.finalOutput) {
         agentPhaseDispatch('finalResponseGeneration', 'started');
-        
-        const responseResult = await this.promptManager.generateResponse(
-          currentState.userMessage || '',
-          toolResults,
-          analysisResult,
-          memory.getMemorySummary()
-        );
+                // --- LCEL: Fase de respuesta final ---
+         const responseResult = await runOptimizedResponseChain({
+           userQuery: currentState.userMessage || '',
+           toolResults,
+           analysisResult,
+           memoryContext: memory.getMemorySummary(),
+           model
+         }) as ResponseOutput;
         
         currentState.finalOutput = responseResult.response;
         this.addHistoryEntry(currentState, 'responseGeneration', responseResult); // Usar 'responseGeneration' en lugar de 'response_generation'

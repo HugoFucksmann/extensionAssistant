@@ -4,7 +4,8 @@
  */
 
 import { z } from 'zod';
-import { createStructuredPrompt } from '../optimizedPromptUtils';
+import { ChatPromptTemplate } from "@langchain/core/prompts";
+import { JsonMarkdownStructuredOutputParser } from "langchain/output_parsers";
 
 // Esquema para validar la salida del modelo
 export const actionOutputSchema = z.object({
@@ -28,79 +29,46 @@ export const actionOutputSchema = z.object({
 export type ActionOutput = z.infer<typeof actionOutputSchema>;
 
 /**
- * Genera el prompt para la fase de acción
+ * Prompt LangChain para la fase de acción
+ * Usa variables: userQuery, lastToolName, lastToolResult, previousActions, memoryContext
  */
-export function generateActionPrompt(
-  userQuery: string,
-  lastToolName: string,
-  lastToolResult: any,
-  previousActions: Array<{tool: string, result: any}> = [],
-  memoryContext?: string
-): string {
-  const systemInstruction = 
-    'Eres un asistente de programación experto que interpreta resultados de herramientas y decide los siguientes pasos.';
-  
-  let context = '';
-  
-  if (memoryContext) {
-    context += `MEMORIA RELEVANTE:\n${memoryContext}\n\n`;
-  }
-  
-  if (previousActions.length > 0) {
-    context += 'ACCIONES PREVIAS:\n';
-    previousActions.forEach(({ tool, result }) => {
-      context += `## ${tool}\n${JSON.stringify(result, null, 2)}\n\n`;
-    });
-  }
-  
-  context += `RESULTADO DE LA ÚLTIMA HERRAMIENTA (${lastToolName}):\n${JSON.stringify(lastToolResult, null, 2)}\n`;
-  
-  const task = 
-    `Basándote en la consulta del usuario: "${userQuery}" y el resultado de la herramienta ${lastToolName}, decide cuál debe ser el siguiente paso.`;
-  
-  const format = 
-    `Responde con un objeto JSON que contenga los siguientes campos:
-    {
-      "interpretation": "Tu interpretación del resultado de la herramienta",
-      "nextAction": "use_tool o respond",
-      "tool": "nombre_de_la_herramienta (solo si nextAction es use_tool)",
-      "parameters": { ... parámetros para la herramienta ... } (solo si nextAction es use_tool),
-      "response": "Respuesta final para el usuario (solo si nextAction es respond)"
-    }`;
-  
-  const examples = 
-    `Ejemplo 1:
-    Usuario: "¿Cuántas líneas de código tiene el archivo main.js?"
-    Resultado de getFileContents: { "success": true, "content": "línea1\\nlínea2\\nlínea3" }
-    Respuesta:
-    \`\`\`json
-    {
-      "interpretation": "He obtenido el contenido del archivo main.js y contiene 3 líneas de código.",
-      "nextAction": "respond",
-      "response": "El archivo main.js tiene 3 líneas de código."
-    }
-    \`\`\`
-    
-    Ejemplo 2:
-    Usuario: "¿Qué funciones hay en el proyecto?"
-    Resultado de searchInWorkspace: { "success": true, "matches": [{"path": "src/utils.js"}, {"path": "src/components/Button.js"}] }
-    Respuesta:
-    \`\`\`json
-    {
-      "interpretation": "He encontrado archivos que podrían contener funciones, pero necesito examinar su contenido.",
-      "nextAction": "use_tool",
-      "tool": "getFileContents",
-      "parameters": {
-        "path": "src/utils.js"
-      }
-    }
-    \`\`\``;
-  
-  return createStructuredPrompt(
-    systemInstruction,
-    context,
-    task,
-    format,
-    examples
-  );
-}
+// Desactivado temporalmente para depuración
+// export const actionPromptLC = ChatPromptTemplate.fromMessages([
+//   [
+//     "system",
+//     "Eres un asistente de programación experto que interpreta resultados de herramientas y decide los siguientes pasos."
+//   ],
+//   [
+//     "user",
+//     [
+//       "{{#if memoryContext}}MEMORIA RELEVANTE:\n{{memoryContext}}\n\n{{/if}}",
+//       "{{#if previousActions}}ACCIONES PREVIAS:\n{{previousActions}}\n\n{{/if}}",
+//       "RESULTADO DE LA ÚLTIMA HERRAMIENTA ({{lastToolName}}):\n{{lastToolResult}}\n",
+//       "Basándote en la consulta del usuario: \"{{userQuery}}\" y el resultado de la herramienta {{lastToolName}}, decide cuál debe ser el siguiente paso.",
+//       "Responde SOLO con un objeto JSON con la siguiente estructura:",
+//       "{",
+//       "  \"interpretation\": \"Tu interpretación del resultado de la herramienta\",",
+//       "  \"nextAction\": \"use_tool o respond\",",
+//       "  \"tool\": \"nombre_de_la_herramienta (solo si nextAction es use_tool)\",",
+//       "  \"parameters\": { ... parámetros para la herramienta ... } (solo si nextAction es use_tool),",
+//       "  \"response\": \"Respuesta final para el usuario (solo si nextAction es respond)\"",
+//       "}"
+//     ].join("\n")
+//   ]
+// ]);
+
+// Versión simplificada para depuración
+export const actionPromptLC = ChatPromptTemplate.fromMessages([
+  ["system", "Eres un asistente de programación. Debes interpretar el resultado y decidir el siguiente paso, respondiendo SOLO con un JSON válido que cumpla exactamente con el esquema proporcionado. No incluyas texto adicional, explicaciones ni bloques de código markdown. Devuelve únicamente el objeto JSON."],
+  ["user", "Interpreta el resultado y decide el siguiente paso."]
+]);
+
+// OutputParser basado en Zod y LangChain
+export const actionOutputParser = new JsonMarkdownStructuredOutputParser(actionOutputSchema);
+
+/**
+ * Ejemplo de uso:
+ * const result = await actionPromptLC.pipe(llm).pipe(actionOutputParser).invoke({
+ *   userQuery, lastToolName, lastToolResult, previousActions, memoryContext
+ * });
+ */
