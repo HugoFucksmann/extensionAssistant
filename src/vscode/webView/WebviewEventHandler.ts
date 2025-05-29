@@ -1,6 +1,16 @@
+// src/vscode/webView/WebviewEventHandler.ts
 import { InternalEventDispatcher } from '../../core/events/InternalEventDispatcher';
-import { EventType, WindsurfEvent, ToolExecutionEventPayload, SystemEventPayload, ErrorOccurredEventPayload, UserInteractionRequiredPayload } from '../../features/events/eventTypes';
+import {
+  EventType,
+  WindsurfEvent,
+  ToolExecutionEventPayload,
+  SystemEventPayload,
+  ErrorOccurredEventPayload,
+  UserInteractionRequiredPayload, // Se mantiene por si hay otros usos, pero no para permisos
+  ResponseEventPayload, // Asumiendo que ResponseEventPayload tiene responseContent
+} from '../../features/events/eventTypes';
 import { WebviewStateManager } from './WebviewStateManager';
+import { ChatMessage } from '../../shared/types'; // Asegúrate que la ruta sea correcta
 
 export class WebviewEventHandler {
   private dispatcherSubscriptions: { unsubscribe: () => void }[] = [];
@@ -19,14 +29,14 @@ export class WebviewEventHandler {
       EventType.TOOL_EXECUTION_STARTED,
       EventType.TOOL_EXECUTION_COMPLETED,
       EventType.TOOL_EXECUTION_ERROR,
-      EventType.SYSTEM_ERROR,
-      EventType.USER_INTERACTION_REQUIRED,
-      EventType.RESPONSE_GENERATED,
+      EventType.SYSTEM_ERROR, // Para errores generales del sistema
+      // EventType.USER_INTERACTION_REQUIRED, // Eliminado si askUser usa diálogos nativos
+      EventType.RESPONSE_GENERATED, // Para respuestas del asistente
     ];
 
     eventTypesToWatch.forEach(eventType => {
       this.dispatcherSubscriptions.push(
-        this.internalEventDispatcher.subscribe(eventType, (event: WindsurfEvent) => 
+        this.internalEventDispatcher.subscribe(eventType, (event: WindsurfEvent) =>
           this.handleInternalEvent(event)
         )
       );
@@ -38,151 +48,150 @@ export class WebviewEventHandler {
   private handleInternalEvent(event: WindsurfEvent): void {
     const eventChatId = event.payload.chatId;
     const currentChatId = this.stateManager.getCurrentChatId();
-    const currentOperationId = this.stateManager.getCurrentOperationId();
 
+    // Solo procesar eventos para el chat actual, excepto errores del sistema que son globales
     if (event.type !== EventType.SYSTEM_ERROR && eventChatId && eventChatId !== currentChatId) {
+      console.log(`[WebviewEventHandler] Ignoring event for different chat. Event ChatID: ${eventChatId}, Current ChatID: ${currentChatId}`);
       return;
     }
 
-    let uiMessagePayload: any = {
-      id: `event_${event.id || Date.now()}`,
-      timestamp: event.timestamp || Date.now(),
-      operationId: currentOperationId,
-    };
-    let uiMessageType: string | null = null;
+    let chatMessage: ChatMessage | null = null;
+    let messageType: string | null = null;
 
     switch (event.type) {
       case EventType.TOOL_EXECUTION_STARTED:
-        ({ uiMessageType, uiMessagePayload } = this.handleToolExecutionStarted(event.payload as ToolExecutionEventPayload, uiMessagePayload));
+        chatMessage = this.handleToolExecutionStarted(event.payload as ToolExecutionEventPayload, event.id);
+        messageType = 'agentActionUpdate';
         break;
 
       case EventType.TOOL_EXECUTION_COMPLETED:
-        ({ uiMessageType, uiMessagePayload } = this.handleToolExecutionCompleted(event.payload as ToolExecutionEventPayload, uiMessagePayload));
+        chatMessage = this.handleToolExecutionCompleted(event.payload as ToolExecutionEventPayload, event.id);
+        messageType = 'agentActionUpdate';
         break;
 
       case EventType.TOOL_EXECUTION_ERROR:
-        ({ uiMessageType, uiMessagePayload } = this.handleToolExecutionError(event.payload as ToolExecutionEventPayload, uiMessagePayload));
+        chatMessage = this.handleToolExecutionError(event.payload as ToolExecutionEventPayload, event.id);
+        messageType = 'agentActionUpdate';
         break;
 
       case EventType.SYSTEM_ERROR:
-        ({ uiMessageType, uiMessagePayload } = this.handleSystemError(event.payload as SystemEventPayload | ErrorOccurredEventPayload, uiMessagePayload));
+        chatMessage = this.handleSystemError(event.payload as SystemEventPayload | ErrorOccurredEventPayload, event.id);
+        messageType = 'systemError';
         break;
 
-      case EventType.USER_INTERACTION_REQUIRED:
-        ({ uiMessageType, uiMessagePayload } = this.handleUserInteractionRequired(event.payload as UserInteractionRequiredPayload, uiMessagePayload));
-        break;
+      // case EventType.USER_INTERACTION_REQUIRED:
+      //   // Si askUser usa diálogos nativos, no necesitamos enviar un mensaje de chat aquí.
+      //   // Si askUser AÚN necesita interactuar con la UI del chat, este caso se reactivaría
+      //   // para enviar un ChatMessage de sender: 'assistant' con la pregunta.
+      //   // Por ahora, lo comentamos asumiendo la simplificación.
+      //   // chatMessage = this.handleUserInteractionRequired(event.payload as UserInteractionRequiredPayload, event.id);
+      //   break;
 
       case EventType.RESPONSE_GENERATED:
-        ({ uiMessageType, uiMessagePayload } = this.handleResponseGenerated(event.payload as any, uiMessagePayload, currentChatId));
+        // Solo procesar si es una respuesta final para el chat actual
+        const responsePayload = event.payload as ResponseEventPayload; // Asumiendo que tiene responseContent, isFinal
+        if (responsePayload.isFinal && responsePayload.chatId === currentChatId) {
+          chatMessage = this.handleResponseGenerated(responsePayload, event.id);
+          messageType = 'assistantResponse';
+        }
         break;
 
       default:
+        console.warn('[WebviewEventHandler] Unhandled event type:', event.type);
         return;
     }
 
-    if (uiMessageType) {
-      this.postMessage(uiMessageType, uiMessagePayload);
+    if (chatMessage && messageType) {
+      this.postMessage(messageType, chatMessage);
     }
   }
 
-  private handleToolExecutionStarted(payload: ToolExecutionEventPayload, uiMessagePayload: any) {
+  private createBaseChatMessage(eventId: string, sender: ChatMessage['sender']): Partial<ChatMessage> {
     return {
-      uiMessageType: 'agentActionUpdate',
-      uiMessagePayload: {
-        ...uiMessagePayload,
-        content: payload.toolDescription || `Ejecutando ${payload.toolName || 'herramienta'}...`,
+      id: `msg_${eventId || Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      timestamp: Date.now(),
+      sender: sender,
+    };
+  }
+
+  private handleToolExecutionStarted(payload: ToolExecutionEventPayload, eventId: string): ChatMessage {
+    return {
+      ...this.createBaseChatMessage(eventId, 'system'),
+      content: payload.toolDescription || `Ejecutando ${payload.toolName || 'herramienta'}...`,
+      metadata: {
         status: 'tool_executing',
         toolName: payload.toolName,
-        toolParams: payload.toolParams,
-      }
-    };
+        toolInput: payload.toolParams, // O `payload.parameters` si es más apropiado
+      },
+    } as ChatMessage;
   }
 
-  private handleToolExecutionCompleted(payload: ToolExecutionEventPayload, uiMessagePayload: any) {
+  private handleToolExecutionCompleted(payload: ToolExecutionEventPayload, eventId: string): ChatMessage {
+    let content = payload.toolDescription
+      ? `${payload.toolDescription} finalizó.`
+      : `${payload.toolName || 'La herramienta'} finalizó.`;
+
+    // Opcionalmente, añadir un breve resumen del resultado si es simple
+    if (payload.result && typeof payload.result === 'string' && payload.result.length < 100) {
+      content += ` Resultado: ${payload.result}`;
+    } else if (payload.result && typeof payload.result === 'object' && payload.result.message && typeof payload.result.message === 'string') {
+      content += ` ${payload.result.message}`;
+    }
+
     return {
-      uiMessageType: 'agentActionUpdate',
-      uiMessagePayload: {
-        ...uiMessagePayload,
-        content: payload.toolDescription ? 
-          `${payload.toolDescription} finalizó.` : 
-          `${payload.toolName || 'La herramienta'} finalizó.`,
+      ...this.createBaseChatMessage(eventId, 'system'),
+      content: content,
+      metadata: {
         status: 'success',
         toolName: payload.toolName,
-        toolParams: payload.toolParams,
-        toolResult: payload.result,
-      }
-    };
+        toolInput: payload.toolParams,
+        toolOutput: payload.result, // Puede ser útil para la UI mostrar detalles
+      },
+    } as ChatMessage;
   }
 
-  private handleToolExecutionError(payload: ToolExecutionEventPayload, uiMessagePayload: any) {
+  private handleToolExecutionError(payload: ToolExecutionEventPayload, eventId: string): ChatMessage {
     return {
-      uiMessageType: 'agentActionUpdate',
-      uiMessagePayload: {
-        ...uiMessagePayload,
-        content: `Error en ${payload.toolDescription || payload.toolName || 'herramienta'}: ${payload.error || 'desconocido'}`,
+      ...this.createBaseChatMessage(eventId, 'system'),
+      content: `Error en ${payload.toolDescription || payload.toolName || 'herramienta'}: ${payload.error || 'Error desconocido'}`,
+      metadata: {
         status: 'error',
         toolName: payload.toolName,
-        toolParams: payload.toolParams,
-      }
-    };
+        toolInput: payload.toolParams,
+        error: payload.error,
+      },
+    } as ChatMessage;
   }
 
-  private handleSystemError(payload: SystemEventPayload | ErrorOccurredEventPayload, uiMessagePayload: any) {
+  private handleSystemError(payload: SystemEventPayload | ErrorOccurredEventPayload, eventId: string): ChatMessage {
+    const errorMessage = 'message' in payload ? payload.message : payload.errorMessage;
     return {
-      uiMessageType: 'systemError',
-      uiMessagePayload: {
-        ...uiMessagePayload,
-        message: 'message' in payload ? payload.message : payload.errorMessage || 'Error inesperado del sistema.',
-      }
-    };
+      ...this.createBaseChatMessage(eventId, 'system'),
+      content: `Error del sistema: ${errorMessage || 'Error inesperado.'}`,
+      metadata: {
+        status: 'error',
+        details: 'details' in payload ? payload.details : undefined,
+      },
+    } as ChatMessage;
   }
 
-  private handleUserInteractionRequired(payload: UserInteractionRequiredPayload, uiMessagePayload: any) {
-    if (payload.interactionType === 'confirmation' && payload.title === 'Permission Required') {
-      const toolNameMatch = payload.promptMessage.match(/Tool '([^']+)'/);
-      const permissionMatch = payload.promptMessage.match(/permission: '([^']+)'/);
-      
-      this.postMessage('permissionRequest', {
-        toolName: toolNameMatch ? toolNameMatch[1] : 'Unknown Tool',
-        permission: permissionMatch ? permissionMatch[1] : 'Unknown Permission',
-        description: payload.promptMessage,
-        operationId: payload.uiOperationId
-      });
-      
-      return { uiMessageType: null, uiMessagePayload };
-    }
-    
+  private handleResponseGenerated(payload: ResponseEventPayload, eventId: string): ChatMessage {
     return {
-      uiMessageType: 'userInputRequired',
-      uiMessagePayload: {
-        ...uiMessagePayload,
-        interactionType: payload.interactionType,
-        promptMessage: payload.promptMessage,
-        options: payload.options,
-        placeholder: payload.placeholder,
-        uiOperationId: payload.uiOperationId,
-        operationId: payload.uiOperationId,
-      }
-    };
+      ...this.createBaseChatMessage(eventId, 'assistant'),
+      content: payload.responseContent,
+      metadata: {
+        status: 'success', // O el estado que venga en el payload.metadata
+        isFinalToolResponse: payload.metadata?.isFinalToolResponse, // Si este metadato es relevante
+        ...(payload.metadata || {}), // Incluir otros metadatos del payload de respuesta
+      },
+    } as ChatMessage;
   }
 
-  private handleResponseGenerated(payload: any, uiMessagePayload: any, currentChatId: string | null) {
-    if (payload.isFinal && payload.chatId === currentChatId) {
-      return {
-        uiMessageType: 'assistantResponse',
-        uiMessagePayload: {
-          ...uiMessagePayload,
-          content: payload.responseContent,
-          operationId: payload.operationId || uiMessagePayload.operationId,
-        }
-      };
-    }
-    
-    return { uiMessageType: null, uiMessagePayload };
-  }
+
 
   public dispose(): void {
     this.dispatcherSubscriptions.forEach(s => s.unsubscribe());
     this.dispatcherSubscriptions = [];
+    console.log('[WebviewEventHandler] Disposed and subscriptions cleared.');
   }
 }

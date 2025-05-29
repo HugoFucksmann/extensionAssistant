@@ -2,28 +2,22 @@ import * as crypto from 'crypto';
 
 export class WebviewStateManager {
   private currentChatId: string | null = null;
-  private currentOperationId: string | null = null;
+  private currentModel: string | null = null;
 
   public getCurrentChatId(): string | null {
     return this.currentChatId;
   }
 
-  public getCurrentOperationId(): string | null {
-    return this.currentOperationId;
+  public getCurrentModel(): string | null {
+    return this.currentModel;
+  }
+
+  public setCurrentModel(model: string): void {
+    this.currentModel = model;
   }
 
   public startNewChat(): void {
     this.currentChatId = this.generateChatId();
-    this.currentOperationId = null;
-  }
-
-  public startNewOperation(): string {
-    this.currentOperationId = `op_${crypto.randomBytes(8).toString('hex')}`;
-    return this.currentOperationId;
-  }
-
-  public clearCurrentOperation(): void {
-    this.currentOperationId = null;
   }
 
   public initializeChat(): void {

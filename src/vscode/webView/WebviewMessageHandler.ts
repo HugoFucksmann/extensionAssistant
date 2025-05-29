@@ -19,8 +19,8 @@ export class WebviewMessageHandler {
       case 'userMessageSent':
         await this.handleUserMessage(message.payload);
         break;
-      case 'permissionResponse':
-        this.handlePermissionResponse(message.payload);
+      case 'switchModel':
+        await this.handleSwitchModel(message.payload);
         break;
       case 'newChatRequestedByUI':
         this.handleNewChatRequest();
@@ -56,10 +56,10 @@ export class WebviewMessageHandler {
       return;
     }
 
-    const operationId = this.stateManager.startNewOperation();
-    console.log(`[WebviewMessageHandler DEBUG] Starting handleUserMessage. ChatID: ${chatId}, OpID: ${operationId}`);
+   
+    
 
-    this.postMessage('processingStarted', { operationId });
+   
 
     try {
       const result = await this.appLogicService.processUserMessage(
@@ -68,40 +68,23 @@ export class WebviewMessageHandler {
         { files: payload.files || [] }
       );
 
-      console.log(`[WebviewMessageHandler DEBUG] processUserMessage result for OpID ${operationId}:`, 
-        JSON.stringify(result).substring(0, 200));
+    
 
       if (!result.success) {
         const errorMessage = result.error || 'Processing failed to produce a response.';
         this.postMessage('systemError', { 
           message: errorMessage,
-          operationId 
         });
-      } else {
-        console.log(`[WebviewMessageHandler DEBUG] processUserMessage successful. OpID: ${operationId}`);
-      }
+      } 
     } catch (error: any) {
       console.error('[WebviewMessageHandler] Critical error processing message:', error);
       this.postMessage('systemError', { 
         message: error.message || 'An unexpected critical error occurred',
-        operationId 
       });
-    } finally {
-      this.postMessage('processingFinished', { operationId });
-      this.stateManager.clearCurrentOperation();
     }
   }
 
-  private handlePermissionResponse(payload: any): void {
-    console.log(`[WebviewMessageHandler DEBUG] Permission response received:`, payload);
-    
-    this.internalEventDispatcher.dispatch(EventType.USER_INPUT_RECEIVED, {
-      uiOperationId: payload.operationId,
-      value: payload.allowed,
-      wasCancelled: !payload.allowed,
-      chatId: this.stateManager.getCurrentChatId() || undefined
-    });
-  }
+
 
   private handleNewChatRequest(): void {
     this.stateManager.startNewChat();
@@ -125,26 +108,37 @@ export class WebviewMessageHandler {
     }
 
     try {
-      const result = await this.appLogicService.invokeTool(
-        'listFiles',
-        { pattern: '**/*' },
-        { chatId }
-      );
-
-      if (result.success && result.data?.files) {
-        const filePaths = (result.data.files as Array<{ path: string; type: string }>)
-          .filter(f => f.type === 'file')
-          .map(f => f.path);
-
-        this.postMessage('projectFiles', { files: filePaths });
-      } else {
-        const errorMsg = result.error || 'Failed to list project files';
-        console.error('[WebviewMessageHandler] Error getting project files:', errorMsg);
-        this.postMessage('systemError', { message: errorMsg });
-      }
+      // Importación dinámica para evitar problemas de dependencias circulares
+      const { listFilesUtil } = await import('../../features/tools/definitions/filesystem/listFiles');
+      const files = await listFilesUtil(require('vscode'), '**/*');
+      const filePaths = files.filter(f => f.type === 'file').map(f => f.path);
+      this.postMessage('projectFiles', { files: filePaths });
     } catch (error: any) {
-      console.error('[WebviewMessageHandler] Error in getProjectFiles handler:', error);
-      this.postMessage('systemError', { message: error.message || 'Failed to list project files' });
+      const errorMsg = error.message || 'Failed to list project files';
+      console.error('[WebviewMessageHandler] Error getting project files:', errorMsg);
+      this.postMessage('systemError', { message: errorMsg });
+    }
+  }
+
+  private async handleSwitchModel(payload: { modelType: string }): Promise<void> {
+    try {
+      if (!payload?.modelType) {
+        this.postMessage('systemError', { message: 'No model type specified' });
+        return;
+      }
+      // Cambiar el modelo realmente usado por el backend
+      const { ComponentFactory } = await import('../../core/ComponentFactory');
+      const modelManager = ComponentFactory.getModelManager();
+      modelManager.setActiveProvider(payload.modelType as 'gemini' | 'ollama');
+      // Persistir en stateManager para la UI
+      if (typeof this.stateManager.setCurrentModel === 'function') {
+        this.stateManager.setCurrentModel(payload.modelType);
+      }
+      this.postMessage('modelSwitched', { modelType: payload.modelType });
+      console.log(`[WebviewMessageHandler] Model switched to: ${payload.modelType}`);
+    } catch (error: any) {
+      console.error('[WebviewMessageHandler] Error switching model:', error);
+      this.postMessage('systemError', { message: error.message || 'Failed to switch model' });
     }
   }
 }

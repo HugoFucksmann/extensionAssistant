@@ -26,8 +26,6 @@ interface AppState {
   currentModel: string;
   isDarkMode: boolean;
   theme: ThemeType;
-  activeFeedbackOperationId: string | null;
-  feedbackMessages: { [operationId: string]: ChatMessage[] };
   testModeEnabled: boolean;
 }
 
@@ -44,8 +42,8 @@ type AppAction =
   | { type: 'TOGGLE_DARK_MODE' }
   | { type: 'SET_THEME'; payload: ThemeType }
   | { type: 'SET_TEST_MODE'; payload: boolean }
-  | { type: 'SESSION_READY'; payload: { chatId: string; messages: ChatMessage[]; model?: string; history?: Chat[]; testMode?: boolean } }
-  | { type: 'AGENT_ACTION_UPDATE'; payload: ChatMessage };
+  | { type: 'SESSION_READY'; payload: { chatId: string; messages: ChatMessage[]; model?: string; history?: Chat[]; testMode?: boolean } };
+
 
 const body = document.body;
 const initialIsDarkMode = body.classList.contains('vscode-dark');
@@ -59,8 +57,6 @@ const initialState: AppState = {
   currentModel: 'gemini',
   isDarkMode: initialIsDarkMode,
   theme: getTheme(initialIsDarkMode),
-  activeFeedbackOperationId: null,
-  feedbackMessages: {},
   testModeEnabled: false,
 };
 
@@ -74,8 +70,6 @@ function appReducer(state: AppState, action: AppAction): AppState {
         currentModel: action.payload.model || state.currentModel,
         chatList: action.payload.history || state.chatList,
         isLoading: false,
-        activeFeedbackOperationId: null,
-        feedbackMessages: {},
         testModeEnabled: action.payload.testMode !== undefined ? action.payload.testMode : state.testModeEnabled,
       };
     case 'SET_MESSAGES':
@@ -93,11 +87,9 @@ function appReducer(state: AppState, action: AppAction): AppState {
         currentChatId: action.payload.chatId, 
         isLoading: false, 
         showHistory: false,
-        activeFeedbackOperationId: null,
-        feedbackMessages: {},
       };
     case 'CLEAR_MESSAGES':
-      return { ...state, messages: [], isLoading: false, activeFeedbackOperationId: null, feedbackMessages: {} };
+      return { ...state, messages: [], isLoading: false };
     case 'SET_CHAT_LIST':
       return { ...state, chatList: action.payload };
     case 'SET_CURRENT_MODEL':
@@ -110,35 +102,44 @@ function appReducer(state: AppState, action: AppAction): AppState {
         return { ...state, theme: action.payload };
     case 'SET_TEST_MODE':
         return { ...state, testModeEnabled: action.payload };
-        case 'AGENT_ACTION_UPDATE': {
-          const opId = action.payload.metadata?.operationId;
-          if (!opId) return state;
-        
-          // AÑADE EL MENSAJE DE ACCIÓN AL ARRAY PRINCIPAL DE MENSAJES
-          const updatedMessages = [...state.messages, action.payload];
-        
-          return {
-            ...state,
-            messages: updatedMessages, // <--- ¡AQUÍ!
-            activeFeedbackOperationId: opId, // Sigue siendo útil para saber cuál está "activo"
-            feedbackMessages: { // Esto puede seguir existiendo si FeedbackRenderer lo usa directamente en otro lugar
-              ...state.feedbackMessages,
-              [opId]: [...(state.feedbackMessages[opId] || []), action.payload]
-            },
-            isLoading: action.payload.metadata?.status === 'thinking' ||
-                         action.payload.metadata?.status === 'tool_executing',
-          };
-        }
-    
     case 'ADD_MESSAGE': {
+      const msg = action.payload;
+      // Si es un mensaje de tool con operationId, actualizar o agregar
+      if (msg.sender === 'system' && msg.metadata && msg.metadata.operationId) {
+        const idx = state.messages.findIndex(
+          m => m.sender === 'system' &&
+            m.metadata &&
+            typeof m.metadata.operationId !== 'undefined' &&
+            msg.metadata &&
+            typeof msg.metadata.operationId !== 'undefined' &&
+            m.metadata.operationId === msg.metadata.operationId
+        );
+        let newMessages;
+        if (idx !== -1) {
+          // Reemplazar el mensaje existente
+          newMessages = [
+            ...state.messages.slice(0, idx),
+            msg,
+            ...state.messages.slice(idx + 1)
+          ];
+        } else {
+          // Agregar como nuevo
+          newMessages = [...state.messages, msg];
+        }
+        return {
+          ...state,
+          messages: newMessages,
+          isLoading: msg.metadata.status === 'thinking' || msg.metadata.status === 'tool_executing',
+        };
+      }
+      // Para otros mensajes, agregar normalmente
       const newState = {
         ...state,
-        messages: [...state.messages, action.payload],
+        messages: [...state.messages, msg],
       };
-      
-      const isAssistantFinalResponse = action.payload.sender === 'assistant';
+      const isAssistantFinalResponse = msg.sender === 'assistant';
       if (isAssistantFinalResponse) {
-        newState.isLoading = false; 
+        newState.isLoading = false;
       }
       return newState;
     }
@@ -181,6 +182,9 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         case 'sessionReady':
           dispatch({ type: 'SESSION_READY', payload });
           break;
+        case 'modelSwitched':
+          dispatch({ type: 'SET_CURRENT_MODEL', payload: payload.modelType });
+          break;
         case 'assistantResponse':
           dispatch({
             type: 'ADD_MESSAGE', payload: {
@@ -198,17 +202,13 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
           break;
         case 'agentActionUpdate':
           dispatch({
-            type: 'AGENT_ACTION_UPDATE',
+            type: 'ADD_MESSAGE',
             payload: {
               id: payload.id || `agent_${Date.now()}`,
               content: payload.content || '',
               sender: 'system',
               timestamp: payload.timestamp || Date.now(),
-              metadata: {
-                status: payload.status,
-                operationId: payload.operationId,
-                toolName: payload.toolName,
-              },
+              metadata: payload.metadata || {},
             }
           });
           break;
