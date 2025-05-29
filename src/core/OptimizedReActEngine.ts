@@ -62,21 +62,27 @@ export class OptimizedReActEngine {
    */
   private zodSchemaToDescription(schema: z.ZodTypeAny): string {
     if (!schema || !schema._def) return "No se definieron parámetros.";
-
+  
     try {
-      const shape = (schema as any).shape;
-      if (!shape) return "Esquema sin forma definida.";
-
-      return Object.entries(shape)
-        .map(([key, val]: [string, any]) => {
-          const isOptional = val._def?.typeName === 'ZodOptional';
-          const innerType = isOptional ? val._def.innerType : val;
-          const typeDesc = innerType._def?.typeName?.replace('Zod', '').toLowerCase() || 'unknown';
-          const description = innerType.description ? ` - ${innerType.description}` : '';
-          
-          return `- ${key}${isOptional ? ' (opcional)' : ' (requerido)'}: ${typeDesc}${description}`;
-        })
-        .join('\n');
+      if (schema._def.typeName === 'ZodObject') {
+        const shape = schema._def.shape(); // Usar el método shape()
+        if (!shape) return "Esquema de objeto sin forma definida.";
+  
+        return Object.entries(shape)
+          .map(([key, val]: [string, any]) => {
+            const isOptional = val._def?.typeName === 'ZodOptional' || val.isOptional();
+            const innerType = isOptional ? (val._def.innerType || val._def.schema) : val; // Manejar optional() y .optional()
+            const typeDesc = innerType._def?.typeName?.replace('Zod', '').toLowerCase() || 'unknown';
+            const description = innerType.description ? ` - ${innerType.description}` : '';
+            
+            return `- ${key}${isOptional ? ' (opcional)' : ' (requerido)'}: ${typeDesc}${description}`;
+          })
+          .join('\n');
+      } else if (schema.description) {
+          return schema.description; // Para tipos simples con descripción
+      } else {
+          return `Parámetro de tipo: ${schema._def.typeName?.replace('Zod', '').toLowerCase() || 'desconocido'}`;
+      }
     } catch (error) {
       console.error('Error al convertir esquema Zod a descripción:', error);
       return "Error al procesar el esquema de parámetros.";

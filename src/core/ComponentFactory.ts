@@ -143,7 +143,6 @@ export class ComponentFactory {
   }
   
   // --- UPDATED getApplicationLogicService ---
-
   public static getApplicationLogicService(extensionContext: vscode.ExtensionContext): ApplicationLogicService {
     if (!this.applicationLogicServiceInstance) {
       const vscodeContext = this.getVSCodeContext(extensionContext);
@@ -155,9 +154,8 @@ export class ComponentFactory {
         console.log('[ComponentFactory] EventLogger instance created and subscribed.');
       }
 
-      const memoryManager = new MemoryManager(extensionContext);
-      // ModelManager & PromptManager are now obtained via their own getters if directly needed,
-      // but primarily accessed through LanguageModelService.
+      const longTermStorage = this.getLongTermStorage(extensionContext); // Obtener singleton
+      const memoryManager = new MemoryManager(longTermStorage); // Inyectar
       const toolRegistry = this.getToolRegistry(extensionContext);
       const conversationManager = new ConversationManager();
       
@@ -167,10 +165,9 @@ export class ComponentFactory {
       this.applicationLogicServiceInstance = new ApplicationLogicService(
         vscodeContext,
         memoryManager,
-        reActEngine, // <-- INJECT ReActEngine instead of WindsurfGraph/old ReActGraph
+        reActEngine,
         conversationManager,
         toolRegistry
-        // dispatcher is not directly injected into ApplicationLogicService
       );
       console.log('[ComponentFactory] ApplicationLogicService instance created.');
     }

@@ -21,10 +21,10 @@ export class MemoryManager {
   // Memoria a largo plazo (persistente entre sesiones)
   private longTermStorage: LongTermStorage;
   
-  constructor(context: vscode.ExtensionContext) {
+  constructor(longTermStorage: LongTermStorage) {
     this.shortTermMemory = new Map();
     this.mediumTermMemory = new Map();
-    this.longTermStorage = new LongTermStorage(context);
+    this.longTermStorage = longTermStorage;
     
     console.log('[MemoryManager] Initialized');
   }
