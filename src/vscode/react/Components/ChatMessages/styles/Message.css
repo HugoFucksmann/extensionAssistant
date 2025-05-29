@@ -1,0 +1,94 @@
+.message {
+  display: flex;
+  margin-bottom: var(--spacing-medium);
+}
+
+.message.user {
+  justify-content: flex-end;
+}
+
+.message.assistant,
+.message.system {
+  justify-content: flex-start;
+}
+
+.message-bubble {
+  max-width: 70%;
+  padding: var(--spacing-medium);
+  border-radius: var(--border-radius-large);
+  position: relative;
+  word-wrap: break-word;
+}
+
+.message.user .message-bubble {
+  background: var(--message-user-bg);
+  color: white;
+  border-bottom-right-radius: var(--border-radius-small);
+}
+
+.message.assistant .message-bubble {
+  background: var(--message-assistant-bg);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: var(--border-radius-small);
+}
+
+.message.system .message-bubble {
+  background: var(--glass-background);
+  border: 1px solid var(--border);
+  max-width: 90%;
+}
+
+.system-message {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-small);
+}
+
+.system-content {
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+.message-content {
+  line-height: 1.5;
+  font-size: 14px;
+}
+
+.message-timestamp {
+  font-size: 11px;
+  opacity: 0.5;
+  margin-top: var(--spacing-small);
+  text-align: right;
+}
+
+.message.assistant .message-timestamp,
+.message.system .message-timestamp {
+  text-align: left;
+}
+
+.message-attachments {
+  margin-top: var(--spacing-medium);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-small);
+}
+
+.attachment {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-small);
+  padding: var(--spacing-small);
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: var(--border-radius-small);
+  font-size: 12px;
+}
+
+.message.user .attachment {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.message.assistant .attachment,
+.message.system .attachment {
+  background: var(--chat-input-bg);
+  border: 1px solid var(--border);
+}
