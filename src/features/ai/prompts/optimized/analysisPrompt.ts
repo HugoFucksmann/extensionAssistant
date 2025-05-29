@@ -9,23 +9,14 @@ import { JsonMarkdownStructuredOutputParser } from "langchain/output_parsers";
 
 // Esquema para validar la salida del modelo
 export const analysisOutputSchema = z.object({
-  // Comprensión de la consulta del usuario
   understanding: z.string().describe('Comprensión clara de lo que pide el usuario'),
-  // Tipo de tarea a realizar
   taskType: z.enum([
-    'code_explanation', 
-    'code_generation', 
-    'code_modification',
-    'debugging',
-    'information_request',
-    'tool_execution'
+    'code_explanation', 'code_generation', 'code_modification',
+    'debugging', 'information_request', 'tool_execution'
   ]).describe('Categoría de la tarea solicitada'),
-  // Herramientas que podrían ser necesarias
-  requiredTools: z.array(z.string()).describe('Nombres de herramientas que podrían ser útiles'),
-  // Contexto adicional necesario
-  requiredContext: z.array(z.string()).describe('Información adicional necesaria para resolver la tarea'),
-  // Plan de acción inicial
-  initialPlan: z.array(z.string()).describe('Pasos iniciales para abordar la tarea')
+  requiredTools: z.array(z.string()).describe('Nombres de herramientas que podrían ser útiles de la lista de herramientas disponibles. Si no se necesita ninguna herramienta, devuelve un array vacío.'),
+  requiredContext: z.array(z.string()).describe('Información adicional que el usuario podría necesitar proporcionar o que el sistema podría necesitar obtener para resolver la tarea (ej: "nombre del archivo", "confirmación para borrar"). Si no se necesita contexto adicional, devuelve un array vacío.'),
+  initialPlan: z.array(z.string()).describe('Pasos iniciales concisos (1-3 pasos) para abordar la tarea. Sé breve.')
 });
 
 // Tipo para la salida del análisis
