@@ -1,12 +1,13 @@
 
-import { useEffect, useRef } from "react"
+import React, { useEffect, useRef } from "react"
 import MessageItem from "./MessageItem"
 import "../styles/ChatMessages.css"
 import { useApp } from "@vscode/react/context/AppContext"
+import LoadingIndicator from "./LoadingIndicator"
 
 const ChatMessages = () => {
-  const { messages = [] } = useApp()
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const { messages = [], isLoading } = useApp()
+  const messagesEndRef = useRef(null)
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -16,7 +17,10 @@ const ChatMessages = () => {
     scrollToBottom()
   }, [messages])
 
-  return (
+  console.log('isLoading ', isLoading);
+  
+
+  return (<>
     <div className="chat-messages">
       <div className="messages-container">
         {messages.length === 0 ? (
@@ -29,6 +33,8 @@ const ChatMessages = () => {
         <div ref={messagesEndRef} />
       </div>
     </div>
+    {!isLoading && <LoadingIndicator />}
+    </>
   )
 }
 

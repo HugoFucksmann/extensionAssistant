@@ -2,6 +2,8 @@ import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { StructuredOutputParser } from "@langchain/core/output_parsers";
 import { responseOutputSchema } from "../prompts/optimized/responsePrompt";
 import { BaseChatModel } from "@langchain/core/language_models/chat_models";
+import { extractCleanJson } from "../../../shared/utils/responseCleaner";
+import { AIMessageChunk } from "@langchain/core/messages";
 
 /**
  * Ejecuta la cadena LCEL para la fase de respuesta optimizada.
@@ -54,6 +56,19 @@ export async function runOptimizedResponseChain({
   const parser = StructuredOutputParser.fromZodSchema(responseOutputSchema);
 
   // Encadenar: prompt -> modelo -> parser
-  const chain = prompt.pipe(model).pipe(parser);
-  return await chain.invoke({});
+  const chain = prompt.pipe(model);
+  
+  // Obtener respuesta cruda y extraer contenido
+  const rawResponse = await chain.invoke({}) as AIMessageChunk;
+  const responseText = typeof rawResponse.content === 'string' ? 
+    rawResponse.content : 
+    JSON.stringify(rawResponse.content);
+  
+  const cleanJson = extractCleanJson(responseText);
+  
+  if (!cleanJson) {
+    throw new Error('No se pudo extraer JSON válido de la respuesta del modelo');
+  }
+  
+  return await parser.parse(cleanJson);
 }

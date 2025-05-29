@@ -1,7 +1,4 @@
-/**
- * Prompt optimizado para la fase de análisis inicial
- * Diseñado para ser conciso y estructurado
- */
+// src/features/ai/prompts/optimized/analysisPrompt.ts
 
 import { z } from 'zod';
 import { ChatPromptTemplate } from "@langchain/core/prompts";
@@ -22,10 +19,7 @@ export const analysisOutputSchema = z.object({
 // Tipo para la salida del análisis
 export type AnalysisOutput = z.infer<typeof analysisOutputSchema>;
 
-/**
- * Prompt LangChain para la fase de análisis inicial
- * Usa variables: userQuery, availableTools, codeContext, memoryContext
- */
+
 // Versión simplificada para depuración
 export const analysisPromptLC = ChatPromptTemplate.fromMessages([
   ["system", `Eres un asistente de programación. Debes analizar la consulta del usuario y responder SOLO con un JSON válido que cumpla exactamente con el esquema proporcionado. 
@@ -47,10 +41,3 @@ Si el usuario solo saluda o inicia una conversación, usa "information_request" 
 
 // OutputParser basado en Zod y LangChain
 export const analysisOutputParser = new JsonMarkdownStructuredOutputParser(analysisOutputSchema);
-
-/**
- * Ejemplo de uso:
- * const result = await analysisPromptLC.pipe(llm).pipe(analysisOutputParser).invoke({
- *   userQuery, availableTools, codeContext, memoryContext
- * });
- */

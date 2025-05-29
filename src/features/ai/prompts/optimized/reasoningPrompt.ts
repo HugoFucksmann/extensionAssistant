@@ -30,7 +30,7 @@ export type ReasoningOutput = z.infer<typeof reasoningOutputSchema>;
 
 /**
  * Prompt LangChain para la fase de razonamiento
- * Usa variables: userQuery, analysisResult, toolsDescription, previousToolResults, memoryContext
+ * Usa variables: 
  */
 // Versión simplificada para depuración
 export const reasoningPromptLC = ChatPromptTemplate.fromMessages([

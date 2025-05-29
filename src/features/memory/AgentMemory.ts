@@ -1,19 +1,15 @@
-/**
- * Sistema de memoria para el agente
- * Proporciona una capa de abstracción sobre el almacenamiento a largo plazo
- * y facilita la gestión del estado del agente durante una conversación
- */
+// src/features/memory/AgentMemory.ts
 
 import { LongTermStorage } from './LongTermStorage';
-import * as vscode from 'vscode';
+
 
 // Tipos de memoria que puede almacenar el agente
 export type MemoryType = 
-  | 'context'     // Contexto general de la conversación
-  | 'codebase'    // Información sobre la base de código
-  | 'user'        // Preferencias y patrones del usuario
-  | 'tools'       // Resultados de herramientas ejecutadas
-  | 'reasoning';  // Razonamiento del agente
+  | 'context' 
+  | 'codebase' 
+  | 'user'     
+  | 'tools'     
+  | 'reasoning'; 
 
 // Estructura de un elemento de memoria
 export interface MemoryItem {

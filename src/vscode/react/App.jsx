@@ -2,10 +2,10 @@ import React from 'react';
 import { getThemeCSSVariables } from './theme/theme';
 
 import ChatInput from './Components/InputChat/ChatInput';
-import ChatMessages from './Components/ChatMessages/ChatMessages';
 import ChatHistory from './Components/historical/ChatHistory';
 import EmptyChatView from './Components/EmptyChatView';
 import { useApp } from './context/AppContext';
+import ChatMessages from './Components/ChatMessages/new/ChatMessages';
 
 
 

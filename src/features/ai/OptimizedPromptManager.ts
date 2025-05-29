@@ -1,8 +1,4 @@
-/**
- * Gestor de prompts optimizados
- * Centraliza la gestión de prompts optimizados para reducir tokens y mejorar la estructura
- */
-
+// src/features/ai/OptimizedPromptManager.ts
 import { runOptimizedAnalysisChain } from './lcel/OptimizedAnalysisChain';
 import { runOptimizedReasoningChain } from './lcel/OptimizedReasoningChain';
 import { runOptimizedActionChain } from './lcel/OptimizedActionChain';

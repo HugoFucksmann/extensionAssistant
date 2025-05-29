@@ -1,7 +1,4 @@
-/**
- * Prompt optimizado para la fase de respuesta final
- * Diseñado para generar respuestas claras y concisas para el usuario
- */
+// src/features/ai/prompts/optimized/responsePrompt.ts
 
 import { z } from 'zod';
 import { ChatPromptTemplate } from "@langchain/core/prompts";
@@ -29,6 +26,7 @@ export type ResponseOutput = z.infer<typeof responseOutputSchema>;
  * Prompt LangChain para la fase de respuesta final
  * Usa variables: userQuery, toolResults, analysisResult, memoryContext
  */
+
 // Versión simplificada para depuración
 export const responsePromptLC = ChatPromptTemplate.fromMessages([
   ["system", "Eres un asistente de programación. Debes generar una respuesta basada en la información recopilada y responder SOLO con un JSON válido que cumpla exactamente con el esquema proporcionado. No incluyas texto adicional, explicaciones ni bloques de código markdown. Devuelve únicamente el objeto JSON."],
@@ -37,10 +35,3 @@ export const responsePromptLC = ChatPromptTemplate.fromMessages([
 
 // OutputParser basado en Zod y LangChain
 export const responseOutputParser = new JsonMarkdownStructuredOutputParser(responseOutputSchema);
-
-/**
- * Ejemplo de uso:
- * const result = await responsePromptLC.pipe(llm).pipe(responseOutputParser).invoke({
- *   userQuery, toolResults, analysisResult, memoryContext
- * });
- */
