@@ -55,7 +55,7 @@ export const getConfig = (env: Environment): {backend: BackendConfig; frontend: 
       maxIterations: 15,
       defaultModelProvider: env === 'production' ? 'gemini' : 'mock',
       defaultModelName: env === 'production' ? 'gemini-pro' : 'mock',
-      temperature: 0.7,
+      temperature: 0.2,
       maxTokens: 4096
     },
     memory: {

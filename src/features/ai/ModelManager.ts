@@ -2,7 +2,7 @@
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { ChatOllama } from '@langchain/ollama';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import { HumanMessage, SystemMessage, BaseMessage, AIMessage } from '@langchain/core/messages';
+import { extractStructuredResponse } from './util/responseCleaner';
 import * as vscode from 'vscode';
 
 export type ModelProvider = 'gemini' | 'ollama';
@@ -61,14 +61,14 @@ export class ModelManager {
       gemini: {
         provider: 'gemini',
         modelName: vsCodeConfig.get<string>('google.modelName') || 'gemini-2.0-flash-exp',
-        temperature: vsCodeConfig.get<number>('google.temperature') ?? 0.3,
+        temperature: vsCodeConfig.get<number>('google.temperature') ?? 0.2,
         maxTokens: vsCodeConfig.get<number>('google.maxTokens') || 4096,
         apiKey: vsCodeConfig.get<string>('google.apiKey') || "AIzaSyBXGZbSj099c4bUOpLxbXKJgysGKKF3sR0",
       },
       ollama: {
         provider: 'ollama',
         modelName: vsCodeConfig.get<string>('ollama.modelName') || 'qwen2.5-coder:7b',
-        temperature: vsCodeConfig.get<number>('ollama.temperature') ?? 0.3,
+        temperature: vsCodeConfig.get<number>('ollama.temperature') ?? 0.2,
         baseUrl: vsCodeConfig.get<string>('ollama.baseUrl') || 'http://localhost:11434',
         maxTokens: vsCodeConfig.get<number>('ollama.maxTokens') || 4096,
       }
@@ -127,6 +127,52 @@ export class ModelManager {
     }
   }
 
+  private wrapModelWithCleaning(model: BaseChatModel): BaseChatModel {
+    return new Proxy(model, {
+      get: (target, prop, receiver) => {
+        const original = Reflect.get(target, prop, receiver);
+
+        if (prop === '_generate' || prop === 'invoke' || prop === 'call') {
+          return async (...args: any[]) => {
+            try {
+              const result = await original.apply(target, args);
+              
+              // Caso 1: Respuesta estándar de LangChain
+              if (result?.generations?.[0]?.text) {
+                return {
+                  ...result,
+                  generations: [{
+                    ...result.generations[0],
+                    text: extractStructuredResponse(result.generations[0].text)
+                  }]
+                };
+              }
+              
+              // Caso 2: Respuesta directa (content)
+              if (result?.content) {
+                return {
+                  ...result,
+                  content: extractStructuredResponse(result.content)
+                };
+              }
+              
+              // Caso 3: String directo
+              if (typeof result === 'string') {
+                return extractStructuredResponse(result);
+              }
+
+              return result;
+            } catch (error) {
+              console.error('Error cleaning model response:', error);
+              throw new Error(`Failed to process model response: ${error}`);
+            }
+          };
+        }
+        return original;
+      }
+    });
+  }
+
 
   public dispose(): void {
     this.configChangeDisposable.dispose();
@@ -135,9 +181,9 @@ export class ModelManager {
   public getActiveModel(): BaseChatModel {
     const model = this.models.get(this.activeProvider);
     if (!model) {
-      throw new Error(`Modelo para el proveedor activo '${this.activeProvider}' no está disponible o no hay modelos configurados.`);
+      throw new Error(`Modelo para el proveedor activo '${this.activeProvider}' no está disponible.`);
     }
-    return model;
+    return this.wrapModelWithCleaning(model);
   }
 
   public setActiveProvider(provider: ModelProvider): void {
@@ -154,55 +200,9 @@ export class ModelManager {
   }
 
  
-  public getActiveProvider(): ModelProvider {
-    return this.activeProvider;
-  }
 
-  public getAvailableProviders(): ModelProvider[] {
-    return Array.from(this.models.keys());
-  }
 
-  public async generateText(promptText: string): Promise<string> {
-    try {
-      const model = this.getActiveModel();
-      const messages = [
-        new HumanMessage({
-          content: promptText
-        })
-      ];
-      const response = await model.invoke(messages);
-      return response.content as string;
-    } catch (error: any) {
-      console.error(`[ModelManager] Error al generar texto con ${this.activeProvider}:`, error);
-      throw error;
-    }
-  }
 
-  public async generateChatResponse(
-    systemPrompt: string,
-    userMessage: string,
-    chatHistory: Array<{ role: 'user' | 'assistant' | 'system', content: string }> = []
-  ): Promise<string> {
-    try {
-      const model = this.getActiveModel();
-      const messages: BaseMessage[] = [new SystemMessage(systemPrompt)];
 
-      chatHistory.forEach(msg => {
-        if (msg.role === 'user') {
-          messages.push(new HumanMessage(msg.content));
-        } else if (msg.role === 'assistant') {
-          messages.push(new AIMessage(msg.content));
-        } else {
-          messages.push(new SystemMessage(msg.content));
-        }
-      });
-      messages.push(new HumanMessage(userMessage));
 
-      const response = await model.invoke(messages);
-      return response.content as string;
-    } catch (error: any) {
-      console.error(`[ModelManager] Error al generar respuesta de chat con ${this.activeProvider}:`, error);
-      throw error;
-    }
-  }
 }

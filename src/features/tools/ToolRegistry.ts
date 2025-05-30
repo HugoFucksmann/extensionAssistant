@@ -74,9 +74,7 @@ export class ToolRegistry {
     } else if (toolName === 'applyEditorEdit' && params.filePath) {
         const fileName = typeof params.filePath === 'string' ? params.filePath.split(/[\\/]/).pop() : 'editor activo';
         return `Aplicando edición a: ${fileName}`;
-    } else if (toolName === 'applyEditorEdit' && !params.filePath) {
-        return `Aplicando edición al editor activo`;
-    }
+    } 
     // Descripción genérica basada en la descripción de la herramienta
     return toolDefinition.description || `Ejecutando ${toolName}`;
   }

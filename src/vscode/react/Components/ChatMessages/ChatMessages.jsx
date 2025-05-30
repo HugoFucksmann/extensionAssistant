@@ -1,5 +1,5 @@
 // src/vscode/react/Components/ChatMessages/ChatMessages.jsx
-import React, { useRef, useLayoutEffect, memo, useMemo } from "react";
+import React, { useRef, useLayoutEffect, memo, useMemo, useEffect } from "react";
 import { useApp } from "../../context/AppContext";
 import ConversationItem from "./components/ConversationItem";
 import { groupMessagesIntoConversations } from "./utils/messageGrouping";
@@ -17,6 +17,10 @@ const ChatMessages = () => {
   const conversations = useMemo(() => {
     return groupMessagesIntoConversations(messages, activeFeedbackOperationId);
   }, [messages, activeFeedbackOperationId]);
+
+  useEffect(() => {
+    console.log('Mensajes de chat recibidos:', messages);
+  }, [messages]);
 
   return (
     <div className="chat-messages-container">

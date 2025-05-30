@@ -30,20 +30,44 @@ export type ReasoningOutput = z.infer<typeof reasoningOutputSchema>;
 
 /**
  * Prompt LangChain para la fase de razonamiento
- * Usa variables: 
  */
-// Versión simplificada para depuración
 export const reasoningPromptLC = ChatPromptTemplate.fromMessages([
-  ["system", "Eres un asistente de programación. Debes decidir si usar una herramienta o responder directamente, y responder SOLO con un JSON válido que cumpla exactamente con el esquema proporcionado. No incluyas texto adicional, explicaciones ni bloques de código markdown. Devuelve únicamente el objeto JSON."],
-  ["user", "Decide si usar una herramienta o responder directamente."]
+  ["system", `Eres un asistente de IA experto en programación. Tu tarea es decidir el siguiente paso: usar una herramienta o responder directamente al usuario.
+Responde ÚNICAMENTE con un objeto JSON válido que se adhiera estrictamente al esquema definido.
+No incluyas NINGÚN texto explicativo, markdown, ni nada fuera del objeto JSON.
+
+ESQUEMA ESPERADO (campos principales):
+{{
+  "reasoning": "string",
+  "action": "string (Uno de: 'use_tool', 'respond')",
+  "tool": "string (Opcional, si action='use_tool')",
+  "parameters": "object (Opcional, si action='use_tool')",
+  "response": "string (Opcional, si action='respond')"
+}}
+
+CONSIGNA:
+1.  **Salida JSON Pura**: Devuelve solo el JSON.
+2.  **Acción**: Decide si 'use_tool' o 'respond'.
+3.  **Herramienta**: Si 'use_tool', especifica 'tool' y 'parameters' según 'DESCRIPCIÓN DE HERRAMIENTAS'. Asegúrate de que los parámetros coincidan con los que requiere la herramienta.
+4.  **Respuesta**: Si 'respond', proporciona el 'response'.`],
+  ["user", `CONTEXTO ACTUAL:
+Consulta del Usuario: "{userQuery}"
+
+Análisis Previo:
+{analysisResult}
+
+Descripción de Herramientas Disponibles (nombre, descripción, esquema de parámetros Zod):
+{toolsDescription}
+
+Resultados de Herramientas Anteriores (si los hay, como string JSON):
+{previousToolResults}
+
+Memoria Relevante (si aplica):
+{memoryContext}
+
+TAREA:
+Basado en el contexto, decide el siguiente paso y genera el JSON correspondiente.`]
 ]);
 
 // OutputParser basado en Zod y LangChain
 export const reasoningOutputParser = new JsonMarkdownStructuredOutputParser(reasoningOutputSchema);
-
-/**
- * Ejemplo de uso:
- * const result = await reasoningPromptLC.pipe(llm).pipe(reasoningOutputParser).invoke({
- *   userQuery, analysisResult, toolsDescription, previousToolResults, memoryContext
- * });
- */

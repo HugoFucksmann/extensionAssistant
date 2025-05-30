@@ -9,6 +9,10 @@ const ChatMessages = () => {
   const { messages = [], isLoading } = useApp()
   const messagesEndRef = useRef(null)
 
+    useEffect(() => {
+      console.log('Mensajes de chat recibidos:', messages);
+    }, [messages]);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }

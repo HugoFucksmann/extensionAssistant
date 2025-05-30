@@ -20,23 +20,44 @@ export const analysisOutputSchema = z.object({
 export type AnalysisOutput = z.infer<typeof analysisOutputSchema>;
 
 
-// Versión simplificada para depuración
+// Versión para usar con LangChain Expression Language
 export const analysisPromptLC = ChatPromptTemplate.fromMessages([
-  ["system", `Eres un asistente de programación. Debes analizar la consulta del usuario y responder SOLO con un JSON válido que cumpla exactamente con el esquema proporcionado. 
+  ["system", `Eres un asistente de IA experto en programación. Tu tarea es analizar la consulta del usuario y el contexto proporcionado.
+Responde ÚNICAMENTE con un objeto JSON válido que se adhiera estrictamente al esquema definido.
+No incluyas NINGÚN texto explicativo, markdown, ni nada fuera del objeto JSON.
 
-INSTRUCCIONES IMPORTANTES:
-1. No incluyas texto adicional, explicaciones ni bloques de código markdown.
-2. Devuelve ÚNICAMENTE el objeto JSON sin ningún texto alrededor.
-3. Para el campo "taskType" DEBES usar uno de estos valores EXACTOS (no inventes ni traduzcas):
-   - "code_explanation" (para explicar código)
-   - "code_generation" (para generar código nuevo)
-   - "code_modification" (para modificar código existente)
-   - "debugging" (para depurar problemas)
-   - "information_request" (para preguntas generales o de información)
-   - "tool_execution" (para ejecutar herramientas específicas)
 
-Si el usuario solo saluda o inicia una conversación, usa "information_request" como taskType.`],
-  ["user", "Analiza la consulta del usuario."]
+
+CONSIGNA:
+1.  **Salida JSON Pura**: Devuelve solo el JSON.
+2.  **taskType**: Usa uno de los valores exactos listados. Si es un saludo o consulta general, usa 'information_request'.
+3.  **requiredTools**: Lista solo herramientas de 'HERRAMIENTAS DISPONIBLES'. Si no se necesitan, usa un array vacío [].
+4.  **initialPlan**: Sé breve y conciso (1-3 pasos).`],
+  ["user", `INFORMACIÓN DISPONIBLE:
+HERRAMIENTAS DISPONIBLES:
+{availableTools}
+
+CONTEXTO DE CÓDIGO (si aplica, puede estar vacío):
+{codeContext}
+
+MEMORIA RELEVANTE (si aplica, puede estar vacío):
+{memoryContext}
+
+CONSULTA DEL USUARIO:
+"{userQuery}"
+
+Analiza la consulta y la información, luego genera el JSON correspondiente.
+
+ESQUEMA ESPERADO (campos principales):
+{{
+  "understanding": "string",
+  "taskType": "string (Uno de: 'code_explanation', 'code_generation', 'code_modification', 'debugging', 'information_request', 'tool_execution')",
+  "requiredTools": "string[]",
+  "requiredContext": "string[]",
+  "initialPlan": "string[]"
+}}
+
+`]
 ]);
 
 // OutputParser basado en Zod y LangChain

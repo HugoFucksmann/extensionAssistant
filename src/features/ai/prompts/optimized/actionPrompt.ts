@@ -24,12 +24,48 @@ export const actionOutputSchema = z.object({
 // Tipo para la salida de la acción
 export type ActionOutput = z.infer<typeof actionOutputSchema>;
 
-// Versión simplificada para depuración
+// Prompt LangChain para la fase de acción
 export const actionPromptLC = ChatPromptTemplate.fromMessages([
-  ["system", "Eres un asistente de programación. Debes interpretar el resultado y decidir el siguiente paso, respondiendo SOLO con un JSON válido que cumpla exactamente con el esquema proporcionado. No incluyas texto adicional, explicaciones ni bloques de código markdown. Devuelve únicamente el objeto JSON."],
-  ["user", "Interpreta el resultado y decide el siguiente paso."]
+  [
+    "system",
+    `
+Eres un asistente de IA experto en programación. Has ejecutado una herramienta y ahora debes interpretar su resultado y decidir el siguiente paso.
+
+CONSIGNA:
+1. **Interpretación**: Analiza el resultado de la herramienta.
+2. **Siguiente Acción**: Decide si debes usar otra herramienta ('use_tool') o si puedes responder directamente ('respond').
+3. **Herramienta o Respuesta**: Proporciona los campos necesarios según 'nextAction'. Si usas una herramienta, asegúrate de que los parámetros sean correctos.
+`
+  ],
+  [
+    "user",
+    `
+CONTEXTO ACTUAL:
+- Consulta Original del Usuario: {userQuery}
+- Acciones Previas (si las hay, como JSON): {previousActions}
+- Resultado de la Última Herramienta ({lastToolName}): {lastToolResult}
+- Memoria Relevante (si aplica): {memoryContext}
+
+TAREA:
+Interpreta el resultado de la herramienta ({lastToolName}) y decide el siguiente paso.
+
+Responde **ÚNICAMENTE** con un objeto JSON **válido**
+
+
+ESQUEMA ESPERADO (campos principales):
+{{
+  "interpretation": "string",
+  "nextAction": "string (Uno de: 'use_tool', 'respond')",
+  "tool": "string (Uno de: 'getFileContents', 'searchInWorkspace', 'writeToFile')",
+  "parameters": objet | null ,
+  "response": "string | null "
+}}
+
+`
+  ]
 ]);
+
+
 
 // OutputParser basado en Zod y LangChain
 export const actionOutputParser = new JsonMarkdownStructuredOutputParser(actionOutputSchema);
-
