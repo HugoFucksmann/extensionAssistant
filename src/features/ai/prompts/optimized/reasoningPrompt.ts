@@ -7,21 +7,21 @@ import { z } from 'zod';
 import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { JsonMarkdownStructuredOutputParser } from "langchain/output_parsers";
 
-// Esquema para validar la salida del modelo
+
 export const reasoningOutputSchema = z.object({
-  // Pensamiento paso a paso sobre cómo abordar el problema
+ 
   reasoning: z.string().describe('Razonamiento detallado sobre cómo resolver la tarea'),
   
-  // Acción a tomar (usar una herramienta o generar respuesta)
-  action: z.enum(['use_tool', 'respond']).describe('Acción a realizar'),
+ 
+  nextAction: z.enum(['use_tool', 'respond']).describe('Acción a realizar'),
   
-  // Herramienta a utilizar (si action es 'use_tool')
+ 
   tool: z.string().optional().describe('Nombre de la herramienta a utilizar'),
   
-  // Parámetros para la herramienta (si action es 'use_tool')
+  
   parameters: z.record(z.any()).optional().describe('Parámetros para la herramienta'),
   
-  // Respuesta final (si action es 'respond')
+ 
   response: z.string().optional().describe('Respuesta final para el usuario')
 });
 
@@ -35,15 +35,6 @@ export const reasoningPromptLC = ChatPromptTemplate.fromMessages([
   ["system", `Eres un asistente de IA experto en programación. Tu tarea es decidir el siguiente paso: usar una herramienta o responder directamente al usuario.
 Responde ÚNICAMENTE con un objeto JSON válido que se adhiera estrictamente al esquema definido.
 No incluyas NINGÚN texto explicativo, markdown, ni nada fuera del objeto JSON.
-
-ESQUEMA ESPERADO (campos principales):
-{{
-  "reasoning": "string",
-  "action": "string (Uno de: 'use_tool', 'respond')",
-  "tool": "string (Opcional, si action='use_tool')",
-  "parameters": "object (Opcional, si action='use_tool')",
-  "response": "string (Opcional, si action='respond')"
-}}
 
 CONSIGNA:
 1.  **Salida JSON Pura**: Devuelve solo el JSON.
@@ -66,7 +57,17 @@ Memoria Relevante (si aplica):
 {memoryContext}
 
 TAREA:
-Basado en el contexto, decide el siguiente paso y genera el JSON correspondiente.`]
+Basado en el contexto, decide el siguiente paso y genera el JSON correspondiente.
+
+ESQUEMA ESPERADO (campos principales):
+{{
+  "reasoning": "string",
+  "nextAction": "use_tool", // o "respond", ningún otro valor es válido
+  "tool": "string (Opcional, si nextAction='use_tool')",
+  "parameters": "object (Opcional, si nextAction='use_tool')",
+  "response": "string (Opcional, si nextAction='respond')"
+}}
+`]
 ]);
 
 // OutputParser basado en Zod y LangChain

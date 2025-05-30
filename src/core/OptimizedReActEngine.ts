@@ -157,16 +157,18 @@ export class OptimizedReActEngine {
       agentPhaseDispatch('initialAnalysis', 'started');
             // --- LCEL: Fase de análisis ---
        const model = this.modelManager.getActiveModel();
-       const analysisResult = await runOptimizedAnalysisChain({
-         userQuery: currentState.userMessage || '',
-         availableTools: this.toolRegistry.getToolNames(),
-         codeContext: JSON.stringify(currentState.context || {}),
-         memoryContext: memorySummary,
-         model
-       });
-      
-      this.addHistoryEntry(currentState, 'reasoning', analysisResult); 
-      agentPhaseDispatch('initialAnalysis', 'completed', { analysis: analysisResult });
+       console.log('[OptimizedReActEngine] --- Fase de análisis inicial ---');
+const analysisResult = await runOptimizedAnalysisChain({
+  userQuery: currentState.userMessage || '',
+  availableTools: this.toolRegistry.getToolNames(),
+  codeContext: JSON.stringify(currentState.context || {}),
+  memoryContext: memorySummary,
+  model
+});
+console.log('[OptimizedReActEngine] Resultado de análisis:', JSON.stringify(analysisResult, null, 2));
+
+this.addHistoryEntry(currentState, 'reasoning', analysisResult);
+agentPhaseDispatch('initialAnalysis', 'completed', { analysis: analysisResult });
       
       // Guardar comprensión en memoria
       memory.addToShortTermMemory({
@@ -180,106 +182,116 @@ export class OptimizedReActEngine {
       let isCompleted = false;
       
       while (!isCompleted && currentState.iterationCount < this.MAX_ITERATIONS) {
-        currentState.iterationCount++;
-        
-        // Fase de razonamiento
-        agentPhaseDispatch('reasoning', 'started');
-                // --- LCEL: Fase de razonamiento ---
-         const reasoningResult: ReasoningOutput = await runOptimizedReasoningChain({
-           userQuery: currentState.userMessage || '',
-           analysisResult,
-           toolsDescription: this.getToolsDescription(),
-           previousToolResults: toolResults.map(tr => ({ name: tr.tool, result: tr.result })),
-           memoryContext: memory.getMemorySummary(),
-           model
-         });
-        
-        this.addHistoryEntry(currentState, 'reasoning', reasoningResult);
-        agentPhaseDispatch('reasoning', 'completed', { reasoning: reasoningResult });
-        
-        // Decidir siguiente acción
-        if (reasoningResult.action === 'respond') {
-          // Generar respuesta final
-          currentState.finalOutput = reasoningResult.response || '';
-          isCompleted = true;
-          continue;
-        }
-        
-        // Ejecutar herramienta
-        if (reasoningResult.action === 'use_tool' && reasoningResult.tool) {
-          agentPhaseDispatch('toolExecution', 'started', { 
-            tool: reasoningResult.tool,
-            parameters: reasoningResult.parameters 
-          });
-          
-          try {
-            const toolResult = await this.toolRegistry.executeTool(
-              reasoningResult.tool,
-              reasoningResult.parameters || {},
-              { chatId: currentState.chatId }
-            );
-            
-            this.addHistoryEntry(currentState, 'action', { // Usar 'action' en lugar de 'tool_execution'
-              tool: reasoningResult.tool,
-              parameters: reasoningResult.parameters,
-              result: toolResult
-            });
-            
-            toolResults.push({
-              tool: reasoningResult.tool,
-              result: toolResult
-            });
-            
-            // Guardar resultado de herramienta en memoria
-            memory.addToShortTermMemory({
-              type: 'tools',
-              content: {
-                tool: reasoningResult.tool,
-                result: toolResult.success ? 
-                  (typeof toolResult.data === 'string' ? toolResult.data.substring(0, 200) : 'Datos obtenidos correctamente') : 
-                  `Error: ${toolResult.error}`
-              },
-              relevance: 0.9
-            });
-            
-            agentPhaseDispatch('toolExecution', 'completed', { 
-              tool: reasoningResult.tool,
-              result: toolResult 
-            });
-            
-            // Fase de acción (interpretar resultado y decidir siguiente paso)
-            agentPhaseDispatch('action', 'started');
-                        // --- LCEL: Fase de acción ---
-             const actionResult: ActionOutput = await runOptimizedActionChain({
-               userQuery: currentState.userMessage || '',
-               lastToolName: reasoningResult.tool!,
-               lastToolResult: toolResult,
-               previousActions: toolResults.slice(0, -1).map(tr => ({ tool: tr.tool, result: tr.result })),
-               memoryContext: memory.getMemorySummary(),
-               model
-             });
-            
-            this.addHistoryEntry(currentState, 'action', actionResult);
-            agentPhaseDispatch('action', 'completed', { action: actionResult });
-            
-            // Decidir siguiente acción basada en la interpretación
-            if (actionResult.nextAction === 'respond') {
-              currentState.finalOutput = actionResult.response || '';
-              isCompleted = true;
-            }
-            // La opción 'reflect' se ha eliminado del esquema para simplificar el flujo
-            // Si nextAction es 'use_tool', continuará con la siguiente iteración
-            
-          } catch (toolError: any) {
-            const errorMessage = `Error al ejecutar herramienta ${reasoningResult.tool}: ${toolError.message}`;
-            console.error('[OptimizedReActEngine]', errorMessage);
-            
-            this.addHistoryEntry(currentState, 'system_message', errorMessage); // Usar 'system_message' en lugar de 'error'
-            agentPhaseDispatch('toolExecution', 'completed', null, errorMessage);
-            
-            // Continuar con la siguiente iteración
-          }
-        }
+  currentState.iterationCount++;
+  console.log(`[OptimizedReActEngine] --- Iteración ${currentState.iterationCount} ---`);
+
+  // Fase de razonamiento
+  agentPhaseDispatch('reasoning', 'started');
+  // --- LCEL: Fase de razonamiento ---
+  const reasoningResult: ReasoningOutput = await runOptimizedReasoningChain({
+    userQuery: currentState.userMessage || '',
+    analysisResult,
+    toolsDescription: this.getToolsDescription(),
+    previousToolResults: toolResults.map(tr => ({ name: tr.tool, result: tr.result })),
+    memoryContext: memory.getMemorySummary(),
+    model
+  });
+  console.log('[OptimizedReActEngine] Resultado de razonamiento:', JSON.stringify(reasoningResult, null, 2));
+  console.log('[OptimizedReActEngine] Decisión nextAction:', reasoningResult.nextAction);
+
+  this.addHistoryEntry(currentState, 'reasoning', reasoningResult);
+  agentPhaseDispatch('reasoning', 'completed', { reasoning: reasoningResult });
+
+  // Decidir siguiente acción
+  if (reasoningResult.nextAction === 'respond') {
+    console.log('[OptimizedReActEngine] El modelo decidió responder al usuario.');
+    // Generar respuesta final
+    currentState.finalOutput = reasoningResult.response || '';
+    isCompleted = true;
+    continue;
+  }
+
+  // Ejecutar herramienta
+  if (reasoningResult.nextAction === 'use_tool' && reasoningResult.tool) {
+          agentPhaseDispatch('toolExecution', 'started', {
+  tool: reasoningResult.tool,
+  parameters: reasoningResult.parameters
+});
+console.log(`[OptimizedReActEngine] Ejecutando herramienta: ${reasoningResult.tool} con parámetros:`, reasoningResult.parameters);
+
+try {
+  const toolResult = await this.toolRegistry.executeTool(
+    reasoningResult.tool,
+    reasoningResult.parameters || {},
+    { chatId: currentState.chatId }
+  );
+  console.log(`[OptimizedReActEngine] Resultado de herramienta (${reasoningResult.tool}):`, JSON.stringify(toolResult, null, 2));
+
+  this.addHistoryEntry(currentState, 'action', {
+    tool: reasoningResult.tool,
+    parameters: reasoningResult.parameters,
+    result: toolResult
+  });
+
+  toolResults.push({
+    tool: reasoningResult.tool,
+    result: toolResult
+  });
+  console.log('[OptimizedReActEngine] toolResults acumulados:', JSON.stringify(toolResults, null, 2));
+
+  // Guardar resultado de herramienta en memoria
+  memory.addToShortTermMemory({
+    type: 'tools',
+    content: {
+      tool: reasoningResult.tool,
+      result: toolResult.success ?
+        (typeof toolResult.data === 'string' ? toolResult.data.substring(0, 200) : 'Datos obtenidos correctamente') :
+        `Error: ${toolResult.error}`
+    },
+    relevance: 0.9
+  });
+  console.log('[OptimizedReActEngine] Memoria relevante:', memory.getMemorySummary());
+
+  agentPhaseDispatch('toolExecution', 'completed', {
+    tool: reasoningResult.tool,
+    result: toolResult
+  });
+
+  // Fase de acción (interpretar resultado y decidir siguiente paso)
+  agentPhaseDispatch('action', 'started');
+  // --- LCEL: Fase de acción ---
+  const actionResult: ActionOutput = await runOptimizedActionChain({
+    userQuery: currentState.userMessage || '',
+    lastToolName: reasoningResult.tool!,
+    lastToolResult: toolResult,
+    previousActions: toolResults.slice(0, -1).map(tr => ({ tool: tr.tool, result: tr.result })),
+    memoryContext: memory.getMemorySummary(),
+    model
+  });
+  console.log('[OptimizedReActEngine] Resultado de acción:', JSON.stringify(actionResult, null, 2));
+
+  this.addHistoryEntry(currentState, 'action', actionResult);
+  agentPhaseDispatch('action', 'completed', { nextAction: actionResult });
+
+  // Decidir siguiente acción basada en la interpretación
+  if (actionResult.nextAction === 'respond') {
+    console.log('[OptimizedReActEngine] El modelo decidió responder tras ejecutar la herramienta.');
+    currentState.finalOutput = actionResult.response || '';
+    isCompleted = true;
+  }
+  // La opción 'reflect' se ha eliminado del esquema para simplificar el flujo
+  // Si nextAction es 'use_tool', continuará con la siguiente iteración
+
+} catch (toolError: any) {
+  const errorMessage = `Error al ejecutar herramienta ${reasoningResult.tool}: ${toolError.message}`;
+  console.error('[OptimizedReActEngine]', errorMessage);
+
+  this.addHistoryEntry(currentState, 'system_message', errorMessage); // Usar 'system_message' en lugar de 'error'
+  agentPhaseDispatch('toolExecution', 'completed', null, errorMessage);
+
+  // Continuar con la siguiente iteración
+}
+}
       }
       
       // --- Fase de respuesta final ---
@@ -298,7 +310,7 @@ export class OptimizedReActEngine {
         this.addHistoryEntry(currentState, 'responseGeneration', responseResult); // Usar 'responseGeneration' en lugar de 'response_generation'
         
         // Guardar elementos de memoria identificados
-        if (responseResult.memoryItems) {
+      /*   if (responseResult.memoryItems) {
           for (const item of responseResult.memoryItems) {
             const memoryId = await memory.persistToLongTermMemory({
               type: item.type,
@@ -309,9 +321,9 @@ export class OptimizedReActEngine {
                 chatId: currentState.chatId
               }
             });
-            console.log(`[OptimizedReActEngine] Elemento de memoria guardado: ${memoryId}`);
+           
           }
-        }
+        } */
         
         agentPhaseDispatch('finalResponseGeneration', 'completed', { response: responseResult });
       }

@@ -2,7 +2,7 @@
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { ChatOllama } from '@langchain/ollama';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import { extractStructuredResponse } from './util/responseCleaner';
+import { cleanResponseString } from './util/responseCleaner';
 import * as vscode from 'vscode';
 
 export type ModelProvider = 'gemini' | 'ollama';
@@ -104,7 +104,7 @@ export class ModelManager {
         baseUrl: detailedConfigs.ollama.baseUrl,
         
       }));
-      console.log('[ModelManager] Modelo Ollama inicializado.');
+     
     } catch (error: any) {
       console.warn('[ModelManager] No se pudo conectar con Ollama. ¿Está en ejecución?', error.message);
     }
@@ -134,8 +134,10 @@ export class ModelManager {
 
         if (prop === '_generate' || prop === 'invoke' || prop === 'call') {
           return async (...args: any[]) => {
+            console.log(`[ModelManager] [${String(prop)}] Input al modelo:`, JSON.stringify(args, null, 2));
             try {
               const result = await original.apply(target, args);
+              console.log(`[ModelManager] [${String(prop)}] Output crudo del modelo:`, JSON.stringify(result, null, 2));
               
               // Caso 1: Respuesta estándar de LangChain
               if (result?.generations?.[0]?.text) {
@@ -143,7 +145,7 @@ export class ModelManager {
                   ...result,
                   generations: [{
                     ...result.generations[0],
-                    text: extractStructuredResponse(result.generations[0].text)
+                    text: cleanResponseString(result.generations[0].text)
                   }]
                 };
               }
@@ -152,13 +154,13 @@ export class ModelManager {
               if (result?.content) {
                 return {
                   ...result,
-                  content: extractStructuredResponse(result.content)
+                  content: cleanResponseString(result.content)
                 };
               }
               
               // Caso 3: String directo
               if (typeof result === 'string') {
-                return extractStructuredResponse(result);
+                return cleanResponseString(result);
               }
 
               return result;

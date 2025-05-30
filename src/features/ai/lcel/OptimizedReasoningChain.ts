@@ -2,10 +2,10 @@ import { reasoningOutputSchema, reasoningPromptLC } from "../prompts/optimized/r
 import { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { JsonOutputParser } from "@langchain/core/output_parsers";
 
-// Función para normalizar la respuesta del modelo
+
 function normalizeReasoningResponse(response: any) {
   if (response && typeof response === 'object') {
-    // Mapear acciones en español a los valores esperados en inglés
+    
     const actionMap: Record<string, 'use_tool' | 'respond'> = {
       'usar_herramienta': 'use_tool',
       'responder': 'respond',
@@ -13,11 +13,11 @@ function normalizeReasoningResponse(response: any) {
       'respond': 'respond'
     };
 
-    const normalizedAction = actionMap[String(response.action || '').toLowerCase()] || 'respond';
+    const normalizedAction = actionMap[String(response.nextAction || '').toLowerCase()] || 'respond';
 
     return {
       reasoning: String(response.reasoning || ''),
-      action: normalizedAction,
+      nextAction: normalizedAction,
       tool: normalizedAction === 'use_tool' ? String(response.tool || '') : undefined,
       parameters: normalizedAction === 'use_tool' ? (response.parameters || {}) : undefined,
       response: normalizedAction === 'respond' ? String(response.response || '') : undefined
@@ -26,10 +26,7 @@ function normalizeReasoningResponse(response: any) {
   return null;
 }
 
-/**
- * Ejecuta la cadena LCEL para la fase de razonamiento optimizado.
- * Recibe los parámetros necesarios y retorna el objeto parseado según reasoningOutputSchema.
- */
+
 export async function runOptimizedReasoningChain({
   userQuery,
   analysisResult,
@@ -47,12 +44,12 @@ export async function runOptimizedReasoningChain({
 }) {
   const defaultResponse = {
     reasoning: 'Analizando la mejor forma de proceder...',
-    action: 'respond' as const,
+    nextAction: 'respond' as const,
     response: 'Voy a ayudarte con eso.'
   };
 
   try {
-    // Construir el contexto
+   
     let context = '';
     if (memoryContext) {
       context += `MEMORIA RELEVANTE:\n${memoryContext}\n\n`;
@@ -67,15 +64,15 @@ export async function runOptimizedReasoningChain({
       });
     }
 
-    // Usar el prompt optimizado
+ 
     const prompt = reasoningPromptLC;
     const parser = new JsonOutputParser();
     
-    // Encadenar: prompt -> modelo -> parser
+   
     const chain = prompt.pipe(model).pipe(parser);
 
-    // Ejecutar la cadena con las variables necesarias
-    const rawResult = await chain.invoke({
+    const { invokeModelWithLogging } = await import('./ModelInvokeLogger');
+    const rawResult = await invokeModelWithLogging(chain, {
       userQuery,
       analysisResult: JSON.stringify(analysisResult, null, 2),
       toolsDescription,
@@ -84,21 +81,28 @@ export async function runOptimizedReasoningChain({
         result: typeof r.result === 'string' ? r.result : JSON.stringify(r.result, null, 2)
       })) || [],
       memoryContext: memoryContext || ''
-    });
+    }, { caller: 'runOptimizedReasoningChain' });
 
-    console.log('Respuesta cruda del modelo (razonamiento):', JSON.stringify(rawResult, null, 2));
-
-    // Normalizar la respuesta
     const normalizedResult = normalizeReasoningResponse(rawResult);
     if (!normalizedResult) {
-      console.error('No se pudo normalizar la respuesta del modelo');
+      console.error('[OptimizedReasoningChain] No se pudo normalizar la respuesta del modelo. Respuesta cruda:',
+        rawResult === undefined ? 'undefined'
+        : rawResult === null ? 'null'
+        : typeof rawResult === 'string' ? rawResult
+        : JSON.stringify(rawResult, null, 2)
+      );
       return defaultResponse;
     }
 
-    // Validar contra el esquema
     const validation = reasoningOutputSchema.safeParse(normalizedResult);
     if (!validation.success) {
-      console.error('Error de validación del esquema:', validation.error);
+      console.error('[OptimizedReasoningChain] Error de validación del esquema:', validation.error);
+      console.error('[OptimizedReasoningChain] Respuesta cruda antes de validación:',
+        rawResult === undefined ? 'undefined'
+        : rawResult === null ? 'null'
+        : typeof rawResult === 'string' ? rawResult
+        : JSON.stringify(rawResult, null, 2)
+      );
       return defaultResponse;
     }
 

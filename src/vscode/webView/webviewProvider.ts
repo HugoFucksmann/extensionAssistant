@@ -66,7 +66,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
   }
 
   public requestShowHistory(): void {
-    console.log(`[WebviewProvider DEBUG] requestShowHistory called.`);
+   
     this.postMessage('showHistory', {});
   }
 
@@ -74,7 +74,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     const oldChatId = this.stateManager.getCurrentChatId();
     this.stateManager.startNewChat();
     
-    console.log(`[WebviewProvider DEBUG] startNewChat called. Old Chat ID: ${oldChatId}, New Chat ID: ${this.stateManager.getCurrentChatId()}`);
+    
     this.postMessage('newChatStarted', { chatId: this.stateManager.getCurrentChatId() });
   }
 
@@ -93,7 +93,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
   }
 
   public dispose(): void {
-    console.log(`[WebviewProvider DEBUG] Disposing WebviewProvider.`);
+    
     this.disposables.forEach(d => d.dispose());
     this.eventHandler.dispose();
   }

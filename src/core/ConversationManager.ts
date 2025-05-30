@@ -10,7 +10,7 @@ export class ConversationManager implements IConversationManager {
   private activeConversations: Map<string, WindsurfState> = new Map();
 
   constructor() {
-    console.log('[ConversationManager] Initialized');
+   
   }
 
   public getOrCreateConversationState(
@@ -52,7 +52,7 @@ export class ConversationManager implements IConversationManager {
       if (contextData.projectContext) state.projectContext = contextData.projectContext;
       if (contextData.editorContext) state.editorContext = contextData.editorContext;
 
-      console.log(`[ConversationManager] Reusing and updating state for chat ${chatId}`);
+    
       this.activeConversations.set(chatId, state); 
       return state;
     }
@@ -83,7 +83,7 @@ export class ConversationManager implements IConversationManager {
       timestamp: currentTime,
     };
     this.activeConversations.set(chatId, newState);
-    console.log(`[ConversationManager] Created new state for chat ${chatId}`);
+   
     return newState;
   }
 
@@ -100,10 +100,7 @@ export class ConversationManager implements IConversationManager {
 
   public async endConversation(chatId: string, memoryManager?: MemoryManager): Promise<void> {
     const state = this.activeConversations.get(chatId);
-    if (state) {
-     
-      console.log(`[ConversationManager] Conversation processing for last message in chat ${chatId} ended. Current status: ${state.completionStatus}.`);
-    }
+   
   }
 
   public clearConversation(chatId: string, memoryManager?: MemoryManager): void {
@@ -111,6 +108,6 @@ export class ConversationManager implements IConversationManager {
     if (memoryManager) {
       memoryManager.clearConversationMemory(chatId); 
     }
-    console.log(`[ConversationManager] Cleared active conversation state and memory for chat ${chatId}`);
+    
   }
 }

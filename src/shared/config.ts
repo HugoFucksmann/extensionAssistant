@@ -1,21 +1,14 @@
-/**
- * Configuración para la arquitectura Windsurf
- */
 
 type Environment = 'development' | 'production';
 
 interface ReactConfig {
   maxIterations: number;
-  defaultModelProvider: string;
-  defaultModelName: string;
   temperature: number;
   maxTokens: number;
 }
 
 interface UIConfig {
-  openPanelOnStartup: boolean;
-  darkThemeByDefault: boolean;
-  showToolExecution: boolean;
+  // (Eliminados campos no usados)
 }
 
 interface MemoryConfig {
@@ -27,15 +20,15 @@ interface MemoryConfig {
 }
 
 interface ToolsConfig {
-  enabledTools: string[];
   maxConcurrentTools: number;
   timeoutMs: number;
 }
 
+
 interface LoggingConfig {
-  level: 'debug' | 'info' | 'warn' | 'error';
+  level: 'debug' | 'info'; // Nivel global para la consola
+  logToConsole: boolean;
   logToFile: boolean;
-  logFilePath: string;
 }
 
 interface BackendConfig {
@@ -53,8 +46,6 @@ export const getConfig = (env: Environment): {backend: BackendConfig; frontend: 
   const baseBackendConfig: BackendConfig = {
     react: {
       maxIterations: 15,
-      defaultModelProvider: env === 'production' ? 'gemini' : 'mock',
-      defaultModelName: env === 'production' ? 'gemini-pro' : 'mock',
       temperature: 0.2,
       maxTokens: 4096
     },
@@ -66,23 +57,13 @@ export const getConfig = (env: Environment): {backend: BackendConfig; frontend: 
       vectorDbPath: 'windsurf-memory'
     },
     tools: {
-      enabledTools: [
-        'getFileContents',
-        'writeToFile',
-        'listFiles',
-        'getActiveEditorContent',
-        'applyTextEdit',
-        'searchWorkspace',
-        'getProjectInfo',
-        'respond'
-      ],
       maxConcurrentTools: 3,
       timeoutMs: 30000
     },
     logging: {
       level: env === 'development' ? 'debug' : 'info',
-      logToFile: true,
-      logFilePath: 'windsurf.log'
+      logToConsole: true,
+      logToFile: true
     }
   };
 
@@ -100,27 +81,4 @@ export const getConfig = (env: Environment): {backend: BackendConfig; frontend: 
   };
 };
 
-/**
- * Tipos de nodos en el grafo ReAct
- */
-/* export enum ReActNodeType {
-  INITIAL_ANALYSIS = 'initialAnalysis',
-  REASONING = 'reasoning',
-  ACTION = 'action',
-  REFLECTION = 'reflection',
-  CORRECTION = 'correction',
-  RESPONSE_GENERATION = 'responseGeneration'
-} */
-
-/**
- * Tipos de transiciones en el grafo ReAct
- */
-/* export enum ReActTransitionType {
-  TO_REASONING = 'toReasoning',
-  TO_ACTION = 'toAction',
-  TO_REFLECTION = 'toReflection',
-  TO_CORRECTION = 'toCorrection',
-  TO_RESPONSE = 'toResponse',
-  TO_END = 'toEnd'
-} */
 

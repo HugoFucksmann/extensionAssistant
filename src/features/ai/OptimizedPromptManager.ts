@@ -9,7 +9,7 @@ import { ReasoningOutput } from './prompts/optimized/reasoningPrompt';
 import { ActionOutput } from './prompts/optimized/actionPrompt';
 import { ResponseOutput } from './prompts/optimized/responsePrompt';
 
-// Tipos de prompts optimizados disponibles
+
 export type OptimizedPromptType = 
   | 'analysis'
   | 'reasoning'
@@ -21,50 +21,45 @@ export class OptimizedPromptManager {
     console.log('[OptimizedPromptManager] Inicializado');
   }
   
-  /**
-   * Simplifica el resultado de una herramienta para reducir tokens
-   * Elimina información innecesaria y trunca textos largos
-   */
+ 
   private simplifyToolResult(result: any): any {
     if (!result) return result;
     
-    // Si es un string, truncarlo
+  
     if (typeof result === 'string') {
       return result.length > 500 ? result.substring(0, 500) + '...' : result;
     }
     
-    // Si es un objeto o array, procesarlo recursivamente
+   
     if (typeof result === 'object') {
       const simplified: Record<string, any> = {};
       
-      // Si es un array, convertirlo a objeto con índices
+     
       if (Array.isArray(result)) {
-        // Si el array es muy grande, tomar solo los primeros elementos
+      
         const limitedArray = result.length > 10 ? result.slice(0, 10) : result;
         return limitedArray.map(item => this.simplifyToolResult(item));
       }
       
-      // Procesar cada propiedad del objeto
+    
       for (const [key, value] of Object.entries(result)) {
         // Omitir propiedades internas o muy grandes
         if (key.startsWith('_') || key === 'rawContent' || key === 'fullContent') {
           continue;
         }
         
-        // Simplificar el valor recursivamente
+      
         simplified[key] = this.simplifyToolResult(value);
       }
       
       return simplified;
     }
     
-    // Devolver valores primitivos sin cambios
+   
     return result;
   }
   
-  /**
-   * Trunca el contexto de memoria para reducir tokens
-   */
+ 
   private truncateMemoryContext(memoryContext: string): string {
     const maxLength = 1000; // Ajustar según necesidades
     if (memoryContext.length <= maxLength) return memoryContext;
@@ -73,9 +68,7 @@ export class OptimizedPromptManager {
       `\n... [Contexto truncado. Longitud original: ${memoryContext.length} caracteres]`;
   }
 
-  /**
- * Genera un análisis inicial de la consulta del usuario usando la cadena LCEL
- */
+
 public async generateAnalysis(
   userQuery: string,
   availableTools: string[],
@@ -93,9 +86,7 @@ public async generateAnalysis(
   }) as AnalysisOutput;
 }
 
-/**
- * Genera razonamiento sobre qué herramienta usar usando la cadena LCEL
- */
+
 public async generateReasoning(
   userQuery: string,
   analysisResult: any,
@@ -115,9 +106,7 @@ public async generateReasoning(
   }) as ReasoningOutput;
 }
 
-/**
- * Genera interpretación de los resultados de una herramienta usando la cadena LCEL
- */
+
 public async generateAction(
   userQuery: string,
   lastToolName: string,
@@ -137,9 +126,7 @@ public async generateAction(
   }) as ActionOutput;
 }
 
-/**
- * Genera la respuesta final para el usuario usando la cadena LCEL
- */
+
 public async generateResponse(
   userQuery: string,
   toolResults: Array<{tool: string, result: any}>,

@@ -24,7 +24,7 @@ export class ApplicationLogicService {
     private toolRegistry: ToolRegistry
   ) {
     
-    console.log('[ApplicationLogicService] Initialized.');
+   
   }
 
   public async processUserMessage(
@@ -33,7 +33,7 @@ export class ApplicationLogicService {
     contextData: Record<string, any> = {} 
   ): Promise<ProcessUserMessageResult> {
     const startTime = Date.now();
-    console.log(`[ApplicationLogicService:${chatId}] Processing message: "${userMessage.substring(0, 50)}..."`);
+  
 
    
 
@@ -57,26 +57,18 @@ export class ApplicationLogicService {
             
             if (projectInfoResult.success && projectInfoResult.data) {
               state.projectContext = projectInfoResult.data as any;
-             
-              console.log(`[ApplicationLogicService:${chatId}] Project context obtained successfully.`);
-            } else if (!projectInfoResult.success) {
-              console.warn(`[ApplicationLogicService:${chatId}] Failed to get project info via ToolRegistry for chat ${chatId}: ${projectInfoResult.error}`);
             }
-        } else {
-            console.warn(`[ApplicationLogicService:${chatId}] Tool '${projectInfoToolName}' not found in registry.`);
-        }
+        } 
       }
     } catch (error) {
-      console.warn(`[ApplicationLogicService:${chatId}] Error during initial project info retrieval for chat ${chatId}:`, error);
+    console.log("Error al obtener el contexto del proyecto");
+    
     }
 
     try {
   
       const resultState = await this.reActEngine.run(state);
-
-
       this.conversationManager.updateConversationState(chatId, resultState);
-
       let finalResponseText = 'No specific response was generated.'; 
 
 
@@ -99,7 +91,7 @@ export class ApplicationLogicService {
                       finalResponseText = lastMeaningfulEntry.content;
                   }
               } else {
-                  console.warn(`[ApplicationLogicService:${chatId}] Completed state but no finalOutput or suitable history entry found.`);
+                 
                   finalResponseText = "The process completed, but I don't have a specific message to show.";
               }
           }
@@ -110,14 +102,14 @@ export class ApplicationLogicService {
         finalResponseText = `The task could not be completed. Last phase: ${lastPhase}. ${resultState.error ? `Error: ${resultState.error}` : ''}`;
       } else {
 
-        console.warn(`[ApplicationLogicService:${chatId}] Unexpected completion status: ${resultState.completionStatus}`);
+       
         finalResponseText = `The process finished with an unexpected status: ${resultState.completionStatus}.`;
       }
 
       await this.memoryManager.storeConversation(chatId, resultState);
 
       const duration = Date.now() - startTime;
-      console.log(`[ApplicationLogicService:${chatId}] Message processing finished. Success: ${resultState.completionStatus === 'completed'}. Duration: ${duration}ms.`);
+    
 
       return {
         success: resultState.completionStatus === 'completed', 
@@ -128,7 +120,7 @@ export class ApplicationLogicService {
 
     } catch (error: any) {
       const duration = Date.now() - startTime;
-      console.error(`[ApplicationLogicService:${chatId}] CRITICAL error processing message (duration: ${duration}ms):`, error);
+    
       const currentState = this.conversationManager.getConversationState(chatId);
       let finalErrorState = currentState || state; 
 
@@ -161,7 +153,7 @@ export class ApplicationLogicService {
   }
 
   public async clearConversation(chatId: string): Promise<void> {
-    console.log(`[ApplicationLogicService] Clearing conversation: ${chatId}`);
+   
    
     this.conversationManager.clearConversation(chatId, this.memoryManager);
   }
@@ -172,10 +164,10 @@ export class ApplicationLogicService {
     executionContextArgs: { chatId?: string; [key: string]: any } = {}
   ): Promise<ToolResult> {
     if (!this.toolRegistry) {
-      console.error('[ApplicationLogicService] ToolRegistry not available to invokeTool.');
+   
       return { success: false, error: 'ToolRegistry not available', executionTime: 0 };
     }
-    console.log(`[ApplicationLogicService] Invoking tool "${toolName}" directly with params:`, params, "ContextArgs:", executionContextArgs);
+  
    
     return this.toolRegistry.executeTool(toolName, params, executionContextArgs);
   }
@@ -185,6 +177,6 @@ export class ApplicationLogicService {
         (this.memoryManager as any).dispose();
     }
   
-    console.log('[ApplicationLogicService] Disposed.');
+    
   }
 }

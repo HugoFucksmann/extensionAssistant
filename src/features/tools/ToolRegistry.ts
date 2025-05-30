@@ -12,7 +12,7 @@ export class ToolRegistry {
   private tools = new Map<string, ToolDefinition<any, any>>();
 
   constructor(private dispatcher: InternalEventDispatcher) {
-    this.log('info', 'ToolRegistry initialized. Ready to register tools.');
+    
   }
 
   private log(level: 'info' | 'warning' | 'error', message: string, details?: Record<string, any>, errorObj?: Error) {
@@ -104,11 +104,11 @@ export class ToolRegistry {
     };
     
     dispatchToolEvent(EventType.TOOL_EXECUTION_STARTED, {});
-    this.log('info', `Attempting to execute tool: ${name}`, baseLogDetails);
+   
 
     if (!tool) {
       const errorMsg = `Tool not found: ${name}`;
-      this.log('warning', errorMsg, baseLogDetails);
+    
       dispatchToolEvent(EventType.TOOL_EXECUTION_ERROR, {
         error: errorMsg,
         duration: Date.now() - startTime,
@@ -116,11 +116,11 @@ export class ToolRegistry {
       return { success: false, error: errorMsg, executionTime: Date.now() - startTime };
     }
 
-    this.log('info', `Validating parameters for tool: ${name}`, baseLogDetails);
+    
     const validationResult = ToolValidator.validate(tool.parametersSchema, rawParams);
 
     if (!validationResult.success) {
-      this.log('warning', `Parameter validation failed for ${name}: ${validationResult.error}`, { ...baseLogDetails, issues: validationResult.issues });
+     
       dispatchToolEvent(EventType.TOOL_EXECUTION_ERROR, {
         error: validationResult.error,
         duration: Date.now() - startTime,
@@ -141,7 +141,7 @@ export class ToolRegistry {
   
 
     try {
-      this.log('info', `Executing tool: ${name}`, logDetailsWithValidatedParams);
+    
       const toolResult = await tool.execute(validatedParams, executionContext);
       const executionTime = Date.now() - startTime;
 
@@ -152,7 +152,7 @@ export class ToolRegistry {
             result: toolResult.data,
             duration: executionTime,
         });
-        this.log('info', `Tool ${name} execution successful. Time: ${executionTime}ms`, { ...logDetailsWithValidatedParams, resultData: toolResult.data });
+      
       } else {
         dispatchToolEvent(EventType.TOOL_EXECUTION_ERROR, {
             parameters: validatedParams,
@@ -160,14 +160,14 @@ export class ToolRegistry {
             error: toolResult.error,
             duration: executionTime,
         });
-        this.log('warning', `Tool ${name} execution failed: ${toolResult.error}. Time: ${executionTime}ms`, { ...logDetailsWithValidatedParams, error: toolResult.error });
+       
       }
       return { ...toolResult, executionTime };
 
     } catch (error: any) {
       const executionTime = Date.now() - startTime;
       const errorMsg = `Unexpected error during execution of tool ${name}: ${error.message}`;
-      this.log('error', errorMsg, logDetailsWithValidatedParams, error);
+    
       dispatchToolEvent(EventType.TOOL_EXECUTION_ERROR, {
         parameters: validatedParams,
         toolParams: validatedParams,

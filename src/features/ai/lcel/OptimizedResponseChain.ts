@@ -2,13 +2,11 @@ import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { StructuredOutputParser } from "@langchain/core/output_parsers";
 import { responseOutputSchema } from "../prompts/optimized/responsePrompt";
 import { BaseChatModel } from "@langchain/core/language_models/chat_models";
+import { invokeModelWithLogging } from "./ModelInvokeLogger";
 
 import { AIMessageChunk } from "@langchain/core/messages";
 
-/**
- * Ejecuta la cadena LCEL para la fase de respuesta optimizada.
- * Recibe los parámetros necesarios y retorna el objeto parseado según responseOutputSchema.
- */
+
 export async function runOptimizedResponseChain({
   userQuery,
   toolResults,
@@ -22,7 +20,7 @@ export async function runOptimizedResponseChain({
   memoryContext?: string;
   model: BaseChatModel;
 }) {
-  // Simplificado para depuración
+  
   const systemInstruction = 'Eres un asistente de programación.';
 
   let context = '';
@@ -40,37 +38,35 @@ export async function runOptimizedResponseChain({
   const task =
     `Basándote en la consulta del usuario: "${userQuery}" y la información recopilada, genera una respuesta clara y concisa. También identifica información importante que debería recordarse para futuras interacciones.`;
 
-  // Simplificado para depuración
+  
   const format = "Responde con un objeto JSON que contenga los campos: response, memoryItems";
 
-  // Ejemplos simplificados para depuración
+
   const examples = "";
 
-  // Construcción del ChatPromptTemplate simplificado
+ 
   const prompt = ChatPromptTemplate.fromMessages([
     ["system", systemInstruction],
     ["user", `${task}\n\n${format}`]
   ]);
 
-  // Output parser basado en Zod
+ 
   const parser = StructuredOutputParser.fromZodSchema(responseOutputSchema);
 
-  // Encadenar: prompt -> modelo -> parser
+ 
   const chain = prompt.pipe(model);
-  
-  // Obtener respuesta cruda y extraer contenido
-  const rawResponse = await chain.invoke({}) as AIMessageChunk;
+  const rawResponse = await invokeModelWithLogging(chain, {}, { caller: 'runOptimizedResponseChain' }) as AIMessageChunk;
  
   
   if (!rawResponse?.content) {
     throw new Error('La respuesta del modelo está vacía o es inválida');
   }
 
-  // Asegurarnos de que el contenido sea un string
+ 
 const content = Array.isArray(rawResponse.content) 
 ? rawResponse.content.map(c => 'text' in c ? c.text : JSON.stringify(c)).join('\n')
 : rawResponse.content;
   
-  // El ModelManager ya limpió el contenido, solo necesitamos parsear
+  
   return await parser.parse(content);
 }

@@ -55,7 +55,7 @@ Responde **ÚNICAMENTE** con un objeto JSON **válido**
 ESQUEMA ESPERADO (campos principales):
 {{
   "interpretation": "string",
-  "nextAction": "string (Uno de: 'use_tool', 'respond')",
+  "nextAction": "use_tool", // o "respond", ningún otro valor es válido
   "tool": "string (Uno de: 'getFileContents', 'searchInWorkspace', 'writeToFile')",
   "parameters": objet | null ,
   "response": "string | null "

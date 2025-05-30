@@ -22,9 +22,9 @@ export class OptimizedReActIntegration {
     toolRegistry: ToolRegistry
   ): OptimizedReActEngine {
     if (!this.instance) {
-      console.log('[OptimizedReActIntegration] Inicializando motor ReAct optimizado');
+      
       this.instance = OptimizedReActFactory.create(context, dispatcher, toolRegistry);
-      console.log('[OptimizedReActIntegration] Motor ReAct optimizado inicializado correctamente');
+     
     }
     return this.instance;
   }

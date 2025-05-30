@@ -21,7 +21,7 @@ const ChatMessages = () => {
     scrollToBottom()
   }, [messages])
 
-  console.log('isLoading ', isLoading);
+ 
   
 
   return (<>

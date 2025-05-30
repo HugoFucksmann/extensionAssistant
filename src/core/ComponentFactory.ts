@@ -1,7 +1,7 @@
 // src/core/ComponentFactory.ts
 import * as vscode from 'vscode';
 import { VSCodeContext } from '../shared/types';
-import { EventLogger } from '../features/events/EventLogger';
+
 import { ModelManager } from '../features/ai/ModelManager';
 import { ToolRegistry } from '../features/tools/ToolRegistry';
 import { allToolDefinitions } from '../features/tools/definitions';
@@ -16,7 +16,7 @@ import { LongTermStorage } from '../features/memory/LongTermStorage';
 export class ComponentFactory {
   private static applicationLogicServiceInstance: ApplicationLogicService;
   private static internalEventDispatcherInstance: InternalEventDispatcher;
-  private static eventLoggerInstance: EventLogger;
+
   private static toolRegistryInstance: ToolRegistry;
   private static vscodeContextInstance: VSCodeContext;
   private static modelManagerInstance: ModelManager;
@@ -42,7 +42,7 @@ export class ComponentFactory {
             globalState: extensionContext.globalState,
             workspaceState: extensionContext.workspaceState,
         };
-        console.log('[ComponentFactory] VSCodeContext instance created.');
+       
     }
     return this.vscodeContextInstance;
   }
@@ -52,7 +52,7 @@ export class ComponentFactory {
       const dispatcher = this.getInternalEventDispatcher();
       this.toolRegistryInstance = new ToolRegistry(dispatcher);
       this.toolRegistryInstance.registerTools(allToolDefinitions);
-      console.log(`[ComponentFactory] ToolRegistry instance created with ${allToolDefinitions.length} tools.`);
+     
     }
     return this.toolRegistryInstance;
   }
@@ -63,7 +63,7 @@ export class ComponentFactory {
     if (!this.modelManagerInstance) {
     
       this.modelManagerInstance = new ModelManager(); 
-      console.log('[ComponentFactory] ModelManager instance created.');
+     
     }
     return this.modelManagerInstance;
   }
@@ -71,7 +71,7 @@ export class ComponentFactory {
   public static getLongTermStorage(extensionContext: vscode.ExtensionContext): LongTermStorage {
     if (!this.longTermStorageInstance) {
       this.longTermStorageInstance = new LongTermStorage(extensionContext);
-      console.log('[ComponentFactory] LongTermStorage instance created.');
+      
     }
     return this.longTermStorageInstance;
   }
@@ -80,7 +80,7 @@ export class ComponentFactory {
     if (!this.optimizedPromptManagerInstance) {
       const modelManager = this.getModelManager();
       this.optimizedPromptManagerInstance = new OptimizedPromptManager(modelManager);
-      console.log('[ComponentFactory] OptimizedPromptManager instance created.');
+      
     }
     return this.optimizedPromptManagerInstance;
   }
@@ -97,7 +97,7 @@ export class ComponentFactory {
         dispatcher,
         longTermStorage
       );
-      console.log('[ComponentFactory] OptimizedReActEngine instance created.');
+      
     }
     return this.optimizedReActEngineInstance;
   }
@@ -107,12 +107,6 @@ export class ComponentFactory {
     if (!this.applicationLogicServiceInstance) {
       const vscodeContext = this.getVSCodeContext(extensionContext);
       const dispatcher = this.getInternalEventDispatcher();
-
-      if (!this.eventLoggerInstance) {
-       
-        this.eventLoggerInstance = new EventLogger(vscodeContext, dispatcher);
-        console.log('[ComponentFactory] EventLogger instance created and subscribed.');
-      }
 
       const longTermStorage = this.getLongTermStorage(extensionContext); 
       const memoryManager = new MemoryManager(longTermStorage); 
@@ -128,7 +122,7 @@ export class ComponentFactory {
         conversationManager,
         toolRegistry
       );
-      console.log('[ComponentFactory] ApplicationLogicService instance created.');
+      
     }
     return this.applicationLogicServiceInstance;
   }
@@ -145,9 +139,6 @@ export class ComponentFactory {
     if (this.internalEventDispatcherInstance && typeof this.internalEventDispatcherInstance.dispose === 'function') {
         this.internalEventDispatcherInstance.dispose();
     }
-    if (this.eventLoggerInstance && typeof (this.eventLoggerInstance as any).dispose === 'function') {
-        (this.eventLoggerInstance as any).dispose();
-    }
 
     // Clear instance references
     // @ts-ignore 
@@ -155,7 +146,7 @@ export class ComponentFactory {
     // @ts-ignore
     this.internalEventDispatcherInstance = undefined;
     // @ts-ignore
-    this.eventLoggerInstance = undefined;
+
     // @ts-ignore
     this.toolRegistryInstance = undefined;
     // @ts-ignore
@@ -174,6 +165,6 @@ export class ComponentFactory {
     this.optimizedReActEngineInstance = undefined;
     // @ts-ignore
     this.longTermStorageInstance = undefined;
-    console.log('[ComponentFactory] All instances disposed.');
+   
   }
 }

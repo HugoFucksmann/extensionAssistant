@@ -5,12 +5,12 @@ import { ComponentFactory } from './core/ComponentFactory';
 let activator: ExtensionActivator | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
-  console.log('Activating extensionAssistant (Windsurf Architecture)');
+ 
   
   try {
     activator = new ExtensionActivator(context);
     activator.activate();
-    console.log('Extension activated successfully');
+  
   } catch (error) {
     console.error('Error activating extension:', error);
     vscode.window.showErrorMessage(
@@ -20,8 +20,8 @@ export function activate(context: vscode.ExtensionContext) {
 }
 
 export function deactivate() {
-  console.log('Deactivating extension');
+
   activator?.deactivate();
   ComponentFactory.dispose();
-  console.log('Extension deactivated.');
+ 
 }

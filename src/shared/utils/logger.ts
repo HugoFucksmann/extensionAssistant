@@ -1,26 +1,65 @@
-import { InternalEventDispatcher } from '../../core/events/InternalEventDispatcher';
-import { EventType } from '../../features/events/eventTypes';
+// src/shared/utils/logger.ts
+import { getConfig } from '../config';
 
-// Instancia única del dispatcher para el logger
-const eventDispatcher = new InternalEventDispatcher();
+// Logger centralizado: consola y opcionalmente OutputChannel VSCode
+let outputChannel: { appendLine: (msg: string) => void } | undefined;
+
+const env = process.env.NODE_ENV === 'production' ? 'production' : 'development';
+const currentConfig = getConfig(env);
+const configuredLogLevel = currentConfig.backend.logging.level;
+const logToConsoleEnabled = currentConfig.backend.logging.logToConsole;
+
+const LOG_LEVELS = {
+  debug: 0,
+  info: 1,
+  warn: 2,
+  error: 3,
+};
+
+export function setLoggerOutputChannel(oc: { appendLine: (msg: string) => void }) {
+  outputChannel = oc;
+}
+
+function logToAllChannels(level: string, message: string, ...args: any[]) {
+  const formatted = `[${level.toUpperCase()}] ${message}`;
+  if (logToConsoleEnabled) {
+    switch (level) {
+      case 'debug':
+        console.debug(formatted, ...args);
+        break;
+      case 'info':
+        console.log(formatted, ...args);
+        break;
+      case 'warn':
+        console.warn(formatted, ...args);
+        break;
+      case 'error':
+        console.error(formatted, ...args);
+        break;
+    }
+  }
+  if (outputChannel) {
+    outputChannel.appendLine(formatted + (args.length ? ' ' + args.map(a => JSON.stringify(a)).join(' ') : ''));
+  }
+}
 
 export const logger = {
-  error: (message: string, error?: any) => {
-    console.error(`[ERROR] ${message}`, error);
-    eventDispatcher.systemError(
-      message,
-      error instanceof Error ? error : new Error(error?.message || String(error)),
-      { stack: error?.stack }
-    );
+  debug: (message: string, ...args: any[]) => {
+    if (LOG_LEVELS.debug >= LOG_LEVELS[configuredLogLevel]) {
+      logToAllChannels('debug', message, ...args);
+    }
   },
-  
-  warn: (message: string, data?: any) => {
-    console.warn(`[WARN] ${message}`, data);
-    eventDispatcher.systemWarning(message, { data });
+  info: (message: string, ...args: any[]) => {
+    if (LOG_LEVELS.info >= LOG_LEVELS[configuredLogLevel]) {
+      logToAllChannels('info', message, ...args);
+    }
   },
-  
-  info: (message: string, data?: any) => {
-    console.log(`[INFO] ${message}`, data);
-    eventDispatcher.systemInfo(message, { data });
+  warn: (message: string, ...args: any[]) => {
+    if (LOG_LEVELS.warn >= LOG_LEVELS[configuredLogLevel]) {
+      logToAllChannels('warn', message, ...args);
+    }
+  },
+  error: (message: string, ...args: any[]) => {
+    logToAllChannels('error', message, ...args);
   }
 };

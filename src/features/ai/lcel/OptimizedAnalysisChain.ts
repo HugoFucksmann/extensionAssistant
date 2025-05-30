@@ -8,10 +8,38 @@ function extractJsonFromString(str: string): any {
     // Intentar extraer JSON de bloques de código markdown
     const jsonMatch = str.match(/```(?:json)?\n([\s\S]*?)\n```/);
     if (jsonMatch && jsonMatch[1]) {
-      return JSON.parse(jsonMatch[1]);
+      console.log('[extractJsonFromString] JSON a parsear (bloque markdown):', jsonMatch[1]);
+      const parsed = JSON.parse(jsonMatch[1]);
+      if (parsed && typeof parsed === 'object') {
+        if (parsed.action) {
+          parsed.nextAction = parsed.action;
+          delete parsed.action;
+        }
+        // Validación/corrección de nextAction
+        const validNextActions = ['use_tool', 'respond'];
+        if (parsed.nextAction && !validNextActions.includes(parsed.nextAction)) {
+          console.warn('[extractJsonFromString] Valor inválido en nextAction:', parsed.nextAction, '-> Forzando a "respond"');
+          parsed.nextAction = 'respond';
+        }
+      }
+      return parsed;
     }
     // Si no hay bloque de código, intentar parsear directamente
-    return JSON.parse(str);
+    console.log('[extractJsonFromString] JSON a parsear (directo):', str);
+    const parsed = JSON.parse(str);
+    if (parsed && typeof parsed === 'object') {
+      if (parsed.action) {
+        parsed.nextAction = parsed.action;
+        delete parsed.action;
+      }
+      // Validación/corrección de nextAction
+      const validNextActions = ['use_tool', 'respond'];
+      if (parsed.nextAction && !validNextActions.includes(parsed.nextAction)) {
+        console.warn('[extractJsonFromString] Valor inválido en nextAction:', parsed.nextAction, '-> Forzando a "respond"');
+        parsed.nextAction = 'respond';
+      }
+    }
+    return parsed;
   } catch (e) {
     console.error('Error al extraer/parsear JSON:', e);
     return null;
@@ -51,10 +79,7 @@ function normalizeModelResponse(response: any) {
   return normalized;
 }
 
-/**
- * Construye y ejecuta la cadena LCEL para la fase de análisis optimizado.
- * Recibe los parámetros necesarios y retorna el objeto parseado según analysisOutputSchema.
- */
+
 export async function runOptimizedAnalysisChain({
   userQuery,
   availableTools,
@@ -97,14 +122,13 @@ export async function runOptimizedAnalysisChain({
     const chain = prompt.pipe(model).pipe(parser);
     
     // Ejecutar la cadena con las variables necesarias
-    const rawResult = await chain.invoke({
+    const { invokeModelWithLogging } = await import('./ModelInvokeLogger');
+    const rawResult = await invokeModelWithLogging(chain, {
       userQuery,
       availableTools: availableTools.join(', '),
       codeContext: codeContext || '',
       memoryContext: memoryContext || ''
-    });
-
-    console.log('Respuesta cruda del modelo:', JSON.stringify(rawResult, null, 2));
+    }, { caller: 'runOptimizedAnalysisChain' });
 
     // Intentar extraer y normalizar la respuesta
     let parsedResult = typeof rawResult === 'string' ? extractJsonFromString(rawResult) : rawResult;

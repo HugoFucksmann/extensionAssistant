@@ -3,18 +3,14 @@ import { analysisOutputSchema } from './optimized/analysisPrompt';
 import { reasoningOutputSchema } from './optimized/reasoningPrompt';
 import { actionOutputSchema } from './optimized/actionPrompt';
 
-/**
- * Tipos de salida de los parsers
- */
+
 export type ParserOutput = 
   | ReturnType<typeof analysisOutputSchema.parse>
   | ReturnType<typeof reasoningOutputSchema.parse>
   | ReturnType<typeof actionOutputSchema.parse>
   | Record<string, any>; // Para cualquier otro tipo de salida
 
-/**
- * Valida la salida de un parser contra su esquema correspondiente
- */
+
 export function validateParserOutput<T>(
   output: unknown, 
   schema: z.ZodSchema<T>
@@ -27,9 +23,7 @@ export function validateParserOutput<T>(
   }
 }
 
-/**
- * Combina múltiples mensajes en un solo prompt
- */
+
 export function combineMessages(
   systemMessage: string,
   userMessage: string,
@@ -42,9 +36,7 @@ export function combineMessages(
   ];
 }
 
-/**
- * Formatea un objeto para mostrarlo en un prompt
- */
+
 export function formatForPrompt(obj: unknown): string { // <--- BUENO
   return typeof obj === 'string' ? obj : JSON.stringify(obj);
 }
@@ -53,17 +45,15 @@ export function validateOutput<T>(output: unknown, schema: z.ZodSchema<T>): T { 
   return schema.parse(output);
 }
 
-export function extractContent(message: unknown): string { // <--- BUENO, pero el nombre podría ser más genérico si no siempre es 'content'
+export function extractContent(message: unknown): string { 
   if (typeof message === 'string') return message;
-  if (message && typeof message === 'object' && 'content' in message) { // Asume que el campo es 'content'
+  if (message && typeof message === 'object' && 'content' in message) { 
     return String((message as any).content);
   }
   return String(message);
 }
 
-/**
- * Extrae el contenido de un mensaje de chat
- */
+
 export function extractMessageContent(message: unknown): string {
   if (typeof message === 'string') return message;
   if (message && typeof message === 'object' && 'content' in message) {
@@ -72,16 +62,11 @@ export function extractMessageContent(message: unknown): string {
   return String(message);
 }
 
-/**
- * Crea un objeto de mensaje para el chat
- */
+
 export function createChatMessage(role: 'user' | 'assistant', content: string) {
   return { role, content };
 }
 
-/**
- * Procesa la salida de un modelo para extraer solo el contenido
- */
 export function processModelOutput(output: unknown): string {
   if (typeof output === 'string') return output;
   if (output && typeof output === 'object' && 'content' in output) {

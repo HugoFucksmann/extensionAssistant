@@ -10,7 +10,7 @@ export class InternalEventDispatcher {
 
   constructor() {
     this.emitter = new EventEmitter();
-    console.log('[InternalEventDispatcher] Initialized.');
+   
   }
 
   /**
@@ -69,9 +69,6 @@ export class InternalEventDispatcher {
     };
   }
 
-  /**
-   * Se suscribe a un evento una sola vez.
-   */
   public once(
     type: EventType,
     listener: (event: WindsurfEvent) => void
@@ -85,11 +82,7 @@ export class InternalEventDispatcher {
   }
 
 
-  /**
-   * Obtiene el historial de eventos, opcionalmente filtrado.
-   * @param filter Opcional: Un filtro para los eventos.
-   * @returns Un array de WindsurfEvent.
-   */
+
   public getEventHistory(filter?: EventFilter): WindsurfEvent[] {
     if (!filter) {
       return [...this.eventHistory];
@@ -105,10 +98,7 @@ export class InternalEventDispatcher {
     return true;
   }
 
-  /**
-   * Limpia todos los listeners y el historial.
-   * Útil durante la desactivación de la extensión o para tests.
-   */
+
   public dispose(): void {
     this.emitter.removeAllListeners();
     this.eventHistory = [];

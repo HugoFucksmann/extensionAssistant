@@ -33,7 +33,7 @@ export class WebviewMessageHandler {
 
   private async handleUIReady(): Promise<void> {
     this.stateManager.initializeChat();
-    console.log(`[WebviewMessageHandler DEBUG] UI Ready. New Chat ID: ${this.stateManager.getCurrentChatId()}`);
+  
     
     this.postMessage('sessionReady', {
       chatId: this.stateManager.getCurrentChatId(),
@@ -76,12 +76,12 @@ export class WebviewMessageHandler {
 
   private handleNewChatRequest(): void {
     this.stateManager.startNewChat();
-    console.log(`[WebviewMessageHandler DEBUG] newChatRequestedByUI. New Chat ID: ${this.stateManager.getCurrentChatId()}`);
+    
     this.postMessage('newChatStarted', { chatId: this.stateManager.getCurrentChatId() });
   }
 
   private async handleCommand(payload: any): Promise<void> {
-    console.log(`[WebviewMessageHandler DEBUG] Received command:`, payload?.command);
+   
 
     if (payload?.command === 'getProjectFiles') {
       await this.handleGetProjectFiles();
@@ -123,7 +123,7 @@ export class WebviewMessageHandler {
         this.stateManager.setCurrentModel(payload.modelType);
       }
       this.postMessage('modelSwitched', { modelType: payload.modelType });
-      console.log(`[WebviewMessageHandler] Model switched to: ${payload.modelType}`);
+      
     } catch (error: any) {
       console.error('[WebviewMessageHandler] Error switching model:', error);
       this.postMessage('systemError', { message: error.message || 'Failed to switch model' });
