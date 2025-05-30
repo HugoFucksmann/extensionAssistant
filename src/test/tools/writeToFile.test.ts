@@ -7,16 +7,33 @@ describe('writeToFile', () => {
   const mockContext: ToolExecutionContext = {
     vscodeAPI: {
       workspace: {
-        asRelativePath: (uri: any) => uri.fsPath || uri,
+        workspaceFolders: [{ 
+          name: 'workspace', 
+          uri: { 
+            fsPath: '/workspace',
+            toString: () => 'file:///workspace' 
+          } 
+        }],
+        asRelativePath: (uri: any) => {
+          const path = uri.fsPath || uri;
+          return path.replace('/workspace/', '');
+        },
         fs: {
           createDirectory: async (_dirUri: any) => {},
           writeFile: async (targetUri: any, content: Uint8Array) => {
-            writtenPath = targetUri.fsPath || targetUri;
+            const path = targetUri.fsPath || targetUri;
+            writtenPath = path.replace('/workspace/', '');
             writtenContent = new TextDecoder().decode(content);
           },
         },
       },
-    },
+      FileType: {
+        File: 2,
+        Directory: 1,
+        SymbolicLink: 4,
+        Unknown: 0
+      }
+    }
   } as any;
 
   beforeEach(() => {
@@ -37,10 +54,16 @@ describe('writeToFile', () => {
       vscodeAPI: {
         ...mockContext.vscodeAPI,
         workspace: {
-          ...mockContext.vscodeAPI.workspace,
+          workspaceFolders: [], // Sin workspace para forzar error
           asRelativePath: () => '',
         },
-      },
+        FileType: {
+          File: 2,
+          Directory: 1,
+          SymbolicLink: 4,
+          Unknown: 0
+        }
+      }
     } as any;
     const result = await writeToFile.execute({ path: '', content: 'fail' }, brokenContext);
     expect(result.success).toBe(false);

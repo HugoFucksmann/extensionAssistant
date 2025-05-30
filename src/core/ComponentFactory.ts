@@ -139,32 +139,6 @@ export class ComponentFactory {
     if (this.internalEventDispatcherInstance && typeof this.internalEventDispatcherInstance.dispose === 'function') {
         this.internalEventDispatcherInstance.dispose();
     }
-
-    // Clear instance references
-    // @ts-ignore 
-    this.applicationLogicServiceInstance = undefined;
-    // @ts-ignore
-    this.internalEventDispatcherInstance = undefined;
-    // @ts-ignore
-
-    // @ts-ignore
-    this.toolRegistryInstance = undefined;
-    // @ts-ignore
-    this.vscodeContextInstance = undefined;
-    // @ts-ignore
-    this.modelManagerInstance = undefined;
-    // @ts-ignore
-    this.promptManagerInstance = undefined;
-    // @ts-ignore
-    this.languageModelServiceInstance = undefined; 
-    // @ts-ignore
-    this.reActEngineInstance = undefined;
-    // @ts-ignore
-    this.optimizedPromptManagerInstance = undefined;
-    // @ts-ignore
-    this.optimizedReActEngineInstance = undefined;
-    // @ts-ignore
-    this.longTermStorageInstance = undefined;
    
   }
 }

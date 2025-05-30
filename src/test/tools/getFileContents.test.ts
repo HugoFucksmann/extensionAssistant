@@ -175,7 +175,6 @@ describe('getFileContents tool', () => {
     
     const result = await getFileContents.execute({ 
       path: 'test.txt', 
-      searchByName: true 
     }, mockContext);
     
     // Verificar que el resultado sea exitoso o que al menos contenga información útil

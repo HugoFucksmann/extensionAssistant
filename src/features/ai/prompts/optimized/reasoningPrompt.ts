@@ -11,8 +11,8 @@ import { JsonMarkdownStructuredOutputParser } from "langchain/output_parsers";
 export const reasoningOutputSchema = z.object({
   reasoning: z.string().describe('Razonamiento detallado sobre cómo resolver la tarea'),
   nextAction: z.enum(['use_tool', 'respond']).describe('Acción a realizar'),
-  tool: z.string().nullable().describe('Nombre de la herramienta a utilizar o null si no aplica'),
-  parameters: z.record(z.any()).nullable().describe('Parámetros para la herramienta o null si no aplica'),
+  tool: z.string().nullable().optional(),       // <-- .optional()
+  parameters: z.record(z.any()).nullable().optional(), // <-- .optional()
   response: z.string().nullable().describe('Respuesta final para el usuario o null si no aplica')
 });
 

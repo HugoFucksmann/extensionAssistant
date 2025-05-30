@@ -3,113 +3,172 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 
 /**
- * Tipo de resultado para las búsquedas de archivos
+ * Resultado de la resolución de archivos
  */
-export interface FileSearchResult {
-  uri: vscode.Uri;
-  relativePath: string;
-  fileName: string;
-  extension: string;
-  isExactMatch: boolean;
+export interface FileResolutionResult {
+  success: boolean;
+  uri?: vscode.Uri;
+  relativePath?: string;
+  error?: string;
+  suggestions?: string[];
 }
 
 /**
- * Resuelve una ruta de archivo de manera robusta, intentando múltiples estrategias
+ * Resuelve un archivo a partir de un path o nombre que puede estar mal formado
+ * Maneja múltiples estrategias de búsqueda y proporciona sugerencias útiles
  * @param vscodeAPI API de VS Code
- * @param filePath Ruta del archivo (absoluta o relativa)
- * @returns URI del archivo si se encuentra, undefined si no
+ * @param input Path o nombre del archivo (puede estar mal formado)
+ * @param maxSuggestions Número máximo de sugerencias a devolver
+ * @returns Resultado de la resolución con URI, error o sugerencias
  */
-export async function resolveFilePath(
+export async function resolveFileFromInput(
   vscodeAPI: typeof vscode,
-  filePath: string
-): Promise<vscode.Uri | undefined> {
+  input: string,
+  maxSuggestions: number = 10
+): Promise<FileResolutionResult> {
+  const cleanInput = input.trim();
+  
+  if (!cleanInput) {
+    return {
+      success: false,
+      error: "File path cannot be empty",
+      suggestions: await getWorkspaceFilesSample(vscodeAPI, maxSuggestions)
+    };
+  }
+
   // 1. Intentar como ruta absoluta
   try {
-    const uri = vscode.Uri.file(filePath);
-    await vscodeAPI.workspace.fs.stat(uri); // Verificar si existe
-    return uri;
+    const uri = vscode.Uri.file(cleanInput);
+    await vscodeAPI.workspace.fs.stat(uri);
+    return {
+      success: true,
+      uri,
+      relativePath: vscodeAPI.workspace.asRelativePath(uri, false)
+    };
   } catch (e) {
-    // No es una ruta absoluta válida o el archivo no existe
+    // Continuar con otras estrategias
   }
 
   // 2. Intentar como ruta relativa al workspace
   try {
-    const uri = resolveWorkspacePath(vscodeAPI, filePath);
+    const uri = resolveWorkspacePath(vscodeAPI, cleanInput);
     if (uri) {
-      await vscodeAPI.workspace.fs.stat(uri); // Verificar si existe
-      return uri;
+      await vscodeAPI.workspace.fs.stat(uri);
+      return {
+        success: true,
+        uri,
+        relativePath: vscodeAPI.workspace.asRelativePath(uri, false)
+      };
     }
   } catch (e) {
-    // No es una ruta relativa válida o el archivo no existe
+    // Continuar con búsqueda por nombre
   }
 
-  // 3. Intentar buscar por nombre de archivo
-  const fileName = path.basename(filePath);
-  const results = await findFilesByName(vscodeAPI, fileName);
+  // 3. Buscar por nombre de archivo (exacto)
+  const fileName = path.basename(cleanInput);
+  const exactMatches = await searchFilesByName(vscodeAPI, fileName, false);
   
-  if (results.length === 1) {
-    return results[0].uri;
+  if (exactMatches.length === 1) {
+    return {
+      success: true,
+      uri: exactMatches[0].uri,
+      relativePath: exactMatches[0].relativePath
+    };
   }
 
-  // 4. Si hay múltiples resultados, intentar encontrar la mejor coincidencia
-  if (results.length > 1) {
-    // Intentar encontrar una coincidencia exacta con la ruta relativa
-    const exactMatch = results.find(r => r.relativePath === filePath || r.relativePath.endsWith(filePath));
-    if (exactMatch) {
-      return exactMatch.uri;
-    }
+  if (exactMatches.length > 1) {
+    // Intentar encontrar coincidencia por ruta parcial
+    const pathMatch = exactMatches.find(match => 
+      match.relativePath === cleanInput || 
+      match.relativePath.endsWith(cleanInput) ||
+      cleanInput.endsWith(match.relativePath)
+    );
     
-    // Si no hay coincidencia exacta, devolver undefined (el llamante deberá manejar múltiples resultados)
+    if (pathMatch) {
+      return {
+        success: true,
+        uri: pathMatch.uri,
+        relativePath: pathMatch.relativePath
+      };
+    }
+
+    return {
+      success: false,
+      error: `Multiple files found with name "${fileName}"`,
+      suggestions: exactMatches.map(m => m.relativePath)
+    };
   }
 
-  return undefined;
+  // 4. Búsqueda difusa si no hay coincidencias exactas
+  const fuzzyMatches = await searchFilesByName(vscodeAPI, fileName, true);
+  
+  if (fuzzyMatches.length > 0) {
+    return {
+      success: false,
+      error: `File "${fileName}" not found`,
+      suggestions: fuzzyMatches.slice(0, maxSuggestions).map(m => m.relativePath)
+    };
+  }
+
+  // 5. Si no hay coincidencias, devolver archivos del workspace como sugerencias
+  return {
+    success: false,
+    error: `File not found: ${cleanInput}`,
+    suggestions: await getWorkspaceFilesSample(vscodeAPI, maxSuggestions)
+  };
 }
 
 /**
- * Resuelve un path relativo al primer workspace folder
- * @param vscodeAPI API de VS Code
- * @param relativePath Ruta relativa al workspace
- * @returns URI del archivo o undefined si no se puede resolver
+ * Busca archivos por nombre en el workspace
  */
-export function resolveWorkspacePath(
+async function searchFilesByName(
   vscodeAPI: typeof vscode,
-  relativePath: string
-): vscode.Uri | undefined {
+  fileName: string,
+  fuzzyMatch: boolean = false
+): Promise<Array<{ uri: vscode.Uri; relativePath: string; fileName: string }>> {
+  try {
+    const escapedFileName = fileName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = fuzzyMatch ? `**/*${escapedFileName}*` : `**/${escapedFileName}`;
+    
+    const foundFiles = await vscodeAPI.workspace.findFiles(pattern, '**/node_modules/**');
+    
+    return foundFiles.map(uri => ({
+      uri,
+      relativePath: vscodeAPI.workspace.asRelativePath(uri, false),
+      fileName: path.basename(uri.fsPath)
+    }));
+  } catch (error) {
+    console.error(`Error searching for file ${fileName}:`, error);
+    return [];
+  }
+}
+
+/**
+ * Resuelve un path relativo al workspace
+ */
+function resolveWorkspacePath(vscodeAPI: typeof vscode, relativePath: string): vscode.Uri | undefined {
   const workspaceFolders = vscodeAPI.workspace.workspaceFolders;
   if (!workspaceFolders || workspaceFolders.length === 0) {
     return undefined;
   }
   
-  // Normalizar la ruta para manejar barras invertidas y otros problemas
   const normalizedPath = normalizePath(relativePath);
-  
-  // Eliminar cualquier prefijo ./ que pueda tener la ruta
   const cleanPath = normalizedPath.startsWith('./') ? normalizedPath.substring(2) : normalizedPath;
   
   try {
     return vscode.Uri.joinPath(workspaceFolders[0].uri, cleanPath);
   } catch (error) {
-    console.error(`Error resolving workspace path "${relativePath}":`, error);
     return undefined;
   }
 }
 
 /**
- * Normaliza una ruta de archivo para que sea consistente en todos los sistemas operativos
- * @param filePath Ruta del archivo a normalizar
- * @returns Ruta normalizada
+ * Normaliza una ruta de archivo
  */
-export function normalizePath(filePath: string): string {
-  // Convertir barras invertidas a barras normales (Windows -> Unix)
-  let normalized = filePath.replace(/\\/g, '/');
-  
-  // Eliminar barras duplicadas
-  normalized = normalized.replace(/\/+/g, '/');
-  
-  // Eliminar './' redundantes
+function normalizePath(filePath: string): string {
+  let normalized = filePath.replace(/\\/g, '/').replace(/\/+/g, '/');
   normalized = normalized.replace(/(\/|^)\.\/(?!\.)/g, '$1');
   
-  // Resolver '..' (subir un nivel)
   const parts = normalized.split('/');
   const result = [];
   
@@ -118,7 +177,7 @@ export function normalizePath(filePath: string): string {
       if (result.length > 0 && result[result.length - 1] !== '..') {
         result.pop();
       } else {
-        result.push(part); // Mantener '..' al principio de la ruta
+        result.push(part);
       }
     } else if (part !== '' && part !== '.') {
       result.push(part);
@@ -129,100 +188,20 @@ export function normalizePath(filePath: string): string {
 }
 
 /**
- * Busca archivos por nombre en todo el workspace
- * @param vscodeAPI API de VS Code
- * @param fileName Nombre del archivo a buscar (puede incluir extensión)
- * @param fuzzyMatch Si es true, busca coincidencias parciales
- * @returns Lista de resultados de búsqueda
+ * Obtiene una muestra de archivos del workspace para sugerencias
  */
-export async function findFilesByName(
+async function getWorkspaceFilesSample(
   vscodeAPI: typeof vscode,
-  fileName: string,
-  fuzzyMatch: boolean = false
-): Promise<FileSearchResult[]> {
-  try {
-    // Escapar caracteres especiales en el nombre del archivo
-    const escapedFileName = fileName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    
-    // Crear el patrón de búsqueda
-    let pattern;
-    if (fuzzyMatch) {
-      // Búsqueda difusa: cualquier archivo que contenga el nombre
-      pattern = `**/*${escapedFileName}*`;
-    } else {
-      // Búsqueda exacta: coincidencia exacta con el nombre de archivo
-      pattern = `**/${escapedFileName}`;
-    }
-    
-    // Buscar archivos que coincidan con el patrón
-    const foundFiles = await vscodeAPI.workspace.findFiles(pattern, '**/node_modules/**');
-    
-    // Convertir los resultados a un formato más útil
-    return foundFiles.map(uri => {
-      const relativePath = vscodeAPI.workspace.asRelativePath(uri, false);
-      const parsedPath = path.parse(relativePath);
-      
-      return {
-        uri,
-        relativePath,
-        fileName: parsedPath.base,
-        extension: parsedPath.ext,
-        isExactMatch: parsedPath.base === fileName
-      };
-    });
-  } catch (error) {
-    console.error(`Error searching for file ${fileName}:`, error);
-    return [];
-  }
-}
-
-/**
- * Obtiene una lista de archivos en el workspace para sugerir al modelo
- * @param vscodeAPI API de VS Code
- * @param maxFiles Número máximo de archivos a devolver
- * @param extensions Extensiones de archivo a incluir (por defecto, archivos de código comunes)
- * @returns Lista de rutas relativas de archivos
- */
-export async function getWorkspaceFilesList(
-  vscodeAPI: typeof vscode,
-  maxFiles: number = 50,
-  extensions: string[] = ['.ts', '.js', '.tsx', '.jsx', '.html', '.css', '.json']
+  maxFiles: number = 10
 ): Promise<string[]> {
   try {
-    // Crear un patrón para buscar archivos con las extensiones especificadas
-    const pattern = `**/*{${extensions.join(',')}}`;    
+    const extensions = ['.ts', '.js', '.tsx', '.jsx', '.html', '.css', '.json'];
+    const pattern = `**/*{${extensions.join(',')}}`;
     const foundFiles = await vscodeAPI.workspace.findFiles(pattern, '**/node_modules/**', maxFiles);
     
-    // Convertir a rutas relativas
     return foundFiles.map(uri => vscodeAPI.workspace.asRelativePath(uri, false));
   } catch (error) {
-    console.error('Error getting workspace files list:', error);
+    console.error('Error getting workspace files sample:', error);
     return [];
   }
-}
-
-/**
- * Agrupa archivos por carpeta para una mejor organización
- * @param vscodeAPI API de VS Code
- * @param files Lista de URIs de archivos
- * @returns Objeto con carpetas como claves y listas de archivos como valores
- */
-export function groupFilesByFolder(
-  vscodeAPI: typeof vscode,
-  files: vscode.Uri[]
-): Record<string, string[]> {
-  const result: Record<string, string[]> = {};
-  
-  for (const uri of files) {
-    const relativePath = vscodeAPI.workspace.asRelativePath(uri, false);
-    const dirName = path.dirname(relativePath);
-    
-    if (!result[dirName]) {
-      result[dirName] = [];
-    }
-    
-    result[dirName].push(relativePath);
-  }
-  
-  return result;
 }

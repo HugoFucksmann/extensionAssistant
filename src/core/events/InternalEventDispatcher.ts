@@ -38,7 +38,7 @@ export class InternalEventDispatcher {
 
    
     this.emitter.emit(type, event);
-    this.emitter.emit('*', event);
+    //this.emitter.emit('*', event);
 
    
     return event;

@@ -14,12 +14,15 @@ describe('getProjectSummary', () => {
             } 
           }
         ],
-        asRelativePath: (uri: any) => uri.fsPath || uri,
+        asRelativePath: (uri: any) => {
+          const path = uri.fsPath || uri;
+          return path.replace('/workspace/', '');
+        },
         findFiles: async () => [
-          { fsPath: '/workspace/index.ts', toString: () => 'file:///workspace/index.ts' },
-          { fsPath: '/workspace/package.json', toString: () => 'file:///workspace/package.json' },
-          { fsPath: '/workspace/src', toString: () => 'file:///workspace/src' },
-          { fsPath: '/workspace/.git', toString: () => 'file:///workspace/.git' }
+          { fsPath: '/workspace/index.ts', toString: () => 'file:///workspace/index.ts', scheme: '', authority: '', path: '', query: '', fragment: '', with: () => undefined },
+          { fsPath: '/workspace/package.json', toString: () => 'file:///workspace/package.json', scheme: '', authority: '', path: '', query: '', fragment: '', with: () => undefined },
+          { fsPath: '/workspace/src', toString: () => 'file:///workspace/src', scheme: '', authority: '', path: '', query: '', fragment: '', with: () => undefined },
+          { fsPath: '/workspace/.git', toString: () => 'file:///workspace/.git', scheme: '', authority: '', path: '', query: '', fragment: '', with: () => undefined }
         ],
         fs: {
           readFile: async (uri: any) => {
@@ -34,15 +37,19 @@ describe('getProjectSummary', () => {
             ['package.json', 2], // File
             ['.git', 1] // Directory
           ],
-          FileType: {
-            File: 2,
-            Directory: 1,
-            SymbolicLink: 4,
-            Unknown: 0
-          }
+          stat: async () => ({}),
+          createDirectory: async () => {},
+          writeFile: async () => {},
+          delete: async () => {}
         },
       },
-    },
+      FileType: {
+        File: 2,
+        Directory: 1,
+        SymbolicLink: 4,
+        Unknown: 0
+      }
+    }
   } as any;
 
   it('devuelve un resumen del proyecto', async () => {
@@ -59,8 +66,18 @@ describe('getProjectSummary', () => {
       vscodeAPI: {
         workspace: {
           workspaceFolders: [],
+          fs: {
+            readDirectory: async () => [],
+            readFile: async () => { throw new Error('No workspace'); }
+          }
         },
-      },
+        FileType: {
+          File: 2,
+          Directory: 1,
+          SymbolicLink: 4,
+          Unknown: 0
+        }
+      }
     } as any;
     const result = await getProjectSummary.execute({}, contextNoWs);
     expect(result.success).toBe(true);

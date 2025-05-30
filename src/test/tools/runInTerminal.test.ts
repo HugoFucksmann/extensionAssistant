@@ -17,7 +17,11 @@ describe('runInTerminal', () => {
       terminals: [fakeTerminal],
       createTerminal: (opts: any) => {
         usedTerminalName = opts.name;
-        return fakeTerminal;
+        // Crea un terminal con el nombre solicitado
+        return {
+          ...fakeTerminal,
+          name: opts.name
+        };
       },
       showTextDocument: () => {},
       showNotebookDocument: () => {},
@@ -44,7 +48,10 @@ describe('runInTerminal', () => {
     expect(result.success).toBe(true);
     expect(sentCommand).toBe('echo test');
     expect(shown).toBe(true);
-    expect(usedTerminalName).toBe('AI Assistant Task');
+    if (result.success) {
+      const data = result.data as { terminalName: string };
+      expect(data.terminalName).toBe('AI Assistant Task');
+    }
   });
 
   it('crea un terminal si no existe', async () => {
@@ -66,12 +73,18 @@ describe('runInTerminal', () => {
 
   it('retorna error si ocurre una excepción', async () => {
     const brokenContext = {
-      ...mockContext,
       vscodeAPI: {
-        ...mockContext.vscodeAPI,
         window: {
-          ...mockContext.vscodeAPI.window,
-          createTerminal: () => { throw new Error('fail'); },
+          terminals: [], // Sin terminales existentes
+          createTerminal: () => { 
+            throw new Error('Terminal creation failed'); 
+          },
+          showErrorMessage: () => {},
+          showInformationMessage: () => {},
+          showWarningMessage: () => {},
+        },
+        workspace: {
+          workspaceFolders: [{ uri: { fsPath: '/workspace' } }],
         },
       },
     } as any;

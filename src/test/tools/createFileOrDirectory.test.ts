@@ -8,17 +8,43 @@ describe('createFileOrDirectory', () => {
   const mockContext: ToolExecutionContext = {
     vscodeAPI: {
       workspace: {
-        asRelativePath: (uri: any) => uri.fsPath || uri,
+        workspaceFolders: [{ 
+          name: 'workspace', 
+          uri: { 
+            fsPath: '/workspace',
+            toString: () => 'file:///workspace' 
+          } 
+        }],
+        asRelativePath: (uri: any) => {
+          const path = uri.fsPath || uri;
+          return path.replace('/workspace/', '');
+        },
         fs: {
-          createDirectory: async (_dirUri: any) => {},
-          writeFile: async (targetUri: any, content: Uint8Array) => {
-            createdPath = targetUri.fsPath || targetUri;
-            createdContent = new TextDecoder().decode(content);
+          createDirectory: async (_dirUri: any) => {
+            if (_dirUri.fsPath && _dirUri.fsPath.includes('/dir')) {
+              createdPath = _dirUri.fsPath.replace('/workspace/', '');
+              createdType = 'directory';
+            }
           },
-          stat: async (_uri: any) => ({}),
+          writeFile: async (targetUri: any, content: Uint8Array) => {
+            const path = targetUri.fsPath || targetUri;
+            createdPath = path.replace('/workspace/', '');
+            createdContent = new TextDecoder().decode(content);
+            createdType = 'file';
+          },
+          stat: async (uri: any) => {
+            // Simular que el archivo/directorio no existe lanzando error
+            throw new Error('File not found');
+          },
         },
       },
-    },
+      FileType: {
+        File: 2,
+        Directory: 1,
+        SymbolicLink: 4,
+        Unknown: 0
+      }
+    }
   } as any;
 
   beforeEach(() => {
@@ -47,10 +73,16 @@ describe('createFileOrDirectory', () => {
       vscodeAPI: {
         ...mockContext.vscodeAPI,
         workspace: {
-          ...mockContext.vscodeAPI.workspace,
+          workspaceFolders: [], // Sin workspace para forzar error
           asRelativePath: () => '',
         },
-      },
+        FileType: {
+          File: 2,
+          Directory: 1,
+          SymbolicLink: 4,
+          Unknown: 0
+        }
+      }
     } as any;
     const result = await createFileOrDirectory.execute({ path: '', type: 'file', content: 'fail' }, brokenContext);
     expect(result.success).toBe(false);

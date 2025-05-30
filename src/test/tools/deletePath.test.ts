@@ -6,15 +6,37 @@ describe('deletePath', () => {
   const mockContext: ToolExecutionContext = {
     vscodeAPI: {
       workspace: {
-        asRelativePath: (uri: any) => uri.fsPath || uri,
+        workspaceFolders: [{ 
+          name: 'workspace', 
+          uri: { 
+            fsPath: '/workspace',
+            toString: () => 'file:///workspace' 
+          } 
+        }],
+        asRelativePath: (uri: any) => {
+          const path = uri.fsPath || uri;
+          return path.replace('/workspace/', '');
+        },
         fs: {
           delete: async (targetUri: any, _opts: any) => {
-            deletedPath = targetUri.fsPath || targetUri;
+            const path = targetUri.fsPath || targetUri;
+            deletedPath = path.replace('/workspace/', '');
           },
-          stat: async (_uri: any) => ({}),
+          stat: async (_uri: any) => ({
+            type: 2, // FileType.File
+            ctime: Date.now(),
+            mtime: Date.now(),
+            size: 100
+          }),
         },
       },
-    },
+      FileType: {
+        File: 2,
+        Directory: 1,
+        SymbolicLink: 4,
+        Unknown: 0
+      }
+    }
   } as any;
 
   beforeEach(() => {
@@ -34,10 +56,16 @@ describe('deletePath', () => {
       vscodeAPI: {
         ...mockContext.vscodeAPI,
         workspace: {
-          ...mockContext.vscodeAPI.workspace,
+          workspaceFolders: [], // Sin workspace para forzar error
           asRelativePath: () => '',
         },
-      },
+        FileType: {
+          File: 2,
+          Directory: 1,
+          SymbolicLink: 4,
+          Unknown: 0
+        }
+      }
     } as any;
     const result = await deletePath.execute({ path: '' }, brokenContext);
     expect(result.success).toBe(false);

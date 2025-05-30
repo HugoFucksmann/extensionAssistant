@@ -103,8 +103,7 @@
     "pretest": "npm run compile",
     "test": "jest",
     "test:watch": "jest --watch",
-    "copy-wasm": "node scripts/copy-wasm.js",
-    "compile:src2": "webpack --config webpack.src2.config.js --mode development"
+    "copy-wasm": "node scripts/copy-wasm.js"
   },
   "devDependencies": {
     "@babel/core": "^7.27.3",

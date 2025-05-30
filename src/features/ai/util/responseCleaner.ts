@@ -84,3 +84,18 @@ export function extractStructuredResponse(rawResponse: string): any {
   // Si todo falla, devolver el contenido original
   return rawResponse;
 }
+
+export function normalizeFinalResponse(raw: string): { response: string } {
+  if (!raw) return { response: "" };
+  // Intentar extraer la key "response" de un JSON válido
+  try {
+    const parsed = JSON.parse(raw.trim());
+    if (typeof parsed === "object" && typeof parsed.response === "string") {
+      return { response: parsed.response };
+    }
+  } catch {
+    // No es JSON, continuar
+  }
+  // Si no es JSON, devolver todo el texto como response
+  return { response: raw.trim() };
+}

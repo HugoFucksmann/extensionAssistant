@@ -98,10 +98,10 @@ export class ConversationManager implements IConversationManager {
    
   }
 
-  public async endConversation(chatId: string, memoryManager?: MemoryManager): Promise<void> {
+/*   public async endConversation(chatId: string, memoryManager?: MemoryManager): Promise<void> {
     const state = this.activeConversations.get(chatId);
    
-  }
+  } */
 
   public clearConversation(chatId: string, memoryManager?: MemoryManager): void {
     this.activeConversations.delete(chatId);
