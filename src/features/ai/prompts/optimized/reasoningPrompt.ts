@@ -9,20 +9,11 @@ import { JsonMarkdownStructuredOutputParser } from "langchain/output_parsers";
 
 
 export const reasoningOutputSchema = z.object({
- 
   reasoning: z.string().describe('Razonamiento detallado sobre cómo resolver la tarea'),
-  
- 
   nextAction: z.enum(['use_tool', 'respond']).describe('Acción a realizar'),
-  
- 
-  tool: z.string().optional().describe('Nombre de la herramienta a utilizar'),
-  
-  
-  parameters: z.record(z.any()).optional().describe('Parámetros para la herramienta'),
-  
- 
-  response: z.string().optional().describe('Respuesta final para el usuario')
+  tool: z.string().nullable().describe('Nombre de la herramienta a utilizar o null si no aplica'),
+  parameters: z.record(z.any()).nullable().describe('Parámetros para la herramienta o null si no aplica'),
+  response: z.string().nullable().describe('Respuesta final para el usuario o null si no aplica')
 });
 
 // Tipo para la salida del razonamiento
@@ -65,7 +56,7 @@ ESQUEMA ESPERADO (campos principales):
   "nextAction": "use_tool", // o "respond", ningún otro valor es válido
   "tool": "string (Opcional, si nextAction='use_tool')",
   "parameters": "object (Opcional, si nextAction='use_tool')",
-  "response": "string (Opcional, si nextAction='respond')"
+   "response": "string | null "
 }}
 `]
 ]);

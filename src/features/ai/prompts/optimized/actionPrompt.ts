@@ -5,20 +5,11 @@ import { JsonMarkdownStructuredOutputParser } from "langchain/output_parsers";
 
 // Esquema para validar la salida del modelo
 export const actionOutputSchema = z.object({
-  // Interpretación del resultado de la herramienta
   interpretation: z.string().describe('Interpretación del resultado de la herramienta'),
-  
-  // Siguiente acción a tomar (simplificado a solo use_tool y respond)
   nextAction: z.enum(['use_tool', 'respond']).describe('Siguiente acción a realizar'),
-  
-  // Herramienta a utilizar (si nextAction es 'use_tool')
-  tool: z.string().optional().describe('Nombre de la herramienta a utilizar'),
-  
-  // Parámetros para la herramienta (si nextAction es 'use_tool')
-  parameters: z.record(z.any()).optional().describe('Parámetros para la herramienta'),
-  
-  // Respuesta final (si nextAction es 'respond')
-  response: z.string().optional().describe('Respuesta final para el usuario')
+  tool: z.string().nullable().describe('Nombre de la herramienta a utilizar o null si no aplica'),
+  parameters: z.record(z.any()).nullable().describe('Parámetros para la herramienta o null si no aplica'),
+  response: z.string().nullable().describe('Respuesta final para el usuario o null si no aplica')
 });
 
 // Tipo para la salida de la acción
