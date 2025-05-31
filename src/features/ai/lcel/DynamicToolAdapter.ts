@@ -32,12 +32,7 @@ export function createDynamicTool(
   });
 }
 
-/**
- * Convierte una lista de ToolDefinition en DynamicStructuredTool[] para LangChain.
- * @param toolDefs Lista de ToolDefinition
- * @param toolRegistryExecute Referencia a ToolRegistry.executeTool
- * @param contextDefaults Contexto por defecto para la ejecución
- */
+
 export function createDynamicToolsFromDefinitions(
   toolDefs: ToolDefinition[],
   toolRegistryExecute: (

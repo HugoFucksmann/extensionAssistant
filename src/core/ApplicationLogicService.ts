@@ -6,7 +6,7 @@ import { ToolRegistry } from '../features/tools/ToolRegistry';
 import { ConversationManager } from './ConversationManager';
 import { ToolResult } from '../features/tools/types';
 
-// Tipo unión para aceptar cualquiera de los dos motores ReAct
+
 type ReActEngineType =  OptimizedReActEngine;
 
 export interface ProcessUserMessageResult {
@@ -32,11 +32,7 @@ export class ApplicationLogicService {
     userMessage: string,
     contextData: Record<string, any> = {} 
   ): Promise<ProcessUserMessageResult> {
-    const startTime = Date.now();
-  
-
    
-
     const state = this.conversationManager.getOrCreateConversationState(
       chatId,
       userMessage,
@@ -108,9 +104,6 @@ export class ApplicationLogicService {
 
       await this.memoryManager.storeConversation(chatId, resultState);
 
-      const duration = Date.now() - startTime;
-    
-
       return {
         success: resultState.completionStatus === 'completed', 
         finalResponse: finalResponseText,
@@ -119,8 +112,7 @@ export class ApplicationLogicService {
       };
 
     } catch (error: any) {
-      const duration = Date.now() - startTime;
-    
+   
       const currentState = this.conversationManager.getConversationState(chatId);
       let finalErrorState = currentState || state; 
 

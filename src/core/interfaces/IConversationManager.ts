@@ -6,7 +6,6 @@ export interface IConversationManager {
   getOrCreateConversationState(chatId: string, initialUserMessage: string, contextData: Record<string, any>, vscodeContext: VSCodeContext): WindsurfState;
   getConversationState(chatId: string): WindsurfState | undefined;
   updateConversationState(chatId: string, state: WindsurfState): void;
-/*   endConversation(chatId: string, memoryManager?: MemoryManager): Promise<void>; */
   clearConversation(chatId: string, memoryManager: MemoryManager): void;
 }
 

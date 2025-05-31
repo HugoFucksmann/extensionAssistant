@@ -2,7 +2,8 @@
 import * as vscode from 'vscode';
 import { z } from 'zod';
 import { ToolDefinition, ToolResult,  } from '../../types';
-import { resolveWorkspacePath } from '../utils';
+import { buildWorkspaceUri } from '@shared/utils/pathUtils';
+
 
 // Esquema Zod para los parámetros
 export const getDocumentDiagnosticsParamsSchema = z.object({
@@ -42,7 +43,7 @@ export const getDocumentDiagnostics: ToolDefinition<typeof getDocumentDiagnostic
 
     try {
       if (filePath) {
-        const resolvedUri = resolveWorkspacePath(context.vscodeAPI, filePath);
+        const resolvedUri = buildWorkspaceUri(context.vscodeAPI, filePath);
         if (!resolvedUri) {
           return { success: false, error: `Could not resolve path in workspace: "${filePath}". Ensure a workspace is open and the path is valid.` };
         }
@@ -53,20 +54,21 @@ export const getDocumentDiagnostics: ToolDefinition<typeof getDocumentDiagnostic
       } else {
         const activeEditor = context.vscodeAPI.window.activeTextEditor;
         if (!activeEditor) {
-         
+          // Homogeneiza: error claro, data: null
           try {
             const files = await context.vscodeAPI.workspace.findFiles('**/*.{js,ts,jsx,tsx,html,css,json}', '**/node_modules/**', 10);
             if (files.length > 0) {
               const filesList = files.map(f => context.vscodeAPI.workspace.asRelativePath(f, false)).join('\n- ');
-              return { 
-                success: false, 
-                error: `No active text editor and no filePath provided. Please specify a file path. Here are some files you could check:\n- ${filesList}` 
-              };
+              return {
+                success: false,
+                error: `No active text editor and no filePath provided. Please specify a file path. Here are some files you could check:\n- ${filesList}`,
+                data: undefined
+              }
             }
           } catch (e) {
             // Si falla la búsqueda, usar el mensaje original
           }
-          return { success: false, error: 'No active text editor and no filePath provided. Please specify a filePath parameter.' };
+          return { success: false, error: 'No active text editor and no filePath provided. Please specify a filePath parameter.', data: undefined };
         }
         targetUri = activeEditor.document.uri;
         documentPathForReturn = activeEditor.document.isUntitled ? 

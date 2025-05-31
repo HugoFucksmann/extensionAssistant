@@ -44,7 +44,7 @@ export const runInTerminal: ToolDefinition<typeof runInTerminalParamsSchema, Run
       
       return { success: true, data: { terminalName: term.name, commandSent: true } };
     } catch (error: any) {
-      return { success: false, error: `Failed to run command "${command}" in terminal: ${error.message}` };
+      return { success: false, error: `Failed to run command "${command}" in terminal: ${error.message}`, data: undefined };
     }
   }
 };

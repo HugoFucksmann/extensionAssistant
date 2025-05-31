@@ -54,6 +54,8 @@ export class WebviewEventHandler {
       return;
     }
 
+  
+
     let chatMessage: ChatMessage | null = null;
     let messageType: string | null = null;
 
@@ -99,9 +101,10 @@ export class WebviewEventHandler {
     }
   }
 
-  private createBaseChatMessage(eventId: string, sender: ChatMessage['sender']): Partial<ChatMessage> {
+  private createBaseChatMessage(eventId: string, sender: ChatMessage['sender'], operationId?: string): Partial<ChatMessage> {
     return {
-      id: `msg_${eventId || Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      id: operationId || eventId,
+      operationId: operationId || eventId,
       timestamp: Date.now(),
       sender: sender,
     };
@@ -109,12 +112,13 @@ export class WebviewEventHandler {
 
   private handleToolExecutionStarted(payload: ToolExecutionEventPayload, eventId: string): ChatMessage {
     return {
-      ...this.createBaseChatMessage(eventId, 'system'),
+      ...this.createBaseChatMessage(eventId, 'system', payload.operationId),
       content: payload.toolDescription || `Ejecutando ${payload.toolName || 'herramienta'}...`,
       metadata: {
         status: 'tool_executing',
         toolName: payload.toolName,
         toolInput: payload.toolParams, // O `payload.parameters` si es más apropiado
+        operationId: payload.operationId || eventId,
       },
     } as ChatMessage;
   }
@@ -124,34 +128,35 @@ export class WebviewEventHandler {
       ? `${payload.toolDescription} finalizó.`
       : `${payload.toolName || 'La herramienta'} finalizó.`;
 
-    // Opcionalmente, añadir un breve resumen del resultado si es simple
-    if (payload.result && typeof payload.result === 'string' && payload.result.length < 100) {
+    if (payload.result && typeof payload.result === 'string') {
       content += ` Resultado: ${payload.result}`;
     } else if (payload.result && typeof payload.result === 'object' && payload.result.message && typeof payload.result.message === 'string') {
       content += ` ${payload.result.message}`;
     }
 
     return {
-      ...this.createBaseChatMessage(eventId, 'system'),
+      ...this.createBaseChatMessage(eventId, 'system', payload.operationId),
       content: content,
       metadata: {
         status: 'success',
         toolName: payload.toolName,
         toolInput: payload.toolParams,
         toolOutput: payload.result, 
+        operationId: payload.operationId || eventId,
       },
     } as ChatMessage;
   }
 
   private handleToolExecutionError(payload: ToolExecutionEventPayload, eventId: string): ChatMessage {
     return {
-      ...this.createBaseChatMessage(eventId, 'system'),
+      ...this.createBaseChatMessage(eventId, 'system', payload.operationId),
       content: `Error en ${payload.toolDescription || payload.toolName || 'herramienta'}: ${payload.error || 'Error desconocido'}`,
       metadata: {
         status: 'error',
         toolName: payload.toolName,
         toolInput: payload.toolParams,
         error: payload.error,
+        operationId: payload.operationId || eventId,
       },
     } as ChatMessage;
   }

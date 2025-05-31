@@ -105,8 +105,7 @@ export class ComponentFactory {
 
   public static getApplicationLogicService(extensionContext: vscode.ExtensionContext): ApplicationLogicService {
     if (!this.applicationLogicServiceInstance) {
-      const vscodeContext = this.getVSCodeContext(extensionContext);
-      const dispatcher = this.getInternalEventDispatcher();
+    
 
       const longTermStorage = this.getLongTermStorage(extensionContext); 
       const memoryManager = new MemoryManager(longTermStorage); 

@@ -2,7 +2,8 @@
 import * as vscode from 'vscode';
 import { z } from 'zod';
 import { ToolDefinition, ToolResult,  } from '../../types';
-import { resolveWorkspacePath } from '../utils';
+import { buildWorkspaceUri } from '@shared/utils/pathUtils';
+
 
 // Esquema Zod para los parámetros
 export const deletePathParamsSchema = z.object({
@@ -23,22 +24,22 @@ export const deletePath: ToolDefinition<typeof deletePathParamsSchema, { path: s
     let targetUri: vscode.Uri | undefined;
 
     try {
-      targetUri = resolveWorkspacePath(context.vscodeAPI, path);
+      targetUri = buildWorkspaceUri(context.vscodeAPI, path);
       if (!targetUri) {
-        return { success: false, error: 'Could not resolve path in workspace. Ensure a workspace is open and the path is valid.' };
+        return { success: false, error: 'Could not resolve path in workspace. Ensure a workspace is open and the path is valid.', data: undefined };
       }
 
       try {
         await context.vscodeAPI.workspace.fs.stat(targetUri);
       } catch (e) {
-        return { success: false, error: `Path not found: ${context.vscodeAPI.workspace.asRelativePath(targetUri, false)}` };
+        return { success: false, error: `Path not found: ${context.vscodeAPI.workspace.asRelativePath(targetUri, false)}`, data: undefined };
       }
 
       // { recursive: true, useTrash: true } son los defaults de vscode.workspace.fs.delete
       await context.vscodeAPI.workspace.fs.delete(targetUri, { recursive: true, useTrash: true });
       return { success: true, data: { path: context.vscodeAPI.workspace.asRelativePath(targetUri, false), deleted: true } };
     } catch (error: any) {
-      return { success: false, error: `Failed to delete path "${path}": ${error.message}` };
+      return { success: false, error: `Failed to delete path "${path}": ${error.message}`, data: undefined };
     }
   }
 };

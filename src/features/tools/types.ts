@@ -2,16 +2,16 @@
 import { InternalEventDispatcher } from '@core/events/InternalEventDispatcher';
 import * as vscode from 'vscode';
 import { z, ZodObject, ZodEffects, ZodTypeAny } from 'zod';
+import { ToolOutput } from '../../shared/types'; // IMPORT ToolOutput
 
 
 export type ZodSchemaType = ZodObject<any, any, any, any, any> | ZodEffects<ZodObject<any, any, any, any, any>, any, any> | ZodTypeAny;
 
 
-
-
 export interface ToolResult<T = any> {
   success: boolean;
-  data?: T;
+  data?: T; // Raw data from the tool's specific execute function
+  mappedOutput?: ToolOutput; // Structured and mapped output for events and history
   error?: string;
   executionTime?: number;
   warnings?: string[];
@@ -28,13 +28,9 @@ export interface ToolExecutionContext {
 
 
 export interface ToolDefinition<P_SCHEMA extends ZodSchemaType = ZodSchemaType, R = any> {
-  /**
-   * Indica si la herramienta debe generar feedback visual para la UI (ej: mensaje de chat, notificación, resultado visible).
-   * Si es false, la herramienta solo ejecuta lógica interna o side-effects.
-   */
   uiFeedback: boolean;
   name: string;
   description: string;
   parametersSchema: P_SCHEMA; 
-  execute: (params: z.infer<P_SCHEMA>, context: ToolExecutionContext) => Promise<ToolResult<R>>;
+  execute: (params: z.infer<P_SCHEMA>, context: ToolExecutionContext) => Promise<ToolResult<R>>; // Should return raw data in R
 }

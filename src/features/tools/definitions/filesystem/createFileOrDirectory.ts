@@ -2,7 +2,8 @@
 import * as vscode from 'vscode';
 import { z } from 'zod';
 import { ToolDefinition, ToolResult,  } from '../../types';
-import { resolveWorkspacePath } from '../utils';
+import { buildWorkspaceUri } from '@shared/utils/pathUtils';
+
 
 // Esquema Zod para los parámetros
 export const createFileOrDirectoryParamsSchema = z.object({
@@ -36,9 +37,9 @@ export const createFileOrDirectory: ToolDefinition<typeof createFileOrDirectoryP
     let targetUri: vscode.Uri | undefined;
 
     try {
-      targetUri = resolveWorkspacePath(context.vscodeAPI, path);
+      targetUri = buildWorkspaceUri(context.vscodeAPI, path);
       if (!targetUri) {
-        return { success: false, error: 'Could not resolve path in workspace. Ensure a workspace is open and the path is valid.' };
+        return { success: false, error: 'Could not resolve path in workspace. Ensure a workspace is open and the path is valid.', data: undefined };
       }
 
       const parentDirUri = vscode.Uri.joinPath(targetUri, '..');
@@ -56,7 +57,7 @@ export const createFileOrDirectory: ToolDefinition<typeof createFileOrDirectoryP
             operation = 'exists';
             return { success: true, data: { path: context.vscodeAPI.workspace.asRelativePath(targetUri, false), type: 'directory', operation } };
           } else {
-            return { success: false, error: `Path ${context.vscodeAPI.workspace.asRelativePath(targetUri, false)} exists and is not a directory.` };
+            return { success: false, error: `Path ${context.vscodeAPI.workspace.asRelativePath(targetUri, false)} exists and is not a directory.`, data: undefined };
           }
         }
         await context.vscodeAPI.workspace.fs.createDirectory(targetUri);
@@ -64,7 +65,7 @@ export const createFileOrDirectory: ToolDefinition<typeof createFileOrDirectoryP
       } else { // type === 'file'
         if (existingStat) {
           if (existingStat.type === context.vscodeAPI.FileType.Directory) {
-            return { success: false, error: `Path ${context.vscodeAPI.workspace.asRelativePath(targetUri, false)} exists and is a directory. Cannot overwrite with a file.` };
+            return { success: false, error: `Path ${context.vscodeAPI.workspace.asRelativePath(targetUri, false)} exists and is a directory. Cannot overwrite with a file.`, data: undefined };
           }
           operation = 'overwritten';
         }
@@ -72,7 +73,7 @@ export const createFileOrDirectory: ToolDefinition<typeof createFileOrDirectoryP
         return { success: true, data: { path: context.vscodeAPI.workspace.asRelativePath(targetUri, false), type: 'file', operation } };
       }
     } catch (error: any) {
-      return { success: false, error: `Failed to create/write "${path}": ${error.message}` };
+      return { success: false, error: `Failed to create/write "${path}": ${error.message}`, data: undefined };
     }
   }
 };

@@ -32,11 +32,7 @@ export const getFileContents: ToolDefinition<
         return {
           success: false,
           error: resolution.error || `File not found: ${requestedPath}`,
-          data: {
-            filePath: requestedPath,
-            content: '',
-            availableFiles: resolution.suggestions || []
-          }
+          data: undefined
         };
       }
 
@@ -62,11 +58,7 @@ export const getFileContents: ToolDefinition<
       return {
         success: false,
         error: `Failed to get file contents for "${requestedPath}": ${error.message}`,
-        data: {
-          filePath: requestedPath,
-          content: '',
-          availableFiles: fallbackResolution.suggestions || []
-        }
+        data: undefined
       };
     }
   }

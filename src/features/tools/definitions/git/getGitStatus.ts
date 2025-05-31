@@ -125,10 +125,10 @@ export const getGitStatus: ToolDefinition<typeof getGitStatusParamsSchema, GitSt
   async execute(
     _params,
     context
-  ): Promise<ToolResult<GitStatusData | { errorReason: string, stderr?: string }>> {
+  ): Promise<ToolResult<GitStatusData>> {
     const workspaceFolder = context.vscodeAPI.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!workspaceFolder) {
-      return { success: false, error: 'No workspace folder found to get Git status from.' };
+      return { success: false, error: 'No workspace folder found to get Git status from.', data: undefined };
     }
 
     try {
@@ -136,7 +136,7 @@ export const getGitStatus: ToolDefinition<typeof getGitStatusParamsSchema, GitSt
       const { stdout, stderr } = await execPromise('git status --porcelain=v1 -b -u', { cwd: workspaceFolder, timeout: 10000 }); // -u para mostrar untracked files, timeout de 10s
 
       if (stderr && !stdout.trim() && stderr.toLowerCase().includes("not a git repository")) {
-           return { success: false, data: { errorReason: `The folder ${workspaceFolder} is not a Git repository.` }, error: `The folder ${workspaceFolder} is not a Git repository.` };
+           return { success: false, error: `The folder ${workspaceFolder} is not a Git repository.`, data: undefined };
       }
       if (stderr && !stdout.trim()) { // Otras advertencias de stderr sin stdout podrían ser problemáticas
           context.dispatcher.systemWarning('Git status command produced stderr without stdout', { stderr, toolName: 'getGitStatus' }, context.chatId);
@@ -165,12 +165,12 @@ export const getGitStatus: ToolDefinition<typeof getGitStatusParamsSchema, GitSt
 
       if (error.stderr?.toLowerCase().includes("not a git repository") || error.message?.toLowerCase().includes("not a git repository")) {
         errorReason = `The folder ${workspaceFolder} is not a Git repository.`;
-        return { success: false, data: { errorReason }, error: errorReason };
+        return { success: false, error: errorReason, data: undefined };
       } else if (error.message?.toLowerCase().includes("command not found") || error.code === 'ENOENT') {
         errorReason = "Git command not found. Please ensure Git is installed and in your system's PATH.";
       }
       
-      return { success: false, error: errorReason, data: { errorReason, stderr: error.stderr } };
+      return { success: false, error: errorReason, data: undefined };
     }
   }
 };

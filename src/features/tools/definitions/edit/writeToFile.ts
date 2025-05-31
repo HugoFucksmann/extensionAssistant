@@ -2,7 +2,8 @@
 import * as vscode from 'vscode';
 import { z } from 'zod';
 import { ToolDefinition, ToolResult,  } from '../../types';
-import { resolveWorkspacePath } from '../utils';
+import { buildWorkspaceUri } from '@shared/utils/pathUtils';
+
 
 // Esquema Zod para los parámetros
 export const writeToFileParamsSchema = z.object({
@@ -23,7 +24,7 @@ export const writeToFile: ToolDefinition<typeof writeToFileParamsSchema, { fileP
     let targetUri: vscode.Uri | undefined;
 
     try {
-      targetUri = resolveWorkspacePath(context.vscodeAPI, path);
+      targetUri = buildWorkspaceUri(context.vscodeAPI, path);
       if (!targetUri) {
         return { success: false, error: 'Could not resolve path in workspace. Ensure a workspace is open and the path is valid.' };
       }

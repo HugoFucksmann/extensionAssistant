@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
+    "module": "ESNext",
     "target": "ES2020",
     "outDir": "out",
     "lib": ["ES2020", "DOM"],
@@ -14,15 +14,22 @@
       "@ai/*": ["src/features/ai/*"],
       "@memory/*": ["src/features/memory/*"],
       "@tools/*": ["src/features/tools/*"],
-      "@events/*": ["src/features/events/*"]
+      "@events/*": ["src/features/events/*"],
+      "@shared/types": ["src/shared/types.ts"],
+      "@components/*": ["src/vscode/react/Components/*"],
+      "@context/*": ["src/vscode/react/context/*"]
     },
     "strict": true,
     "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
-    "jsx": "react",
+    "jsx": "react-jsx",
     "incremental": true,
-    "tsBuildInfoFile": "./out/.tsbuildinfo"
+    "tsBuildInfoFile": "./out/.tsbuildinfo",
+    "moduleResolution": "node",
+    "allowImportingTsExtensions": false,
+    "noEmit": true
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", ".vscode-test", "out"]

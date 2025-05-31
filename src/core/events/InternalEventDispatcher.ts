@@ -19,7 +19,7 @@ export class InternalEventDispatcher {
    * @param payload El payload del evento, conforme a la interfaz correspondiente.
    * @returns El objeto WindsurfEvent completo que fue emitido.
    */
-  public dispatch(type: EventType, payload: EventPayload): WindsurfEvent {
+  public dispatch(type: EventType, payload: EventPayload, forcedId?: string): WindsurfEvent {
     const event: WindsurfEvent = {
       type,
       payload: {
@@ -27,7 +27,7 @@ export class InternalEventDispatcher {
         timestamp: payload.timestamp || Date.now(), 
       },
       timestamp: Date.now(),
-      id: uuidv4(),
+      id: forcedId || uuidv4(),
     };
 
   

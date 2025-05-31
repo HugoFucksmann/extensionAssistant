@@ -32,8 +32,8 @@ export const getActiveEditorInfo: ToolDefinition<typeof getActiveEditorInfoParam
   ): Promise<ToolResult<ActiveEditorInfo | null>> {
     const editor = context.vscodeAPI.window.activeTextEditor;
     if (!editor) {
-      // Es válido que no haya un editor activo, no es un error de la herramienta en sí.
-      return { success: true, data: null, warnings: ['No active text editor found.'] };
+      // Para feedback uniforme, poner warning en error y data en null
+      return { success: false, error: 'No active text editor found.', data: null };
     }
 
     const document = editor.document;

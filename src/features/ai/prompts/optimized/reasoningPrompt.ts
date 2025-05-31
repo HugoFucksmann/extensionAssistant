@@ -13,7 +13,7 @@ export const reasoningOutputSchema = z.object({
   nextAction: z.enum(['use_tool', 'respond']).describe('Acción a realizar'),
   tool: z.string().nullable().optional(),       // <-- .optional()
   parameters: z.record(z.any()).nullable().optional(), // <-- .optional()
-  response: z.string().nullable().describe('Respuesta final para el usuario o null si no aplica')
+  response: z.string().nullable().optional() // <-- .optional() para hacerlo opcional
 });
 
 // Tipo para la salida del razonamiento

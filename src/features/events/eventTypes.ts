@@ -1,4 +1,5 @@
 // src/features/events/eventTypes.ts
+import { ToolOutput } from '../../shared/types'; // Import ToolOutput
 
 /**
  * All supported event types in the system
@@ -43,7 +44,10 @@ export interface BaseEventPayload {
   timestamp?: number; 
   chatId?: string;    
   source?: string;    
-  // operationId?: string; // Optional: for correlating events to a specific user operation
+  /**
+   * Identificador único opcional para correlacionar eventos de una misma operación/herramienta.
+   */
+  operationId?: string;
 }
 
 // ... (ConversationEventPayload, ConversationEndedPayload - keep as is) ...
@@ -53,7 +57,7 @@ export interface ConversationEventPayload extends BaseEventPayload {
   duration?: number; 
 }
 export interface ConversationEndedPayload extends BaseEventPayload {
-  reason: 'completed' | 'cleared_by_user' | 'error' | 'max_iterations_reached';
+  finalStatus: 'completed' | 'cleared_by_user' | 'error' | 'max_iterations_reached' | 'failed' | 'cancelled'; // Added 'failed', 'cancelled' and changed 'reason' to 'finalStatus'
   duration?: number;
 }
 
@@ -82,7 +86,7 @@ export interface LlmRequestCompletedPayload extends LlmRequestStartedPayload {
 * Agent Phase Event Payload (NEW or Refined ReActEventPayload)
 */
 export interface AgentPhaseEventPayload extends BaseEventPayload {
-  phase: 'reasoning' | 'action' | 'finalResponseGeneration' | 'reflection' | 'correction' | string; // string for extensibility
+  phase: 'reasoning' | 'action' | 'finalResponseGeneration' | 'reflection' | 'correction' | 'toolOutputAnalysis' | 'initialAnalysis' | 'toolExecution' | string; // Added toolOutputAnalysis, initialAnalysis, toolExecution
   iteration?: number;
   data?: any;       // Relevant data from the phase (e.g., reasoning output, action details)
   duration?: number;  // ms for this phase
@@ -96,8 +100,8 @@ export type ReActEventPayload = AgentPhaseEventPayload;
 // ... (ToolExecutionEventPayload, ResponseEventPayload, NodeEventPayload, ErrorOccurredEventPayload, SystemEventPayload, UserInteractionRequiredPayload, UserInputReceivedPayload - keep as is or ensure they extend BaseEventPayload correctly) ...
 export interface ToolExecutionEventPayload extends BaseEventPayload {
   toolName: string;
-  parameters?: Record<string, any>; // Parámetros originales/validados
-  result?: any;
+  parameters?: Record<string, any>; 
+  result?: ToolOutput; // <--- UPDATED from any to ToolOutput
   error?: string;
   duration?: number;
   toolDescription?: string; // Descripción amigable de la acción de la herramienta (NUEVO)

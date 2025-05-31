@@ -32,6 +32,7 @@ interface AppState {
 type AppAction =
   | { type: 'SET_MESSAGES'; payload: ChatMessage[] }
   | { type: 'ADD_MESSAGE'; payload: ChatMessage }
+  | { type: 'UPDATE_MESSAGE'; payload: { id: string; [key: string]: any } }
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_CHAT_ID'; payload: string | null }
   | { type: 'SET_SHOW_HISTORY'; payload: boolean }
@@ -104,7 +105,47 @@ function appReducer(state: AppState, action: AppAction): AppState {
         return { ...state, testModeEnabled: action.payload };
     case 'ADD_MESSAGE': {
       const msg = action.payload;
-      return { ...state, messages: [...state.messages, msg] };
+      // Usar operationId como id si existe (para feedback de herramientas)
+      const msgId = msg.metadata?.operationId || msg.operationId || msg.id;
+      // Evitar duplicados de feedback/tool: si ya existe uno con ese id, actualizarlo
+      const exists = state.messages.some(m => m.id === msgId);
+      if (exists) {
+        const idx = state.messages.findIndex(m => m.id === msgId);
+        const updatedMessages = [...state.messages];
+        updatedMessages[idx] = { ...updatedMessages[idx], ...msg, id: msgId };
+        return { ...state, messages: updatedMessages };
+      }
+      return { ...state, messages: [...state.messages, { ...msg, id: msgId }] };
+    }
+    case 'UPDATE_MESSAGE': {
+      // Usar operationId como id si existe (para feedback de herramientas)
+      const { id, operationId, ...rest } = action.payload;
+      const msgId = operationId || id;
+      const idx = state.messages.findIndex(msg => msg.id === msgId);
+      if (idx === -1) {
+        // Si no existe, agregar como nuevo feedback
+        return {
+          ...state,
+          messages: [
+            ...state.messages,
+            {
+              id: msgId || `agent_${Date.now()}`,
+              content: rest.content || '',
+              sender: 'system',
+              timestamp: rest.timestamp || Date.now(),
+              metadata: rest.metadata || {},
+            }
+          ]
+        };
+      }
+      const updatedMessages = [...state.messages];
+      updatedMessages[idx] = {
+        ...updatedMessages[idx],
+        ...rest,
+        id: updatedMessages[idx].id,
+        timestamp: rest.timestamp || updatedMessages[idx].timestamp
+      };
+      return { ...state, messages: updatedMessages };
     }
     default:
       return state;
@@ -145,9 +186,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         case 'sessionReady':
           dispatch({ type: 'SESSION_READY', payload });
           break;
-        case 'modelSwitched':
-          dispatch({ type: 'SET_CURRENT_MODEL', payload: payload.modelType });
-          break;
         case 'assistantResponse':
           dispatch({
             type: 'ADD_MESSAGE', payload: {
@@ -163,19 +201,12 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         case 'newChatStarted':
           dispatch({ type: 'NEW_CHAT_STARTED', payload: { chatId: payload.chatId } });
           break;
-        case 'agentActionUpdate':
-          dispatch({
-            type: 'ADD_MESSAGE',
-            payload: {
-              id: payload.id || `agent_${Date.now()}`,
-              content: payload.content || '',
-              sender: 'system',
-              timestamp: payload.timestamp || Date.now(),
-              metadata: payload.metadata || {},
-            }
-          });
+        case 'agentActionUpdate': {
+          // Usar operationId como id para UPDATE_MESSAGE si existe
+          const { operationId, id, ...rest } = payload;
+          dispatch({ type: 'UPDATE_MESSAGE', payload: { id: operationId || id, operationId, ...rest } });
           break;
-
+        }
         case 'systemError':
           dispatch({
             type: 'ADD_MESSAGE', payload: {

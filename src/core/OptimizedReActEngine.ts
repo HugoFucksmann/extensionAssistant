@@ -1,8 +1,8 @@
 // src/core/OptimizedReActEngine.ts
-import { WindsurfState, HistoryEntry } from '../shared/types';
+import { WindsurfState, HistoryEntry, ToolOutput } from '../shared/types'; 
 import { ToolRegistry } from '../features/tools/ToolRegistry';
 import { InternalEventDispatcher } from './events/InternalEventDispatcher';
-import { EventType, AgentPhaseEventPayload, ResponseEventPayload } from '../features/events/eventTypes';
+import { EventType, AgentPhaseEventPayload, ResponseEventPayload, ToolExecutionEventPayload } from '../features/events/eventTypes';
 import { ModelManager } from '../features/ai/ModelManager';
 import { runOptimizedAnalysisChain } from '../features/ai/lcel/OptimizedAnalysisChain';
 import { runOptimizedReasoningChain } from '../features/ai/lcel/OptimizedReasoningChain';
@@ -14,6 +14,7 @@ import { ResponseOutput } from '../features/ai/prompts/optimized/responsePrompt'
 import { AgentMemory } from '../features/memory/AgentMemory';
 import { LongTermStorage } from '../features/memory/LongTermStorage';
 import { z } from 'zod';
+import { ToolResult as InternalToolResult } from '../features/tools/types'; 
 
 export class OptimizedReActEngine {
   private toolsDescriptionCache: string | null = null;
@@ -28,9 +29,6 @@ export class OptimizedReActEngine {
     this.dispatcher.systemInfo('OptimizedReActEngine initialized.', { source: 'OptimizedReActEngine' }, 'OptimizedReActEngine');
   }
 
-  /**
-   * Obtiene una descripción concisa de las herramientas disponibles
-   */
   private getToolsDescription(): string {
     if (this.toolsDescriptionCache) {
       return this.toolsDescriptionCache;
@@ -49,21 +47,18 @@ export class OptimizedReActEngine {
     return this.toolsDescriptionCache;
   }
 
-  /**
-   * Convierte un esquema Zod a una descripción legible
-   */
   private zodSchemaToDescription(schema: z.ZodTypeAny): string {
     if (!schema || !schema._def) return "No se definieron parámetros.";
   
     try {
       if (schema._def.typeName === 'ZodObject') {
-        const shape = schema._def.shape(); // Usar el método shape()
+        const shape = schema._def.shape(); 
         if (!shape) return "Esquema de objeto sin forma definida.";
   
         return Object.entries(shape)
           .map(([key, val]: [string, any]) => {
             const isOptional = val._def?.typeName === 'ZodOptional' || val.isOptional();
-            const innerType = isOptional ? (val._def.innerType || val._def.schema) : val; // Manejar optional() y .optional()
+            const innerType = isOptional ? (val._def.innerType || val._def.schema) : val; 
             const typeDesc = innerType._def?.typeName?.replace('Zod', '').toLowerCase() || 'unknown';
             const description = innerType.description ? ` - ${innerType.description}` : '';
             
@@ -71,7 +66,7 @@ export class OptimizedReActEngine {
           })
           .join('\n');
       } else if (schema.description) {
-          return schema.description; // Para tipos simples con descripción
+          return schema.description; 
       } else {
           return `Parámetro de tipo: ${schema._def.typeName?.replace('Zod', '').toLowerCase() || 'desconocido'}`;
       }
@@ -81,56 +76,45 @@ export class OptimizedReActEngine {
     }
   }
 
-  /**
-   * Añade una entrada al historial del estado
-   */
   private addHistoryEntry(
     state: WindsurfState, 
-    phase: string,
+    phase: HistoryEntry['phase'], 
     content: string | Record<string, any>,
     metadata: Partial<HistoryEntry['metadata']> = {}
   ): void {
-
     const entry: HistoryEntry = {
       timestamp: Date.now(),
-      phase: phase as any, 
-      content: typeof content === 'string' ? content : JSON.stringify(content),
-      metadata: {
-        ...metadata,
-        iteration: state.iterationCount
+      phase: phase, 
+      content: typeof content === 'string' ? content : JSON.stringify(content), 
+      metadata: { 
+        status: 'success', 
+        ...metadata, 
+        iteration: state.iterationCount, 
       }
     };
-    
     state.history.push(entry);
   }
 
-  /**
-   * Ejecuta el flujo ReAct optimizado
-   */
   public async run(initialState: WindsurfState): Promise<WindsurfState> {
-  
     const currentState = { ...initialState };
     currentState.iterationCount = currentState.iterationCount || 0;
     currentState.history = currentState.history || [];
     
-  
     const memory = new AgentMemory(
       this.longTermStorage,
       currentState.chatId,
       { 
         userQuery: currentState.userMessage || '',
-        activeFile: currentState.context?.activeFile,
-        workspaceRoot: currentState.context?.workspaceRoot
+        activeFile: currentState.context?.activeFile, 
+        workspaceRoot: currentState.context?.workspaceRoot 
       }
     );
     
-    // Recuperar memoria relevante
     await memory.retrieveRelevantMemory(currentState.userMessage || '');
     const memorySummary = memory.getMemorySummary();
     
-    // Función para enviar eventos de fase del agente
     const agentPhaseDispatch = (
-      phase: string,
+      phase: AgentPhaseEventPayload['phase'], 
       status: 'started' | 'completed', 
       data?: any, 
       error?: string
@@ -145,190 +129,196 @@ export class OptimizedReActEngine {
         data,
         error,
         source: 'OptimizedReActEngine',
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        iteration: currentState.iterationCount
       };
-      
       this.dispatcher.dispatch(eventType, payload);
     };
     
+    const startTime = Date.now(); 
 
     try {
-      // --- Fase de análisis inicial ---
       agentPhaseDispatch('initialAnalysis', 'started');
-            // --- LCEL: Fase de análisis ---
-       const model = this.modelManager.getActiveModel();
-       console.log('[OptimizedReActEngine] --- Fase de análisis inicial ---');
-const analysisResult = await runOptimizedAnalysisChain({
-  userQuery: currentState.userMessage || '',
-  availableTools: this.toolRegistry.getToolNames(),
-  codeContext: JSON.stringify(currentState.context || {}),
-  memoryContext: memorySummary,
-  model
-});
-console.log('[OptimizedReActEngine] Resultado de análisis:', JSON.stringify(analysisResult, null, 2));
+      const model = this.modelManager.getActiveModel();
+      console.log('[OptimizedReActEngine] --- Fase de análisis inicial ---');
+      const analysisResult = await runOptimizedAnalysisChain({
+        userQuery: currentState.userMessage || '',
+        availableTools: this.toolRegistry.getToolNames(),
+        codeContext: JSON.stringify(currentState.editorContext || currentState.projectContext || {}), 
+        memoryContext: memorySummary,
+        model
+      });
+      console.log('[OptimizedReActEngine] Resultado de análisis:', JSON.stringify(analysisResult, null, 2));
 
-this.addHistoryEntry(currentState, 'reasoning', analysisResult);
-agentPhaseDispatch('initialAnalysis', 'completed', { analysis: analysisResult });
+      this.addHistoryEntry(currentState, 'reasoning', analysisResult, { phase_details: 'initial_analysis' }); 
+      agentPhaseDispatch('initialAnalysis', 'completed', { analysis: analysisResult });
       
-      // Guardar comprensión en memoria
       memory.addToShortTermMemory({
         type: 'context',
         content: analysisResult.understanding,
         relevance: 1.0
       });
       
-      // --- Fase de ejecución iterativa ---
-      const toolResults: Array<{tool: string, result: any}> = [];
+     
+      const toolResultsAccumulator: Array<{tool: string, toolCallResult: InternalToolResult}> = []; 
       let isCompleted = false;
       
       while (!isCompleted && currentState.iterationCount < this.MAX_ITERATIONS) {
-  currentState.iterationCount++;
-  console.log(`[OptimizedReActEngine] --- Iteración ${currentState.iterationCount} ---`);
+        currentState.iterationCount++;
+        const iterationStartTime = Date.now();
+        console.log(`[OptimizedReActEngine] --- Iteración ${currentState.iterationCount} ---`);
 
-  // Fase de razonamiento
-  agentPhaseDispatch('reasoning', 'started');
-  // --- LCEL: Fase de razonamiento ---
-  const reasoningResult: ReasoningOutput = await runOptimizedReasoningChain({
-    userQuery: currentState.userMessage || '',
-    analysisResult,
-    toolsDescription: this.getToolsDescription(),
-    previousToolResults: toolResults.map(tr => ({ name: tr.tool, result: tr.result })),
-    memoryContext: memory.getMemorySummary(),
-    model
-  });
-  console.log('[OptimizedReActEngine] Resultado de razonamiento:', JSON.stringify(reasoningResult, null, 2));
-  console.log('[OptimizedReActEngine] Decisión nextAction:', reasoningResult.nextAction);
+        agentPhaseDispatch('reasoning', 'started');
+        const reasoningResult: ReasoningOutput = await runOptimizedReasoningChain({
+          userQuery: currentState.userMessage || '',
+          analysisResult,
+          toolsDescription: this.getToolsDescription(),
+          
+          previousToolResults: toolResultsAccumulator.map(tr => ({ 
+            name: tr.tool, 
+            result: tr.toolCallResult.data ?? tr.toolCallResult.error ?? "No data/error from tool" 
+          })),
+          memoryContext: memory.getMemorySummary(),
+          model
+        });
+        console.log('[OptimizedReActEngine] Resultado de razonamiento:', JSON.stringify(reasoningResult, null, 2));
+        console.log('[OptimizedReActEngine] Decisión nextAction:', reasoningResult.nextAction);
 
-  this.addHistoryEntry(currentState, 'reasoning', reasoningResult);
-  agentPhaseDispatch('reasoning', 'completed', { reasoning: reasoningResult });
+        this.addHistoryEntry(currentState, 'reasoning', reasoningResult);
+        agentPhaseDispatch('reasoning', 'completed', { reasoning: reasoningResult });
 
-  // Decidir siguiente acción
-  if (reasoningResult.nextAction === 'respond') {
-    console.log('[OptimizedReActEngine] El modelo decidió responder al usuario.');
-    // Generar respuesta final
-    currentState.finalOutput = reasoningResult.response || '';
-    isCompleted = true;
-    continue;
-  }
+        if (reasoningResult.nextAction === 'respond') {
+          console.log('[OptimizedReActEngine] El modelo decidió responder al usuario.');
+          currentState.finalOutput = reasoningResult.response || 'No specific response content provided by model.';
+          isCompleted = true;
+          continue;
+        }
 
-  // Ejecutar herramienta
-  if (reasoningResult.nextAction === 'use_tool' && reasoningResult.tool) {
+        if (reasoningResult.nextAction === 'use_tool' && reasoningResult.tool) {
+          const toolExecutionStartTime = Date.now();
           agentPhaseDispatch('toolExecution', 'started', {
-  tool: reasoningResult.tool,
-  parameters: reasoningResult.parameters
-});
-console.log(`[OptimizedReActEngine] Ejecutando herramienta: ${reasoningResult.tool} con parámetros:`, reasoningResult.parameters);
+            tool: reasoningResult.tool,
+            parameters: reasoningResult.parameters
+          });
+          console.log(`[OptimizedReActEngine] Ejecutando herramienta: ${reasoningResult.tool} con parámetros:`, reasoningResult.parameters);
 
-try {
-  const toolResult = await this.toolRegistry.executeTool(
-    reasoningResult.tool,
-    reasoningResult.parameters || {},
-    { chatId: currentState.chatId }
-  );
-  console.log(`[OptimizedReActEngine] Resultado de herramienta (${reasoningResult.tool}):`, JSON.stringify(toolResult, null, 2));
+          try {
+            const internalToolResult: InternalToolResult = await this.toolRegistry.executeTool(
+              reasoningResult.tool,
+              reasoningResult.parameters || {},
+              { chatId: currentState.chatId }
+            );
+            
+            console.log(`[OptimizedReActEngine] Resultado de herramienta (${reasoningResult.tool}):`, JSON.stringify(internalToolResult, null, 2));
+            
+            const toolExecParams = reasoningResult.parameters === null ? undefined : reasoningResult.parameters;
 
-  this.addHistoryEntry(currentState, 'action', {
-    tool: reasoningResult.tool,
-    parameters: reasoningResult.parameters,
-    result: toolResult
-  });
+            this.addHistoryEntry(currentState, 'action', {
+              tool: reasoningResult.tool,
+              parameters: toolExecParams, 
+              result_summary: internalToolResult.success ? "Success" : `Error: ${internalToolResult.error}` 
+            }, { 
+                tool_executions: [{ 
+                    name: reasoningResult.tool!,
+                    parameters: toolExecParams, 
+                    status: internalToolResult.success ? 'completed' : 'error',
+                    result: internalToolResult.mappedOutput, 
+                    error: internalToolResult.error,
+                    startTime: toolExecutionStartTime,
+                    endTime: Date.now(),
+                    duration: Date.now() - toolExecutionStartTime,
+                }]
+            });
+            
+            
+            toolResultsAccumulator.push({
+              tool: reasoningResult.tool,
+              toolCallResult: internalToolResult 
+            });
+         
+            console.log('[OptimizedReActEngine] toolResults acumulados (data/error):', JSON.stringify(toolResultsAccumulator.map(tr => tr.toolCallResult.data || tr.toolCallResult.error), null, 2));
 
-  toolResults.push({
-    tool: reasoningResult.tool,
-    result: toolResult
-  });
-  console.log('[OptimizedReActEngine] toolResults acumulados:', JSON.stringify(toolResults, null, 2));
+            memory.addToShortTermMemory({
+              type: 'tools',
+              content: {
+                tool: reasoningResult.tool,
+                result: internalToolResult.success ?
+                  (typeof internalToolResult.mappedOutput?.message === 'string' ? internalToolResult.mappedOutput.message.substring(0,200) : 
+                   typeof internalToolResult.data === 'string' ? internalToolResult.data.substring(0, 200) : // Check raw data
+                   'Datos obtenidos correctamente') :
+                  `Error: ${internalToolResult.error}`
+              },
+              relevance: 0.9
+            });
+            console.log('[OptimizedReActEngine] Memoria relevante:', memory.getMemorySummary());
 
-  // Guardar resultado de herramienta en memoria
-  memory.addToShortTermMemory({
-    type: 'tools',
-    content: {
-      tool: reasoningResult.tool,
-      result: toolResult.success ?
-        (typeof toolResult.data === 'string' ? toolResult.data.substring(0, 200) : 'Datos obtenidos correctamente') :
-        `Error: ${toolResult.error}`
-    },
-    relevance: 0.9
-  });
-  console.log('[OptimizedReActEngine] Memoria relevante:', memory.getMemorySummary());
+            agentPhaseDispatch('toolOutputAnalysis', 'started', { 
+                toolName: reasoningResult.tool, 
+                toolOutput: internalToolResult.mappedOutput 
+            });
 
-  agentPhaseDispatch('toolExecution', 'completed', {
-    tool: reasoningResult.tool,
-    result: toolResult
-  });
+            const actionResult: ActionOutput = await runOptimizedActionChain({
+              userQuery: currentState.userMessage || '',
+              lastToolName: reasoningResult.tool!,
+              
+              lastToolResult: internalToolResult.data ?? internalToolResult.error ?? "No data/error from tool", 
+              previousActions: toolResultsAccumulator.slice(0, -1).map(tr => ({ 
+                  tool: tr.tool, 
+                
+                  result: tr.toolCallResult.data ?? tr.toolCallResult.error ?? "No data/error from tool" 
+              })),
+              memoryContext: memory.getMemorySummary(),
+              model
+            });
+            console.log('[OptimizedReActEngine] Resultado de acción:', JSON.stringify(actionResult, null, 2));
 
-  // Fase de acción (interpretar resultado y decidir siguiente paso)
-  agentPhaseDispatch('action', 'started');
-  // --- LCEL: Fase de acción ---
-  const actionResult: ActionOutput = await runOptimizedActionChain({
-    userQuery: currentState.userMessage || '',
-    lastToolName: reasoningResult.tool!,
-    lastToolResult: toolResult,
-    previousActions: toolResults.slice(0, -1).map(tr => ({ tool: tr.tool, result: tr.result })),
-    memoryContext: memory.getMemorySummary(),
-    model
-  });
-  console.log('[OptimizedReActEngine] Resultado de acción:', JSON.stringify(actionResult, null, 2));
+            this.addHistoryEntry(currentState, 'action', actionResult, { phase_details: 'action_interpretation' });
+            agentPhaseDispatch('toolOutputAnalysis', 'completed', { 
+                toolName: reasoningResult.tool, 
+                modelDecision: actionResult 
+            });
 
-  this.addHistoryEntry(currentState, 'action', actionResult);
-  agentPhaseDispatch('action', 'completed', { nextAction: actionResult });
+            if (actionResult.nextAction === 'respond') {
+              console.log('[OptimizedReActEngine] El modelo decidió responder tras ejecutar la herramienta.');
+              currentState.finalOutput = actionResult.response || 'No specific response content provided by model after tool use.';
+              isCompleted = true;
+            }
 
-  // Decidir siguiente acción basada en la interpretación
-  if (actionResult.nextAction === 'respond') {
-    console.log('[OptimizedReActEngine] El modelo decidió responder tras ejecutar la herramienta.');
-    currentState.finalOutput = actionResult.response || '';
-    isCompleted = true;
-  }
-  // La opción 'reflect' se ha eliminado del esquema para simplificar el flujo
-  // Si nextAction es 'use_tool', continuará con la siguiente iteración
-
-} catch (toolError: any) {
-  const errorMessage = `Error al ejecutar herramienta ${reasoningResult.tool}: ${toolError.message}`;
-  console.error('[OptimizedReActEngine]', errorMessage);
-
-  this.addHistoryEntry(currentState, 'system_message', errorMessage); // Usar 'system_message' en lugar de 'error'
-  agentPhaseDispatch('toolExecution', 'completed', null, errorMessage);
-
-  // Continuar con la siguiente iteración
-}
-}
+          } catch (toolError: any) {
+            const errorMessage = `Error al ejecutar herramienta ${reasoningResult.tool}: ${toolError.message}`;
+            console.error('[OptimizedReActEngine]', errorMessage);
+            this.addHistoryEntry(currentState, 'system_message', errorMessage, { status: 'error' });
+            agentPhaseDispatch('toolExecution', 'completed', { tool: reasoningResult.tool }, errorMessage); 
+          }
+        } else if (reasoningResult.nextAction === 'use_tool' && !reasoningResult.tool) {
+            const errorMsg = "Model decided to use a tool but did not specify which tool.";
+            console.warn(`[OptimizedReActEngine] ${errorMsg}`);
+            this.addHistoryEntry(currentState, 'system_message', errorMsg, { status: 'error' });
+            currentState.finalOutput = "I tried to use a tool, but I'm unsure which one. Can you clarify?";
+            isCompleted = true;
+        }
+        console.log(`[OptimizedReActEngine] Iteración ${currentState.iterationCount} completada en ${Date.now() - iterationStartTime}ms`);
       }
       
-      // --- Fase de respuesta final ---
-      if (!currentState.finalOutput) {
+      if (!currentState.finalOutput && !isCompleted) { 
         agentPhaseDispatch('finalResponseGeneration', 'started');
-                // --- LCEL: Fase de respuesta final ---
          const responseResult = await runOptimizedResponseChain({
            userQuery: currentState.userMessage || '',
-           toolResults,
+           // CORRECTED: Pass raw data or error to the model
+           toolResults: toolResultsAccumulator.map(tr => ({ 
+               tool: tr.tool, 
+               result: tr.toolCallResult.data ?? tr.toolCallResult.error ?? "No data/error from tool"
+            })), 
            analysisResult,
            memoryContext: memory.getMemorySummary(),
            model
          }) as ResponseOutput;
         
-        currentState.finalOutput = responseResult.response;
-        this.addHistoryEntry(currentState, 'responseGeneration', responseResult); // Usar 'responseGeneration' en lugar de 'response_generation'
-        
-        // Guardar elementos de memoria identificados
-      /*   if (responseResult.memoryItems) {
-          for (const item of responseResult.memoryItems) {
-            const memoryId = await memory.persistToLongTermMemory({
-              type: item.type,
-              content: item.content,
-              relevance: item.relevance,
-              metadata: {
-                source: 'finalResponse',
-                chatId: currentState.chatId
-              }
-            });
-           
-          }
-        } */
-        
+        currentState.finalOutput = responseResult.response || "The process completed, but no specific final response was generated.";
+        this.addHistoryEntry(currentState, 'responseGeneration', responseResult);
         agentPhaseDispatch('finalResponseGeneration', 'completed', { response: responseResult });
       }
       
-      // Marcar como completado
       currentState.completionStatus = 'completed';
       
     } catch (error: any) {
@@ -336,17 +326,16 @@ try {
       currentState.error = error.message;
       currentState.completionStatus = 'failed';
       
-      // Enviar evento de error
       this.dispatcher.dispatch(EventType.SYSTEM_ERROR, {
         message: `Error en OptimizedReActEngine: ${error.message}`,
         level: 'error',
         chatId: currentState.chatId,
-        details: { error: error.stack },
-        source: 'OptimizedReActEngine'
+        details: { error: error.stack || error.toString() }, 
+        source: 'OptimizedReActEngine',
+        timestamp: Date.now()
       });
     }
     
-    // --- Enviar eventos finales ---
     if (currentState.finalOutput) {
       const responsePayload: ResponseEventPayload = {
         responseContent: typeof currentState.finalOutput === 'string' ? 
@@ -354,18 +343,18 @@ try {
           JSON.stringify(currentState.finalOutput),
         isFinal: true,
         chatId: currentState.chatId,
-        source: 'OptimizedReActEngine'
+        source: 'OptimizedReActEngine',
+        timestamp: Date.now()
       };
-      
       this.dispatcher.dispatch(EventType.RESPONSE_GENERATED, responsePayload);
     }
     
-    // Evento de finalización de conversación
     this.dispatcher.dispatch(EventType.CONVERSATION_ENDED, {
       chatId: currentState.chatId,
       finalStatus: currentState.completionStatus,
-      duration: Date.now() - (initialState.timestamp || Date.now()),
-      source: 'OptimizedReActEngine'
+      duration: Date.now() - (initialState.timestamp || startTime), 
+      source: 'OptimizedReActEngine',
+      timestamp: Date.now()
     });
     
     return currentState;

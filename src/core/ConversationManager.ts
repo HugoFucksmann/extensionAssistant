@@ -22,7 +22,7 @@ export class ConversationManager implements IConversationManager {
     const currentTime = Date.now();
 
     if (state) {
-      // Reutilizar y actualizar estado existente
+      
       state.userMessage = userMessage;
       state.objective = `Responder a: ${userMessage.substring(0, 100)}...`;
       state.iterationCount = 0; 
@@ -98,10 +98,7 @@ export class ConversationManager implements IConversationManager {
    
   }
 
-/*   public async endConversation(chatId: string, memoryManager?: MemoryManager): Promise<void> {
-    const state = this.activeConversations.get(chatId);
-   
-  } */
+
 
   public clearConversation(chatId: string, memoryManager?: MemoryManager): void {
     this.activeConversations.delete(chatId);
