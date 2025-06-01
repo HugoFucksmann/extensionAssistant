@@ -141,6 +141,7 @@ export interface ReasoningResult {
 
 }
 
+export type NextAction = 'use_tool' | 'respond' | 'reflect' | 'correct';
 
 export interface PlanStep {
   id: string;
@@ -153,11 +154,7 @@ export interface PlanStep {
   endTime?: number;
 }
 
-export interface NextAction {
-  toolName: string; 
-  params: Record<string, any>;
-  thought?: string;
-}
+
 
 
 export interface ActionResult { 

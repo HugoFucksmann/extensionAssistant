@@ -2,7 +2,7 @@
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { ChatOllama } from '@langchain/ollama';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import { cleanResponseString } from './util/responseCleaner';
+// ELIMINADO: import { cleanResponseString } from './util/responseCleaner'; // Ya no se usa aquí
 import * as vscode from 'vscode';
 
 export type ModelProvider = 'gemini' | 'ollama';
@@ -34,29 +34,57 @@ export class ModelManager {
     this.configChangeDisposable = vscode.workspace.onDidChangeConfiguration(e => {
       if (e.affectsConfiguration('extensionAssistant')) {
         console.log('[ModelManager] Configuración cambiada, reinicializando...');
-        const oldPreferredProvider = this.getUserPreferredProvider();
+        const oldPreferredProvider = this.getUserPreferredProvider(); // Guardar antes de recargar config
         this.config = this.loadDetailedConfiguration();
-        this.activeProvider = this.getUserPreferredProvider(); // Re-evaluar preferencia
-        this.initializeModels();
-        this.ensureActiveProviderIsValid();
+        const newPreferredProvider = this.getUserPreferredProvider(); // Obtener nueva preferencia
 
-        if (oldPreferredProvider !== this.activeProvider) {
-            console.log(`[ModelManager] Proveedor activo cambiado a: ${this.activeProvider} debido a cambio de configuración o disponibilidad.`);
+        // Solo reinicializar modelos y revalidar proveedor si la configuración relevante cambió
+        // o si el proveedor preferido cambió.
+        if (this.didModelConfigChange(oldPreferredProvider) || oldPreferredProvider !== newPreferredProvider) {
+            this.initializeModels();
+            this.activeProvider = newPreferredProvider; // Actualizar al nuevo preferido
+            this.ensureActiveProviderIsValid(); // Validar el nuevo activo
+
+            if (oldPreferredProvider !== this.activeProvider || this.didModelConfigChange(oldPreferredProvider)) {
+                 console.log(`[ModelManager] Proveedor activo o configuración de modelo cambiada a: ${this.activeProvider}.`);
+            }
         }
       }
     });
   }
 
+  // Helper para verificar si la configuración del modelo cambió
+  private didModelConfigChange(oldPreferredProvider: ModelProvider): boolean {
+    const oldConfig = this.config[oldPreferredProvider];
+    const currentVsCodeConfig = vscode.workspace.getConfiguration('extensionAssistant');
+    let changed = false;
+
+    if (oldPreferredProvider === 'gemini') {
+        if (oldConfig.modelName !== (currentVsCodeConfig.get<string>('google.modelName') || 'gemini-2.0-flash-exp') ||
+            oldConfig.temperature !== (currentVsCodeConfig.get<number>('google.temperature') ?? 0.2) ||
+            oldConfig.maxTokens !== (currentVsCodeConfig.get<number>('google.maxTokens') || 4096) ||
+            oldConfig.apiKey !== (currentVsCodeConfig.get<string>('google.apiKey') || "AIzaSyBXGZbSj099c4bUOpLxbXKJgysGKKF3sR0")) {
+            changed = true;
+        }
+    } else if (oldPreferredProvider === 'ollama') {
+        if (oldConfig.modelName !== (currentVsCodeConfig.get<string>('ollama.modelName') || 'qwen2.5-coder:7b') ||
+            oldConfig.temperature !== (currentVsCodeConfig.get<number>('ollama.temperature') ?? 0.2) ||
+            oldConfig.baseUrl !== (currentVsCodeConfig.get<string>('ollama.baseUrl') || 'http://localhost:11434') ||
+            oldConfig.maxTokens !== (currentVsCodeConfig.get<number>('ollama.maxTokens') || 4096)) {
+            changed = true;
+        }
+    }
+    return changed;
+  }
+
+
   private getUserPreferredProvider(): ModelProvider {
     const config = vscode.workspace.getConfiguration('extensionAssistant');
-   
     return config.get<ModelProvider>('modelType', 'gemini');
   }
 
   private loadDetailedConfiguration(): Record<ModelProvider, ModelConfig> {
     const vsCodeConfig = vscode.workspace.getConfiguration('extensionAssistant');
-
-    
     return {
       gemini: {
         provider: 'gemini',
@@ -79,7 +107,6 @@ export class ModelManager {
     this.models.clear();
     const detailedConfigs = this.config;
 
-   
     if (detailedConfigs.gemini.apiKey) {
       try {
         this.models.set('gemini', new ChatGoogleGenerativeAI({
@@ -96,15 +123,13 @@ export class ModelManager {
       console.warn("[ModelManager] Clave de API de Google no proporcionada. Modelo Gemini no disponible.");
     }
 
-    // Inicializar Ollama
     try {
       this.models.set('ollama', new ChatOllama({
         model: detailedConfigs.ollama.modelName,
         temperature: detailedConfigs.ollama.temperature,
         baseUrl: detailedConfigs.ollama.baseUrl,
-        
       }));
-     
+      console.log('[ModelManager] Modelo Ollama inicializado.');
     } catch (error: any) {
       console.warn('[ModelManager] No se pudo conectar con Ollama. ¿Está en ejecución?', error.message);
     }
@@ -116,65 +141,19 @@ export class ModelManager {
     if (this.models.has(preferredProvider)) {
       this.activeProvider = preferredProvider;
     } else if (this.models.size > 0) {
-      // Fallback al primer modelo disponible si el preferido no está listo
       const fallbackProvider = Array.from(this.models.keys())[0];
       console.warn(`[ModelManager] Proveedor preferido '${preferredProvider}' no disponible. Usando fallback: '${fallbackProvider}'.`);
       this.activeProvider = fallbackProvider;
     } else {
-     
       console.error('[ModelManager] No hay modelos disponibles. Configura Ollama o proporciona una clave de API de Google.');
-     
+      // Aquí podrías asignar un proveedor por defecto aunque no esté inicializado,
+      // para evitar errores de 'undefined', aunque getActiveModel() fallará.
+      // O manejarlo para que getActiveModel() devuelva undefined o lance un error más específico.
+      // Por ahora, se mantiene como estaba, lo que podría llevar a errores si no hay modelos.
     }
   }
 
-  private wrapModelWithCleaning(model: BaseChatModel): BaseChatModel {
-    return new Proxy(model, {
-      get: (target, prop, receiver) => {
-        const original = Reflect.get(target, prop, receiver);
-
-        if (prop === '_generate' || prop === 'invoke' || prop === 'call') {
-          return async (...args: any[]) => {
-            console.log(`[ModelManager] [${String(prop)}] Input al modelo:`, JSON.stringify(args, null, 2));
-            try {
-              const result = await original.apply(target, args);
-              console.log(`[ModelManager] [${String(prop)}] Output crudo del modelo:`, JSON.stringify(result, null, 2));
-              
-              // Caso 1: Respuesta estándar de LangChain
-              if (result?.generations?.[0]?.text) {
-                return {
-                  ...result,
-                  generations: [{
-                    ...result.generations[0],
-                    text: cleanResponseString(result.generations[0].text)
-                  }]
-                };
-              }
-              
-              // Caso 2: Respuesta directa (content)
-              if (result?.content) {
-                return {
-                  ...result,
-                  content: cleanResponseString(result.content)
-                };
-              }
-              
-              // Caso 3: String directo
-              if (typeof result === 'string') {
-                return cleanResponseString(result);
-              }
-
-              return result;
-            } catch (error) {
-              console.error('Error cleaning model response:', error);
-              throw new Error(`Failed to process model response: ${error}`);
-            }
-          };
-        }
-        return original;
-      }
-    });
-  }
-
+  // ELIMINADO: private wrapModelWithCleaning(model: BaseChatModel): BaseChatModel { ... }
 
   public dispose(): void {
     this.configChangeDisposable.dispose();
@@ -183,16 +162,24 @@ export class ModelManager {
   public getActiveModel(): BaseChatModel {
     const model = this.models.get(this.activeProvider);
     if (!model) {
-      throw new Error(`Modelo para el proveedor activo '${this.activeProvider}' no está disponible.`);
+      // Intentar reinicializar y revalidar si el modelo no está disponible
+      // Esto podría ocurrir si la configuración cambió pero el listener no se disparó o hubo un error.
+      console.warn(`[ModelManager] Modelo para proveedor activo '${this.activeProvider}' no encontrado. Intentando reinicializar...`);
+      this.initializeModels();
+      this.ensureActiveProviderIsValid();
+      const recheckedModel = this.models.get(this.activeProvider);
+      if (!recheckedModel) {
+        throw new Error(`Modelo para el proveedor activo '${this.activeProvider}' sigue sin estar disponible después de reinicializar. Verifique la configuración.`);
+      }
+      return recheckedModel; // Devolver el modelo re-verificado
     }
-    return this.wrapModelWithCleaning(model);
+    // YA NO SE ENVUELVE CON EL PROXY: return this.wrapModelWithCleaning(model);
+    return model;
   }
 
   public setActiveProvider(provider: ModelProvider): void {
-   
     if (!this.models.has(provider)) {
-      console.warn(`[ModelManager] Intento de activar proveedor no disponible: '${provider}'. No se realizaron cambios.`);
-     
+      console.warn(`[ModelManager] Intento de activar proveedor no disponible: '${provider}'. Verifique que el modelo esté configurado e inicializado. No se realizaron cambios.`);
       return;
     }
     if (this.activeProvider !== provider) {
@@ -200,11 +187,4 @@ export class ModelManager {
         console.log(`[ModelManager] Proveedor activo cambiado manualmente a: ${provider}`);
     }
   }
-
- 
-
-
-
-
-
 }

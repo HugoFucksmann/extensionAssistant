@@ -1,13 +1,11 @@
 // src/core/ApplicationLogicService.ts
 import { VSCodeContext, WindsurfState } from '../shared/types';
 import { MemoryManager } from '../features/memory/MemoryManager';
-import { OptimizedReActEngine } from './OptimizedReActEngine';
+import { InternalEventDispatcher } from './events/InternalEventDispatcher';
 import { ToolRegistry } from '../features/tools/ToolRegistry';
 import { ConversationManager } from './ConversationManager';
 import { ToolResult } from '../features/tools/types';
-
-
-type ReActEngineType =  OptimizedReActEngine;
+import { LCELEngine } from './LCELEngine';
 
 export interface ProcessUserMessageResult {
   success: boolean;
@@ -17,14 +15,18 @@ export interface ProcessUserMessageResult {
 }
 
 export class ApplicationLogicService {
+  private dispatcher: InternalEventDispatcher;
+
   constructor(
     private memoryManager: MemoryManager,
-    private reActEngine: ReActEngineType, 
+    private reActEngine: LCELEngine, 
     private conversationManager: ConversationManager,
     private toolRegistry: ToolRegistry
   ) {
-    
-   
+    this.dispatcher = new InternalEventDispatcher();
+    if (reActEngine === null) {
+      console.warn('ApplicationLogicService initialized with null LCEL engine. Some functionality may be limited.');
+    }
   }
 
   public async processUserMessage(
@@ -32,7 +34,11 @@ export class ApplicationLogicService {
     userMessage: string,
     contextData: Record<string, any> = {} 
   ): Promise<ProcessUserMessageResult> {
+    const startTime = Date.now();
+  
+
    
+
     const state = this.conversationManager.getOrCreateConversationState(
       chatId,
       userMessage,
@@ -76,7 +82,7 @@ export class ApplicationLogicService {
           } else {
              
               const lastMeaningfulEntry = resultState.history?.slice().reverse().find(
-                  h => h.phase === 'responseGeneration' && h.content
+                  (h: any) => h.phase === 'responseGeneration' && h.content
               );
               if (lastMeaningfulEntry?.content) {
                   try {
@@ -104,6 +110,9 @@ export class ApplicationLogicService {
 
       await this.memoryManager.storeConversation(chatId, resultState);
 
+      const duration = Date.now() - startTime;
+    
+
       return {
         success: resultState.completionStatus === 'completed', 
         finalResponse: finalResponseText,
@@ -112,7 +121,8 @@ export class ApplicationLogicService {
       };
 
     } catch (error: any) {
-   
+      const duration = Date.now() - startTime;
+    
       const currentState = this.conversationManager.getConversationState(chatId);
       let finalErrorState = currentState || state; 
 

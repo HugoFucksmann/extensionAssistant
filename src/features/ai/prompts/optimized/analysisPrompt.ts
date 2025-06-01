@@ -22,41 +22,38 @@ export type AnalysisOutput = z.infer<typeof analysisOutputSchema>;
 
 // Versión para usar con LangChain Expression Language
 export const analysisPromptLC = ChatPromptTemplate.fromMessages([
-  ["system", `Eres un asistente de IA experto en programación. Tu tarea es analizar la consulta del usuario y el contexto proporcionado.
-Responde ÚNICAMENTE con un objeto JSON válido que se adhiera estrictamente al esquema definido.
-No incluyas NINGÚN texto explicativo, markdown, ni nada fuera del objeto JSON.
+  ["system", `Eres un asistente de IA experto en programación. 
+    Tu tarea es analizar la consulta del usuario y determinar:
 
+    1. La comprensión del problema
+    2. El tipo de tarea (código, documentación, etc.)
+    3. Las herramientas necesarias
+    4. El contexto requerido
+    5. Un plan inicial de acción
 
+    INFORMACIÓN DISPONIBLE:
+    HERRAMIENTAS DISPONIBLES:
+    {availableTools}
 
-CONSIGNA:
-1.  **Salida JSON Pura**: Devuelve solo el JSON.
-2.  **taskType**: Usa uno de los valores exactos listados. Si es un saludo o consulta general, usa 'information_request'.
-3.  **requiredTools**: Lista solo herramientas de 'HERRAMIENTAS DISPONIBLES'. Si no se necesitan, usa un array vacío [].
-4.  **initialPlan**: Sé breve y conciso (1-3 pasos).`],
-  ["user", `INFORMACIÓN DISPONIBLE:
-HERRAMIENTAS DISPONIBLES:
-{availableTools}
+    CONTEXTO DE CÓDIGO (si aplica, puede estar vacío):
+    {codeContext}
 
-CONTEXTO DE CÓDIGO (si aplica, puede estar vacío):
-{codeContext}
+    MEMORIA RELEVANTE (si aplica, puede estar vacío):
+    {memoryContext}
 
-MEMORIA RELEVANTE (si aplica, puede estar vacío):
-{memoryContext}
-
-CONSULTA DEL USUARIO:
-"{userQuery}"
-
-Analiza la consulta y la información, luego genera el JSON correspondiente.
-
-ESQUEMA ESPERADO (campos principales):
-{{
-  "understanding": "string",
-  "taskType": "string (Uno de: 'code_explanation', 'code_generation', 'code_modification', 'debugging', 'information_request', 'tool_execution')",
-  "requiredTools": "string[]",
-  "requiredContext": "string[]",
-  "initialPlan": "string[]"
-}}
-
+    ESQUEMA ESPERADO (campos principales):
+    {{
+      "understanding": "string",
+      "taskType": "string (Uno de: 'code_explanation', 'code_generation', 'code_modification', 'debugging', 'information_request', 'tool_execution')",
+      "requiredTools": "string[]",
+      "requiredContext": "string[]",
+      "initialPlan": "string[]"
+    }}
+    
+  `],
+  ["user", `
+    CONSULTA DEL USUARIO:
+    "{userQuery}"
 `]
 ]);
 
