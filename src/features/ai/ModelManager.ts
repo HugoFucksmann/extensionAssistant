@@ -2,7 +2,7 @@
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { ChatOllama } from '@langchain/ollama';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import { cleanResponseString } from './util/responseCleaner';
+// [Eliminado: cleanResponseString] La limpieza y parseo de respuestas ahora es responsabilidad exclusiva de aiResponseParser.
 import * as vscode from 'vscode';
 
 export type ModelProvider = 'gemini' | 'ollama';
@@ -127,53 +127,6 @@ export class ModelManager {
     }
   }
 
-  private wrapModelWithCleaning(model: BaseChatModel): BaseChatModel {
-    return new Proxy(model, {
-      get: (target, prop, receiver) => {
-        const original = Reflect.get(target, prop, receiver);
-
-        if (prop === '_generate' || prop === 'invoke' || prop === 'call') {
-          return async (...args: any[]) => {
-            console.log(`[ModelManager] [${String(prop)}] Input al modelo:`, JSON.stringify(args, null, 2));
-            try {
-              const result = await original.apply(target, args);
-              console.log(`[ModelManager] [${String(prop)}] Output crudo del modelo:`, JSON.stringify(result, null, 2));
-              
-              // Caso 1: Respuesta estándar de LangChain
-              if (result?.generations?.[0]?.text) {
-                return {
-                  ...result,
-                  generations: [{
-                    ...result.generations[0],
-                    text: cleanResponseString(result.generations[0].text)
-                  }]
-                };
-              }
-              
-              // Caso 2: Respuesta directa (content)
-              if (result?.content) {
-                return {
-                  ...result,
-                  content: cleanResponseString(result.content)
-                };
-              }
-              
-              // Caso 3: String directo
-              if (typeof result === 'string') {
-                return cleanResponseString(result);
-              }
-
-              return result;
-            } catch (error) {
-              console.error('Error cleaning model response:', error);
-              throw new Error(`Failed to process model response: ${error}`);
-            }
-          };
-        }
-        return original;
-      }
-    });
-  }
 
 
   public dispose(): void {
@@ -185,7 +138,8 @@ export class ModelManager {
     if (!model) {
       throw new Error(`Modelo para el proveedor activo '${this.activeProvider}' no está disponible.`);
     }
-    return this.wrapModelWithCleaning(model);
+    // El modelo se retorna directamente. El pipeline se encarga de parsear y limpiar la respuesta.
+    return model;
   }
 
   public setActiveProvider(provider: ModelProvider): void {

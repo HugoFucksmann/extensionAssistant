@@ -1,8 +1,10 @@
-import { responsePromptLC, responseOutputParser } from "../prompts/optimized/responsePrompt";
-import { normalizeFinalResponse } from "../util/responseCleaner";
+import { responsePromptLC } from "../prompts/optimized/responsePrompt";
+
+import { responseOutputSchema } from "../prompts/optimized/responsePrompt";
 import { formatForPrompt } from "../prompts/promptUtils";
 import { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { invokeModelWithLogging } from "./ModelInvokeLogger";
+import { createAutoCorrectStep } from "@shared/utils/aiResponseParser";
 
 export async function runOptimizedResponseChain({
   userQuery,
@@ -25,11 +27,16 @@ export async function runOptimizedResponseChain({
     memoryContext: memoryContext || ''
   };
 
+  // Paso de parseo con autocorrección usando el parser centralizado y el schema adecuado
+  const parseStep = createAutoCorrectStep(responseOutputSchema, model, {
+    maxAttempts: 2,
+    verbose: process.env.NODE_ENV === 'development',
+  });
+
   // Encadenar: prompt centralizado -> modelo -> parser centralizado
-  const chain = responsePromptLC.pipe(model).pipe(responseOutputParser);
-  const rawResult = await invokeModelWithLogging(chain, promptInput, { caller: 'runOptimizedResponseChain' });
-  // Normalizar siempre la salida final para la UI
-  return normalizeFinalResponse(
-    typeof rawResult === 'string' ? rawResult : JSON.stringify(rawResult)
-  );
+  const chain = responsePromptLC.pipe(model).pipe(parseStep);
+  const result = await invokeModelWithLogging(chain, promptInput, { caller: 'runOptimizedResponseChain' });
+  // Retornar el resultado ya parseado y validado
+  return result;
+
 }

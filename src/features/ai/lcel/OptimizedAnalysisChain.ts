@@ -1,83 +1,9 @@
 import { analysisOutputSchema, analysisPromptLC } from "../prompts/optimized/analysisPrompt";
 import { BaseChatModel } from "@langchain/core/language_models/chat_models";
-import { JsonOutputParser } from "@langchain/core/output_parsers";
+import { createAutoCorrectStep } from "../../../shared/utils/aiResponseParser";
 
-// Función para extraer JSON de una cadena que podría contener markdown
-function extractJsonFromString(str: string): any {
-  try {
-    // Intentar extraer JSON de bloques de código markdown
-    const jsonMatch = str.match(/```(?:json)?\n([\s\S]*?)\n```/);
-    if (jsonMatch && jsonMatch[1]) {
-      console.log('[extractJsonFromString] JSON a parsear (bloque markdown):', jsonMatch[1]);
-      const parsed = JSON.parse(jsonMatch[1]);
-      if (parsed && typeof parsed === 'object') {
-        if (parsed.action) {
-          parsed.nextAction = parsed.action;
-          delete parsed.action;
-        }
-        // Validación/corrección de nextAction
-        const validNextActions = ['use_tool', 'respond'];
-        if (parsed.nextAction && !validNextActions.includes(parsed.nextAction)) {
-          console.warn('[extractJsonFromString] Valor inválido en nextAction:', parsed.nextAction, '-> Forzando a "respond"');
-          parsed.nextAction = 'respond';
-        }
-      }
-      return parsed;
-    }
-    // Si no hay bloque de código, intentar parsear directamente
-    console.log('[extractJsonFromString] JSON a parsear (directo):', str);
-    const parsed = JSON.parse(str);
-    if (parsed && typeof parsed === 'object') {
-      if (parsed.action) {
-        parsed.nextAction = parsed.action;
-        delete parsed.action;
-      }
-      // Validación/corrección de nextAction
-      const validNextActions = ['use_tool', 'respond'];
-      if (parsed.nextAction && !validNextActions.includes(parsed.nextAction)) {
-        console.warn('[extractJsonFromString] Valor inválido en nextAction:', parsed.nextAction, '-> Forzando a "respond"');
-        parsed.nextAction = 'respond';
-      }
-    }
-    return parsed;
-  } catch (e) {
-    console.error('Error al extraer/parsear JSON:', e);
-    return null;
-  }
-}
 
-// Función para normalizar la respuesta del modelo
-function normalizeModelResponse(response: any) {
-  // Si la respuesta no es un objeto, devolver null
-  if (!response || typeof response !== 'object') {
-    console.log('La respuesta no es un objeto:', response);
-    return null;
-  }
 
-  // Extraer y validar taskType
-  const validTaskTypes = [
-    'code_explanation', 'code_generation', 'code_modification',
-    'debugging', 'information_request', 'tool_execution'
-  ];
-  
-  const taskType = validTaskTypes.includes(response.taskType) 
-    ? response.taskType 
-    : 'information_request';
-
-  // Crear objeto normalizado con valores por defecto
-  const normalized = {
-    understanding: String(response.understanding || 'Analizando tu solicitud...'),
-    taskType,
-    requiredTools: Array.isArray(response.requiredTools) ? response.requiredTools : [],
-    requiredContext: Array.isArray(response.requiredContext) ? response.requiredContext : [],
-    initialPlan: Array.isArray(response.initialPlan) 
-      ? response.initialPlan 
-      : ['Procesando tu solicitud...']
-  };
-
-  console.log('Respuesta normalizada:', JSON.stringify(normalized, null, 2));
-  return normalized;
-}
 
 
 export async function runOptimizedAnalysisChain({
@@ -115,40 +41,38 @@ export async function runOptimizedAnalysisChain({
     // Usar el prompt optimizado de analysisPromptLC
     const prompt = analysisPromptLC;
     
-    // Crear el parser
-    const parser = new JsonOutputParser();
+    // Crear el paso de parseo con autocorrección
+    const parseStep = createAutoCorrectStep(analysisOutputSchema, model, {
+      maxAttempts: 2,
+      verbose: process.env.NODE_ENV === 'development'
+    });
     
-    // Encadenar: prompt -> modelo -> parser
-    const chain = prompt.pipe(model).pipe(parser);
+    // Encadenar: prompt -> modelo -> parseo con autocorrección
+    const chain = prompt.pipe(model).pipe(parseStep);
     
-    // Ejecutar la cadena con las variables necesarias
-    const { invokeModelWithLogging } = await import('./ModelInvokeLogger');
-    const rawResult = await invokeModelWithLogging(chain, {
-      userQuery,
-      availableTools: availableTools.join(', '),
-      codeContext: codeContext || '',
-      memoryContext: memoryContext || ''
-    }, { caller: 'runOptimizedAnalysisChain' });
-
-    // Intentar extraer y normalizar la respuesta
-    let parsedResult = typeof rawResult === 'string' ? extractJsonFromString(rawResult) : rawResult;
-    const normalizedResult = parsedResult ? normalizeModelResponse(parsedResult) : null;
-
-    // Validar manualmente el resultado contra el esquema
-    if (!normalizedResult) {
-      console.error('No se pudo extraer una respuesta válida del modelo');
-      console.error('Respuesta recibida:', rawResult);
+    try {
+      // Ejecutar la cadena con las variables necesarias
+      const { invokeModelWithLogging } = await import('./ModelInvokeLogger');
+      
+      // La cadena ahora devuelve directamente el objeto parseado y validado
+      return await invokeModelWithLogging(chain, {
+        userQuery,
+        availableTools: availableTools.join(', '),
+        codeContext: codeContext || '',
+        memoryContext: memoryContext || ''
+      }, { 
+        caller: 'runOptimizedAnalysisChain',
+        // Asegurarse de que el logger sepa que esperamos un objeto, no un string
+        responseFormatter: (r: unknown) => JSON.stringify(r, null, 2)
+      });
+      
+    } catch (error) {
+      console.error('Error al procesar la respuesta del modelo:', error);
+      if (error instanceof Error) {
+        console.error('Detalles del error:', error.message);
+      }
       return defaultResponse;
     }
-
-    const validation = analysisOutputSchema.safeParse(normalizedResult);
-    if (!validation.success) {
-      console.error('Error de validación del esquema:', validation.error);
-      console.error('Respuesta recibida:', rawResult);
-      return defaultResponse;
-    }
-
-    return validation.data;
   } catch (error) {
     console.error('Error en runOptimizedAnalysisChain:', error);
     return defaultResponse;

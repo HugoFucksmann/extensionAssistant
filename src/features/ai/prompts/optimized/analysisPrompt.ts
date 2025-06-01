@@ -23,32 +23,20 @@ export type AnalysisOutput = z.infer<typeof analysisOutputSchema>;
 // Versión para usar con LangChain Expression Language
 export const analysisPromptLC = ChatPromptTemplate.fromMessages([
   ["system", `Eres un asistente de IA experto en programación. Tu tarea es analizar la consulta del usuario y el contexto proporcionado.
+
 Responde ÚNICAMENTE con un objeto JSON válido que se adhiera estrictamente al esquema definido.
-No incluyas NINGÚN texto explicativo, markdown, ni nada fuera del objeto JSON.
+No incluyas texto explicativo, markdown ni nada fuera del objeto JSON.
 
+INSTRUCCIONES:
+1.  Devuelve solo el JSON.
+2.  taskType: Usa uno de los valores exactos listados.
+3.  requiredTools: Usa herramientas de 'HERRAMIENTAS DISPONIBLES'. Si no se necesitan, usa [].
+4.  initialPlan: Sé breve y conciso (1-3 pasos).
 
-
-CONSIGNA:
-1.  **Salida JSON Pura**: Devuelve solo el JSON.
-2.  **taskType**: Usa uno de los valores exactos listados. Si es un saludo o consulta general, usa 'information_request'.
-3.  **requiredTools**: Lista solo herramientas de 'HERRAMIENTAS DISPONIBLES'. Si no se necesitan, usa un array vacío [].
-4.  **initialPlan**: Sé breve y conciso (1-3 pasos).`],
-  ["user", `INFORMACIÓN DISPONIBLE:
 HERRAMIENTAS DISPONIBLES:
 {availableTools}
 
-CONTEXTO DE CÓDIGO (si aplica, puede estar vacío):
-{codeContext}
-
-MEMORIA RELEVANTE (si aplica, puede estar vacío):
-{memoryContext}
-
-CONSULTA DEL USUARIO:
-"{userQuery}"
-
-Analiza la consulta y la información, luego genera el JSON correspondiente.
-
-ESQUEMA ESPERADO (campos principales):
+ESQUEMA JSON ESPERADO:
 {{
   "understanding": "string",
   "taskType": "string (Uno de: 'code_explanation', 'code_generation', 'code_modification', 'debugging', 'information_request', 'tool_execution')",
@@ -56,9 +44,17 @@ ESQUEMA ESPERADO (campos principales):
   "requiredContext": "string[]",
   "initialPlan": "string[]"
 }}
+`],
+  ["user", `CONSULTA: "{userQuery}"
 
+CONTEXTO DE CÓDIGO:
+{codeContext}
+
+MEMORIA RELEVANTE:
+{memoryContext}
 `]
 ]);
+
 
 // OutputParser basado en Zod y LangChain
 export const analysisOutputParser = new JsonMarkdownStructuredOutputParser(analysisOutputSchema);

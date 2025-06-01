@@ -24,42 +24,42 @@ export type ReasoningOutput = z.infer<typeof reasoningOutputSchema>;
  */
 export const reasoningPromptLC = ChatPromptTemplate.fromMessages([
   ["system", `Eres un asistente de IA experto en programación. Tu tarea es decidir el siguiente paso: usar una herramienta o responder directamente al usuario.
-Responde ÚNICAMENTE con un objeto JSON válido que se adhiera estrictamente al esquema definido.
-No incluyas NINGÚN texto explicativo, markdown, ni nada fuera del objeto JSON.
 
-CONSIGNA:
-1.  **Salida JSON Pura**: Devuelve solo el JSON.
-2.  **Acción**: Decide si 'use_tool' o 'respond'.
-3.  **Herramienta**: Si 'use_tool', especifica 'tool' y 'parameters' según 'DESCRIPCIÓN DE HERRAMIENTAS'. Asegúrate de que los parámetros coincidan con los que requiere la herramienta.
-4.  **Respuesta**: Si 'respond', proporciona el 'response'.`],
-  ["user", `CONTEXTO ACTUAL:
-Consulta del Usuario: "{userQuery}"
+Responde ÚNICAMENTE con un objeto JSON válido que se adhiera estrictamente al esquema definido.
+No incluyas texto explicativo, markdown ni nada fuera del objeto JSON.
+
+INSTRUCCIONES:
+1. Devuelve solo el JSON.
+2. nextAction: Usa solo 'use_tool' o 'respond'.
+3. tool y parameters: Si nextAction = 'use_tool', proporciona ambos usando la DESCRIPCIÓN DE HERRAMIENTAS.
+4. response: Si nextAction = 'respond', completa ese campo.
+5. reasoning: Explica brevemente el razonamiento detrás de la decisión.
+
+DESCRIPCIÓN DE HERRAMIENTAS (nombre, descripción, esquema de parámetros Zod):
+{toolsDescription}
+
+ESQUEMA JSON ESPERADO:
+{{
+  "reasoning": "string",
+  "nextAction": "use_tool", // o "respond"
+  "tool": "string | null",
+  "parameters": "object | null",
+  "response": "string | null"
+}}
+`],
+  ["user", `Consulta del Usuario: "{userQuery}"
 
 Análisis Previo:
 {analysisResult}
 
-Descripción de Herramientas Disponibles (nombre, descripción, esquema de parámetros Zod):
-{toolsDescription}
-
-Resultados de Herramientas Anteriores (si los hay, como string JSON):
+Resultados de Herramientas Anteriores (si los hay):
 {previousToolResults}
 
-Memoria Relevante (si aplica):
+Memoria Relevante:
 {memoryContext}
-
-TAREA:
-Basado en el contexto, decide el siguiente paso y genera el JSON correspondiente.
-
-ESQUEMA ESPERADO (campos principales):
-{{
-  "reasoning": "string",
-  "nextAction": "use_tool", // o "respond", ningún otro valor es válido
-  "tool": "string (Opcional, si nextAction='use_tool')",
-  "parameters": "object (Opcional, si nextAction='use_tool')",
-   "response": "string | null "
-}}
 `]
 ]);
+
 
 // OutputParser basado en Zod y LangChain
 export const reasoningOutputParser = new JsonMarkdownStructuredOutputParser(reasoningOutputSchema);
