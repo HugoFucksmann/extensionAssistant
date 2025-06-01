@@ -7,9 +7,7 @@ interface ReactConfig {
   maxTokens: number;
 }
 
-interface UIConfig {
-  // (Eliminados campos no usados)
-}
+
 
 interface MemoryConfig {
   persistenceEnabled: boolean;
@@ -38,11 +36,7 @@ interface BackendConfig {
   logging: LoggingConfig;
 }
 
-interface FrontendConfig {
-  ui: UIConfig;
-}
-
-export const getConfig = (env: Environment): {backend: BackendConfig; frontend: FrontendConfig} => {
+export const getConfig = (env: Environment): {backend: BackendConfig} => {
   const baseBackendConfig: BackendConfig = {
     react: {
       maxIterations: 15,
@@ -67,17 +61,9 @@ export const getConfig = (env: Environment): {backend: BackendConfig; frontend: 
     }
   };
 
-  const baseFrontendConfig: FrontendConfig = {
-    ui: {
-      openPanelOnStartup: false,
-      darkThemeByDefault: true,
-      showToolExecution: true
-    }
-  };
 
   return {
     backend: baseBackendConfig,
-    frontend: baseFrontendConfig
   };
 };
 

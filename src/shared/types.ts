@@ -183,15 +183,6 @@ export interface ReflectionResult {
 
 
 
-export interface Insight {
-  id: string;
-  type: 'observation' | 'learning' | 'warning' | 'suggestion';
-  content: string;
-  timestamp: number;
-  context?: Record<string, any>;
-}
-
-
 export interface CorrectionResult {
   correctionDescription: string; 
   updatedPlan?: PlanStep[]; 

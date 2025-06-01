@@ -3,11 +3,9 @@ import { ToolDefinition, ToolResult, ToolExecutionContext } from './types';
 import { InternalEventDispatcher } from '../../core/events/InternalEventDispatcher';
 import * as vscode from 'vscode';
 import { ToolValidator } from './ToolValidator';
-import { generateOperationId } from '../../shared/utils/generateIds';
+import { generateUniqueId } from '../../shared/utils/generateIds';
 import { EventType, ToolExecutionEventPayload } from '../../features/events/eventTypes';
 import { ToolOutput } from '../../shared/types'; 
-
-import { createDynamicTool, createDynamicToolsFromDefinitions } from '../ai/lcel/DynamicToolAdapter';
 import { DynamicStructuredTool } from '@langchain/core/tools';
 
 export class ToolRegistry {
@@ -169,7 +167,7 @@ export class ToolRegistry {
     rawParams: any,
     executionCtxArgs: { chatId?: string; [key: string]: any } = {}
   ): Promise<ToolResult> { // This is ToolResult from ./types
-    const operationId = generateOperationId();
+    const operationId = generateUniqueId();
     const startTime = Date.now();
 
     const tool = this.getTool(name);

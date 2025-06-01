@@ -1,11 +1,4 @@
-// src/features/tools/definitions/filesystem/listFiles.ts
-import { z } from 'zod';
-
-// Esquema Zod para los parámetros
-export const listFilesParamsSchema = z.object({
-  pattern: z.string().optional().default('**/*').describe('Glob pattern (e.g., "src/**/*.ts"). Defaults to all files in the workspace, respecting .gitignore and files.exclude settings.'),
-  
-}).strict();
+// src/shared/utils/listFiles.ts
 
 type ListedFile = { path: string; type: 'file' | 'directory' | 'symbolicLink' | 'unknown' };
 
