@@ -5,7 +5,7 @@ import * as vscode from 'vscode';
 import { ToolValidator } from './ToolValidator';
 import { generateUniqueId } from '../../shared/utils/generateIds';
 import { EventType, ToolExecutionEventPayload } from '../../features/events/eventTypes';
-import { ToolOutput } from '../../shared/types'; 
+import { ToolOutput } from './types'; 
 import { DynamicStructuredTool } from '@langchain/core/tools';
 
 export class ToolRegistry {

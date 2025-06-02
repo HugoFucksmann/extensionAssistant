@@ -1,6 +1,6 @@
 // src/core/ComponentFactory.ts
 import * as vscode from 'vscode';
-import { VSCodeContext } from '../shared/types';
+import { VSCodeContext } from '../vscode/types';
 
 import { ModelManager } from '../features/ai/ModelManager';
 import { ToolRegistry } from '../features/tools/ToolRegistry';

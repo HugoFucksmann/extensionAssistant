@@ -1,5 +1,6 @@
 // src/core/ConversationManager.ts
-import { WindsurfState,  HistoryEntry } from '../shared/types';
+import { WindsurfState } from './types';
+import { HistoryEntry } from '../features/chat/types';
 import { ConversationMemoryManager } from '../features/memory/ConversationMemoryManager';
 import { getConfig } from '../shared/config';
 import { IConversationManager } from './interfaces/IConversationManager';

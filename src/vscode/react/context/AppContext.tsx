@@ -1,21 +1,13 @@
 // src/vscode/react/context/AppContext.tsx
 
+import '../../types';
 import React, { createContext, useContext, useEffect, useReducer } from 'react';
-import { ChatMessage, Chat } from '@shared/types';
+import { ChatMessage, Chat } from '../../../features/chat/types';
+
 // @ts-ignore
 import { getTheme } from '../theme/theme.js';
 
 type ThemeType = any;
-
-declare global {
-  interface Window {
-    vscode?: {
-      postMessage: (message: any) => void;
-      getState: () => any;
-      setState: (state: any) => void;
-    };
-  }
-}
 
 interface AppState {
   messages: ChatMessage[];
@@ -45,7 +37,7 @@ type AppAction =
   | { type: 'SET_TEST_MODE'; payload: boolean }
   | { type: 'SESSION_READY'; payload: { chatId: string; messages: ChatMessage[]; model?: string; history?: Chat[]; testMode?: boolean } };
 
-const body = document.body;
+const body = document.body as any;
 const initialIsDarkMode = body.classList.contains('vscode-dark');
 
 const initialState: AppState = {
@@ -181,10 +173,14 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const [state, dispatch] = useReducer(appReducer, initialState);
 
   const postMessageToBackend = (type: string, payload?: any) => {
-    window.vscode?.postMessage({ type, payload });
+    (window as any).vscode?.postMessage({ type, payload });
   };
 
   useEffect(() => {
+    const win = window as any;
+    const doc = document as any;
+    const body = doc.body as any;
+
     const handleMessage = (event: MessageEvent) => {
       const { type, payload } = event.data;
 
@@ -256,19 +252,22 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       }
     };
 
-    window.addEventListener('message', handleMessage);
+    win.addEventListener('message', handleMessage);
     postMessageToBackend('uiReady');
 
     const observer = new MutationObserver(() => {
-      const currentIsDark = document.body.classList.contains('vscode-dark');
-      if (state.isDarkMode !== currentIsDark) {
+      const isDark = body.classList.contains('vscode-dark');
+      if (state.isDarkMode !== isDark) {
         dispatch({ type: 'TOGGLE_DARK_MODE' });
       }
     });
-    observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    observer.observe(body, { 
+      attributes: true, 
+      attributeFilter: ['class'] 
+    });
 
     return () => {
-      window.removeEventListener('message', handleMessage);
+      win.removeEventListener('message', handleMessage);
       observer.disconnect();
     };
   }, [state.isDarkMode, state.chatList.length]); 

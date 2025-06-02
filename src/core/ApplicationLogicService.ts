@@ -1,5 +1,5 @@
 // src/core/ApplicationLogicService.ts
-import {  WindsurfState } from '../shared/types';
+import { WindsurfState } from './types';
 import { ConversationMemoryManager } from '../features/memory/ConversationMemoryManager';
 import { OptimizedReActEngine } from './OptimizedReActEngine';
 import { ToolRegistry } from '../features/tools/ToolRegistry';

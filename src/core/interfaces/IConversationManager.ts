@@ -1,5 +1,5 @@
 // src/core/interfaces/IConversationManager.ts
-import { WindsurfState } from '../../shared/types';
+import { WindsurfState } from '../types';
 import { ConversationMemoryManager } from '../../features/memory/ConversationMemoryManager';
 
 export interface IConversationManager {

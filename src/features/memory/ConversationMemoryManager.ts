@@ -1,6 +1,7 @@
 // src/features/memory/ConversationMemoryManager.ts
 import { LongTermStorage } from './LongTermStorage';
-import { WindsurfState, HistoryEntry } from '@shared/types';
+import { WindsurfState } from '@core/types';
+import { HistoryEntry } from '@features/chat/types';
 
 
 export class ConversationMemoryManager {

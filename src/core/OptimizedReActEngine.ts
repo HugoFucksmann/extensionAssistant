@@ -1,5 +1,6 @@
 // src/core/OptimizedReActEngine.ts
-import { WindsurfState, HistoryEntry } from '../shared/types'; 
+import { WindsurfState } from './types';
+import { HistoryEntry } from '../features/chat/types'; 
 import { ToolRegistry } from '../features/tools/ToolRegistry';
 import { InternalEventDispatcher } from './events/InternalEventDispatcher';
 import { EventType, AgentPhaseEventPayload, ResponseEventPayload, ToolExecutionEventPayload } from '../features/events/eventTypes';
@@ -210,7 +211,7 @@ export class OptimizedReActEngine {
         };
         
         const execKey = toolParamsHash(
-          reasoningResult.tool,
+          reasoningResult.tool ?? '',
           reasoningResult.parameters,
           currentState.chatId ?? null
         );

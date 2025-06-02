@@ -10,7 +10,8 @@ import {
   AgentPhaseEventPayload, // Agregar esta importación
 } from '../../features/events/eventTypes';
 import { WebviewStateManager } from './WebviewStateManager';
-import { ChatMessage, ToolOutput } from '../../shared/types';
+import { ChatMessage } from '../../features/chat/types';
+import { ToolOutput } from '../../features/tools/types';
 import { IConversationManager } from '../../core/interfaces/IConversationManager';
 
 export class WebviewEventHandler {

@@ -1,6 +1,6 @@
 // src/features/events/eventTypes.ts
 import { ActionOutput } from '@features/ai/prompts/optimized/actionPrompt';
-import { ToolOutput } from '../../shared/types'; // Import ToolOutput
+import { ToolOutput } from '../tools/types';
 
 /**
  * All supported event types in the system
