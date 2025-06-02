@@ -1,6 +1,6 @@
 // src/core/types.ts
-import { ChatMessage } from '../features/chat/types';
-import { ToolOutput, ToolExecution } from '../features/tools/types';
+import {  HistoryEntry } from '../features/chat/types';
+import {  ToolExecution } from '../features/tools/types';
 
 
 export interface WindsurfState {
@@ -70,25 +70,7 @@ export interface CorrectionResult {
   nextActionAfterCorrection?: NextAction;
 }
 
-export interface HistoryEntry extends Omit<ChatMessage, 'id' | 'sender' | 'timestamp' | 'files'> {
-  phase: 'user_input' | 'reasoning' | 'action_planning' | 'action' | 'reflection' | 'correction' | 'responseGeneration' | 'system_message' | 'toolOutputAnalysis';
-  iteration?: number;
-  content: string;
-  timestamp: number;
-  metadata: {
-    tool_executions?: ToolExecution[];
-    processingTime?: number;
-    status?: 'success' | 'error' | 'skipped';
-    error_message?: string;
-    // For toolOutputAnalysis phase
-    toolName?: string;
-    toolOutput?: ToolOutput;
-    modelDecision?: any;
-    // For OptimizedReActEngine history entries
-    phase_details?: string;
-    [key: string]: any;
-  };
-}
+
 
 export interface ProcessingStatus {
   phase: string;

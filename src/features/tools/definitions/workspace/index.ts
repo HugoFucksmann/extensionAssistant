@@ -5,6 +5,3 @@ export const workspaceToolDefinitions = [
   getProjectSummary,
 ];
 
-export {
-  getProjectSummary,
-};

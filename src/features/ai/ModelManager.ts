@@ -2,7 +2,6 @@
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { ChatOllama } from '@langchain/ollama';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
-// [Eliminado: cleanResponseString] La limpieza y parseo de respuestas ahora es responsabilidad exclusiva de aiResponseParser.
 import * as vscode from 'vscode';
 
 export type ModelProvider = 'gemini' | 'ollama';
