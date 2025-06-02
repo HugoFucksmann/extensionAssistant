@@ -1,4 +1,5 @@
 // src/features/events/eventTypes.ts
+import { ActionOutput } from '@features/ai/prompts/optimized/actionPrompt';
 import { ToolOutput } from '../../shared/types'; // Import ToolOutput
 
 /**
@@ -82,9 +83,7 @@ export interface LlmRequestCompletedPayload extends LlmRequestStartedPayload {
   tokenUsage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number };
 }
 
-/**
-* Agent Phase Event Payload (NEW or Refined ReActEventPayload)
-*/
+
 export interface AgentPhaseEventPayload extends BaseEventPayload {
   phase: 'reasoning' | 'action' | 'finalResponseGeneration' | 'reflection' | 'correction' | 'toolOutputAnalysis' | 'initialAnalysis' | 'toolExecution' | string; // Added toolOutputAnalysis, initialAnalysis, toolExecution
   iteration?: number;
@@ -93,20 +92,20 @@ export interface AgentPhaseEventPayload extends BaseEventPayload {
   error?: string;     // If the phase failed
 }
 
-// Alias para compatibilidad
-export type ReActEventPayload = AgentPhaseEventPayload;
 
 
-// ... (ToolExecutionEventPayload, ResponseEventPayload, NodeEventPayload, ErrorOccurredEventPayload, SystemEventPayload, UserInteractionRequiredPayload, UserInputReceivedPayload - keep as is or ensure they extend BaseEventPayload correctly) ...
 export interface ToolExecutionEventPayload extends BaseEventPayload {
   toolName: string;
   parameters?: Record<string, any>; 
-  result?: ToolOutput; // <--- UPDATED from any to ToolOutput
+  result?: ToolOutput; 
   error?: string;
   duration?: number;
-  toolDescription?: string; // Descripción amigable de la acción de la herramienta (NUEVO)
-  toolParams?: Record<string, any>; // Parámetros para mostrar en la UI (NUEVO)
-  isProcessingStep?: boolean; // Flag para identificar pasos de procesamiento
+  toolDescription?: string; 
+  toolParams?: Record<string, any>;
+  isProcessingStep?: boolean;
+  modelAnalysis?: ActionOutput | any; 
+  rawToolOutput?: any;
+  toolSuccess?: boolean; 
 }
 
 
@@ -116,14 +115,7 @@ export interface ResponseEventPayload extends BaseEventPayload {
   metadata?: Record<string, any>; 
   duration?: number;      
 }
-export interface NodeEventPayload extends BaseEventPayload {
-  nodeType: string;  
-  nodeId?: string;    
-  input?: any;      
-  output?: any;     
-  duration?: number;  
-  error?: string;     
-}
+
 export interface ErrorOccurredEventPayload extends BaseEventPayload {
   errorMessage: string;
   errorStack?: string;

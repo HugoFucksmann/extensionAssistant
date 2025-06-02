@@ -1,13 +1,13 @@
 // src/core/interfaces/IConversationManager.ts
 import { WindsurfState } from '../../shared/types';
-import { MemoryManager } from '../../features/memory/ConversationMemoryManager';
+import { ConversationMemoryManager } from '../../features/memory/ConversationMemoryManager';
 
 export interface IConversationManager {
   // Core conversation methods
   getOrCreateConversationState(chatId?: string, initialUserMessage?: string, contextData?: Record<string, any>): { state: WindsurfState; isNew: boolean };
   getConversationState(chatId: string): WindsurfState | undefined;
   updateConversationState(chatId: string, state: WindsurfState): void;
-  clearConversation(chatId?: string, memoryManager?: MemoryManager): boolean;
+  clearConversation(chatId?: string, conversationMemoryManager?: ConversationMemoryManager): boolean;
   
   // Chat management
   generateChatId(): string;

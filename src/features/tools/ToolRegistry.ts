@@ -53,249 +53,166 @@ export class ToolRegistry {
   }
 
   private generateToolUIDescription(toolName: string, params: any, toolDefinition?: ToolDefinition<any,any>): string {
-    if (!toolDefinition) return `Executing ${toolName}`;
+    const getFileName = (path?: string) => path?.split(/[\/]/).pop() || 'archivo';
+    
+    const toolDescriptions: Record<string, (params: any) => string> = {
+      getFileContents: (p) => `Reading file: ${getFileName(p.path)}`,
+      searchInWorkspace: (p) => `Searching workspace for: "${p.query}"`,
+      writeToFile: (p) => `Writing to file: ${getFileName(p.path)}`,
+      createFileOrDirectory: (p) => `Creating ${p.type || 'item'}: ${getFileName(p.path)}`,
+      deletePath: (p) => `Deleting: ${getFileName(p.path)}`,
+      getActiveEditorInfo: () => 'Getting active editor information',
+      getDocumentDiagnostics: (p) => `Getting diagnostics for: ${getFileName(p.filePath) || 'active editor'}`,
+      getGitStatus: () => 'Getting Git status',
+      getProjectSummary: () => 'Getting project summary',
+      runInTerminal: (p) => `Running in terminal: "${p.command}"`
+    };
 
-    const getFileName = (filePath: string | undefined): string => 
-        typeof filePath === 'string' ? filePath.split(/[\\/]/).pop() || 'archivo' : 'archivo';
-
-    switch (toolName) {
-        case 'getFileContents':
-            return `Reading file: ${getFileName(params.path)}`;
-        case 'searchInWorkspace':
-            return `Searching workspace for: "${params.query}"`;
-        case 'writeToFile':
-            return `Writing to file: ${getFileName(params.path)}`;
-        case 'createFileOrDirectory':
-            return `Creating ${params.type || 'item'}: ${getFileName(params.path)}`;
-        case 'deletePath':
-            return `Deleting: ${getFileName(params.path)}`;
-        case 'getActiveEditorInfo':
-            return 'Getting active editor information';
-        case 'getDocumentDiagnostics':
-            return `Getting diagnostics for: ${params.filePath ? getFileName(params.filePath) : 'active editor'}`;
-        case 'getGitStatus':
-            return 'Getting Git status';
-        case 'getProjectSummary':
-            return 'Getting project summary';
-        case 'runInTerminal':
-            return `Running in terminal: "${params.command}"`;
-        default:
-            return toolDefinition.description || `Executing ${toolName}`;
-    }
+    return toolDescriptions[toolName]?.(params) || toolDefinition?.description || `Executing ${toolName}`;
   }
 
   private mapToToolOutput(toolName: string, rawData: any, success: boolean, errorMsg?: string): ToolOutput {
-    let output: ToolOutput = { message: success ? "Tool executed." : `Error: ${errorMsg || "Unknown error"}` };
-    if (!success) {
-        output.details = { originalError: errorMsg };
-    }
+    const baseOutput: ToolOutput = {
+      message: success ? "Tool executed." : `Error: ${errorMsg || "Unknown error"}`,
+      ...(success ? { details: rawData } : { details: { originalError: errorMsg } })
+    };
 
-    if (success && rawData) {
-        const data = rawData as any;
-        switch (toolName) {
-            case 'getFileContents':
-                output = { filePath: data.filePath, content: data.content, availableFiles: data.availableFiles };
-                break;
-            case 'createFileOrDirectory':
-                output = { filePath: data.path, fileOperationType: data.type, fileOperationStatus: data.operation };
-                break;
-            case 'deletePath':
-                output = { filePath: data.path, fileOperationStatus: data.deleted ? 'deleted' : 'error_not_deleted' };
-                break;
-            case 'searchInWorkspace':
-                output = { query: data.query, results: data.results, totalFound: data.totalFound, searchLimited: data.searchLimited };
-                break;
-            case 'getActiveEditorInfo':
-                if (data) {
-                    output = {
-                        activeEditor_filePath: data.filePath, activeEditor_content: data.content,
-                        activeEditor_languageId: data.languageId, activeEditor_lineCount: data.lineCount,
-                        activeEditor_selection: data.selection,
-                    };
-                } else { // Tool might return null if no editor is active, which is a valid 'success' case
-                    output = { message: "No active editor found." };
-                }
-                break;
-            case 'getDocumentDiagnostics':
-                output = { diagnostics_documentPath: data.documentPath, diagnostics_list: data.diagnostics };
-                break;
-            case 'runInTerminal':
-                output = { terminal_name: data.terminalName, terminal_commandSent: data.commandSent };
-                break;
-            case 'getGitStatus':
-                if (data && data.currentBranch !== undefined) { 
-                     output = {
-                        git_currentBranch: data.currentBranch, git_remoteTracking: data.remoteTracking,
-                        git_changedFilesCount: data.changedFilesCount, git_stagedFilesCount: data.stagedFilesCount,
-                        git_unstagedFilesCount: data.unstagedFilesCount, git_untrackedFilesCount: data.untrackedFilesCount,
-                        git_conflictedFilesCount: data.conflictedFilesCount, git_files: data.files,
-                    };
-                } else if (data && data.errorReason) { // This case might occur if getGitStatus returns success:false but has data.errorReason
-                     output = { message: `Git status error: ${data.errorReason}` };
-                } else if (success) { // If success but data is not as expected
-                     output = { message: "Git status determined successfully but data format unexpected.", details: data };
-                }
-                // If !success, the generic error message is already set
-                break;
-            case 'getProjectSummary':
-                if (data) {
-                    output = {
-                        project_name: data.projectName, project_rootPath: data.rootPath,
-                        project_workspaceName: data.workspaceName, project_topLevelStructure: data.topLevelStructure,
-                        project_detectedPrimaryLanguage: data.detectedPrimaryLanguage,
-                    };
-                } else { // Tool might return null if no workspace, valid 'success' case
-                    output = { message: "No workspace open or project summary not available." };
-                }
-                break;
-            case 'writeToFile':
-                output = { filePath: data.filePath, fileOperationStatus: 'overwritten' };
-                break;
-            default:
-                if (success) output = { message: "Tool executed successfully.", details: data };
-                // If !success, generic error message is fine
+    if (!success) return baseOutput;
+
+    const toolMappers: Record<string, (data: any) => ToolOutput> = {
+      getFileContents: (d) => ({ ...baseOutput, filePath: d.filePath, content: d.content, availableFiles: d.availableFiles }),
+      createFileOrDirectory: (d) => ({ ...baseOutput, filePath: d.path, fileOperationType: d.type, fileOperationStatus: d.operation }),
+      deletePath: (d) => ({ ...baseOutput, filePath: d.path, fileOperationStatus: d.deleted ? 'deleted' : 'error_not_deleted' }),
+      searchInWorkspace: (d) => ({ ...baseOutput, query: d.query, results: d.results, totalFound: d.totalFound, searchLimited: d.searchLimited }),
+      getActiveEditorInfo: (d) => d ? {
+        ...baseOutput,
+        activeEditor_filePath: d.filePath,
+        activeEditor_content: d.content,
+        activeEditor_languageId: d.languageId,
+        activeEditor_lineCount: d.lineCount,
+        activeEditor_selection: d.selection
+      } : { ...baseOutput, message: "No active editor found." },
+      getDocumentDiagnostics: (d) => ({ ...baseOutput, diagnostics_documentPath: d.documentPath, diagnostics_list: d.diagnostics }),
+      runInTerminal: (d) => ({ ...baseOutput, terminal_name: d.terminalName, terminal_commandSent: d.commandSent }),
+      getGitStatus: (d) => {
+        if (d?.currentBranch !== undefined) {
+          return {
+            ...baseOutput,
+            git_currentBranch: d.currentBranch,
+            git_remoteTracking: d.remoteTracking,
+            git_changedFilesCount: d.changedFilesCount,
+            git_stagedFilesCount: d.stagedFilesCount,
+            git_unstagedFilesCount: d.unstagedFilesCount,
+            git_untrackedFilesCount: d.untrackedFilesCount,
+            git_conflictedFilesCount: d.conflictedFilesCount,
+            git_files: d.files
+          };
+        } else if (d?.errorReason) {
+          return { ...baseOutput, message: `Git status error: ${d.errorReason}` };
+        } else if (success) {
+          return { ...baseOutput, message: "Git status determined successfully but data format unexpected.", details: d };
         }
-    } else if (!success && toolName === 'getGitStatus' && rawData && (rawData as any).errorReason) {
-        // Special handling for getGitStatus error structure
-        output = { message: `Git status error: ${(rawData as any).errorReason}` };
-    }
-    return output;
+        return baseOutput;
+      },
+      getProjectSummary: (d) => d ? {
+        ...baseOutput,
+        project_name: d.projectName,
+        project_rootPath: d.rootPath,
+        project_workspaceName: d.workspaceName,
+        project_topLevelStructure: d.topLevelStructure,
+        project_detectedPrimaryLanguage: d.detectedPrimaryLanguage
+      } : { ...baseOutput, message: "No workspace open or project summary not available." },
+      writeToFile: (d) => ({ ...baseOutput, filePath: d.filePath, fileOperationStatus: 'overwritten' })
+    };
+
+    return toolMappers[toolName]?.(rawData) || baseOutput;
   }
 
   async executeTool(
     name: string,
     rawParams: any,
-    executionCtxArgs: { chatId?: string; [key: string]: any } = {}
-  ): Promise<ToolResult> { // This is ToolResult from ./types
-    const operationId = generateUniqueId();
+    executionCtxArgs: { chatId?: string; operationId?: string; [key: string]: any } = {}
+): Promise<ToolResult> { // ToolResult de ./types
+    const operationId = executionCtxArgs.operationId || generateUniqueId();
     const startTime = Date.now();
-
     const tool = this.getTool(name);
     const toolDescriptionForUI = this.generateToolUIDescription(name, rawParams, tool);
 
-    const dispatchToolEvent = (type: EventType, payload: Partial<ToolExecutionEventPayload>) => {
-      const eventPayload: ToolExecutionEventPayload = {
+    // Solo despachar TOOL_EXECUTION_STARTED desde aquí
+    const startPayload: ToolExecutionEventPayload = {
         toolName: name,
-        parameters: payload.parameters || rawParams,
+        parameters: rawParams,
         toolDescription: toolDescriptionForUI,
-        toolParams: payload.toolParams || rawParams, 
+        toolParams: rawParams,
         chatId: executionCtxArgs.chatId,
         source: 'ToolRegistry',
-        operationId,
-        result: payload.result, // This will be ToolOutput
-        error: payload.error,
-        duration: payload.duration,
-        isProcessingStep: payload.isProcessingStep,
+        operationId, // Usa el operationId recibido o generado
         timestamp: Date.now(),
-      };
-      this.dispatcher.dispatch(type, eventPayload);
+        // No incluir result, error, duration, modelAnalysis, etc. aquí
     };
-    
-    dispatchToolEvent(EventType.TOOL_EXECUTION_STARTED, { parameters: rawParams, toolParams: rawParams });
-   
-    if (!tool) {
-      const errorMsg = `Tool not found: ${name}`;
-      const executionTime = Date.now() - startTime;
-      const mappedErrorOutput = this.mapToToolOutput(name, null, false, errorMsg);
-      dispatchToolEvent(EventType.TOOL_EXECUTION_ERROR, {
-        error: errorMsg,
-        duration: executionTime,
-        result: mappedErrorOutput,
-      });
-      return { 
-        success: false, 
-        error: errorMsg, 
-        executionTime: executionTime,
-        mappedOutput: mappedErrorOutput,
-      };
-    }
-    
-    const validationResult = ToolValidator.validate(tool.parametersSchema, rawParams);
+    this.dispatcher.dispatch(EventType.TOOL_EXECUTION_STARTED, startPayload);
 
+    if (!tool) {
+        const errorMsg = `Tool not found: ${name}`;
+        const executionTime = Date.now() - startTime;
+        const mappedErrorOutput = this.mapToToolOutput(name, null, false, errorMsg);
+        // NO despachar TOOL_EXECUTION_ERROR desde aquí
+        return {
+            success: false,
+            error: errorMsg,
+            executionTime: executionTime,
+            mappedOutput: mappedErrorOutput,
+        };
+    }
+
+    const validationResult = ToolValidator.validate(tool.parametersSchema, rawParams);
     if (!validationResult.success) {
-      const executionTime = Date.now() - startTime;
-      const mappedErrorOutput = this.mapToToolOutput(name, null, false, validationResult.error);
-      dispatchToolEvent(EventType.TOOL_EXECUTION_ERROR, {
-        error: validationResult.error,
-        duration: executionTime,
-        parameters: rawParams, 
-        toolParams: rawParams,
-        result: mappedErrorOutput,
-      });
-      return { 
-        success: false, 
-        error: validationResult.error, 
-        executionTime: executionTime,
-        mappedOutput: mappedErrorOutput,
-      };
+        const executionTime = Date.now() - startTime;
+        const mappedErrorOutput = this.mapToToolOutput(name, null, false, validationResult.error);
+        // NO despachar TOOL_EXECUTION_ERROR desde aquí
+        return {
+            success: false,
+            error: validationResult.error,
+            executionTime: executionTime,
+            mappedOutput: mappedErrorOutput,
+        };
     }
     const validatedParams = validationResult.data;
 
     const executionContext: ToolExecutionContext = {
-      vscodeAPI: vscode,
-      dispatcher: this.dispatcher,
-      chatId: executionCtxArgs.chatId,
-      ...executionCtxArgs
+        vscodeAPI: vscode,
+        dispatcher: this.dispatcher, // El dispatcher se pasa para que la herramienta pueda emitir eventos si es necesario (raro)
+        chatId: executionCtxArgs.chatId,
+        ...executionCtxArgs
     };
 
     try {
-      // tool.execute is expected to return Promise<ToolResult<R>>
-      // where ToolResult<R> might not have mappedOutput or executionTime set by the tool itself.
-      const toolExecuteOutcome = await tool.execute(validatedParams, executionContext);
-      const executionTime = Date.now() - startTime;
+        const toolExecuteOutcome = await tool.execute(validatedParams, executionContext);
+        const executionTime = Date.now() - startTime;
+        const mappedOutput = this.mapToToolOutput(name, toolExecuteOutcome.data, toolExecuteOutcome.success, toolExecuteOutcome.error);
 
-      // Centralized mapping from toolExecuteOutcome.data to a structured ToolOutput
-      const mappedOutput = this.mapToToolOutput(name, toolExecuteOutcome.data, toolExecuteOutcome.success, toolExecuteOutcome.error);
-
-      const finalToolResultToReturn: ToolResult = {
-        success: toolExecuteOutcome.success,
-        data: toolExecuteOutcome.data, // Preserve original raw data
-        mappedOutput: mappedOutput,    // Set the centrally mapped output
-        error: toolExecuteOutcome.error,
-        warnings: toolExecuteOutcome.warnings,
-        executionTime: executionTime,  // Set execution time
-      };
-
-      if (finalToolResultToReturn.success) {
-        dispatchToolEvent(EventType.TOOL_EXECUTION_COMPLETED, {
-            parameters: validatedParams,
-            toolParams: validatedParams,
-            result: finalToolResultToReturn.mappedOutput, // Use mappedOutput for the event
-            duration: executionTime,
-        });
-      } else {
-        dispatchToolEvent(EventType.TOOL_EXECUTION_ERROR, {
-            parameters: validatedParams,
-            toolParams: validatedParams,
-            error: finalToolResultToReturn.error || "Tool execution failed",
-            result: finalToolResultToReturn.mappedOutput, // Include mappedOutput in error event
-            duration: executionTime,
-        });
-      }
-      
-      return finalToolResultToReturn;
-
-    } catch (error: any) { 
-      const executionTime = Date.now() - startTime;
-      const errorMsg = `Unexpected error during execution of tool ${name}: ${error.message}`;
-      const mappedErrorOutput = this.mapToToolOutput(name, { originalException: error.toString() }, false, errorMsg);
-      
-      dispatchToolEvent(EventType.TOOL_EXECUTION_ERROR, {
-        parameters: validatedParams, 
-        toolParams: validatedParams,
-        error: errorMsg,
-        result: mappedErrorOutput,
-        duration: executionTime,
-      });
-
-      return { 
-        success: false, 
-        error: errorMsg, 
-        executionTime,
-        mappedOutput: mappedErrorOutput,
-      };
+        // NO despachar TOOL_EXECUTION_COMPLETED desde aquí
+        return {
+            success: toolExecuteOutcome.success,
+            data: toolExecuteOutcome.data,
+            mappedOutput: mappedOutput,
+            error: toolExecuteOutcome.error,
+            warnings: toolExecuteOutcome.warnings,
+            executionTime: executionTime,
+        };
+    } catch (error: any) {
+        const executionTime = Date.now() - startTime;
+        const errorMsg = `Unexpected error during execution of tool ${name}: ${error.message}`;
+        const mappedErrorOutput = this.mapToToolOutput(name, { originalException: error.toString() }, false, errorMsg);
+        // NO despachar TOOL_EXECUTION_ERROR desde aquí
+        return {
+            success: false,
+            error: errorMsg,
+            executionTime,
+            mappedOutput: mappedErrorOutput,
+        };
     }
-  }
+}
 
   public asDynamicTool(toolName: string, contextDefaults: Record<string, any> = {}): DynamicStructuredTool | undefined {
     const toolDef = this.getTool(toolName);

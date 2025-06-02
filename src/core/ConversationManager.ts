@@ -1,6 +1,6 @@
 // src/core/ConversationManager.ts
 import { WindsurfState,  HistoryEntry } from '../shared/types';
-import { MemoryManager } from '../features/memory/ConversationMemoryManager';
+import { ConversationMemoryManager } from '../features/memory/ConversationMemoryManager';
 import { getConfig } from '../shared/config';
 import { IConversationManager } from './interfaces/IConversationManager';
 import * as crypto from 'crypto';
@@ -145,14 +145,14 @@ export class ConversationManager implements IConversationManager {
    * Clears a conversation and optionally its memory
    * If no chatId is provided, clears the active conversation
    */
-  public clearConversation(chatId?: string, memoryManager?: MemoryManager): boolean {
+  public clearConversation(chatId?: string, conversationMemoryManager?: ConversationMemoryManager): boolean {
     const targetChatId = chatId || this.activeChatId;
     if (!targetChatId) return false;
     
     const wasDeleted = this.activeConversations.delete(targetChatId);
     
-    if (memoryManager && wasDeleted) {
-      memoryManager.clearConversationMemory(targetChatId);
+    if (conversationMemoryManager && wasDeleted) {
+      conversationMemoryManager.clearConversationMemory(targetChatId);
     }
     
     // Reset active chat ID if we're clearing the current one

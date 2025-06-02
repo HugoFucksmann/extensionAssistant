@@ -5,7 +5,7 @@ import { ChatMessage, Chat } from '@shared/types';
 // @ts-ignore
 import { getTheme } from '../theme/theme.js';
 
-type ThemeType = any; // Tipo genérico para el tema
+type ThemeType = any;
 
 declare global {
   interface Window {
@@ -44,7 +44,6 @@ type AppAction =
   | { type: 'SET_THEME'; payload: ThemeType }
   | { type: 'SET_TEST_MODE'; payload: boolean }
   | { type: 'SESSION_READY'; payload: { chatId: string; messages: ChatMessage[]; model?: string; history?: Chat[]; testMode?: boolean } };
-
 
 const body = document.body;
 const initialIsDarkMode = body.classList.contains('vscode-dark');
@@ -100,71 +99,58 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, isDarkMode: newIsDarkMode, theme: getTheme(newIsDarkMode) };
     }
     case 'SET_THEME':
-        return { ...state, theme: action.payload };
+      return { ...state, theme: action.payload };
     case 'SET_TEST_MODE':
-        return { ...state, testModeEnabled: action.payload };
+      return { ...state, testModeEnabled: action.payload };
     case 'ADD_MESSAGE': {
       const msg = action.payload;
       const msgId = msg.metadata?.operationId || msg.operationId || msg.id;
-      const toolName = msg.metadata?.toolName || msg.toolName;
-      // Buscar si ya existe mensaje de tool con mismo operationId y toolName
-      const idx = state.messages.findIndex(m => {
-        const mTool = m.metadata?.toolName || m.toolName;
-        const mOpId = m.metadata?.operationId || m.operationId || m.id;
-        return mOpId === msgId && mTool === toolName && toolName;
-      });
-      if (idx !== -1) {
-        // Solo actualizar status/output, no agregar mensaje nuevo
+      
+      // Simplificar la lógica: siempre agregar mensajes únicos
+      const existingIndex = state.messages.findIndex(m => 
+        (m.metadata?.operationId || m.operationId || m.id) === msgId
+      );
+      
+      if (existingIndex !== -1) {
+        // Actualizar mensaje existente
         const updatedMessages = [...state.messages];
-        updatedMessages[idx] = {
-          ...updatedMessages[idx],
+        updatedMessages[existingIndex] = {
+          ...updatedMessages[existingIndex],
           ...msg,
           id: msgId,
           metadata: {
-            ...updatedMessages[idx].metadata,
+            ...updatedMessages[existingIndex].metadata,
             ...msg.metadata,
-            status: msg.metadata?.status || msg.status,
-            toolOutput: msg.metadata?.toolOutput || msg.toolOutput,
-            success: msg.metadata?.success ?? msg.success,
           },
         };
         return { ...state, messages: updatedMessages };
+      } else {
+        // Agregar nuevo mensaje
+        return { ...state, messages: [...state.messages, { ...msg, id: msgId }] };
       }
-      // Solo agregar si es un evento STARTED o no es tool feedback
-      const isToolFeedback = toolName && msg.metadata?.status;
-      if (isToolFeedback && msg.metadata?.status !== 'started') {
-        // Si no hay STARTED previo, ignorar COMPLETED/ERROR
-        return state;
-      }
-      return { ...state, messages: [...state.messages, { ...msg, id: msgId }] };
     }
     case 'UPDATE_MESSAGE': {
-      // Usar operationId como id si existe (para feedback de herramientas)
       const { id, operationId, ...rest } = action.payload;
       const msgId = operationId || id;
-      const idx = state.messages.findIndex(msg => msg.id === msgId);
+      const idx = state.messages.findIndex(msg => 
+        (msg.metadata?.operationId || msg.operationId || msg.id) === msgId
+      );
+      
       if (idx === -1) {
-        // Si no existe, agregar como nuevo feedback
-        return {
-          ...state,
-          messages: [
-            ...state.messages,
-            {
-              id: msgId || `agent_${Date.now()}`,
-              content: rest.content || '',
-              sender: 'system',
-              timestamp: rest.timestamp || Date.now(),
-              metadata: rest.metadata || {},
-            }
-          ]
-        };
+        console.warn(`[AppContext] UPDATE_MESSAGE: Message with id ${msgId} not found for update.`);
+        return state;
       }
+      
       const updatedMessages = [...state.messages];
       updatedMessages[idx] = {
         ...updatedMessages[idx],
         ...rest,
         id: updatedMessages[idx].id,
-        timestamp: rest.timestamp || updatedMessages[idx].timestamp
+        timestamp: rest.timestamp || updatedMessages[idx].timestamp,
+        metadata: {
+          ...updatedMessages[idx].metadata,
+          ...rest.metadata,
+        }
       };
       return { ...state, messages: updatedMessages };
     }
@@ -201,7 +187,6 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       const { type, payload } = event.data;
-   
 
       switch (type) {
         case 'sessionReady':
@@ -222,50 +207,52 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         case 'newChatStarted':
           dispatch({ type: 'NEW_CHAT_STARTED', payload: { chatId: payload.chatId } });
           break;
-        case 'agentActionUpdate': {
-          // Usar operationId como id para UPDATE_MESSAGE si existe
-          const { operationId, id, ...rest } = payload;
-          dispatch({ type: 'UPDATE_MESSAGE', payload: { id: operationId || id, operationId, ...rest } });
+        case 'agentActionUpdate':
+          // Manejar actualizaciones de herramientas
+          dispatch({ type: 'ADD_MESSAGE', payload });
           break;
-        }
+        case 'agentPhaseUpdate':
+          // Nuevo: manejar actualizaciones de fases del agente
+          dispatch({ type: 'ADD_MESSAGE', payload });
+          break;
         case 'systemError':
           dispatch({
             type: 'ADD_MESSAGE', payload: {
-              id: `err_${Date.now()}`,
-              content: `Error: ${payload.message}`,
+              id: payload.id || `err_${Date.now()}`, 
+              content: payload.content, 
               sender: 'system',
-              timestamp: Date.now(),
-              metadata: { status: 'error' }, 
+              timestamp: payload.timestamp || Date.now(),
+              metadata: payload.metadata || { status: 'error' }, 
             }
           });
           dispatch({ type: 'SET_LOADING', payload: false });
           break;
         case 'chatHistory':
-            dispatch({ type: 'SET_CHAT_LIST', payload: payload.history || [] });
-            break;
+          dispatch({ type: 'SET_CHAT_LIST', payload: payload.history || [] });
+          break;
         case 'chatLoaded':
-            dispatch({ type: 'SET_MESSAGES', payload: payload.messages || [] });
-            dispatch({ type: 'SET_CHAT_ID', payload: payload.chatId });
-            dispatch({ type: 'SET_SHOW_HISTORY', payload: false });
-            break;
+          dispatch({ type: 'SET_MESSAGES', payload: payload.messages || [] });
+          dispatch({ type: 'SET_CHAT_ID', payload: payload.chatId });
+          dispatch({ type: 'SET_SHOW_HISTORY', payload: false });
+          break;
         case 'modelSwitched':
-            dispatch({ type: 'SET_CURRENT_MODEL', payload: payload.modelType });
-            break;
+          dispatch({ type: 'SET_CURRENT_MODEL', payload: payload.modelType });
+          break;
         case 'themeChanged':
-            const newThemeIsDark = payload.theme === 'dark';
-            if (state.isDarkMode !== newThemeIsDark) {
-                dispatch({ type: 'TOGGLE_DARK_MODE' });
-            }
-            break;
+          const newThemeIsDark = payload.theme === 'dark';
+          if (state.isDarkMode !== newThemeIsDark) {
+            dispatch({ type: 'TOGGLE_DARK_MODE' });
+          }
+          break;
         case 'testModeChanged':
-            dispatch({ type: 'SET_TEST_MODE', payload: payload.enabled });
-            break;
+          dispatch({ type: 'SET_TEST_MODE', payload: payload.enabled });
+          break;
         case 'showHistory':
-            dispatch({ type: 'SET_SHOW_HISTORY', payload: true });
-            if (state.chatList.length === 0) {
-                postMessageToBackend('command', { command: 'getChatHistory' });
-            }
-            break;
+          dispatch({ type: 'SET_SHOW_HISTORY', payload: true });
+          if (state.chatList.length === 0) {
+            postMessageToBackend('command', { command: 'getChatHistory' });
+          }
+          break;
       }
     };
 
@@ -273,16 +260,16 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     postMessageToBackend('uiReady');
 
     const observer = new MutationObserver(() => {
-        const currentIsDark = document.body.classList.contains('vscode-dark');
-        if (state.isDarkMode !== currentIsDark) {
-            dispatch({ type: 'TOGGLE_DARK_MODE' });
-        }
+      const currentIsDark = document.body.classList.contains('vscode-dark');
+      if (state.isDarkMode !== currentIsDark) {
+        dispatch({ type: 'TOGGLE_DARK_MODE' });
+      }
     });
     observer.observe(document.body, { attributes: true, attributeFilter: ['class'] });
 
     return () => {
-        window.removeEventListener('message', handleMessage);
-        observer.disconnect();
+      window.removeEventListener('message', handleMessage);
+      observer.disconnect();
     };
   }, [state.isDarkMode, state.chatList.length]); 
 
@@ -295,6 +282,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       files: files,
     };
     dispatch({ type: 'ADD_MESSAGE', payload: userMessage });
+    dispatch({ type: 'SET_LOADING', payload: true });
     postMessageToBackend('userMessageSent', { text, files });
   };
 
@@ -305,7 +293,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   const setShowHistory = (show: boolean) => {
     dispatch({ type: 'SET_SHOW_HISTORY', payload: show });
     if (show && state.chatList.length === 0) {
-        postMessageToBackend('command', { command: 'getChatHistory' });
+      postMessageToBackend('command', { command: 'getChatHistory' });
     }
   };
 
@@ -318,10 +306,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const toggleDarkMode = () => {
-      dispatch({ type: 'TOGGLE_DARK_MODE' });
+    dispatch({ type: 'TOGGLE_DARK_MODE' });
   }
-
-  
 
   return (
     <AppContext.Provider value={{

@@ -227,6 +227,9 @@ const ChatInput = () => {
     },
   };
 
+  console.log("isLoading ", isLoading);
+  
+
   return (
     <div style={styles.container} ref={dropdownRef}> {/* dropdownRef de useFileMention */}
       {/* Contenedor para los FileChips */}
@@ -273,7 +276,7 @@ const ChatInput = () => {
             placeholder={selectedFiles.length > 0 
               ? "Add more details..." 
               : "Type your message... (Use @ to mention files)"}
-            disabled={isLoading}
+           // disabled={isLoading}
             aria-autocomplete="list"
             aria-expanded={isDropdownOpen}
             aria-controls={isDropdownOpen ? "file-dropdown-listbox" : undefined} // ID del listbox
