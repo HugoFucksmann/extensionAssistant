@@ -10,15 +10,21 @@ import {
 } from '../../features/events/eventTypes';
 import { WebviewStateManager } from './WebviewStateManager';
 import { ChatMessage } from '../../shared/types';
+import { IConversationManager } from '../../core/interfaces/IConversationManager';
 
 export class WebviewEventHandler {
   private dispatcherSubscriptions: { unsubscribe: () => void }[] = [];
 
+  private currentChatId: string | null = null;
+
   constructor(
     private readonly internalEventDispatcher: InternalEventDispatcher,
+    private readonly conversationManager: IConversationManager,
     private readonly stateManager: WebviewStateManager,
     private readonly postMessage: (type: string, payload: any) => void
-  ) {}
+  ) {
+    this.currentChatId = this.conversationManager.getActiveChatId();
+  }
 
   public subscribeToEvents(): void {
     this.dispatcherSubscriptions.forEach(s => s.unsubscribe());
@@ -46,7 +52,8 @@ export class WebviewEventHandler {
 
   private handleInternalEvent(event: WindsurfEvent): void {
     const eventChatId = event.payload.chatId;
-    const currentChatId = this.stateManager.getCurrentChatId();
+    const currentChatId = this.conversationManager.getActiveChatId();
+    this.currentChatId = currentChatId; // Keep track of the current chat ID
 
 
     if (event.type !== EventType.SYSTEM_ERROR && eventChatId && eventChatId !== currentChatId) {

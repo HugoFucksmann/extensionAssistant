@@ -5,7 +5,7 @@ import { VSCodeContext } from '../shared/types';
 import { ModelManager } from '../features/ai/ModelManager';
 import { ToolRegistry } from '../features/tools/ToolRegistry';
 import { allToolDefinitions } from '../features/tools/definitions';
-import { MemoryManager } from '../features/memory/MemoryManager';
+import { ConversationMemoryManager } from '../features/memory/ConversationMemoryManager';
 import { ConversationManager } from './ConversationManager';
 import { ApplicationLogicService } from './ApplicationLogicService';
 import { InternalEventDispatcher } from './events/InternalEventDispatcher';
@@ -23,6 +23,7 @@ export class ComponentFactory {
   private static optimizedPromptManagerInstance: OptimizedPromptManager;
   private static optimizedReActEngineInstance: OptimizedReActEngine;
   private static longTermStorageInstance: LongTermStorage;
+  private static conversationManagerInstance: ConversationManager;
 
   public static getInternalEventDispatcher(): InternalEventDispatcher {
     if (!this.internalEventDispatcherInstance) {
@@ -108,7 +109,7 @@ export class ComponentFactory {
     
 
       const longTermStorage = this.getLongTermStorage(extensionContext); 
-      const memoryManager = new MemoryManager(longTermStorage); 
+      const conversationMemoryManager = new ConversationMemoryManager(longTermStorage); 
       const conversationManager = new ConversationManager();
       const toolRegistry = this.getToolRegistry();
       
@@ -116,7 +117,7 @@ export class ComponentFactory {
       const reActEngine = this.getOptimizedReActEngine(extensionContext);
 
       this.applicationLogicServiceInstance = new ApplicationLogicService(
-        memoryManager,
+        conversationMemoryManager,
         reActEngine,
         conversationManager,
         toolRegistry
@@ -126,18 +127,56 @@ export class ComponentFactory {
     return this.applicationLogicServiceInstance;
   }
 
-  public static dispose(): void {
-    if (this.applicationLogicServiceInstance && typeof (this.applicationLogicServiceInstance as any).dispose === 'function') {
-        (this.applicationLogicServiceInstance as any).dispose();
+  /**
+   * Libera todos los recursos manejados por el ComponentFactory
+   * Asegura que todas las instancias que manejan recursos sean correctamente limpiadas
+   */
+  public static getConversationManager(extensionContext: vscode.ExtensionContext): ConversationManager {
+    if (!this.conversationManagerInstance) {
+      this.conversationManagerInstance = new ConversationManager();
     }
-  
+    return this.conversationManagerInstance;
+  }
+
+  public static async dispose(): Promise<void> {
+    // Descartar instancias en orden inverso al de creación
+    if (this.optimizedReActEngineInstance && typeof this.optimizedReActEngineInstance.dispose === 'function') {
+      this.optimizedReActEngineInstance.dispose();
+      this.optimizedReActEngineInstance = null!;
+    }
+
+    if (this.optimizedPromptManagerInstance && typeof (this.optimizedPromptManagerInstance as any).dispose === 'function') {
+      (this.optimizedPromptManagerInstance as any).dispose();
+      this.optimizedPromptManagerInstance = null!;
+    }
+
+    if (this.longTermStorageInstance && typeof this.longTermStorageInstance.dispose === 'function') {
+      await this.longTermStorageInstance.dispose();
+      this.longTermStorageInstance = null!;
+    }
+
     if (this.modelManagerInstance && typeof (this.modelManagerInstance as any).dispose === 'function') {
-        (this.modelManagerInstance as any).dispose();
+      (this.modelManagerInstance as any).dispose();
+      this.modelManagerInstance = null!;
     }
-  
+
+    if (this.toolRegistryInstance && typeof (this.toolRegistryInstance as any).dispose === 'function') {
+      (this.toolRegistryInstance as any).dispose();
+      this.toolRegistryInstance = null!;
+    }
+
     if (this.internalEventDispatcherInstance && typeof this.internalEventDispatcherInstance.dispose === 'function') {
-        this.internalEventDispatcherInstance.dispose();
+      this.internalEventDispatcherInstance.dispose();
+      this.internalEventDispatcherInstance = null!;
     }
-   
+
+    if (this.applicationLogicServiceInstance && typeof (this.applicationLogicServiceInstance as any).dispose === 'function') {
+      (this.applicationLogicServiceInstance as any).dispose();
+      this.applicationLogicServiceInstance = null!;
+    }
+    
+    if (this.conversationManagerInstance && typeof (this.conversationManagerInstance as any).dispose === 'function') {
+      this.conversationManagerInstance = null!;
+    }
   }
 }

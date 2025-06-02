@@ -1,17 +1,22 @@
 // src/features/tools/definitions/git/index.ts
 import { getGitStatus } from './getGitStatus';
-// Importa otras herramientas de git aquí cuando las crees
-// import { gitCommit } from './gitCommit';
-// import { gitPush } from './gitPush';
+import { gitCommit } from './gitCommit';
+import { gitPush } from './gitPush';
+import { gitPull } from './gitPull';
+import { gitDiff } from './gitDiff';
 
 export const gitToolDefinitions = [
   getGitStatus,
-  // gitCommit,
-  // gitPush,
+  gitCommit,
+  gitPush,
+  gitPull,
+  gitDiff,
 ];
 
 export {
   getGitStatus,
-  // gitCommit,
-  // gitPush,
+  gitCommit,
+  gitPush,
+  gitPull,
+  gitDiff,
 };

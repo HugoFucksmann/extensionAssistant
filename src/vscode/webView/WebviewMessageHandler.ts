@@ -1,9 +1,13 @@
 import { ApplicationLogicService } from '../../core/ApplicationLogicService';
 import { WebviewStateManager } from './WebviewStateManager';
+import { IConversationManager } from '../../core/interfaces/IConversationManager';
 
 export class WebviewMessageHandler {
+  private currentChatId: string | null = null;
+
   constructor(
     private readonly appLogicService: ApplicationLogicService,
+    private readonly conversationManager: IConversationManager,
     private readonly stateManager: WebviewStateManager,
     private readonly postMessage: (type: string, payload: any) => void
   ) {}
@@ -32,19 +36,27 @@ export class WebviewMessageHandler {
   }
 
   private async handleUIReady(): Promise<void> {
-    this.stateManager.initializeChat();
-  
+    // Initialize a new chat if none exists
+    if (!this.conversationManager.getActiveChatId()) {
+      this.currentChatId = this.conversationManager.createNewChat();
+    } else {
+      this.currentChatId = this.conversationManager.getActiveChatId();
+    }
     
     this.postMessage('sessionReady', {
-      chatId: this.stateManager.getCurrentChatId(),
+      chatId: this.currentChatId,
       messages: [],
     });
   }
 
   private async handleUserMessage(payload: { text: string; files?: string[] }): Promise<void> {
-    const chatId = this.stateManager.getCurrentChatId();
+    if (!this.currentChatId) {
+      this.currentChatId = this.conversationManager.createNewChat();
+    }
+    
+    const chatId = this.currentChatId;
     if (!chatId) {
-      this.postMessage('systemError', { message: 'No active chat session' });
+      this.postMessage('systemError', { message: 'Failed to create or retrieve chat session' });
       return;
     }
 
@@ -74,10 +86,27 @@ export class WebviewMessageHandler {
     }
   }
 
-  private handleNewChatRequest(): void {
-    this.stateManager.startNewChat();
-    
-    this.postMessage('newChatStarted', { chatId: this.stateManager.getCurrentChatId() });
+  /**
+   * Handles the creation of a new chat
+   * @public
+   */
+  public handleNewChatRequest(): void {
+    try {
+      // Create a new chat and get its ID
+      const newChatId = this.conversationManager.createNewChat();
+      this.currentChatId = newChatId;
+      
+      // Notify the UI that a new chat was started
+      this.postMessage('newChatStarted', { 
+        chatId: newChatId,
+        activeChatId: this.conversationManager.getActiveChatId()
+      });
+    } catch (error) {
+      console.error('[WebviewMessageHandler] Error creating new chat:', error);
+      this.postMessage('systemError', {
+        message: 'Failed to create a new chat. Please try again.'
+      });
+    }
   }
 
   private async handleCommand(payload: any): Promise<void> {
@@ -89,9 +118,13 @@ export class WebviewMessageHandler {
   }
 
   private async handleGetProjectFiles(): Promise<void> {
-    const chatId = this.stateManager.getCurrentChatId();
+    if (!this.currentChatId) {
+      this.currentChatId = this.conversationManager.createNewChat();
+    }
+    
+    const chatId = this.currentChatId;
     if (!chatId) {
-      this.postMessage('systemError', { message: 'No active chat session to associate with tool execution.' });
+      this.postMessage('systemError', { message: 'Failed to create or retrieve chat session for tool execution.' });
       return;
     }
 

@@ -34,7 +34,28 @@ const ChatMessages = () => {
             <p>No messages yet. Start a conversation!</p>
           </div>
         ) : (
-          messages.map((message, index) => <MessageItem key={message?.id || `msg-${index}`} message={message} />)
+          (() => {
+            // Filtro: solo el último mensaje por toolName+toolInput+sender
+            const toolMsgMap = new Map();
+            const result = [];
+            for (let i = messages.length - 1; i >= 0; i--) {
+              const m = messages[i];
+              const meta = m?.metadata || {};
+              if (meta.toolName && meta.toolInput && (m.sender === 'system' || m.sender === 'feedback')) {
+                const key = `${meta.toolName}::${JSON.stringify(meta.toolInput)}::${m.sender}`;
+                if (!toolMsgMap.has(key)) {
+                  toolMsgMap.set(key, true);
+                  result.unshift(m);
+                }
+              } else {
+                // Mensajes normales, siempre incluir (puede haber varios)
+                result.unshift(m);
+              }
+            }
+            return result.map((message, index) => (
+              <MessageItem key={message?.id || `msg-${index}`} message={message} />
+            ));
+          })()
         )}
         <div ref={messagesEndRef} />
       </div>

@@ -1,10 +1,10 @@
-// src/features/memory/AgentMemory.ts
+// src/features/memory/ReActCycleMemory.ts
 
 import { LongTermStorage } from './LongTermStorage';
 
 
-// Tipos de memoria que puede almacenar el agente
-export type MemoryType = 
+
+export type ReActCycleMemoryType = 
   | 'context' 
   | 'codebase' 
   | 'user'     
@@ -12,9 +12,9 @@ export type MemoryType =
   | 'reasoning'; 
 
 // Estructura de un elemento de memoria
-export interface MemoryItem {
+export interface ReActCycleMemoryItem {
   id: string;
-  type: MemoryType;
+  type: ReActCycleMemoryType;
   content: any;
   relevance: number;  // 0-1, qué tan relevante es para el contexto actual
   timestamp: number;
@@ -22,10 +22,10 @@ export interface MemoryItem {
 }
 
 // Estado de memoria del agente durante una conversación
-export interface AgentMemoryState {
+export interface ReActCycleMemoryState {
   chatId: string;
-  shortTermMemory: MemoryItem[];  // Memoria de la conversación actual
-  relevantLongTermMemory: MemoryItem[];  // Memoria relevante recuperada del almacenamiento
+  shortTermMemory: ReActCycleMemoryItem[];  // Memoria de la conversación actual
+  relevantLongTermMemory: ReActCycleMemoryItem[];  // Memoria relevante recuperada del almacenamiento
   currentContext: {
     userQuery: string;
     codeContext?: string;
@@ -38,8 +38,8 @@ export interface AgentMemoryState {
   };
 }
 
-export class AgentMemory {
-  private state: AgentMemoryState;
+export class ReActCycleMemory {
+  private state: ReActCycleMemoryState;
   private static MAX_SHORT_TERM_ITEMS = 20;
   
   constructor(
@@ -62,9 +62,9 @@ export class AgentMemory {
   /**
    * Añade un elemento a la memoria a corto plazo
    */
-  public addToShortTermMemory(item: Omit<MemoryItem, 'id' | 'timestamp'>): string {
+  public addToShortTermMemory(item: Omit<ReActCycleMemoryItem, 'id' | 'timestamp'>): string {
     const id = `mem_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-    const memoryItem: MemoryItem = {
+    const memoryItem: ReActCycleMemoryItem = {
       ...item,
       id,
       timestamp: Date.now()
@@ -73,10 +73,10 @@ export class AgentMemory {
     this.state.shortTermMemory.push(memoryItem);
     
     // Limitar el tamaño de la memoria a corto plazo
-    if (this.state.shortTermMemory.length > AgentMemory.MAX_SHORT_TERM_ITEMS) {
+    if (this.state.shortTermMemory.length > ReActCycleMemory.MAX_SHORT_TERM_ITEMS) {
       // Eliminar los elementos menos relevantes primero
       this.state.shortTermMemory.sort((a, b) => b.relevance - a.relevance);
-      this.state.shortTermMemory = this.state.shortTermMemory.slice(0, AgentMemory.MAX_SHORT_TERM_ITEMS);
+      this.state.shortTermMemory = this.state.shortTermMemory.slice(0, ReActCycleMemory.MAX_SHORT_TERM_ITEMS);
     }
     
     this.updateMetadata();
@@ -86,11 +86,11 @@ export class AgentMemory {
   /**
    * Recupera elementos relevantes de la memoria a largo plazo
    */
-  public async retrieveRelevantMemory(query: string, limit: number = 5): Promise<MemoryItem[]> {
+  public async retrieveRelevantMemory(query: string, limit: number = 5): Promise<ReActCycleMemoryItem[]> {
     try {
       const results = await this.storage.search(query, limit);
       
-      const memoryItems: MemoryItem[] = results.map(result => ({
+      const memoryItems: ReActCycleMemoryItem[] = results.map(result => ({
         id: result.key,
         type: result.metadata.type || 'context',
         content: result.data,
@@ -112,7 +112,7 @@ export class AgentMemory {
   /**
    * Persiste un elemento importante en la memoria a largo plazo
    */
-  public async persistToLongTermMemory(item: Omit<MemoryItem, 'id' | 'timestamp'>): Promise<string> {
+  public async persistToLongTermMemory(item: Omit<ReActCycleMemoryItem, 'id' | 'timestamp'>): Promise<string> {
     const id = `ltm_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     
     await this.storage.store(id, item.content, {
@@ -127,7 +127,7 @@ export class AgentMemory {
   /**
    * Actualiza el contexto actual del agente
    */
-  public updateContext(context: Partial<AgentMemoryState['currentContext']>): void {
+  public updateContext(context: Partial<ReActCycleMemoryState['currentContext']>): void {
     this.state.currentContext = {
       ...this.state.currentContext,
       ...context
@@ -175,7 +175,7 @@ export class AgentMemory {
   /**
    * Obtiene el estado completo de la memoria
    */
-  public getState(): AgentMemoryState {
+  public getState(): ReActCycleMemoryState {
     return this.state;
   }
 

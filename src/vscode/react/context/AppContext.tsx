@@ -105,15 +105,36 @@ function appReducer(state: AppState, action: AppAction): AppState {
         return { ...state, testModeEnabled: action.payload };
     case 'ADD_MESSAGE': {
       const msg = action.payload;
-      // Usar operationId como id si existe (para feedback de herramientas)
       const msgId = msg.metadata?.operationId || msg.operationId || msg.id;
-      // Evitar duplicados de feedback/tool: si ya existe uno con ese id, actualizarlo
-      const exists = state.messages.some(m => m.id === msgId);
-      if (exists) {
-        const idx = state.messages.findIndex(m => m.id === msgId);
+      const toolName = msg.metadata?.toolName || msg.toolName;
+      // Buscar si ya existe mensaje de tool con mismo operationId y toolName
+      const idx = state.messages.findIndex(m => {
+        const mTool = m.metadata?.toolName || m.toolName;
+        const mOpId = m.metadata?.operationId || m.operationId || m.id;
+        return mOpId === msgId && mTool === toolName && toolName;
+      });
+      if (idx !== -1) {
+        // Solo actualizar status/output, no agregar mensaje nuevo
         const updatedMessages = [...state.messages];
-        updatedMessages[idx] = { ...updatedMessages[idx], ...msg, id: msgId };
+        updatedMessages[idx] = {
+          ...updatedMessages[idx],
+          ...msg,
+          id: msgId,
+          metadata: {
+            ...updatedMessages[idx].metadata,
+            ...msg.metadata,
+            status: msg.metadata?.status || msg.status,
+            toolOutput: msg.metadata?.toolOutput || msg.toolOutput,
+            success: msg.metadata?.success ?? msg.success,
+          },
+        };
         return { ...state, messages: updatedMessages };
+      }
+      // Solo agregar si es un evento STARTED o no es tool feedback
+      const isToolFeedback = toolName && msg.metadata?.status;
+      if (isToolFeedback && msg.metadata?.status !== 'started') {
+        // Si no hay STARTED previo, ignorar COMPLETED/ERROR
+        return state;
       }
       return { ...state, messages: [...state.messages, { ...msg, id: msgId }] };
     }

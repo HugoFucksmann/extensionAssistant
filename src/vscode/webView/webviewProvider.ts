@@ -5,6 +5,7 @@ import { InternalEventDispatcher } from '../../core/events/InternalEventDispatch
 import { WebviewMessageHandler } from './WebviewMessageHandler';
 import { WebviewEventHandler } from './WebviewEventHandler';
 import { WebviewStateManager } from './WebviewStateManager';
+import { IConversationManager } from '../../core/interfaces/IConversationManager';
 import * as crypto from 'crypto';
 
 export class WebviewProvider implements vscode.WebviewViewProvider {
@@ -17,16 +18,19 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
   constructor(
     private readonly extensionUri: vscode.Uri,
     private readonly appLogicService: ApplicationLogicService,
-    private readonly internalEventDispatcher: InternalEventDispatcher
+    private readonly internalEventDispatcher: InternalEventDispatcher,
+    private readonly conversationManager: IConversationManager
   ) {
     this.stateManager = new WebviewStateManager();
     this.messageHandler = new WebviewMessageHandler(
       this.appLogicService,
+      this.conversationManager,
       this.stateManager,
       this.postMessage.bind(this)
     );
     this.eventHandler = new WebviewEventHandler(
       this.internalEventDispatcher,
+      this.conversationManager,
       this.stateManager,
       this.postMessage.bind(this)
     );
@@ -70,12 +74,11 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     this.postMessage('showHistory', {});
   }
 
+  /**
+   * Starts a new chat by delegating to the message handler
+   */
   public startNewChat(): void {
-    const oldChatId = this.stateManager.getCurrentChatId();
-    this.stateManager.startNewChat();
-    
-    
-    this.postMessage('newChatStarted', { chatId: this.stateManager.getCurrentChatId() });
+    this.messageHandler.handleNewChatRequest();
   }
 
 

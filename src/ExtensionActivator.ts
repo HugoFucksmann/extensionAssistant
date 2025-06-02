@@ -18,11 +18,13 @@ export class ExtensionActivator {
   private initializeServices(): void {
     const appLogicService = ComponentFactory.getApplicationLogicService(this.context);
     const dispatcher = ComponentFactory.getInternalEventDispatcher();
+    const conversationManager = ComponentFactory.getConversationManager(this.context);
     
     this.webviewProvider = new WebviewProvider(
       this.context.extensionUri, 
       appLogicService, 
-      dispatcher
+      dispatcher,
+      conversationManager
     );
     
     this.commandManager = new CommandManager(this.webviewProvider);

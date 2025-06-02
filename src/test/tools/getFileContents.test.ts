@@ -153,6 +153,11 @@ describe('getFileContents tool', () => {
     expect(result.success).toBe(true);
     expect(result.data?.content).toBe('Test file content');
     expect(result.data?.filePath).toBe('test.txt');
+    expect(result.data?.fileSize).toBe(100);
+    expect(result.data?.encoding).toBe('utf-8');
+    expect(result.data?.mimeType).toBe('text/plain');
+    expect(result.data?.isBinary).toBe(false);
+    expect(result.data?.lineCount).toBe(1); // El contenido de prueba tiene una sola línea
   });
 
   test('should handle file not found', async () => {
@@ -186,6 +191,11 @@ describe('getFileContents tool', () => {
     } else {
       expect(result.data?.filePath).toContain('test.txt');
       expect(result.data?.content).toBe('Test file content');
+      expect(result.data?.fileSize).toBe(100);
+      expect(result.data?.encoding).toBe('utf-8');
+      expect(result.data?.mimeType).toBe('text/plain');
+      expect(result.data?.isBinary).toBe(false);
+      expect(result.data?.lineCount).toBe(1); // El contenido de prueba tiene una sola línea
     }
   });
 });

@@ -1,30 +1,47 @@
-import * as crypto from 'crypto';
-
 export class WebviewStateManager {
-  private currentChatId: string | null = null;
   private currentModel: string | null = null;
+  private isSidebarVisible: boolean = true;
+  private isDarkMode: boolean = false;
 
-  public getCurrentChatId(): string | null {
-    return this.currentChatId;
-  }
-
+  /**
+   * Gets the current model
+   */
   public getCurrentModel(): string | null {
     return this.currentModel;
   }
 
+  /**
+   * Sets the current model
+   */
   public setCurrentModel(model: string): void {
     this.currentModel = model;
   }
 
-  public startNewChat(): void {
-    this.currentChatId = this.generateChatId();
+  /**
+   * Sets the sidebar visibility
+   */
+  public setSidebarVisibility(visible: boolean): void {
+    this.isSidebarVisible = visible;
   }
 
-  public initializeChat(): void {
-    this.currentChatId = this.generateChatId();
+  /**
+   * Gets the sidebar visibility
+   */
+  public getSidebarVisibility(): boolean {
+    return this.isSidebarVisible;
   }
 
-  private generateChatId(): string {
-    return `chat_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+  /**
+   * Sets the dark mode
+   */
+  public setDarkMode(enabled: boolean): void {
+    this.isDarkMode = enabled;
+  }
+
+  /**
+   * Gets the dark mode state
+   */
+  public getDarkMode(): boolean {
+    return this.isDarkMode;
   }
 }

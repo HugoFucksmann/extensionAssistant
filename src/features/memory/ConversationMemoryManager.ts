@@ -1,9 +1,9 @@
-// src/features/memory/MemoryManager.ts
+// src/features/memory/ConversationMemoryManager.ts
 import { LongTermStorage } from './LongTermStorage';
 import { WindsurfState, HistoryEntry } from '@shared/types';
 
 
-export class MemoryManager {
+export class ConversationMemoryManager {
  
   private shortTermMemory: Map<string, any>;
 
@@ -59,7 +59,7 @@ export class MemoryManager {
       
       
     } catch (error) {
-      console.error(`[MemoryManager] Error storing conversation:`, error);
+      console.error(`[ConversationMemoryManager] Error storing conversation:`, error);
       throw error;
     }
   }
@@ -91,7 +91,7 @@ export class MemoryManager {
       
       return memories;
     } catch (error) {
-      console.error(`[MemoryManager] Error retrieving memories:`, error);
+      console.error(`[ConversationMemoryManager] Error retrieving memories:`, error);
       return [];
     }
   }
@@ -149,7 +149,7 @@ export class MemoryManager {
       await this.longTermStorage.dispose();
     
     } catch (error) {
-      console.error('[MemoryManager] Error during disposal:', error);
+      console.error('[ConversationMemoryManager] Error during disposal:', error);
       throw error;
     }
   }

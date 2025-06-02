@@ -22,12 +22,23 @@ export const createFileOrDirectoryParamsSchema = z.object({
 });
 
 
-type CreateResultType = { path: string; type: 'file' | 'directory'; operation: 'created' | 'overwritten' | 'exists' };
+type CreateResultType = { 
+  path: string; 
+  type: 'file' | 'directory'; 
+  operation: 'created' | 'overwritten' | 'exists';
+  absolutePath: string;
+  size?: number;
+  encoding: string;
+  mimeType?: string;
+  lastModified: string;
+  parentDirectory: string;
+  children?: string[]; // Para directorios
+};
 
 export const createFileOrDirectory: ToolDefinition<typeof createFileOrDirectoryParamsSchema, CreateResultType> = {
   uiFeedback: true,
   name: 'createFileOrDirectory',
-  description: 'Creates a new file or a new directory. Paths must be relative to the workspace root. Creates parent directories if they do not exist. Overwrites existing files if type is "file".',
+  description: 'Creates a new file or a new directory with detailed metadata. Paths must be relative to the workspace root. Creates parent directories if they do not exist. Overwrites existing files if type is "file".',
   parametersSchema: createFileOrDirectoryParamsSchema,
   async execute(
     params, // Tipado por Zod
@@ -51,26 +62,75 @@ export const createFileOrDirectory: ToolDefinition<typeof createFileOrDirectoryP
         existingStat = await context.vscodeAPI.workspace.fs.stat(targetUri);
       } catch (e) { /* No existe, se creará */ }
 
+      // Aseguramos que targetUri está definido
+      const targetPath = targetUri.fsPath;
+      const relativePath = context.vscodeAPI.workspace.asRelativePath(targetUri, false);
+      const parentRelativePath = context.vscodeAPI.workspace.asRelativePath(parentDirUri, false);
+
       if (type === 'directory') {
         if (existingStat) {
           if (existingStat.type === context.vscodeAPI.FileType.Directory) {
             operation = 'exists';
-            return { success: true, data: { path: context.vscodeAPI.workspace.asRelativePath(targetUri, false), type: 'directory', operation } };
+            const children = await context.vscodeAPI.workspace.fs.readDirectory(targetUri);
+            return { 
+              success: true, 
+              data: { 
+                path: relativePath,
+                type: 'directory', 
+                operation,
+                absolutePath: targetPath,
+                size: 0,
+                encoding: 'utf-8',
+                mimeType: 'inode/directory',
+                lastModified: new Date(existingStat.mtime).toISOString(),
+                parentDirectory: parentRelativePath,
+                children: children.map(([name, _]) => name)
+              } 
+            };
           } else {
-            return { success: false, error: `Path ${context.vscodeAPI.workspace.asRelativePath(targetUri, false)} exists and is not a directory.`, data: undefined };
+            return { success: false, error: `Path ${relativePath} exists and is not a directory.`, data: undefined };
           }
         }
         await context.vscodeAPI.workspace.fs.createDirectory(targetUri);
-        return { success: true, data: { path: context.vscodeAPI.workspace.asRelativePath(targetUri, false), type: 'directory', operation } };
+        const stat = await context.vscodeAPI.workspace.fs.stat(targetUri);
+        return { 
+          success: true, 
+          data: { 
+            path: relativePath,
+            type: 'directory', 
+            operation,
+            absolutePath: targetPath,
+            size: 0,
+            encoding: 'utf-8',
+            mimeType: 'inode/directory',
+            lastModified: new Date(stat.mtime).toISOString(),
+            parentDirectory: parentRelativePath,
+            children: []
+          } 
+        };
       } else { // type === 'file'
         if (existingStat) {
           if (existingStat.type === context.vscodeAPI.FileType.Directory) {
-            return { success: false, error: `Path ${context.vscodeAPI.workspace.asRelativePath(targetUri, false)} exists and is a directory. Cannot overwrite with a file.`, data: undefined };
+            return { success: false, error: `Path ${relativePath} exists and is a directory. Cannot overwrite with a file.`, data: undefined };
           }
           operation = 'overwritten';
         }
         await context.vscodeAPI.workspace.fs.writeFile(targetUri, new TextEncoder().encode(content || ''));
-        return { success: true, data: { path: context.vscodeAPI.workspace.asRelativePath(targetUri, false), type: 'file', operation } };
+        const fileStat = await context.vscodeAPI.workspace.fs.stat(targetUri);
+        return { 
+          success: true, 
+          data: { 
+            path: relativePath,
+            type: 'file', 
+            operation,
+            absolutePath: targetPath,
+            size: fileStat.size,
+            encoding: 'utf-8',
+            mimeType: 'text/plain',
+            lastModified: new Date(fileStat.mtime).toISOString(),
+            parentDirectory: parentRelativePath
+          } 
+        };
       }
     } catch (error: any) {
       return { success: false, error: `Failed to create/write "${path}": ${error.message}`, data: undefined };

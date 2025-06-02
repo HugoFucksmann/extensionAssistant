@@ -1,8 +1,8 @@
 // src/core/OptimizedReActEngine.ts
-import { WindsurfState, HistoryEntry, ToolOutput } from '../shared/types'; 
+import { WindsurfState, HistoryEntry } from '../shared/types'; 
 import { ToolRegistry } from '../features/tools/ToolRegistry';
 import { InternalEventDispatcher } from './events/InternalEventDispatcher';
-import { EventType, AgentPhaseEventPayload, ResponseEventPayload, ToolExecutionEventPayload } from '../features/events/eventTypes';
+import { EventType, AgentPhaseEventPayload, ResponseEventPayload } from '../features/events/eventTypes';
 import { ModelManager } from '../features/ai/ModelManager';
 import { runOptimizedAnalysisChain } from '../features/ai/lcel/OptimizedAnalysisChain';
 import { runOptimizedReasoningChain } from '../features/ai/lcel/OptimizedReasoningChain';
@@ -11,7 +11,7 @@ import { runOptimizedResponseChain } from '../features/ai/lcel/OptimizedResponse
 import { ReasoningOutput } from '../features/ai/prompts/optimized/reasoningPrompt';
 import { ActionOutput } from '../features/ai/prompts/optimized/actionPrompt';
 import { ResponseOutput } from '../features/ai/prompts/optimized/responsePrompt';
-import { AgentMemory } from '../features/memory/AgentMemory';
+import { ReActCycleMemory } from '../features/memory/ReActCycleMemory';
 import { LongTermStorage } from '../features/memory/LongTermStorage';
 import { z } from 'zod';
 import { ToolResult as InternalToolResult } from '../features/tools/types'; 
@@ -100,7 +100,7 @@ export class OptimizedReActEngine {
     currentState.iterationCount = currentState.iterationCount || 0;
     currentState.history = currentState.history || [];
     
-    const memory = new AgentMemory(
+    const memory = new ReActCycleMemory(
       this.longTermStorage,
       currentState.chatId,
       { 
@@ -194,23 +194,51 @@ export class OptimizedReActEngine {
           continue;
         }
 
+        // --- DEDUPLICACIÓN DE EJECUCIÓN DE HERRAMIENTAS POR CICLO ---
+        if (!currentState._executedTools) {
+          currentState._executedTools = new Set<string>();
+        }
+        // Hash estable por tool+params+chatId
+        const toolParamsHash = (tool: string, params: any, chatId: string | null) => {
+          // Ordena las claves para evitar falsos positivos
+          const ordered = (obj: any) =>
+            obj && typeof obj === 'object' && !Array.isArray(obj)
+              ? Object.keys(obj).sort().reduce((acc, k) => { acc[k] = ordered(obj[k]); return acc; }, {} as any)
+              : obj;
+          return `${chatId || 'nochat'}::${tool}::${JSON.stringify(ordered(params||{}))}`;
+        };
+        const execKey = toolParamsHash(reasoningResult.tool, reasoningResult.parameters, currentState.chatId);
+        if (currentState._executedTools.has(execKey)) {
+          // Ya se ejecutó esta tool+input en el ciclo actual, saltar ejecución y eventos
+          console.warn(`[OptimizedReActEngine] Tool deduplicada: ${reasoningResult.tool} con mismos parámetros ya ejecutada en este ciclo.`);
+          continue;
+        }
+        currentState._executedTools.add(execKey);
+        // --- FIN DEDUPLICACIÓN ---
+
         if (reasoningResult.nextAction === 'use_tool' && reasoningResult.tool) {
           const toolExecutionStartTime = Date.now();
-          agentPhaseDispatch('toolExecution', 'started', {
-            tool: reasoningResult.tool,
-            parameters: reasoningResult.parameters
+          const operationId = `${currentState.chatId || 'nochat'}-${Date.now()}-${reasoningResult.tool}`;
+          this.dispatcher.dispatch(EventType.TOOL_EXECUTION_STARTED, {
+            toolName: reasoningResult.tool!,
+            parameters: reasoningResult.parameters,
+            chatId: currentState.chatId,
+            source: 'OptimizedReActEngine',
+            operationId,
+            timestamp: Date.now(),
           });
+
           console.log(`[OptimizedReActEngine] Ejecutando herramienta: ${reasoningResult.tool} con parámetros:`, reasoningResult.parameters);
 
           try {
             const internalToolResult: InternalToolResult = await this.toolRegistry.executeTool(
-              reasoningResult.tool,
+              reasoningResult.tool!,
               reasoningResult.parameters || {},
               { chatId: currentState.chatId }
             );
-            
+
             console.log(`[OptimizedReActEngine] Resultado de herramienta (${reasoningResult.tool}):`, JSON.stringify(internalToolResult, null, 2));
-            
+
             const toolExecParams = reasoningResult.parameters === null ? undefined : reasoningResult.parameters;
 
             this.addHistoryEntry(currentState, 'action', {
@@ -229,67 +257,91 @@ export class OptimizedReActEngine {
                     duration: Date.now() - toolExecutionStartTime,
                 }]
             });
-            
-            
+
             toolResultsAccumulator.push({
-              tool: reasoningResult.tool,
+              tool: reasoningResult.tool!,
               toolCallResult: internalToolResult 
             });
-         
-            console.log('[OptimizedReActEngine] toolResults acumulados (data/error):', JSON.stringify(toolResultsAccumulator.map(tr => tr.toolCallResult.data || tr.toolCallResult.error), null, 2));
 
             memory.addToShortTermMemory({
               type: 'tools',
               content: {
-                tool: reasoningResult.tool,
+                tool: reasoningResult.tool!,
                 result: internalToolResult.success ?
                   (typeof internalToolResult.mappedOutput?.message === 'string' ? internalToolResult.mappedOutput.message.substring(0,200) : 
-                   typeof internalToolResult.data === 'string' ? internalToolResult.data.substring(0, 200) : // Check raw data
+                   typeof internalToolResult.data === 'string' ? internalToolResult.data.substring(0, 200) :
                    'Datos obtenidos correctamente') :
                   `Error: ${internalToolResult.error}`
               },
               relevance: 0.9
             });
-            console.log('[OptimizedReActEngine] Memoria relevante:', memory.getMemorySummary());
 
-            agentPhaseDispatch('toolOutputAnalysis', 'started', { 
-                toolName: reasoningResult.tool, 
-                toolOutput: internalToolResult.mappedOutput 
-            });
+  // 2. Análisis/reflexión del modelo sobre el resultado de la tool
+  const actionResult: ActionOutput = await runOptimizedActionChain({
+    userQuery: currentState.userMessage || '',
+    lastToolName: reasoningResult.tool!,
+    lastToolResult: internalToolResult.data ?? internalToolResult.error ?? "No data/error from tool", 
+    previousActions: toolResultsAccumulator.slice(0, -1).map(tr => ({ 
+        tool: tr.tool, 
+        result: tr.toolCallResult.data ?? tr.toolCallResult.error ?? "No data/error from tool" 
+    })),
+    memoryContext: memory.getMemorySummary(),
+    model
+  });
+  console.log('[OptimizedReActEngine] Resultado de acción:', JSON.stringify(actionResult, null, 2));
 
-            const actionResult: ActionOutput = await runOptimizedActionChain({
-              userQuery: currentState.userMessage || '',
-              lastToolName: reasoningResult.tool!,
-              
-              lastToolResult: internalToolResult.data ?? internalToolResult.error ?? "No data/error from tool", 
-              previousActions: toolResultsAccumulator.slice(0, -1).map(tr => ({ 
-                  tool: tr.tool, 
-                
-                  result: tr.toolCallResult.data ?? tr.toolCallResult.error ?? "No data/error from tool" 
-              })),
-              memoryContext: memory.getMemorySummary(),
-              model
-            });
-            console.log('[OptimizedReActEngine] Resultado de acción:', JSON.stringify(actionResult, null, 2));
+  this.addHistoryEntry(currentState, 'action', actionResult, { phase_details: 'action_interpretation' });
 
-            this.addHistoryEntry(currentState, 'action', actionResult, { phase_details: 'action_interpretation' });
-            agentPhaseDispatch('toolOutputAnalysis', 'completed', { 
-                toolName: reasoningResult.tool, 
-                modelDecision: actionResult 
-            });
+  // 3. Emitir TOOL_EXECUTION_COMPLETED agrupando output de tool + análisis del modelo
+  this.dispatcher.dispatch(EventType.TOOL_EXECUTION_COMPLETED, {
+    toolName: reasoningResult.tool!,
+    parameters: reasoningResult.parameters,
+    chatId: currentState.chatId,
+    source: 'OptimizedReActEngine',
+    operationId,
+    timestamp: Date.now(),
+    result: internalToolResult.mappedOutput,
+    duration: Date.now() - toolExecutionStartTime,
+    toolDescription: this.toolRegistry.getTool(reasoningResult.tool!)?.description,
+    toolParams: reasoningResult.parameters,
+    isProcessingStep: false,
+    // --- feedback enriquecido ---
+    modelAnalysis: actionResult, // Nuevo campo: output/reflexión del modelo
+    rawToolOutput: internalToolResult.data, // Campo crudo opcional
+    toolSuccess: internalToolResult.success,
+    toolError: internalToolResult.error,
+  });
 
-            if (actionResult.nextAction === 'respond') {
-              console.log('[OptimizedReActEngine] El modelo decidió responder tras ejecutar la herramienta.');
-              currentState.finalOutput = actionResult.response || 'No specific response content provided by model after tool use.';
-              isCompleted = true;
-            }
+  if (actionResult.nextAction === 'respond') {
+    currentState.finalOutput = actionResult.response || 'No specific response content provided by model after tool use.';
+    isCompleted = true;
+  }
 
-          } catch (toolError: any) {
-            const errorMessage = `Error al ejecutar herramienta ${reasoningResult.tool}: ${toolError.message}`;
-            console.error('[OptimizedReActEngine]', errorMessage);
-            this.addHistoryEntry(currentState, 'system_message', errorMessage, { status: 'error' });
-            agentPhaseDispatch('toolExecution', 'completed', { tool: reasoningResult.tool }, errorMessage); 
-          }
+} catch (toolError: any) {
+  const errorMessage = `Error al ejecutar herramienta ${reasoningResult.tool}: ${toolError.message}`;
+  this.addHistoryEntry(currentState, 'system_message', errorMessage, { status: 'error' });
+  // Emitir TOOL_EXECUTION_ERROR solo tras el análisis fallido
+  this.dispatcher.dispatch(EventType.TOOL_EXECUTION_ERROR, {
+    toolName: reasoningResult.tool!,
+    parameters: reasoningResult.parameters,
+    chatId: currentState.chatId,
+    source: 'OptimizedReActEngine',
+    operationId,
+    timestamp: Date.now(),
+    error: toolError.message,
+    duration: Date.now() - toolExecutionStartTime,
+    toolDescription: this.toolRegistry.getTool(reasoningResult.tool!)?.description,
+    toolParams: reasoningResult.parameters,
+    isProcessingStep: false,
+    // No hay análisis/reflexión del modelo porque falló la tool
+    modelAnalysis: null,
+    rawToolOutput: null,
+    toolSuccess: false,
+    toolError: toolError.message,
+  });
+}
+// --- FIN NUEVO FLUJO DE FEEDBACK DE HERRAMIENTAS ---
+
         } else if (reasoningResult.nextAction === 'use_tool' && !reasoningResult.tool) {
             const errorMsg = "Model decided to use a tool but did not specify which tool.";
             console.warn(`[OptimizedReActEngine] ${errorMsg}`);
@@ -358,5 +410,16 @@ export class OptimizedReActEngine {
     });
     
     return currentState;
+  }
+
+  /**
+   * Libera los recursos utilizados por el motor ReAct
+   */
+  public dispose(): void {
+    // Limpiar la caché de descripción de herramientas
+    this.toolsDescriptionCache = null;
+    
+    // No es necesario limpiar las dependencias inyectadas (toolRegistry, modelManager, etc.)
+    // ya que son manejadas por el ComponentFactory
   }
 }

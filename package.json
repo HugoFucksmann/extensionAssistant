@@ -45,10 +45,6 @@
         "extensionAssistant.persistChat": {
           "type": "boolean",
           "default": true
-        },
-        "extensionAssistant.useOrchestration": {
-          "type": "boolean",
-          "default": false
         }
       }
     },
