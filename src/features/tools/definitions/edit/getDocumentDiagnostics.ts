@@ -29,7 +29,21 @@ type DiagnosticsResult = {
 };
 
 export const getDocumentDiagnostics: ToolDefinition<typeof getDocumentDiagnosticsParamsSchema, DiagnosticsResult> = {
+  getUIDescription: (params) => `Obtener diagnósticos de: ${params?.filePath?.split(/[\\/]/).pop() || 'editor activo'}`,
   uiFeedback: true,
+  mapToOutput: (rawData, success, errorMsg) => success && rawData ? {
+    title: 'Diagnóstico de documento',
+    summary: 'Diagnóstico obtenido correctamente.',
+    details: `Archivo: ${rawData.documentPath}\nCantidad de diagnósticos: ${rawData.diagnostics.length}`,
+    items: rawData.diagnostics,
+    meta: { documentPath: rawData.documentPath, diagnosticsCount: rawData.diagnostics.length }
+  } : {
+    title: 'Error de diagnóstico',
+    summary: `Error: ${errorMsg || 'No se pudo obtener diagnóstico.'}`,
+    details: errorMsg,
+    items: [],
+    meta: {}
+  },
   name: 'getDocumentDiagnostics',
   description: 'Gets diagnostic errors and warnings for the active editor or a specified file. If filePath is omitted, uses the active editor.',
   parametersSchema: getDocumentDiagnosticsParamsSchema,

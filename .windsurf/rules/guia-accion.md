@@ -2,9 +2,5 @@
 trigger: manual
 ---
 
-- no agregues codigo que no se te pidio
-- si consistentemente tenes errores en un cambio, examina el flujo completo.
-- verifica al final errores ejecutando npm run compile.
-- no supongas, busca y examina el contenido de los archivos.
-- procede siempre que puedas con la tarea siguiente hasta terminar sin detenerte.
-- examina archivos necesarios para estar seguro antes de aplicar cambios.
+Regla global:
+Siempre ejecuta directamente cualquier instrucción explícita del usuario, sin pedir confirmación, sin preguntar, y sin sugerir alternativas, salvo que la acción sea peligrosa o destructiva. Si el usuario pide un cambio, hazlo. No preguntes si debe hacerse, solo hazlo.

@@ -12,6 +12,7 @@ export const writeToFileParamsSchema = z.object({
 }).strict();
 
 export const writeToFile: ToolDefinition<typeof writeToFileParamsSchema, { filePath: string }> = {
+  getUIDescription: (params) => `Escribir en archivo: ${params?.path?.split(/[\\/]/).pop() || 'archivo'}`,
   uiFeedback: true,
   name: 'writeToFile',
   description: 'Writes or overwrites content to a specified file. Creates parent directories if they do not exist. The path must be relative to the workspace root.',
@@ -38,5 +39,12 @@ export const writeToFile: ToolDefinition<typeof writeToFileParamsSchema, { fileP
     } catch (error: any) {
       return { success: false, error: `Failed to write to file "${path}": ${error.message}` };
     }
-  }
+  },
+  mapToOutput: (rawData, success, errorMsg) => ({
+    title: success ? 'Archivo guardado' : 'Error al guardar archivo',
+    summary: success ? 'Archivo guardado correctamente.' : `Error: ${errorMsg || 'No se pudo guardar el archivo.'}`,
+    details: !success && errorMsg ? errorMsg : undefined,
+    items: [],
+    meta: rawData && rawData.filePath ? { filePath: rawData.filePath } : {}
+  })
 };

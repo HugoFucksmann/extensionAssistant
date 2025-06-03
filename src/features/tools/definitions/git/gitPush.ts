@@ -23,7 +23,25 @@ type GitPushResult = {
 };
 
 export const gitPush: ToolDefinition<typeof gitPushParamsSchema, GitPushResult> = {
+  getUIDescription: (params) => `Hacer git push a ${params?.remote || 'origin'}/${params?.branch || ''}`,
   uiFeedback: true,
+  mapToOutput: (rawData, success, errorMsg) => success && rawData ? {
+    title: 'Push realizado',
+    summary: 'Push ejecutado correctamente.',
+    details: `Branch: ${rawData.branch || 'desconocido'}\nCommits empujados: ${rawData.commitsPushed ?? 'N/A'}`,
+    items: [],
+    meta: {
+      branch: rawData.branch,
+      remote: rawData.pushedTo,
+      commitsPushed: rawData.commitsPushed
+    }
+  } : {
+    title: 'Error de push',
+    summary: `Error: ${errorMsg || 'No se pudo hacer push.'}`,
+    details: errorMsg,
+    items: [],
+    meta: {}
+  },
   name: 'gitPush',
   description: 'Pushes the current branch to the specified remote.',
   parametersSchema: gitPushParamsSchema,

@@ -23,7 +23,25 @@ type GitPullResult = {
 };
 
 export const gitPull: ToolDefinition<typeof gitPullParamsSchema, GitPullResult> = {
+  getUIDescription: (params) => `Hacer git pull de ${params?.remote || 'origin'}/${params?.branch || ''}`,
   uiFeedback: true,
+  mapToOutput: (rawData, success, errorMsg) => success && rawData ? {
+    title: 'Pull realizado',
+    summary: 'Pull ejecutado correctamente.',
+    details: `Branch: ${rawData.branch || 'desconocido'}\nCommits traídos: ${rawData.commitsPulled ?? 'N/A'}`,
+    items: [],
+    meta: {
+      branch: rawData.branch,
+      remote: rawData.pulledFrom,
+      commitsPulled: rawData.commitsPulled
+    }
+  } : {
+    title: 'Error de pull',
+    summary: `Error: ${errorMsg || 'No se pudo hacer pull.'}`,
+    details: errorMsg,
+    items: [],
+    meta: {}
+  },
   name: 'gitPull',
   description: 'Pulls changes from the specified remote and branch.',
   parametersSchema: gitPullParamsSchema,

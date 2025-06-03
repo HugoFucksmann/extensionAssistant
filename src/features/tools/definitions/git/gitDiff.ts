@@ -27,7 +27,21 @@ type GitDiffResult = {
 };
 
 export const gitDiff: ToolDefinition<typeof gitDiffParamsSchema, GitDiffResult> = {
+  getUIDescription: () => 'Mostrar diferencias de Git.',
   uiFeedback: true,
+  mapToOutput: (rawData, success, errorMsg) => success && rawData ? {
+    title: 'Diferencia de archivos',
+    summary: 'Diff obtenido correctamente.',
+    details: rawData.diffSummary || rawData.stdout,
+    items: rawData.filesChanged || [],
+    meta: { isStaged: rawData.isStaged }
+  } : {
+    title: 'Error de diff',
+    summary: `Error: ${errorMsg || 'No se pudo obtener el diff.'}`,
+    details: errorMsg,
+    items: [],
+    meta: {}
+  },
   name: 'gitDiff',
   description: 'Shows the diff for the whole repo or a specific file. Optionally shows only staged changes.',
   parametersSchema: gitDiffParamsSchema,

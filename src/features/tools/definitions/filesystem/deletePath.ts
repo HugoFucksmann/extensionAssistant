@@ -11,8 +11,27 @@ export const deletePathParamsSchema = z.object({
 
 }).strict();
 
-export const deletePath: ToolDefinition<typeof deletePathParamsSchema, { path: string; deleted: boolean }> = {
+export type DeletePathResultData = {
+  path: string;
+  deleted: boolean;
+}
+
+export const deletePath: ToolDefinition<typeof deletePathParamsSchema, DeletePathResultData> = {
+  getUIDescription: (params) => `Eliminar: ${params?.path?.split(/[\\/]/).pop() || 'ítem'}`,
   uiFeedback: true,
+  mapToOutput: (rawData, success, errorMsg) => success ? {
+    title: 'Elemento eliminado',
+    summary: 'Eliminado correctamente.',
+    details: `Ruta: ${rawData.path}`,
+    items: [],
+    meta: { path: rawData.path, deleted: rawData.deleted }
+  } : {
+    title: 'Error al eliminar',
+    summary: `Error: ${errorMsg || 'No se pudo eliminar.'}`,
+    details: errorMsg,
+    items: [],
+    meta: {}
+  },
   name: 'deletePath',
   description: 'Deletes a file or directory recursively. The path must be relative to the workspace root. Uses trash by default if available on the system.',
   parametersSchema: deletePathParamsSchema,

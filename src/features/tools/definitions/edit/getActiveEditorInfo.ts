@@ -22,7 +22,25 @@ type ActiveEditorInfo = {
 };
 
 export const getActiveEditorInfo: ToolDefinition<typeof getActiveEditorInfoParamsSchema, ActiveEditorInfo | null> = {
+  getUIDescription: () => 'Obtener información del editor activo.',
   uiFeedback: true,
+  mapToOutput: (rawData, success, errorMsg) => success && rawData ? {
+    title: 'Editor activo',
+    summary: 'Información del editor obtenida correctamente.',
+    details: `Archivo: ${rawData.filePath || 'Sin archivo'}\nLenguaje: ${rawData.languageId}\nSelección: ${rawData.selection ? rawData.selection.text : 'Sin selección'}`,
+    items: [],
+    meta: {
+      filePath: rawData.filePath,
+      languageId: rawData.languageId,
+      lineCount: rawData.lineCount
+    }
+  } : {
+    title: 'Error al obtener editor',
+    summary: `Error: ${errorMsg || 'No se pudo obtener información del editor.'}`,
+    details: errorMsg,
+    items: [],
+    meta: {}
+  },
   name: 'getActiveEditorInfo',
   description: 'Gets information from the currently active text editor, including its content, file path (if any), language, and current selection. Returns null if no text editor is active.',
   parametersSchema: getActiveEditorInfoParamsSchema,
