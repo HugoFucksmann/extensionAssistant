@@ -175,7 +175,10 @@ export class ComponentFactory {
       this.applicationLogicServiceInstance = null!;
     }
     
-    if (this.conversationManagerInstance && typeof (this.conversationManagerInstance as any).dispose === 'function') {
+    if (this.conversationManagerInstance) {
+      if (typeof this.conversationManagerInstance.dispose === 'function') {
+        this.conversationManagerInstance.dispose();
+      }
       this.conversationManagerInstance = null!;
     }
   }

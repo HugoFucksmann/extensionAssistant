@@ -1,4 +1,4 @@
-import { writeToFile } from '../../features/tools/definitions/edit/writeToFile';
+import { writeToFile } from '../../features/tools/definitions/filesystem/writeToFile';
 import { ToolExecutionContext } from '../../features/tools/types';
 
 describe('writeToFile', () => {
@@ -7,19 +7,19 @@ describe('writeToFile', () => {
   const mockContext: ToolExecutionContext = {
     vscodeAPI: {
       workspace: {
-        workspaceFolders: [{ 
-          name: 'workspace', 
-          uri: { 
+        workspaceFolders: [{
+          name: 'workspace',
+          uri: {
             fsPath: '/workspace',
-            toString: () => 'file:///workspace' 
-          } 
+            toString: () => 'file:///workspace'
+          }
         }],
         asRelativePath: (uri: any) => {
           const path = uri.fsPath || uri;
           return path.replace('/workspace/', '');
         },
         fs: {
-          createDirectory: async (_dirUri: any) => {},
+          createDirectory: async (_dirUri: any) => { },
           writeFile: async (targetUri: any, content: Uint8Array) => {
             const path = targetUri.fsPath || targetUri;
             writtenPath = path.replace('/workspace/', '');

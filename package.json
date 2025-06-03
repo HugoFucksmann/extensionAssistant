@@ -42,8 +42,14 @@
           ],
           "default": "gemini"
         },
+        "extensionAssistant.google.apiKey": {
+          "type": "string",
+          "description": "API key de Google Cloud para el modelo Gemini",
+          "default": ""
+        },
         "extensionAssistant.persistChat": {
           "type": "boolean",
+          "description": "Si se deben persistir los chats entre sesiones",
           "default": true
         }
       }

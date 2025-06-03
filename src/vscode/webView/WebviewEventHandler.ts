@@ -203,9 +203,12 @@ export class WebviewEventHandler {
     }
 
     const toolResultOutput = payload.result as ToolOutput | undefined;
-    if (toolResultOutput?.message) {
-      const shortMessage = toolResultOutput.message.substring(0, 150);
-      contentLines.push(`📋 Resultado: ${shortMessage}${toolResultOutput.message.length > 150 ? '...' : ''}`);
+    if (toolResultOutput?.summary) {
+      const shortMessage = toolResultOutput.summary.substring(0, 150);
+      contentLines.push(`📋 Resultado: ${shortMessage}${toolResultOutput.summary.length > 150 ? '...' : ''}`);
+    } else if (toolResultOutput?.details) {
+      const shortMessage = toolResultOutput.details.substring(0, 150);
+      contentLines.push(`📋 Resultado: ${shortMessage}${toolResultOutput.details.length > 150 ? '...' : ''}`);
     }
 
     const modelAnalysis = payload.modelAnalysis as any;

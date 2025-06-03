@@ -170,4 +170,13 @@ export class ConversationManager implements IConversationManager {
   public getActiveConversationIds(): string[] {
     return Array.from(this.activeConversations.keys());
   }
+
+  /**
+   * Libera los recursos utilizados por el ConversationManager
+   */
+  public dispose(): void {
+    // Limpiar todas las conversaciones activas
+    this.activeConversations.clear();
+    this.activeChatId = null;
+  }
 }

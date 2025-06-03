@@ -3,11 +3,10 @@ import { getActiveEditorInfo } from './getActiveEditorInfo';
 
 import { getDocumentDiagnostics } from './getDocumentDiagnostics';
 
-import { writeToFile } from './writeToFile';
 
 export const editorToolDefinitions = [
   getActiveEditorInfo,
-  writeToFile,
+
   getDocumentDiagnostics,
 
 ];
@@ -15,7 +14,7 @@ export const editorToolDefinitions = [
 
 export {
   getActiveEditorInfo,
-  writeToFile,
+
   getDocumentDiagnostics,
 
 };

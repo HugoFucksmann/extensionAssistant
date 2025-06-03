@@ -1,7 +1,7 @@
 // src/features/tools/definitions/git/getGitStatus.ts
 import * as vscode from 'vscode';
 import { z } from 'zod';
-import { ToolDefinition, ToolResult,  } from '../../types';
+import { ToolDefinition, ToolResult, } from '../../types';
 import { exec } from 'child_process';
 import * as util from 'util';
 
@@ -43,28 +43,31 @@ function parseGitPorcelainStatus(porcelainOutput: string): {
   let behind = 0;
   const files: GitFileStatus[] = [];
 
+  // Manejar la línea de branch
   if (lines.length > 0 && lines[0].startsWith('##')) {
-    const branchLine = lines.shift()!; 
-    const branchMatch = branchLine.match(/^##\s*([^.]+)(?:\.\.\.\S+\s*\[ahead (\d+)(?:, behind (\d+))?\]|\.\.\.\S+\s*\[behind (\d+)\]|\.\.\.\S+\s*\[ahead (\d+)\])?/);
-    if (branchMatch) {
-      branch = branchMatch[1].trim();
-      if (branch === 'HEAD (no branch)') branch = null;
+    const branchLine = lines.shift()!;
 
-      if (branchMatch[2]) ahead = parseInt(branchMatch[2], 10); // [ahead X]
-      if (branchMatch[3]) behind = parseInt(branchMatch[3], 10); // [, behind Y]
-      if (branchMatch[4]) behind = parseInt(branchMatch[4], 10); // solo [behind Y]
-      if (branchMatch[5]) ahead = parseInt(branchMatch[5], 10); // solo [ahead X] (cuando behind no está)
-    } else if (branchLine.includes("no branch")) {
-        branch = null; // Detached HEAD o similar sin info de tracking
-    } else {
-        // Caso: ## main (sin upstream) o ## initial (sin commits)
-        const simpleBranchMatch = branchLine.match(/^##\s*([^\s.(]+)/);
-        if (simpleBranchMatch) {
-            branch = simpleBranchMatch[1].trim();
+    // Primero intentar el patrón más común con tracking
+    const trackingMatch = branchLine.match(/^##\s*([^.]+)\s*\.\.\.\s*(\S+)\s*\[ahead\s*(\d+)(?:,\s*behind\s*(\d+))?\]/);
+    if (trackingMatch) {
+      branch = trackingMatch[1].trim();
+      ahead = parseInt(trackingMatch[3] || '0', 10);
+      behind = parseInt(trackingMatch[4] || '0', 10);
+    }
+    // Luego intentar patrones alternativos
+    else {
+      const simpleMatch = branchLine.match(/^##\s*([^.]+)(?:\s*\[no\s+branch\])?/);
+      if (simpleMatch) {
+        branch = simpleMatch[1].trim();
+        // Si es "no branch", estamos en detached HEAD
+        if (branch === 'HEAD' && branchLine.includes('no branch')) {
+          branch = null;
         }
+      }
     }
   }
 
+  // Procesar el resto de las líneas de archivos
   lines.forEach(line => {
     if (line.trim() === '') return;
 
@@ -75,13 +78,14 @@ function parseGitPorcelainStatus(porcelainOutput: string): {
     let description = '';
     let originalPath: string | undefined = undefined;
 
-    // Handle renamed/copied files: R <original_path> -> <new_path> or C <original_path> -> <new_path>
+    // Manejar renombrados/copiados
     if ((X === 'R' || X === 'C') && pathPart.includes(' -> ')) {
-        const parts = pathPart.split(' -> ');
-        originalPath = parts[0];
-        pathPart = parts[1];
+      const parts = pathPart.split(' -> ');
+      originalPath = parts[0];
+      pathPart = parts[1];
     }
 
+    // Construir descripción basada en estados
     if (X === 'M') description += 'Index: Modified. ';
     if (X === 'A') description += 'Index: Added. ';
     if (X === 'D') description += 'Index: Deleted. ';
@@ -92,17 +96,16 @@ function parseGitPorcelainStatus(porcelainOutput: string): {
     if (Y === 'M') description += 'WorkTree: Modified. ';
     if (Y === 'D') description += 'WorkTree: Deleted. ';
     if (X === '?' && Y === '?') description = 'Untracked. ';
-    else if (X === ' ' && Y === 'A') description += 'WorkTree: Added (Intent-to-add, not staged). '; // Raro, pero posible
-    else if (X === 'A' && Y === 'A') description = 'Index & WorkTree: Added (Unmerged or new and staged). '; // Conflicto de adición o nuevo y staged
-    
-    if (X === 'U' || Y === 'U' || (X === 'A' && Y === 'A') || (X === 'D' && Y === 'D')) {
-        description = 'Conflict: Unmerged. ';
-        if (X === 'A' && Y === 'A') description += "Both added. ";
-        if (X === 'D' && Y === 'D') description += "Both deleted. ";
-        if (X === 'U' && Y === 'U') description += "Both modified. ";
-      
-    }
+    else if (X === ' ' && Y === 'A') description += 'WorkTree: Added (Intent-to-add, not staged). ';
+    else if (X === 'A' && Y === 'A') description = 'Index & WorkTree: Added (Unmerged or new and staged). ';
 
+    // Manejar conflictos específicos
+    if (X === 'U' || Y === 'U' || (X === 'A' && Y === 'A') || (X === 'D' && Y === 'D')) {
+      description = 'Conflict: Unmerged. ';
+      if (X === 'A' && Y === 'A') description += "Both added. ";
+      if (X === 'D' && Y === 'D') description += "Both deleted. ";
+      if (X === 'U' && Y === 'U') description += "Both modified. ";
+    }
 
     files.push({
       path: pathPart,
@@ -154,12 +157,12 @@ export const getGitStatus: ToolDefinition<typeof getGitStatusParamsSchema, GitSt
       const { stdout, stderr } = await execPromise('git status --porcelain=v1 -b -u', { cwd: workspaceFolder, timeout: 10000 }); // -u para mostrar untracked files, timeout de 10s
 
       if (stderr && !stdout.trim() && stderr.toLowerCase().includes("not a git repository")) {
-           return { success: false, error: `The folder ${workspaceFolder} is not a Git repository.`, data: undefined };
+        return { success: false, error: `The folder ${workspaceFolder} is not a Git repository.`, data: undefined };
       }
       if (stderr && !stdout.trim()) { // Otras advertencias de stderr sin stdout podrían ser problemáticas
-          context.dispatcher.systemWarning('Git status command produced stderr without stdout', { stderr, toolName: 'getGitStatus' }, context.chatId);
+        context.dispatcher.systemWarning('Git status command produced stderr without stdout', { stderr, toolName: 'getGitStatus' }, context.chatId);
       }
-      
+
       const parsedStatus = parseGitPorcelainStatus(stdout);
 
       const data: GitStatusData = {
@@ -187,7 +190,7 @@ export const getGitStatus: ToolDefinition<typeof getGitStatusParamsSchema, GitSt
       } else if (error.message?.toLowerCase().includes("command not found") || error.code === 'ENOENT') {
         errorReason = "Git command not found. Please ensure Git is installed and in your system's PATH.";
       }
-      
+
       return { success: false, error: errorReason, data: undefined };
     }
   }

@@ -43,25 +43,6 @@ export class ApplicationLogicService {
     }
     
     try {
-      if (!state.projectContext && this.toolRegistry) {
-        const projectInfoToolName = 'getProjectSummary';
-        if (this.toolRegistry.getTool(projectInfoToolName)) {
-          const projectInfoResult = await this.toolRegistry.executeTool(
-            projectInfoToolName,
-            {},
-            { chatId }
-          );
-          
-          if (projectInfoResult.success && projectInfoResult.data) {
-            state.projectContext = projectInfoResult.data as any;
-          }
-        }
-      }
-    } catch (error) {
-      console.log("Error al obtener el contexto del proyecto");
-    }
-
-    try {
       const resultState = await this.reActEngine.run(state);
       this.conversationManager.updateConversationState(chatId, resultState);
       await this.conversationMemoryManager.storeConversation(chatId, resultState);

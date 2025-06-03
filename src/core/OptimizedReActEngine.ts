@@ -1,6 +1,6 @@
 // src/core/OptimizedReActEngine.ts
 import { WindsurfState } from './types';
-import { HistoryEntry } from '../features/chat/types'; 
+import { HistoryEntry } from '../features/chat/types';
 import { ToolRegistry } from '../features/tools/ToolRegistry';
 import { InternalEventDispatcher } from './events/InternalEventDispatcher';
 import { EventType, AgentPhaseEventPayload, ResponseEventPayload, ToolExecutionEventPayload } from '../features/events/eventTypes';
@@ -15,7 +15,7 @@ import { ResponseOutput } from '../features/ai/prompts/optimized/responsePrompt'
 import { ReActCycleMemory } from '../features/memory/ReActCycleMemory';
 import { LongTermStorage } from '../features/memory/LongTermStorage';
 import { z } from 'zod';
-import { ToolResult as InternalToolResult } from '../features/tools/types'; 
+import { ToolResult as InternalToolResult } from '../features/tools/types';
 
 export class OptimizedReActEngine {
   private toolsDescriptionCache: string | null = null;
@@ -37,39 +37,39 @@ export class OptimizedReActEngine {
 
     this.toolsDescriptionCache = this.toolRegistry.getAllTools()
       .map(tool => {
-        const paramsDescription = tool.parametersSchema ? 
-          this.zodSchemaToDescription(tool.parametersSchema) : 
+        const paramsDescription = tool.parametersSchema ?
+          this.zodSchemaToDescription(tool.parametersSchema) :
           'No requiere parámetros';
-        
+
         return `${tool.name}: ${tool.description}\nParámetros: ${paramsDescription}`;
       })
       .join('\n\n');
-    
+
     return this.toolsDescriptionCache;
   }
 
   private zodSchemaToDescription(schema: z.ZodTypeAny): string {
     if (!schema || !schema._def) return "No se definieron parámetros.";
-  
+
     try {
       if (schema._def.typeName === 'ZodObject') {
-        const shape = schema._def.shape(); 
+        const shape = schema._def.shape;
         if (!shape) return "Esquema de objeto sin forma definida.";
-  
+
         return Object.entries(shape)
           .map(([key, val]: [string, any]) => {
             const isOptional = val._def?.typeName === 'ZodOptional' || val.isOptional();
-            const innerType = isOptional ? (val._def.innerType || val._def.schema) : val; 
+            const innerType = isOptional ? (val._def?.innerType || val._def?.schema || val) : val;
             const typeDesc = innerType._def?.typeName?.replace('Zod', '').toLowerCase() || 'unknown';
             const description = innerType.description ? ` - ${innerType.description}` : '';
-            
+
             return `- ${key}${isOptional ? ' (opcional)' : ' (requerido)'}: ${typeDesc}${description}`;
           })
           .join('\n');
       } else if (schema.description) {
-          return schema.description; 
+        return schema.description;
       } else {
-          return `Parámetro de tipo: ${schema._def.typeName?.replace('Zod', '').toLowerCase() || 'desconocido'}`;
+        return `Parámetro de tipo: ${schema._def.typeName?.replace('Zod', '').toLowerCase() || 'desconocido'}`;
       }
     } catch (error) {
       console.error('Error al convertir esquema Zod a descripción:', error);
@@ -78,19 +78,19 @@ export class OptimizedReActEngine {
   }
 
   private addHistoryEntry(
-    state: WindsurfState, 
-    phase: HistoryEntry['phase'], 
+    state: WindsurfState,
+    phase: HistoryEntry['phase'],
     content: string | Record<string, any>,
     metadata: Partial<HistoryEntry['metadata']> = {}
   ): void {
     const entry: HistoryEntry = {
       timestamp: Date.now(),
-      phase: phase, 
-      content: typeof content === 'string' ? content : JSON.stringify(content), 
-      metadata: { 
-        status: 'success', 
-        ...metadata, 
-        iteration: state.iterationCount, 
+      phase: phase,
+      content: typeof content === 'string' ? content : JSON.stringify(content),
+      metadata: {
+        status: 'success',
+        ...metadata,
+        iteration: state.iterationCount,
       }
     };
     state.history.push(entry);
@@ -100,30 +100,30 @@ export class OptimizedReActEngine {
     const currentState = { ...initialState };
     currentState.iterationCount = currentState.iterationCount || 0;
     currentState.history = currentState.history || [];
-    
+
     const memory = new ReActCycleMemory(
       this.longTermStorage,
       currentState.chatId,
-      { 
+      {
         userQuery: currentState.userMessage || '',
-        activeFile: currentState.context?.activeFile, 
-        workspaceRoot: currentState.context?.workspaceRoot 
+        activeFile: currentState.editorContext?.activeFile,
+        workspaceRoot: currentState.projectContext?.workspaceRoot
       }
     );
-    
+
     await memory.retrieveRelevantMemory(currentState.userMessage || '');
     const memorySummary = memory.getMemorySummary();
-    
+
     const agentPhaseDispatch = (
-      phase: AgentPhaseEventPayload['phase'], 
-      status: 'started' | 'completed', 
-      data?: any, 
+      phase: AgentPhaseEventPayload['phase'],
+      status: 'started' | 'completed',
+      data?: any,
       error?: string
     ): void => {
-      const eventType = status === 'started' 
-        ? EventType.AGENT_PHASE_STARTED 
+      const eventType = status === 'started'
+        ? EventType.AGENT_PHASE_STARTED
         : EventType.AGENT_PHASE_COMPLETED;
-      
+
       const payload: AgentPhaseEventPayload = {
         phase,
         chatId: currentState.chatId,
@@ -135,36 +135,36 @@ export class OptimizedReActEngine {
       };
       this.dispatcher.dispatch(eventType, payload);
     };
-    
-    const startTime = Date.now(); 
+
+    const startTime = Date.now();
 
     try {
       // === ANÁLISIS INICIAL ===
       agentPhaseDispatch('initialAnalysis', 'started');
       const model = this.modelManager.getActiveModel();
       console.log('[OptimizedReActEngine] --- Fase de análisis inicial ---');
-      
+
       const analysisResult = await runOptimizedAnalysisChain({
         userQuery: currentState.userMessage || '',
         availableTools: this.toolRegistry.getToolNames(),
-        codeContext: JSON.stringify(currentState.editorContext || currentState.projectContext || {}), 
+        codeContext: JSON.stringify(currentState.editorContext || currentState.projectContext || {}),
         memoryContext: memorySummary,
         model
       });
-      
+
       console.log('[OptimizedReActEngine] Resultado de análisis:', JSON.stringify(analysisResult, null, 2));
-      this.addHistoryEntry(currentState, 'reasoning', analysisResult, { phase_details: 'initial_analysis' }); 
+      this.addHistoryEntry(currentState, 'reasoning', analysisResult, { phase_details: 'initial_analysis' });
       agentPhaseDispatch('initialAnalysis', 'completed', { analysis: analysisResult });
-      
+
       memory.addToShortTermMemory({
         type: 'context',
         content: analysisResult.understanding,
         relevance: 1.0
       });
-      
-      const toolResultsAccumulator: Array<{tool: string, toolCallResult: InternalToolResult}> = []; 
+
+      const toolResultsAccumulator: Array<{ tool: string, toolCallResult: InternalToolResult }> = [];
       let isCompleted = false;
-      
+
       // === CICLO PRINCIPAL ===
       while (!isCompleted && currentState.iterationCount < this.MAX_ITERATIONS) {
         currentState.iterationCount++;
@@ -177,14 +177,14 @@ export class OptimizedReActEngine {
           userQuery: currentState.userMessage || '',
           analysisResult,
           toolsDescription: this.getToolsDescription(),
-          previousToolResults: toolResultsAccumulator.map(tr => ({ 
-            name: tr.tool, 
-            result: tr.toolCallResult.data ?? tr.toolCallResult.error ?? "No data/error from tool" 
+          previousToolResults: toolResultsAccumulator.map(tr => ({
+            name: tr.tool,
+            result: tr.toolCallResult.data ?? tr.toolCallResult.error ?? "No data/error from tool"
           })),
           memoryContext: memory.getMemorySummary(),
           model
         });
-        
+
         console.log('[OptimizedReActEngine] Resultado de razonamiento:', JSON.stringify(reasoningResult, null, 2));
         this.addHistoryEntry(currentState, 'reasoning', reasoningResult);
         agentPhaseDispatch('reasoning', 'completed', { reasoning: reasoningResult });
@@ -201,21 +201,21 @@ export class OptimizedReActEngine {
         if (!currentState._executedTools) {
           currentState._executedTools = new Set<string>();
         }
-        
+
         const toolParamsHash = (tool: string, params: any, chatId: string | null) => {
           const ordered = (obj: any) =>
             obj && typeof obj === 'object' && !Array.isArray(obj)
               ? Object.keys(obj).sort().reduce((acc, k) => { acc[k] = ordered(obj[k]); return acc; }, {} as any)
               : obj;
-          return `${chatId || 'nochat'}::${tool}::${JSON.stringify(ordered(params||{}))}`;
+          return `${chatId || 'nochat'}::${tool}::${JSON.stringify(ordered(params || {}))}`;
         };
-        
+
         const execKey = toolParamsHash(
           reasoningResult.tool ?? '',
           reasoningResult.parameters,
           currentState.chatId ?? null
         );
-        
+
         if (currentState._executedTools.has(execKey)) {
           console.warn(`[OptimizedReActEngine] Tool deduplicada: ${reasoningResult.tool} con mismos parámetros ya ejecutada en este ciclo.`);
           continue;
@@ -243,14 +243,14 @@ export class OptimizedReActEngine {
 
             this.addHistoryEntry(currentState, 'action', {
               tool: reasoningResult.tool,
-              parameters: toolExecParams, 
-              result_summary: internalToolResult.success ? "Success" : `Error: ${internalToolResult.error}` 
-            }, { 
-              tool_executions: [{ 
+              parameters: toolExecParams,
+              result_summary: internalToolResult.success ? "Success" : `Error: ${internalToolResult.error}`
+            }, {
+              tool_executions: [{
                 name: reasoningResult.tool!,
-                parameters: toolExecParams, 
+                parameters: toolExecParams,
                 status: internalToolResult.success ? 'completed' : 'error',
-                result: internalToolResult.mappedOutput, 
+                result: internalToolResult.mappedOutput,
                 error: internalToolResult.error,
                 startTime: toolExecutionStartTime,
                 endTime: Date.now(),
@@ -260,7 +260,7 @@ export class OptimizedReActEngine {
 
             toolResultsAccumulator.push({
               tool: reasoningResult.tool!,
-              toolCallResult: internalToolResult 
+              toolCallResult: internalToolResult
             });
 
             memory.addToShortTermMemory({
@@ -268,9 +268,9 @@ export class OptimizedReActEngine {
               content: {
                 tool: reasoningResult.tool!,
                 result: internalToolResult.success ?
-                  (typeof internalToolResult.mappedOutput?.message === 'string' ? internalToolResult.mappedOutput.message.substring(0,200) : 
-                   typeof internalToolResult.data === 'string' ? internalToolResult.data.substring(0, 200) :
-                   'Datos obtenidos correctamente') :
+                  (typeof internalToolResult.mappedOutput?.summary === 'string' ? internalToolResult.mappedOutput.summary.substring(0, 200) :
+                    typeof internalToolResult.data === 'string' ? internalToolResult.data.substring(0, 200) :
+                      'Datos obtenidos correctamente') :
                   `Error: ${internalToolResult.error}`
               },
               relevance: 0.9
@@ -280,15 +280,15 @@ export class OptimizedReActEngine {
             const actionResult: ActionOutput = await runOptimizedActionChain({
               userQuery: currentState.userMessage || '',
               lastToolName: reasoningResult.tool!,
-              lastToolResult: internalToolResult.data ?? internalToolResult.error ?? "No data/error from tool", 
-              previousActions: toolResultsAccumulator.slice(0, -1).map(tr => ({ 
-                tool: tr.tool, 
-                result: tr.toolCallResult.data ?? tr.toolCallResult.error ?? "No data/error from tool" 
+              lastToolResult: internalToolResult.data ?? internalToolResult.error ?? "No data/error from tool",
+              previousActions: toolResultsAccumulator.slice(0, -1).map(tr => ({
+                tool: tr.tool,
+                result: tr.toolCallResult.data ?? tr.toolCallResult.error ?? "No data/error from tool"
               })),
               memoryContext: memory.getMemorySummary(),
               model
             });
-            
+
             console.log('[OptimizedReActEngine] Resultado de acción:', JSON.stringify(actionResult, null, 2));
             this.addHistoryEntry(currentState, 'action', actionResult, { phase_details: 'action_interpretation' });
 
@@ -330,7 +330,7 @@ export class OptimizedReActEngine {
           } catch (toolError: any) {
             const errorMessage = `Error durante la ejecución o análisis de la herramienta ${reasoningResult.tool}: ${toolError.message}`;
             this.addHistoryEntry(currentState, 'system_message', errorMessage, { status: 'error' });
-            
+
             this.dispatcher.dispatch(EventType.TOOL_EXECUTION_ERROR, {
               toolName: reasoningResult.tool!,
               parameters: reasoningResult.parameters ?? undefined,
@@ -356,46 +356,46 @@ export class OptimizedReActEngine {
           currentState.finalOutput = "I tried to use a tool, but I'm unsure which one. Can you clarify?";
           isCompleted = true;
         }
-        
+
         console.log(`[OptimizedReActEngine] Iteración ${currentState.iterationCount} completada en ${Date.now() - iterationStartTime}ms`);
       }
-      
+
       // === GENERACIÓN DE RESPUESTA FINAL ===
-      if (!currentState.finalOutput && !isCompleted) { 
+      if (!currentState.finalOutput && !isCompleted) {
         agentPhaseDispatch('finalResponseGeneration', 'started');
         const responseResult = await runOptimizedResponseChain({
           userQuery: currentState.userMessage || '',
-          toolResults: toolResultsAccumulator.map(tr => ({ 
-            tool: tr.tool, 
+          toolResults: toolResultsAccumulator.map(tr => ({
+            tool: tr.tool,
             result: tr.toolCallResult.data ?? tr.toolCallResult.error ?? "No data/error from tool"
-          })), 
+          })),
           analysisResult,
           memoryContext: memory.getMemorySummary(),
           model
         }) as ResponseOutput;
-        
+
         currentState.finalOutput = responseResult.response || "The process completed, but no specific final response was generated.";
         this.addHistoryEntry(currentState, 'responseGeneration', responseResult);
         agentPhaseDispatch('finalResponseGeneration', 'completed', { response: responseResult });
       }
-      
+
       currentState.completionStatus = 'completed';
-      
+
     } catch (error: any) {
       console.error('[OptimizedReActEngine] Error durante la ejecución:', error);
       currentState.error = error.message;
       currentState.completionStatus = 'failed';
-      
+
       this.dispatcher.dispatch(EventType.SYSTEM_ERROR, {
         message: `Error en OptimizedReActEngine: ${error.message}`,
         level: 'error',
         chatId: currentState.chatId,
-        details: { error: error.stack || error.toString() }, 
+        details: { error: error.stack || error.toString() },
         source: 'OptimizedReActEngine',
         timestamp: Date.now()
       });
     }
-    
+
     // === EVENTO DE RESPUESTA FINAL ===
     if (currentState.finalOutput) {
       const responseContentStr = typeof currentState.finalOutput === 'string'
@@ -413,7 +413,7 @@ export class OptimizedReActEngine {
       };
       this.dispatcher.dispatch(EventType.RESPONSE_GENERATED, responsePayload);
     }
-    
+
     return currentState;
   }
 

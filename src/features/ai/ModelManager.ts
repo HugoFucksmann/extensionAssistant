@@ -55,21 +55,20 @@ export class ModelManager {
   private loadDetailedConfiguration(): Record<ModelProvider, ModelConfig> {
     const vsCodeConfig = vscode.workspace.getConfiguration('extensionAssistant');
 
-    
     return {
       gemini: {
         provider: 'gemini',
-        modelName: vsCodeConfig.get<string>('google.modelName') || 'gemini-2.0-flash-exp',
-        temperature: vsCodeConfig.get<number>('google.temperature') ?? 0.2,
-        maxTokens: vsCodeConfig.get<number>('google.maxTokens') || 4096,
-        apiKey: vsCodeConfig.get<string>('google.apiKey') || "AIzaSyBXGZbSj099c4bUOpLxbXKJgysGKKF3sR0",
+        modelName: 'gemini-2.0-flash-exp',
+        temperature: 0.2,
+        maxTokens: 4096,
+        apiKey: vsCodeConfig.get<string>('google.apiKey') || process.env.GOOGLE_API_KEY,
       },
       ollama: {
         provider: 'ollama',
-        modelName: vsCodeConfig.get<string>('ollama.modelName') || 'qwen2.5-coder:7b',
-        temperature: vsCodeConfig.get<number>('ollama.temperature') ?? 0.2,
-        baseUrl: vsCodeConfig.get<string>('ollama.baseUrl') || 'http://localhost:11434',
-        maxTokens: vsCodeConfig.get<number>('ollama.maxTokens') || 4096,
+        modelName: 'qwen2.5-coder:7b',
+        temperature: 0.2,
+        baseUrl: 'http://localhost:11434',
+        maxTokens: 4096,
       }
     };
   }
@@ -79,20 +78,31 @@ export class ModelManager {
     const detailedConfigs = this.config;
 
    
-    if (detailedConfigs.gemini.apiKey) {
+    // Validar y inicializar Gemini
+    const geminiConfig = detailedConfigs.gemini;
+    if (geminiConfig.apiKey) {
+      // Validar formato de la clave
+      if (!/^AIzaSy[0-9A-Za-z_-]{33}$/.test(geminiConfig.apiKey)) {
+        console.warn('[ModelManager] Clave de API de Google inválida. Formato esperado: AIzaSy seguido de 33 caracteres alfanuméricos.');
+        this.models.delete('gemini');
+        return;
+      }
+
       try {
         this.models.set('gemini', new ChatGoogleGenerativeAI({
-          model: detailedConfigs.gemini.modelName,
-          temperature: detailedConfigs.gemini.temperature,
-          maxOutputTokens: detailedConfigs.gemini.maxTokens,
-          apiKey: detailedConfigs.gemini.apiKey,
+          model: geminiConfig.modelName,
+          temperature: geminiConfig.temperature,
+          maxOutputTokens: geminiConfig.maxTokens,
+          apiKey: geminiConfig.apiKey,
         }));
         console.log('[ModelManager] Modelo Gemini inicializado.');
       } catch (error: any) {
         console.warn('[ModelManager] Error al inicializar Gemini:', error.message);
+        this.models.delete('gemini');
       }
     } else {
       console.warn("[ModelManager] Clave de API de Google no proporcionada. Modelo Gemini no disponible.");
+      this.models.delete('gemini');
     }
 
     // Inicializar Ollama
@@ -121,8 +131,7 @@ export class ModelManager {
       this.activeProvider = fallbackProvider;
     } else {
      
-      console.error('[ModelManager] No hay modelos disponibles. Configura Ollama o proporciona una clave de API de Google.');
-     
+      console.error('[ModelManager] No hay modelos disponibles. Por favor, asegúrate de tener Ollama en ejecución o configura una clave de API de Google.');
     }
   }
 
@@ -148,16 +157,7 @@ export class ModelManager {
      
       return;
     }
-    if (this.activeProvider !== provider) {
-        this.activeProvider = provider;
-        console.log(`[ModelManager] Proveedor activo cambiado manualmente a: ${provider}`);
-    }
+    this.activeProvider = provider;
+    console.log(`[ModelManager] Proveedor activo cambiado manualmente a: ${provider}`);
   }
-
- 
-
-
-
-
-
 }
