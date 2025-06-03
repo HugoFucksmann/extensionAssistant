@@ -1,38 +1,33 @@
 // src/features/tools/definitions/workspace/getProjectSummary.ts
 import * as vscode from 'vscode';
 import { z } from 'zod';
-import { ToolDefinition, ToolResult,  } from '../../types'; // Añadido InternalEventDispatcher
-import * as path from 'path'; // Node.js path module
+import { ToolDefinition, ToolResult, } from '../../types';
+import * as path from 'path';
 
-// Esquema Zod para los parámetros (vacío)
+
 export const getProjectSummaryParamsSchema = z.object({}).strict();
 
-// Tipos para la data retornada
+
 type TopLevelEntry = {
   name: string;
-  type: 'file' | 'directory' | 'other'; // 'other' para SymbolicLink, Unknown, etc.
+  type: 'file' | 'directory' | 'other';
 };
 type ProjectSummaryData = {
   projectName: string;
   rootPath: string;
   workspaceName: string;
-  topLevelStructure: TopLevelEntry[]; // Limitado a un número razonable
-  detectedPrimaryLanguage: string; // Heurística simple
+  topLevelStructure: TopLevelEntry[];
+  detectedPrimaryLanguage: string;
 };
 
 async function readJsonFileSafe(
-    vscodeFs: typeof vscode.workspace.fs,
-    fileUri: vscode.Uri,
-    // dispatcher: InternalEventDispatcher, // Dispatcher no es necesario aquí si solo es un warning interno
-    // chatId?: string
+  vscodeFs: typeof vscode.workspace.fs,
+  fileUri: vscode.Uri,
 ): Promise<any | undefined> {
   try {
     const content = await vscodeFs.readFile(fileUri);
     return JSON.parse(new TextDecoder().decode(content));
   } catch (error) {
-    // Silenciosamente retornar undefined si el archivo no existe o no es JSON válido.
-    // El dispatcher podría usarse para un log de debug/info si se desea.
-    // console.warn(`Failed to read or parse JSON file: ${fileUri.fsPath}`, error);
     return undefined;
   }
 }

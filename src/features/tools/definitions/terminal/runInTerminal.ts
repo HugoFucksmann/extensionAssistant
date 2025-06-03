@@ -1,8 +1,8 @@
 // src/features/tools/definitions/terminal/runInTerminal.ts
 import { z } from 'zod';
-import { ToolDefinition, ToolResult,  } from '../../types';
+import { ToolDefinition, ToolResult, } from '../../types';
 
-// Esquema Zod para los parámetros
+
 export const runInTerminalParamsSchema = z.object({
   command: z.string().min(1, { message: "Command to run cannot be empty." }),
   terminalName: z.string().optional().default('AI Assistant Task').describe("Optional name for the terminal. If a terminal with this name exists, it will be reused. Defaults to 'AI Assistant Task'."),
@@ -47,15 +47,15 @@ export const runInTerminal: ToolDefinition<typeof runInTerminalParamsSchema, Run
       if (!term) {
         term = context.vscodeAPI.window.createTerminal({
           name: terminalName,
-          cwd: workspaceFolderUri 
+          cwd: workspaceFolderUri
         });
       }
-      
+
       term.sendText(command);
       if (focus) {
-        term.show(false); 
+        term.show(false);
       }
-      
+
       return { success: true, data: { terminalName: term.name, commandSent: true } };
     } catch (error: any) {
       return { success: false, error: `Failed to run command "${command}" in terminal: ${error.message}`, data: undefined };

@@ -19,7 +19,7 @@ export async function runOptimizedActionChain({
   memoryContext?: string;
   model: BaseChatModel;
 }) {
-  // Formatear los parámetros para el prompt centralizado
+
   const promptInput = {
     userQuery,
     lastToolName,
@@ -28,7 +28,7 @@ export async function runOptimizedActionChain({
     memoryContext: memoryContext || ''
   };
 
-  // Encadenar: prompt centralizado -> modelo -> parser centralizado
+
   const chain = actionPromptLC.pipe(model).pipe(actionOutputParser);
   return await invokeModelWithLogging(chain, promptInput, { caller: 'runOptimizedActionChain' });
 }

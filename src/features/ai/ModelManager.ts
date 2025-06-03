@@ -40,7 +40,7 @@ export class ModelManager {
         this.ensureActiveProviderIsValid();
 
         if (oldPreferredProvider !== this.activeProvider) {
-            console.log(`[ModelManager] Proveedor activo cambiado a: ${this.activeProvider} debido a cambio de configuración o disponibilidad.`);
+          console.log(`[ModelManager] Proveedor activo cambiado a: ${this.activeProvider} debido a cambio de configuración o disponibilidad.`);
         }
       }
     });
@@ -48,7 +48,7 @@ export class ModelManager {
 
   private getUserPreferredProvider(): ModelProvider {
     const config = vscode.workspace.getConfiguration('extensionAssistant');
-   
+
     return config.get<ModelProvider>('modelType', 'gemini');
   }
 
@@ -77,11 +77,11 @@ export class ModelManager {
     this.models.clear();
     const detailedConfigs = this.config;
 
-   
-    // Validar y inicializar Gemini
+
+
     const geminiConfig = detailedConfigs.gemini;
     if (geminiConfig.apiKey) {
-      // Validar formato de la clave
+
       if (!/^AIzaSy[0-9A-Za-z_-]{33}$/.test(geminiConfig.apiKey)) {
         console.warn('[ModelManager] Clave de API de Google inválida. Formato esperado: AIzaSy seguido de 33 caracteres alfanuméricos.');
         this.models.delete('gemini');
@@ -105,15 +105,15 @@ export class ModelManager {
       this.models.delete('gemini');
     }
 
-    // Inicializar Ollama
+
     try {
       this.models.set('ollama', new ChatOllama({
         model: detailedConfigs.ollama.modelName,
         temperature: detailedConfigs.ollama.temperature,
         baseUrl: detailedConfigs.ollama.baseUrl,
-        
+
       }));
-     
+
     } catch (error: any) {
       console.warn('[ModelManager] No se pudo conectar con Ollama. ¿Está en ejecución?', error.message);
     }
@@ -125,12 +125,12 @@ export class ModelManager {
     if (this.models.has(preferredProvider)) {
       this.activeProvider = preferredProvider;
     } else if (this.models.size > 0) {
-      // Fallback al primer modelo disponible si el preferido no está listo
+
       const fallbackProvider = Array.from(this.models.keys())[0];
       console.warn(`[ModelManager] Proveedor preferido '${preferredProvider}' no disponible. Usando fallback: '${fallbackProvider}'.`);
       this.activeProvider = fallbackProvider;
     } else {
-     
+
       console.error('[ModelManager] No hay modelos disponibles. Por favor, asegúrate de tener Ollama en ejecución o configura una clave de API de Google.');
     }
   }
@@ -146,15 +146,15 @@ export class ModelManager {
     if (!model) {
       throw new Error(`Modelo para el proveedor activo '${this.activeProvider}' no está disponible.`);
     }
-    // El modelo se retorna directamente. El pipeline se encarga de parsear y limpiar la respuesta.
+
     return model;
   }
 
   public setActiveProvider(provider: ModelProvider): void {
-   
+
     if (!this.models.has(provider)) {
       console.warn(`[ModelManager] Intento de activar proveedor no disponible: '${provider}'. No se realizaron cambios.`);
-     
+
       return;
     }
     this.activeProvider = provider;

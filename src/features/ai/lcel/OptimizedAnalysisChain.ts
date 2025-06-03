@@ -2,10 +2,6 @@ import { analysisOutputSchema, analysisPromptLC } from "../prompts/optimized/ana
 import { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { createAutoCorrectStep } from "../../../shared/utils/aiResponseParser";
 
-
-
-
-
 export async function runOptimizedAnalysisChain({
   userQuery,
   availableTools,
@@ -28,7 +24,7 @@ export async function runOptimizedAnalysisChain({
   };
 
   try {
-    // Construir el contexto
+
     let context = '';
     if (memoryContext) {
       context += `MEMORIA RELEVANTE:\n${memoryContext}\n\n`;
@@ -38,34 +34,34 @@ export async function runOptimizedAnalysisChain({
     }
     context += `HERRAMIENTAS DISPONIBLES:\n${availableTools.join(', ')}\n`;
 
-    // Usar el prompt optimizado de analysisPromptLC
+
     const prompt = analysisPromptLC;
-    
-    // Crear el paso de parseo con autocorrección
+
+
     const parseStep = createAutoCorrectStep(analysisOutputSchema, model, {
       maxAttempts: 2,
       verbose: process.env.NODE_ENV === 'development'
     });
-    
-    // Encadenar: prompt -> modelo -> parseo con autocorrección
+
+
     const chain = prompt.pipe(model).pipe(parseStep);
-    
+
     try {
-      // Ejecutar la cadena con las variables necesarias
+
       const { invokeModelWithLogging } = await import('./ModelInvokeLogger');
-      
-      // La cadena ahora devuelve directamente el objeto parseado y validado
+
+
       return await invokeModelWithLogging(chain, {
         userQuery,
         availableTools: availableTools.join(', '),
         codeContext: codeContext || '',
         memoryContext: memoryContext || ''
-      }, { 
+      }, {
         caller: 'runOptimizedAnalysisChain',
-        // Asegurarse de que el logger sepa que esperamos un objeto, no un string
+
         responseFormatter: (r: unknown) => JSON.stringify(r, null, 2)
       });
-      
+
     } catch (error) {
       console.error('Error al procesar la respuesta del modelo:', error);
       if (error instanceof Error) {

@@ -1,7 +1,7 @@
 // src/features/tools/definitions/filesystem/deletePath.ts
 import * as vscode from 'vscode';
 import { z } from 'zod';
-import { ToolDefinition, ToolResult,  } from '../../types';
+import { ToolDefinition, ToolResult, } from '../../types';
 import { buildWorkspaceUri } from '@shared/utils/pathUtils';
 
 
@@ -54,7 +54,7 @@ export const deletePath: ToolDefinition<typeof deletePathParamsSchema, DeletePat
         return { success: false, error: `Path not found: ${context.vscodeAPI.workspace.asRelativePath(targetUri, false)}`, data: undefined };
       }
 
-      // { recursive: true, useTrash: true } son los defaults de vscode.workspace.fs.delete
+
       await context.vscodeAPI.workspace.fs.delete(targetUri, { recursive: true, useTrash: true });
       return { success: true, data: { path: context.vscodeAPI.workspace.asRelativePath(targetUri, false), deleted: true } };
     } catch (error: any) {

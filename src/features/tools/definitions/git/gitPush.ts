@@ -63,23 +63,23 @@ export const gitPush: ToolDefinition<typeof gitPushParamsSchema, GitPushResult> 
     try {
       const pushCmd = `git push ${remote} ${branchToPush}`;
       const { stdout, stderr } = await execPromise(pushCmd, { cwd: workspaceFolder, timeout: 20000 });
-      // Obtener metadatos adicionales
+
       let remoteUrl: string | undefined = undefined;
       let commitHash: string | undefined = undefined;
       let commitsPushed: number | undefined = undefined;
       try {
         const { stdout: urlOut } = await execPromise(`git remote get-url ${remote}`, { cwd: workspaceFolder });
         remoteUrl = urlOut.trim();
-      } catch {}
+      } catch { }
       try {
         const { stdout: hashOut } = await execPromise('git rev-parse HEAD', { cwd: workspaceFolder });
         commitHash = hashOut.trim();
-      } catch {}
+      } catch { }
       try {
-        // Commits empujados = diferencia entre remoto y local antes del push
+
         const { stdout: countOut } = await execPromise(`git rev-list --count ${remote}/${branchToPush}..${branchToPush}`, { cwd: workspaceFolder });
         commitsPushed = parseInt(countOut.trim(), 10) || 0;
-      } catch {}
+      } catch { }
       return {
         success: true,
         data: {

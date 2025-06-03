@@ -24,7 +24,7 @@ const App = () => {
   const { messages, isLoading, showHistory, theme, activeFeedbackOperationId } = useApp();
   const isEmpty = messages.length === 0;
 
-  // Inyectar variables CSS del tema
+  
   const appContainerStyle = {
     display: 'flex',
     flexDirection: 'column',

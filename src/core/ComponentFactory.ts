@@ -28,22 +28,22 @@ export class ComponentFactory {
   public static getInternalEventDispatcher(): InternalEventDispatcher {
     if (!this.internalEventDispatcherInstance) {
       this.internalEventDispatcherInstance = new InternalEventDispatcher();
-      
+
     }
     return this.internalEventDispatcherInstance;
   }
 
   private static getVSCodeContext(extensionContext: vscode.ExtensionContext): VSCodeContext {
     if (!this.vscodeContextInstance) {
-        this.vscodeContextInstance = {
-            extensionUri: extensionContext.extensionUri,
-            extensionPath: extensionContext.extensionPath,
-            subscriptions: extensionContext.subscriptions,
-            outputChannel: vscode.window.createOutputChannel("Extension Assistant Log"), 
-            globalState: extensionContext.globalState,
-            workspaceState: extensionContext.workspaceState,
-        };
-       
+      this.vscodeContextInstance = {
+        extensionUri: extensionContext.extensionUri,
+        extensionPath: extensionContext.extensionPath,
+        subscriptions: extensionContext.subscriptions,
+        outputChannel: vscode.window.createOutputChannel("Extension Assistant Log"),
+        globalState: extensionContext.globalState,
+        workspaceState: extensionContext.workspaceState,
+      };
+
     }
     return this.vscodeContextInstance;
   }
@@ -53,39 +53,39 @@ export class ComponentFactory {
       const dispatcher = this.getInternalEventDispatcher();
       this.toolRegistryInstance = new ToolRegistry(dispatcher);
       this.toolRegistryInstance.registerTools(allToolDefinitions);
-     
+
     }
     return this.toolRegistryInstance;
   }
-  
+
 
 
   public static getModelManager(): ModelManager {
     if (!this.modelManagerInstance) {
-    
-      this.modelManagerInstance = new ModelManager(); 
-     
+
+      this.modelManagerInstance = new ModelManager();
+
     }
     return this.modelManagerInstance;
   }
-  
+
   public static getLongTermStorage(extensionContext: vscode.ExtensionContext): LongTermStorage {
     if (!this.longTermStorageInstance) {
       this.longTermStorageInstance = new LongTermStorage(extensionContext);
-      
+
     }
     return this.longTermStorageInstance;
   }
-  
+
   public static getOptimizedPromptManager(): OptimizedPromptManager {
     if (!this.optimizedPromptManagerInstance) {
       const modelManager = this.getModelManager();
       this.optimizedPromptManagerInstance = new OptimizedPromptManager(modelManager);
-      
+
     }
     return this.optimizedPromptManagerInstance;
   }
-  
+
   public static getOptimizedReActEngine(extensionContext: vscode.ExtensionContext): OptimizedReActEngine {
     if (!this.optimizedReActEngineInstance) {
       const modelManager = this.getModelManager();
@@ -98,22 +98,22 @@ export class ComponentFactory {
         dispatcher,
         longTermStorage
       );
-      
+
     }
     return this.optimizedReActEngineInstance;
   }
-  
+
 
   public static getApplicationLogicService(extensionContext: vscode.ExtensionContext): ApplicationLogicService {
     if (!this.applicationLogicServiceInstance) {
-    
 
-      const longTermStorage = this.getLongTermStorage(extensionContext); 
-      const conversationMemoryManager = new ConversationMemoryManager(longTermStorage); 
+
+      const longTermStorage = this.getLongTermStorage(extensionContext);
+      const conversationMemoryManager = new ConversationMemoryManager(longTermStorage);
       const conversationManager = new ConversationManager();
       const toolRegistry = this.getToolRegistry();
-      
-     
+
+
       const reActEngine = this.getOptimizedReActEngine(extensionContext);
 
       this.applicationLogicServiceInstance = new ApplicationLogicService(
@@ -122,16 +122,13 @@ export class ComponentFactory {
         conversationManager,
         toolRegistry
       );
-      
+
     }
     return this.applicationLogicServiceInstance;
   }
 
-  /**
-   * Libera todos los recursos manejados por el ComponentFactory
-   * Asegura que todas las instancias que manejan recursos sean correctamente limpiadas
-   */
-  public static getConversationManager(extensionContext: vscode.ExtensionContext): ConversationManager {
+
+  public static getConversationManager(): ConversationManager {
     if (!this.conversationManagerInstance) {
       this.conversationManagerInstance = new ConversationManager();
     }
@@ -174,7 +171,7 @@ export class ComponentFactory {
       (this.applicationLogicServiceInstance as any).dispose();
       this.applicationLogicServiceInstance = null!;
     }
-    
+
     if (this.conversationManagerInstance) {
       if (typeof this.conversationManagerInstance.dispose === 'function') {
         this.conversationManagerInstance.dispose();

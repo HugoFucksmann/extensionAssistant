@@ -6,7 +6,7 @@ export async function invokeModelWithLogging<T = any>(
 ): Promise<T> {
   try {
     const response = await chain.invoke(inputArgs);
-    // Logging estructurado
+
     console.log('[ModelInvokeLogger] Invocación de modelo:', {
       inputArgs,
       logContext,

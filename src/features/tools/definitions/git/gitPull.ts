@@ -63,23 +63,23 @@ export const gitPull: ToolDefinition<typeof gitPullParamsSchema, GitPullResult> 
     try {
       const pullCmd = `git pull ${remote} ${branchToPull}`;
       const { stdout, stderr } = await execPromise(pullCmd, { cwd: workspaceFolder, timeout: 20000 });
-      // Obtener metadatos adicionales
+
       let remoteUrl: string | undefined = undefined;
       let commitHash: string | undefined = undefined;
       let commitsPulled: number | undefined = undefined;
       try {
         const { stdout: urlOut } = await execPromise(`git remote get-url ${remote}`, { cwd: workspaceFolder });
         remoteUrl = urlOut.trim();
-      } catch {}
+      } catch { }
       try {
         const { stdout: hashOut } = await execPromise('git rev-parse HEAD', { cwd: workspaceFolder });
         commitHash = hashOut.trim();
-      } catch {}
+      } catch { }
       try {
-        // Commits traídos = diferencia entre local y remoto antes del pull
+
         const { stdout: countOut } = await execPromise(`git rev-list --count ${branchToPull}..${remote}/${branchToPull}`, { cwd: workspaceFolder });
         commitsPulled = parseInt(countOut.trim(), 10) || 0;
-      } catch {}
+      } catch { }
       return {
         success: true,
         data: {

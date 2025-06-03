@@ -1,7 +1,7 @@
 // src/shared/utils/logger.ts
 import { getConfig } from '../config';
 
-// Logger centralizado: consola y opcionalmente OutputChannel VSCode
+
 let outputChannel: { appendLine: (msg: string) => void } | undefined;
 
 const env = process.env.NODE_ENV === 'production' ? 'production' : 'development';

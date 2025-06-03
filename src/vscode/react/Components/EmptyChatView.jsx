@@ -4,7 +4,7 @@ import ChatInput from './InputChat/ChatInput';
 import { useApp } from '../context/AppContext';
 
 const EmptyChatView = () => {
-  const { theme } = useApp(); // Assuming theme is now provided by AppContext
+  const { theme } = useApp(); 
 
   const styles = {
     container: {
@@ -15,7 +15,7 @@ const EmptyChatView = () => {
       alignItems: 'center',
       padding: theme.spacing.large,
       gap: '24px',
-      height: '100%', // Ensure it takes full height
+      height: '100%', 
     },
     welcomeTextContainer: {
       textAlign: 'center',
@@ -27,12 +27,12 @@ const EmptyChatView = () => {
     },
     subtitle: {
       fontSize: theme.typography.subtitle,
-      color: theme.colors.text, // Or a secondary text color
+      color: theme.colors.text, 
       opacity: 0.7,
     },
     inputContainer: {
       width: '100%',
-      maxWidth: '600px', // Or your preferred max width
+      maxWidth: '600px', 
     },
   };
 

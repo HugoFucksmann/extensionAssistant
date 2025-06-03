@@ -57,7 +57,7 @@ export const gitCommit: ToolDefinition<typeof gitCommitParamsSchema, GitCommitRe
     try {
       const commitCmd = `git commit${all ? ' -a' : ''} -m ${JSON.stringify(message)}`;
       const { stdout, stderr } = await execPromise(commitCmd, { cwd: workspaceFolder, timeout: 15000 });
-      // Parse committed files and hash
+
       const summaryMatch = stdout.match(/\[([\w\d]+)\] (.*)/);
       let commitHash = undefined;
       let commitSummary = undefined;
@@ -69,26 +69,26 @@ export const gitCommit: ToolDefinition<typeof gitCommitParamsSchema, GitCommitRe
         .split('\n')
         .filter(line => /^\s*\w+\s+.+/.test(line))
         .map(line => line.trim().split(/\s+/).pop()!);
-      // Obtener metadatos adicionales del último commit
+
       let commitDate: string | undefined = undefined;
       let author: string | undefined = undefined;
       let filesChangedSummary: FileCommitSummary[] = [];
       if (commitHash) {
         try {
-          // Obtener fecha y autor
+
           const { stdout: logOut } = await execPromise(`git log -1 --pretty=format:"%H|%an|%ad"`, { cwd: workspaceFolder });
           const [hash, authorName, date] = logOut.split('|');
           if (hash === commitHash) {
             commitDate = date;
             author = authorName;
           }
-          // Obtener resumen de archivos cambiados
+
           const { stdout: statOut } = await execPromise(`git show --numstat --pretty="" ${commitHash}`, { cwd: workspaceFolder });
           filesChangedSummary = statOut.split('\n').filter(l => l.trim().length > 0 && /^\d+/.test(l)).map(l => {
             const [ins, del, ...rest] = l.trim().split(/\s+/);
             return { file: rest.join(' '), insertions: parseInt(ins, 10) || 0, deletions: parseInt(del, 10) || 0 };
           });
-        } catch {}
+        } catch { }
       }
       return {
         success: true,

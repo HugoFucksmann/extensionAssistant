@@ -51,7 +51,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
       enableScripts: true,
       localResourceRoots: [this.extensionUri],
     };
-    
+
     this.view.webview.html = getReactHtmlContent({
       scriptUri: this.view.webview.asWebviewUri(
         vscode.Uri.joinPath(this.extensionUri, 'out', 'webView', 'webview.js')
@@ -71,13 +71,10 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
   }
 
   public requestShowHistory(): void {
-   
+
     this.postMessage('showHistory', {});
   }
 
-  /**
-   * Starts a new chat by delegating to the message handler
-   */
   public startNewChat(): void {
     this.messageHandler.handleNewChatRequest();
   }
@@ -97,7 +94,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
   }
 
   public dispose(): void {
-    
+
     this.disposables.forEach(d => d.dispose());
     this.eventHandler.dispose();
   }

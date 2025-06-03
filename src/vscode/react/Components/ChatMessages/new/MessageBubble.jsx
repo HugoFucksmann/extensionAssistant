@@ -4,7 +4,7 @@ import "../styles/MessageBubble.css"
 
 
 const MessageBubble = ({ message }) => {
-  // Validate message object
+  
   if (!message || typeof message !== "object") {
     return null
   }
@@ -32,7 +32,7 @@ const MessageBubble = ({ message }) => {
     return (
       <div className="message-content">
         {lines.map((line, index) => {
-          // Detectar bloques de código
+    
           if (line.startsWith("```")) {
             return (
               <div key={index} className="code-delimiter">
@@ -41,7 +41,7 @@ const MessageBubble = ({ message }) => {
             )
           }
 
-          // Detectar líneas de código inline
+          
           if (line.includes("`") && line.match(/`[^`]+`/)) {
             const parts = line.split(/(`[^`]+`)/)
             return (
@@ -82,7 +82,7 @@ const MessageBubble = ({ message }) => {
     )
   }
 
-  // Get sender with fallback
+  
   const sender = message?.sender || "unknown"
 
   return (

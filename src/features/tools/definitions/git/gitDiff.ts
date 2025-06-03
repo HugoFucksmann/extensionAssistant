@@ -56,7 +56,7 @@ export const gitDiff: ToolDefinition<typeof gitDiffParamsSchema, GitDiffResult> 
     if (file) diffCmd += ` -- "${file}"`;
     try {
       const { stdout, stderr } = await execPromise(diffCmd, { cwd: workspaceFolder, timeout: 15000 });
-      // Obtener resumen de archivos cambiados usando git diff --numstat
+
       let filesChanged: FileDiffSummary[] = [];
       try {
         let numstatCmd = 'git diff --numstat';
@@ -76,7 +76,7 @@ export const gitDiff: ToolDefinition<typeof gitDiffParamsSchema, GitDiffResult> 
             };
           });
       } catch (e) {
-        // Si falla el numstat, filesChanged queda vacío
+
       }
       return {
         success: true,

@@ -7,7 +7,7 @@ export class ExtensionActivator {
   private webviewProvider?: WebviewProvider;
   private commandManager?: CommandManager;
 
-  constructor(private readonly context: vscode.ExtensionContext) {}
+  constructor(private readonly context: vscode.ExtensionContext) { }
 
   public activate(): void {
     this.initializeServices();
@@ -18,15 +18,15 @@ export class ExtensionActivator {
   private initializeServices(): void {
     const appLogicService = ComponentFactory.getApplicationLogicService(this.context);
     const dispatcher = ComponentFactory.getInternalEventDispatcher();
-    const conversationManager = ComponentFactory.getConversationManager(this.context);
-    
+    const conversationManager = ComponentFactory.getConversationManager();
+
     this.webviewProvider = new WebviewProvider(
-      this.context.extensionUri, 
-      appLogicService, 
+      this.context.extensionUri,
+      appLogicService,
       dispatcher,
       conversationManager
     );
-    
+
     this.commandManager = new CommandManager(this.webviewProvider);
   }
 
@@ -44,7 +44,7 @@ export class ExtensionActivator {
 
   private registerCommands(): void {
     if (!this.commandManager) return;
-    
+
     const commands = this.commandManager.getCommands();
     commands.forEach(command => {
       this.context.subscriptions.push(command);

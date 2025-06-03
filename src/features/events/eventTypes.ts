@@ -10,24 +10,24 @@ export enum EventType {
   CONVERSATION_STARTED = 'conversation:started',
   CONVERSATION_ENDED = 'conversation:ended',
 
-  // LLM Interaction Events (NEW)
+  // LLM Interaction Events
   LLM_REQUEST_STARTED = 'llm:request:started',
   LLM_REQUEST_COMPLETED = 'llm:request:completed',
 
   // Agent/ReAct Cycle Events
   AGENT_PHASE_STARTED = 'agent:phase:started',
   AGENT_PHASE_COMPLETED = 'agent:phase:completed',
-  
+
   // Tool execution
   TOOL_EXECUTION_STARTED = 'tool:execution:started',
   TOOL_EXECUTION_COMPLETED = 'tool:execution:completed',
   TOOL_EXECUTION_ERROR = 'tool:execution:error',
-  // TOOL_EXECUTION_ATTEMPT = 'tool:execution:attempt', // Consider if needed vs. just STARTED
+
 
   // Response handling
   RESPONSE_GENERATED = 'response:generated',
   RESPONSE_DELIVERED = 'response:delivered',
-  
+
   // System events
   SYSTEM_INFO = 'system:info',
   SYSTEM_WARNING = 'system:warning',
@@ -38,24 +38,20 @@ export enum EventType {
   USER_INPUT_RECEIVED = 'ui:input:received'
 }
 
-/**
-* Base interface for all event payloads
-*/
+
 export interface BaseEventPayload {
-  timestamp?: number; 
-  chatId?: string;    
-  source?: string;    
-  /**
-   * Identificador único opcional para correlacionar eventos de una misma operación/herramienta.
-   */
+  timestamp?: number;
+  chatId?: string;
+  source?: string;
+
   operationId?: string;
 }
 
-// ... (ConversationEventPayload, ConversationEndedPayload - keep as is) ...
+
 export interface ConversationEventPayload extends BaseEventPayload {
-  userMessage?: string; 
+  userMessage?: string;
   finalStatus?: 'completed' | 'failed' | 'cancelled';
-  duration?: number; 
+  duration?: number;
 }
 export interface ConversationEndedPayload extends BaseEventPayload {
   finalStatus: 'completed' | 'cleared_by_user' | 'error' | 'max_iterations_reached' | 'failed' | 'cancelled'; // Added 'failed', 'cancelled' and changed 'reason' to 'finalStatus'
@@ -64,22 +60,22 @@ export interface ConversationEndedPayload extends BaseEventPayload {
 
 
 /**
-* LLM Request Payloads (NEW)
+* LLM Request Payloads
 */
 export interface LlmRequestStartedPayload extends BaseEventPayload {
-  llmRequestType: 'reasoning' | 'responseGeneration' | string; // string for extensibility
+  llmRequestType: 'reasoning' | 'responseGeneration' | string;
   promptLength?: number;
-  modelProvider?: string; // e.g., 'gemini', 'ollama'
+  modelProvider?: string;
   modelName?: string;
 }
 
 export interface LlmRequestCompletedPayload extends LlmRequestStartedPayload {
   responseLength?: number;
-  duration: number; // ms
+  duration: number;
   success: boolean;
   error?: string;
-  // rawPrompt?: string; // Optional for debugging, can be large
-  rawResponse?: string; // Optional for debugging, can be large
+
+  rawResponse?: string;
   tokenUsage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number };
 }
 
@@ -87,69 +83,69 @@ export interface LlmRequestCompletedPayload extends LlmRequestStartedPayload {
 export interface AgentPhaseEventPayload extends BaseEventPayload {
   phase: 'reasoning' | 'action' | 'finalResponseGeneration' | 'reflection' | 'correction' | 'toolOutputAnalysis' | 'initialAnalysis' | 'toolExecution' | string; // Added toolOutputAnalysis, initialAnalysis, toolExecution
   iteration?: number;
-  data?: any;       // Relevant data from the phase (e.g., reasoning output, action details)
-  duration?: number;  // ms for this phase
-  error?: string;     // If the phase failed
+  data?: any;
+  duration?: number;
+  error?: string;
 }
 
 
 
 export interface ToolExecutionEventPayload extends BaseEventPayload {
   toolName: string;
-  parameters?: Record<string, any>; 
-  result?: ToolOutput; 
+  parameters?: Record<string, any>;
+  result?: ToolOutput;
   error?: string;
   duration?: number;
-  toolDescription?: string; 
+  toolDescription?: string;
   toolParams?: Record<string, any>;
   isProcessingStep?: boolean;
-  modelAnalysis?: ActionOutput | any; 
+  modelAnalysis?: ActionOutput | any;
   rawToolOutput?: any;
-  toolSuccess?: boolean; 
+  toolSuccess?: boolean;
 }
 
 
 export interface ResponseEventPayload extends BaseEventPayload {
-  responseContent: string; 
-  isFinal?: boolean;      
-  metadata?: Record<string, any>; 
-  duration?: number;      
+  responseContent: string;
+  isFinal?: boolean;
+  metadata?: Record<string, any>;
+  duration?: number;
 }
 
 export interface ErrorOccurredEventPayload extends BaseEventPayload {
   errorMessage: string;
   errorStack?: string;
-  errorType?: string; 
-  details?: Record<string, any>; 
+  errorType?: string;
+  details?: Record<string, any>;
 }
 export interface SystemEventPayload extends BaseEventPayload {
   message: string;
-  level: 'info' | 'warning' | 'error'; 
+  level: 'info' | 'warning' | 'error';
   details?: Record<string, any>;
-  errorObject?: { name?: string; message: string; stack?: string }; 
+  errorObject?: { name?: string; message: string; stack?: string };
 }
 export interface UserInteractionRequiredPayload extends BaseEventPayload {
   interactionType: 'requestInput' | 'confirmation' | 'choiceSelection';
 
   promptMessage: string;
-  inputType?: 'text' | 'password' | 'number'; 
+  inputType?: 'text' | 'password' | 'number';
   placeholder?: string;
   defaultValue?: string;
   options?: Array<{ label: string; value: any }>;
   confirmButtonText?: string;
   cancelButtonText?: string;
-  title?: string; 
+  title?: string;
 }
 export interface UserInputReceivedPayload extends BaseEventPayload {
-  value?: any; 
-  wasCancelled?: boolean; 
+  value?: any;
+  wasCancelled?: boolean;
 }
 
 
 /**
 * Union type for all event payloads
 */
-export type EventPayload = 
+export type EventPayload =
   | BaseEventPayload
   | ConversationEventPayload
   | ConversationEndedPayload
@@ -167,9 +163,9 @@ export type EventPayload =
 */
 export interface WindsurfEvent {
   type: EventType;
-  payload: EventPayload; 
-  timestamp: number;     
-  id: string;            
+  payload: EventPayload;
+  timestamp: number;
+  id: string;
 }
 
 /**
@@ -180,8 +176,8 @@ export interface EventFilter {
   chatId?: string;
   source?: string;
   timeRange?: {
-    start?: number; 
-    end?: number;   
+    start?: number;
+    end?: number;
   };
   custom?: (event: WindsurfEvent) => boolean;
 }

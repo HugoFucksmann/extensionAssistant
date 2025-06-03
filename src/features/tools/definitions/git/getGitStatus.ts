@@ -7,7 +7,7 @@ import * as util from 'util';
 
 const execPromise = util.promisify(exec);
 
-// Tipos para la data retornada
+
 interface GitFileStatus {
   path: string;
   indexStatus: string;
@@ -28,7 +28,7 @@ interface GitStatusData {
   files: GitFileStatus[];
 }
 
-// Esquema Zod para los parámetros (vacío)
+
 const getGitStatusParamsSchema = z.object({}).strict();
 
 function parseGitPorcelainStatus(porcelainOutput: string): {
@@ -43,23 +43,23 @@ function parseGitPorcelainStatus(porcelainOutput: string): {
   let behind = 0;
   const files: GitFileStatus[] = [];
 
-  // Manejar la línea de branch
+
   if (lines.length > 0 && lines[0].startsWith('##')) {
     const branchLine = lines.shift()!;
 
-    // Primero intentar el patrón más común con tracking
+
     const trackingMatch = branchLine.match(/^##\s*([^.]+)\s*\.\.\.\s*(\S+)\s*\[ahead\s*(\d+)(?:,\s*behind\s*(\d+))?\]/);
     if (trackingMatch) {
       branch = trackingMatch[1].trim();
       ahead = parseInt(trackingMatch[3] || '0', 10);
       behind = parseInt(trackingMatch[4] || '0', 10);
     }
-    // Luego intentar patrones alternativos
+
     else {
       const simpleMatch = branchLine.match(/^##\s*([^.]+)(?:\s*\[no\s+branch\])?/);
       if (simpleMatch) {
         branch = simpleMatch[1].trim();
-        // Si es "no branch", estamos en detached HEAD
+
         if (branch === 'HEAD' && branchLine.includes('no branch')) {
           branch = null;
         }
@@ -67,7 +67,7 @@ function parseGitPorcelainStatus(porcelainOutput: string): {
     }
   }
 
-  // Procesar el resto de las líneas de archivos
+
   lines.forEach(line => {
     if (line.trim() === '') return;
 

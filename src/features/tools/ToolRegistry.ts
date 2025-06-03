@@ -52,17 +52,13 @@ export class ToolRegistry {
     return Array.from(this.tools.values());
   }
 
-  /**
-   * Genera el ToolOutput final para una herramienta.
-   * Si la ToolDefinition tiene mapToOutput, delega allí el mapeo.
-   * Si no, retorna un ToolOutput genérico con las 5 keys universales.
-   */
+
   private mapToToolOutput(toolName: string, rawData: any, success: boolean, errorMsg?: string): ToolOutput {
     const toolDef = this.getTool(toolName);
     if (toolDef?.mapToOutput) {
       return toolDef.mapToOutput(rawData, success, errorMsg);
     }
-    // Mapeo genérico por defecto si la tool no define mapToOutput
+
     return {
       title: toolName,
       summary: success ? "Tool executed." : `Error: ${errorMsg || "Unknown error"}`,
@@ -76,7 +72,7 @@ export class ToolRegistry {
     name: string,
     rawParams: any,
     executionCtxArgs: { chatId?: string; operationId?: string;[key: string]: any } = {}
-  ): Promise<ToolResult> { // ToolResult de ./types
+  ): Promise<ToolResult> {
     const operationId = executionCtxArgs.operationId || generateUniqueId();
     const startTime = Date.now();
     const tool = this.getTool(name);
@@ -84,7 +80,7 @@ export class ToolRegistry {
       ? tool.getUIDescription(rawParams)
       : (tool?.description || `Executing ${name}`);
 
-    // Solo despachar TOOL_EXECUTION_STARTED desde aquí
+
     const startPayload: ToolExecutionEventPayload = {
       toolName: name,
       parameters: rawParams,
@@ -92,9 +88,9 @@ export class ToolRegistry {
       toolParams: rawParams,
       chatId: executionCtxArgs.chatId,
       source: 'ToolRegistry',
-      operationId, // Usa el operationId recibido o generado
+      operationId,
       timestamp: Date.now(),
-      // No incluir result, error, duration, modelAnalysis, etc. aquí
+
     };
     this.dispatcher.dispatch(EventType.TOOL_EXECUTION_STARTED, startPayload);
 
@@ -102,7 +98,7 @@ export class ToolRegistry {
       const errorMsg = `Tool not found: ${name}`;
       const executionTime = Date.now() - startTime;
       const mappedErrorOutput = this.mapToToolOutput(name, null, false, errorMsg);
-      // NO despachar TOOL_EXECUTION_ERROR desde aquí
+
       return {
         success: false,
         error: errorMsg,
@@ -115,7 +111,7 @@ export class ToolRegistry {
     if (!validationResult.success) {
       const executionTime = Date.now() - startTime;
       const mappedErrorOutput = this.mapToToolOutput(name, null, false, validationResult.error);
-      // NO despachar TOOL_EXECUTION_ERROR desde aquí
+
       return {
         success: false,
         error: validationResult.error,
@@ -127,7 +123,7 @@ export class ToolRegistry {
 
     const executionContext: ToolExecutionContext = {
       vscodeAPI: vscode,
-      dispatcher: this.dispatcher, // El dispatcher se pasa para que la herramienta pueda emitir eventos si es necesario (raro)
+      dispatcher: this.dispatcher,
       chatId: executionCtxArgs.chatId,
       ...executionCtxArgs
     };
@@ -137,7 +133,7 @@ export class ToolRegistry {
       const executionTime = Date.now() - startTime;
       const mappedOutput = this.mapToToolOutput(name, toolExecuteOutcome.data, toolExecuteOutcome.success, toolExecuteOutcome.error);
 
-      // NO despachar TOOL_EXECUTION_COMPLETED desde aquí
+
       return {
         success: toolExecuteOutcome.success,
         data: toolExecuteOutcome.data,
@@ -150,7 +146,7 @@ export class ToolRegistry {
       const executionTime = Date.now() - startTime;
       const errorMsg = `Unexpected error during execution of tool ${name}: ${error.message}`;
       const mappedErrorOutput = this.mapToToolOutput(name, { originalException: error.toString() }, false, errorMsg);
-      // NO despachar TOOL_EXECUTION_ERROR desde aquí
+
       return {
         success: false,
         error: errorMsg,
@@ -163,13 +159,11 @@ export class ToolRegistry {
   public asDynamicTool(toolName: string, contextDefaults: Record<string, any> = {}): DynamicStructuredTool | undefined {
     const toolDef = this.getTool(toolName);
     if (!toolDef) return undefined;
-    // Langchain's func expects the raw data, not the full ToolResult wrapper.
-    // So, we adapt executeTool's Promise<ToolResult> to what DynamicStructuredTool's func expects.
+
     const langChainFunc = async (input: any, runContext?: any) => {
       const toolResult = await this.executeTool(toolName, input, { ...contextDefaults, ...runContext });
       if (toolResult.success) {
-        // Langchain tools typically return the direct data or a string summary.
-        // We can return the raw data, or a stringified version of mappedOutput if it's more descriptive.
+
         return toolResult.data ?? JSON.stringify(toolResult.mappedOutput) ?? "Success";
       } else {
         throw new Error(toolResult.error || `Tool ${toolName} execution failed.`);

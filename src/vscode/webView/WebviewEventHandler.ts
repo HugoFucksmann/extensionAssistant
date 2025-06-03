@@ -7,7 +7,7 @@ import {
   SystemEventPayload,
   ErrorOccurredEventPayload,
   ResponseEventPayload,
-  AgentPhaseEventPayload, // Agregar esta importación
+  AgentPhaseEventPayload,
 } from '../../features/events/eventTypes';
 import { WebviewStateManager } from './WebviewStateManager';
 import { ChatMessage } from '../../features/chat/types';
@@ -15,10 +15,7 @@ import { ToolOutput } from '../../features/tools/types';
 import { IConversationManager } from '../../core/interfaces/IConversationManager';
 
 export class WebviewEventHandler {
-  /**
-   * Actualiza el chatId activo para filtrar correctamente los eventos de respuesta.
-   * Debe ser llamado desde WebviewMessageHandler cuando cambie el chat activo.
-   */
+
   public setCurrentChatId(chatId: string) {
     this.currentChatId = chatId;
   }
@@ -28,7 +25,7 @@ export class WebviewEventHandler {
   constructor(
     private readonly internalEventDispatcher: InternalEventDispatcher,
     private readonly conversationManager: IConversationManager,
-    private readonly stateManager: WebviewStateManager, 
+    private readonly stateManager: WebviewStateManager,
     private readonly postMessage: (type: string, payload: any) => void
   ) {
     this.currentChatId = this.conversationManager.getActiveChatId();
@@ -44,8 +41,8 @@ export class WebviewEventHandler {
       EventType.TOOL_EXECUTION_ERROR,
       EventType.SYSTEM_ERROR,
       EventType.RESPONSE_GENERATED,
-      EventType.AGENT_PHASE_STARTED,    // Agregar estos eventos
-      EventType.AGENT_PHASE_COMPLETED, // para mostrar las fases
+      EventType.AGENT_PHASE_STARTED,
+      EventType.AGENT_PHASE_COMPLETED,
     ];
 
     eventTypesToWatch.forEach(eventType => {
@@ -61,7 +58,7 @@ export class WebviewEventHandler {
 
   private handleInternalEvent(event: WindsurfEvent): void {
     let chatMessage: ChatMessage | null = null;
-    let messageTypeForPost: string | null = null; 
+    let messageTypeForPost: string | null = null;
 
     switch (event.type) {
       case EventType.TOOL_EXECUTION_STARTED:
@@ -87,7 +84,7 @@ export class WebviewEventHandler {
         }
         break;
 
-      // Nuevos manejadores para fases del agente
+
       case EventType.AGENT_PHASE_STARTED:
         chatMessage = this.handleAgentPhaseStarted(event.payload as AgentPhaseEventPayload, event.id);
         messageTypeForPost = 'agentPhaseUpdate';
@@ -112,23 +109,23 @@ export class WebviewEventHandler {
   private createBaseChatMessage(eventId: string, sender: ChatMessage['sender'], operationId?: string): Partial<ChatMessage> {
     return {
       id: operationId || eventId,
-      operationId: operationId, 
+      operationId: operationId,
       timestamp: Date.now(),
       sender: sender,
       metadata: {}
     };
   }
 
-  // Nuevos manejadores para fases del agente
+
   private handleAgentPhaseStarted(payload: AgentPhaseEventPayload, eventId: string): ChatMessage {
     const chatMsg = this.createBaseChatMessage(eventId, 'system') as ChatMessage;
-    
+
     const phaseNames: Record<string, string> = {
       'initialAnalysis': '🔍 Analizando la consulta',
       'reasoning': '🤔 Razonando sobre la acción',
       'finalResponseGeneration': '✍️ Generando respuesta final'
     };
-    
+
     chatMsg.content = phaseNames[payload.phase] || `Iniciando fase: ${payload.phase}`;
     chatMsg.metadata = {
       ...chatMsg.metadata,
@@ -137,34 +134,34 @@ export class WebviewEventHandler {
       iteration: payload.iteration,
       source: payload.source
     };
-    
+
     return chatMsg;
   }
 
   private handleAgentPhaseCompleted(payload: AgentPhaseEventPayload, eventId: string): ChatMessage {
     const chatMsg = this.createBaseChatMessage(eventId, 'system') as ChatMessage;
-    
+
     const phaseCompletedNames: Record<string, string> = {
       'initialAnalysis': '✅ Análisis completado',
-      'reasoning': '✅ Razonamiento completado', 
+      'reasoning': '✅ Razonamiento completado',
       'finalResponseGeneration': '✅ Respuesta lista'
     };
-    
+
     let content = phaseCompletedNames[payload.phase] || `Fase completada: ${payload.phase}`;
-    
-    // Agregar detalles específicos según la fase
+
+
     if (payload.data) {
       if (payload.phase === 'initialAnalysis' && payload.data.analysis?.understanding) {
         const understanding = payload.data.analysis.understanding.substring(0, 100);
         content += `\n💡 Entendimiento: ${understanding}${payload.data.analysis.understanding.length > 100 ? '...' : ''}`;
       } else if (payload.phase === 'reasoning' && payload.data.reasoning?.nextAction) {
-        const action = payload.data.reasoning.nextAction === 'use_tool' ? 
-          `usar herramienta: ${payload.data.reasoning.tool}` : 
+        const action = payload.data.reasoning.nextAction === 'use_tool' ?
+          `usar herramienta: ${payload.data.reasoning.tool}` :
           'responder al usuario';
         content += `\n🎯 Próxima acción: ${action}`;
       }
     }
-    
+
     chatMsg.content = content;
     chatMsg.metadata = {
       ...chatMsg.metadata,
@@ -174,7 +171,7 @@ export class WebviewEventHandler {
       source: payload.source,
       phaseData: payload.data
     };
-    
+
     return chatMsg;
   }
 
@@ -212,8 +209,8 @@ export class WebviewEventHandler {
     }
 
     const modelAnalysis = payload.modelAnalysis as any;
-    if (modelAnalysis?.interpretation) { 
-      contentLines.push(`🧠 Análisis: ${modelAnalysis.interpretation.substring(0,100)}...`);
+    if (modelAnalysis?.interpretation) {
+      contentLines.push(`🧠 Análisis: ${modelAnalysis.interpretation.substring(0, 100)}...`);
     }
 
     chatMsg.content = contentLines.join('\n') || `${toolDisplayName} procesada.`;
@@ -222,7 +219,7 @@ export class WebviewEventHandler {
       status: payload.toolSuccess !== false ? 'success' : 'error',
       toolName: payload.toolName,
       toolInput: payload.toolParams || payload.parameters,
-      toolOutput: payload.result, 
+      toolOutput: payload.result,
       rawToolOutput: payload.rawToolOutput,
       modelAnalysis: payload.modelAnalysis,
       toolSuccess: payload.toolSuccess,
@@ -240,7 +237,7 @@ export class WebviewEventHandler {
       toolName: payload.toolName,
       toolInput: payload.toolParams || payload.parameters,
       error: payload.error,
-      toolOutput: payload.result, 
+      toolOutput: payload.result,
       modelAnalysis: payload.modelAnalysis,
       toolSuccess: false,
     };
@@ -250,7 +247,7 @@ export class WebviewEventHandler {
   private handleSystemError(payload: SystemEventPayload | ErrorOccurredEventPayload, eventId: string): ChatMessage {
     const chatMsg = this.createBaseChatMessage(eventId, 'system') as ChatMessage;
     let errorMessageText = 'Error inesperado del sistema.';
-    
+
     if ('message' in payload && typeof payload.message === 'string') {
       errorMessageText = payload.message;
     } else if ('errorMessage' in payload && typeof payload.errorMessage === 'string') {

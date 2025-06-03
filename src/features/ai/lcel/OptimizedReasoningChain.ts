@@ -17,7 +17,7 @@ export async function runOptimizedReasoningChain({
   memoryContext?: string;
   model: BaseChatModel;
 }) {
-  // Formatear los parámetros para el prompt centralizado
+
   const promptInput = {
     userQuery,
     analysisResult: formatForPrompt(analysisResult),
@@ -26,7 +26,7 @@ export async function runOptimizedReasoningChain({
     memoryContext: memoryContext || ''
   };
 
-  // Encadenar: prompt centralizado -> modelo -> parser centralizado
+
   const chain = reasoningPromptLC.pipe(model).pipe(reasoningOutputParser);
   const { invokeModelWithLogging } = await import('./ModelInvokeLogger');
   return await invokeModelWithLogging(chain, promptInput, { caller: 'runOptimizedReasoningChain' });
