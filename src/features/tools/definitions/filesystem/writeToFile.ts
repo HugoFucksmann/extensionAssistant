@@ -1,14 +1,14 @@
 // src/features/tools/definitions/filesystem/writeToFile.ts
 import * as vscode from 'vscode';
 import { z } from 'zod';
-import { ToolDefinition, ToolResult,  } from '../../types';
+import { ToolDefinition, ToolResult, } from '../../types';
 import { buildWorkspaceUri } from '@shared/utils/pathUtils';
 
 
 // Esquema Zod para los parámetros
 export const writeToFileParamsSchema = z.object({
   path: z.string().min(1, { message: "File path cannot be empty." }),
-  content: z.string() 
+  content: z.string()
 }).strict();
 
 export const writeToFile: ToolDefinition<typeof writeToFileParamsSchema, { filePath: string }> = {
@@ -29,9 +29,9 @@ export const writeToFile: ToolDefinition<typeof writeToFileParamsSchema, { fileP
       if (!targetUri) {
         return { success: false, error: 'Could not resolve path in workspace. Ensure a workspace is open and the path is valid.' };
       }
-      
+
       const dirUri = vscode.Uri.joinPath(targetUri, '..');
-   
+
       await context.vscodeAPI.workspace.fs.createDirectory(dirUri);
 
       await context.vscodeAPI.workspace.fs.writeFile(targetUri, new TextEncoder().encode(content));
@@ -39,12 +39,5 @@ export const writeToFile: ToolDefinition<typeof writeToFileParamsSchema, { fileP
     } catch (error: any) {
       return { success: false, error: `Failed to write to file "${path}": ${error.message}` };
     }
-  },
-  mapToOutput: (rawData, success, errorMsg) => ({
-    title: success ? 'Archivo guardado' : 'Error al guardar archivo',
-    summary: success ? 'Archivo guardado correctamente.' : `Error: ${errorMsg || 'No se pudo guardar el archivo.'}`,
-    details: !success && errorMsg ? errorMsg : undefined,
-    items: [],
-    meta: rawData && rawData.filePath ? { filePath: rawData.filePath } : {}
-  })
+  }
 };

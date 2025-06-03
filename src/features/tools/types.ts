@@ -3,34 +3,22 @@ import { InternalEventDispatcher } from '@core/events/InternalEventDispatcher';
 import * as vscode from 'vscode';
 import { z, ZodObject, ZodEffects, ZodTypeAny } from 'zod';
 
-
-export interface ToolOutput {
-  title?: string;
-  summary?: string;
-  details?: string;
-  items?: Array<any>;
-  meta?: Record<string, any>;
-}
-
-
-export interface ToolExecution {
+export interface ToolExecution<T = any> {
   name: string;
   status: 'started' | 'completed' | 'error' | 'permission_denied';
   parameters?: Record<string, any>;
-  result?: ToolOutput;
+  result?: T;
   error?: string;
   startTime?: number;
   endTime?: number;
   duration?: number;
 }
 
-
 export type ZodSchemaType = ZodObject<any, any, any, any, any> | ZodEffects<ZodObject<any, any, any, any, any>, any, any> | ZodTypeAny;
 
 export interface ToolResult<T = any> {
   success: boolean;
   data?: T;
-  mappedOutput?: ToolOutput;
   error?: string;
   executionTime?: number;
   warnings?: string[];
@@ -47,13 +35,24 @@ export interface ToolDefinition<
   ParamsSchema extends z.ZodType<any, any, any>,
   ResultData = any
 > {
-
-  getUIDescription?: (params: any) => string;
-  uiFeedback: boolean;
+  /** Nombre único de la herramienta */
   name: string;
-  description: string;
-  parametersSchema: ParamsSchema;
-  execute: (params: z.infer<ParamsSchema>, context: ToolExecutionContext) => Promise<ToolResult<ResultData>>;
 
-  mapToOutput?: (rawData: any, success: boolean, errorMsg?: string) => ToolOutput;
+  /** Descripción de la herramienta */
+  description: string;
+
+  /** Esquema de validación de parámetros */
+  parametersSchema: ParamsSchema;
+
+  /** Si es true, mostrará un indicador de carga en la UI */
+  uiFeedback?: boolean;
+
+  /** Función que ejecuta la lógica de la herramienta */
+  execute: (
+    params: z.infer<ParamsSchema>,
+    context: ToolExecutionContext
+  ) => Promise<ToolResult<ResultData>>;
+
+  /** Descripción para la UI (opcional) */
+  getUIDescription?: (params: any) => string;
 }

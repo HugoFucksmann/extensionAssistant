@@ -17,19 +17,6 @@ type RunInTerminalResultData = {
 export const runInTerminal: ToolDefinition<typeof runInTerminalParamsSchema, RunInTerminalResultData> = {
   getUIDescription: (params) => `Ejecutar en terminal: ${params?.command || ''}`,
   uiFeedback: false,
-  mapToOutput: (rawData, success, errorMsg) => success && rawData ? {
-    title: 'Comando enviado a terminal',
-    summary: 'Comando enviado correctamente.',
-    details: `Terminal: ${rawData.terminalName}`,
-    items: [],
-    meta: { terminalName: rawData.terminalName, commandSent: rawData.commandSent }
-  } : {
-    title: 'Error al ejecutar en terminal',
-    summary: `Error: ${errorMsg || 'No se pudo ejecutar el comando.'}`,
-    details: errorMsg,
-    items: [],
-    meta: {}
-  },
   name: 'runInTerminal',
   description: 'Opens a new VS Code terminal (or uses/creates one with the specified name) and runs the given command. Does not capture output for the AI. Use for interactive commands, long-running tasks, or when output capture by the AI is not needed.',
   parametersSchema: runInTerminalParamsSchema,

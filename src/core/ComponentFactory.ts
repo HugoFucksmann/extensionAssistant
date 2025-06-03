@@ -99,15 +99,14 @@ export class ComponentFactory {
 
   public static getApplicationLogicService(extensionContext: vscode.ExtensionContext): ApplicationLogicService {
     if (!this.applicationLogicServiceInstance) {
-
-
+      // Get the reActEngine first, which will create its dependencies
+      const reActEngine = this.getOptimizedReActEngine(extensionContext);
+      
+      // Get the instances that were created by getOptimizedReActEngine
       const longTermStorage = this.getLongTermStorage(extensionContext);
+      const toolRegistry = this.getToolRegistry();
       const conversationMemoryManager = new ConversationMemoryManager(longTermStorage);
       const conversationManager = new ConversationManager();
-      const toolRegistry = this.getToolRegistry();
-
-
-      const reActEngine = this.getOptimizedReActEngine(extensionContext);
 
       this.applicationLogicServiceInstance = new ApplicationLogicService(
         conversationMemoryManager,
@@ -115,7 +114,6 @@ export class ComponentFactory {
         conversationManager,
         toolRegistry
       );
-
     }
     return this.applicationLogicServiceInstance;
   }

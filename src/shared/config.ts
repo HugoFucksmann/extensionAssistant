@@ -14,7 +14,7 @@ interface MemoryConfig {
   storageLocation: string;
   shortTermExpiry: number;
   mediumTermExpiry: number;
-  vectorDbPath: string;
+
 }
 
 interface ToolsConfig {
@@ -36,7 +36,7 @@ interface BackendConfig {
   logging: LoggingConfig;
 }
 
-export const getConfig = (env: Environment): {backend: BackendConfig} => {
+export const getConfig = (env: Environment): { backend: BackendConfig } => {
   const baseBackendConfig: BackendConfig = {
     react: {
       maxIterations: 15,
@@ -48,7 +48,7 @@ export const getConfig = (env: Environment): {backend: BackendConfig} => {
       storageLocation: 'user',
       shortTermExpiry: 24 * 60 * 60 * 1000,
       mediumTermExpiry: 7 * 24 * 60 * 60 * 1000,
-      vectorDbPath: 'windsurf-memory'
+
     },
     tools: {
       maxConcurrentTools: 3,

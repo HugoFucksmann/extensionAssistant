@@ -35,24 +35,6 @@ async function readJsonFileSafe(
 export const getProjectSummary: ToolDefinition<typeof getProjectSummaryParamsSchema, ProjectSummaryData | null> = {
   getUIDescription: () => 'Obtener resumen de proyecto.',
   uiFeedback: true,
-  mapToOutput: (rawData, success, errorMsg) => success && rawData ? {
-    title: 'Resumen de proyecto',
-    summary: 'Resumen de proyecto obtenido correctamente.',
-    details: `Nombre: ${rawData.projectName}\nPath: ${rawData.rootPath}\nLenguaje: ${rawData.detectedPrimaryLanguage}`,
-    items: rawData.topLevelStructure,
-    meta: {
-      projectName: rawData.projectName,
-      rootPath: rawData.rootPath,
-      workspaceName: rawData.workspaceName,
-      primaryLanguage: rawData.detectedPrimaryLanguage
-    }
-  } : {
-    title: 'Error de resumen de proyecto',
-    summary: `Error: ${errorMsg || 'No se pudo obtener el resumen.'}`,
-    details: errorMsg,
-    items: [],
-    meta: {}
-  },
   name: 'getProjectSummary',
   description: 'Gets a summary of the current VS Code workspace: root path, project name (from package.json or folder name), primary language (heuristic), and basic top-level file/folder structure. Returns null if no workspace is open.',
   parametersSchema: getProjectSummaryParamsSchema,

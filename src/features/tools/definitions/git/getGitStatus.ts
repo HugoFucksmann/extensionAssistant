@@ -122,24 +122,6 @@ function parseGitPorcelainStatus(porcelainOutput: string): {
 export const getGitStatus: ToolDefinition<typeof getGitStatusParamsSchema, GitStatusData | { errorReason: string, stderr?: string }> = {
   getUIDescription: () => 'Obtener estado de Git.',
   uiFeedback: true,
-  mapToOutput: (rawData, success, errorMsg) => success && rawData ? {
-    title: 'Estado de Git',
-    summary: `Branch actual: ${rawData.currentBranch || 'desconocido'}`,
-    details: `Archivos cambiados: ${rawData.changedFilesCount}\nStaged: ${rawData.stagedFilesCount}\nUnstaged: ${rawData.unstagedFilesCount}`,
-    items: rawData.files,
-    meta: {
-      currentBranch: rawData.currentBranch,
-      changedFilesCount: rawData.changedFilesCount,
-      stagedFilesCount: rawData.stagedFilesCount,
-      unstagedFilesCount: rawData.unstagedFilesCount
-    }
-  } : {
-    title: 'Error de Git',
-    summary: `Error: ${errorMsg || 'No se pudo obtener el estado de Git.'}`,
-    details: errorMsg,
-    items: [],
-    meta: {}
-  },
   name: 'getGitStatus',
   description: 'Gets the current Git status for the workspace: current branch, remote tracking (ahead/behind), and a list of changed/staged/untracked files. Returns an error reason if not a Git repository or Git is not found.',
   parametersSchema: getGitStatusParamsSchema,

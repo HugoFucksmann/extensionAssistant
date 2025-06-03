@@ -32,19 +32,6 @@ type GitCommitResult = {
 export const gitCommit: ToolDefinition<typeof gitCommitParamsSchema, GitCommitResult> = {
   getUIDescription: (params) => `Hacer commit: ${params?.message || ''}`,
   uiFeedback: true,
-  mapToOutput: (rawData, success, errorMsg) => success && rawData ? {
-    title: 'Commit realizado',
-    summary: 'Commit ejecutado correctamente.',
-    details: `Hash: ${rawData.commitHash || 'desconocido'}\nResumen: ${rawData.commitSummary || ''}`,
-    items: rawData.committedFiles || [],
-    meta: { commitHash: rawData.commitHash, commitSummary: rawData.commitSummary }
-  } : {
-    title: 'Error de commit',
-    summary: `Error: ${errorMsg || 'No se pudo realizar el commit.'}`,
-    details: errorMsg,
-    items: [],
-    meta: {}
-  },
   name: 'gitCommit',
   description: 'Commits staged changes (or all changes if --all) with the provided commit message.',
   parametersSchema: gitCommitParamsSchema,

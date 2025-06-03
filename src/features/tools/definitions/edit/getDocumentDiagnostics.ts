@@ -1,7 +1,7 @@
 // src/features/tools/definitions/editor/getDocumentDiagnostics.ts
 import * as vscode from 'vscode';
 import { z } from 'zod';
-import { ToolDefinition, ToolResult,  } from '../../types';
+import { ToolDefinition, ToolResult, } from '../../types';
 import { buildWorkspaceUri } from '@shared/utils/pathUtils';
 
 
@@ -13,7 +13,7 @@ export const getDocumentDiagnosticsParamsSchema = z.object({
 // Tipo para la data retornada
 type DiagnosticInfo = {
   message: string;
-  severity: string; 
+  severity: string;
   range: {
     startLine: number;
     startChar: number;
@@ -24,26 +24,13 @@ type DiagnosticInfo = {
   code?: string | number;
 };
 type DiagnosticsResult = {
-  documentPath: string; 
+  documentPath: string;
   diagnostics: DiagnosticInfo[];
 };
 
 export const getDocumentDiagnostics: ToolDefinition<typeof getDocumentDiagnosticsParamsSchema, DiagnosticsResult> = {
   getUIDescription: (params) => `Obtener diagnósticos de: ${params?.filePath?.split(/[\\/]/).pop() || 'editor activo'}`,
   uiFeedback: true,
-  mapToOutput: (rawData, success, errorMsg) => success && rawData ? {
-    title: 'Diagnóstico de documento',
-    summary: 'Diagnóstico obtenido correctamente.',
-    details: `Archivo: ${rawData.documentPath}\nCantidad de diagnósticos: ${rawData.diagnostics.length}`,
-    items: rawData.diagnostics,
-    meta: { documentPath: rawData.documentPath, diagnosticsCount: rawData.diagnostics.length }
-  } : {
-    title: 'Error de diagnóstico',
-    summary: `Error: ${errorMsg || 'No se pudo obtener diagnóstico.'}`,
-    details: errorMsg,
-    items: [],
-    meta: {}
-  },
   name: 'getDocumentDiagnostics',
   description: 'Gets diagnostic errors and warnings for the active editor or a specified file. If filePath is omitted, uses the active editor.',
   parametersSchema: getDocumentDiagnosticsParamsSchema,
@@ -63,7 +50,7 @@ export const getDocumentDiagnostics: ToolDefinition<typeof getDocumentDiagnostic
         }
         targetUri = resolvedUri;
         documentPathForReturn = context.vscodeAPI.workspace.asRelativePath(targetUri, false);
-       
+
         await context.vscodeAPI.workspace.openTextDocument(targetUri);
       } else {
         const activeEditor = context.vscodeAPI.window.activeTextEditor;
@@ -85,9 +72,9 @@ export const getDocumentDiagnostics: ToolDefinition<typeof getDocumentDiagnostic
           return { success: false, error: 'No active text editor and no filePath provided. Please specify a filePath parameter.', data: undefined };
         }
         targetUri = activeEditor.document.uri;
-        documentPathForReturn = activeEditor.document.isUntitled ? 
-            `untitled:${activeEditor.document.fileName}` : 
-            context.vscodeAPI.workspace.asRelativePath(targetUri, false);
+        documentPathForReturn = activeEditor.document.isUntitled ?
+          `untitled:${activeEditor.document.fileName}` :
+          context.vscodeAPI.workspace.asRelativePath(targetUri, false);
       }
 
       const diagnostics = context.vscodeAPI.languages.getDiagnostics(targetUri);
@@ -104,12 +91,12 @@ export const getDocumentDiagnostics: ToolDefinition<typeof getDocumentDiagnostic
         code: typeof d.code === 'object' ? String(d.code.value) : d.code ? String(d.code) : undefined,
       }));
 
-      return { 
-        success: true, 
-        data: { 
-          documentPath: documentPathForReturn, 
-          diagnostics: formattedDiagnostics 
-        } 
+      return {
+        success: true,
+        data: {
+          documentPath: documentPathForReturn,
+          diagnostics: formattedDiagnostics
+        }
       };
     } catch (error: any) {
       return { success: false, error: `Failed to get document diagnostics: ${error.message}` };

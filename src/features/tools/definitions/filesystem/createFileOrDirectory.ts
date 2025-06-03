@@ -38,24 +38,6 @@ type CreateResultType = {
 export const createFileOrDirectory: ToolDefinition<typeof createFileOrDirectoryParamsSchema, CreateResultType> = {
   getUIDescription: (params) => `Crear ${params?.type || 'ítem'}: ${params?.path?.split(/[\\/]/).pop() || 'archivo'}`,
   uiFeedback: true,
-  mapToOutput: (rawData, success, errorMsg) => success ? {
-    title: rawData.type === 'file' ? 'Archivo creado' : 'Directorio creado',
-    summary: `${rawData.type === 'file' ? 'Archivo' : 'Directorio'} creado correctamente.`,
-    details: `Ruta: ${rawData.path}\nTipo: ${rawData.type}\nOperación: ${rawData.operation}`,
-    items: [],
-    meta: {
-      path: rawData.path,
-      type: rawData.type,
-      operation: rawData.operation,
-      absolutePath: rawData.absolutePath
-    }
-  } : {
-    title: 'Error al crear',
-    summary: `Error: ${errorMsg || 'No se pudo crear.'}`,
-    details: errorMsg,
-    items: [],
-    meta: {}
-  },
   name: 'createFileOrDirectory',
   description: 'Creates a new file or a new directory with detailed metadata. Paths must be relative to the workspace root. Creates parent directories if they do not exist. Overwrites existing files if type is "file".',
   parametersSchema: createFileOrDirectoryParamsSchema,

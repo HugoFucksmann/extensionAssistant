@@ -3,8 +3,10 @@ import { z } from 'zod';
 import { ToolDefinition, ToolResult } from '../../types';
 import { exec } from 'child_process';
 import * as util from 'util';
+import { getConfig } from '../../../../shared/config';
 
 const execPromise = util.promisify(exec);
+const config = getConfig('production');
 
 export const gitPushParamsSchema = z.object({
   remote: z.string().optional().default('origin'),
@@ -25,23 +27,6 @@ type GitPushResult = {
 export const gitPush: ToolDefinition<typeof gitPushParamsSchema, GitPushResult> = {
   getUIDescription: (params) => `Hacer git push a ${params?.remote || 'origin'}/${params?.branch || ''}`,
   uiFeedback: true,
-  mapToOutput: (rawData, success, errorMsg) => success && rawData ? {
-    title: 'Push realizado',
-    summary: 'Push ejecutado correctamente.',
-    details: `Branch: ${rawData.branch || 'desconocido'}\nCommits empujados: ${rawData.commitsPushed ?? 'N/A'}`,
-    items: [],
-    meta: {
-      branch: rawData.branch,
-      remote: rawData.pushedTo,
-      commitsPushed: rawData.commitsPushed
-    }
-  } : {
-    title: 'Error de push',
-    summary: `Error: ${errorMsg || 'No se pudo hacer push.'}`,
-    details: errorMsg,
-    items: [],
-    meta: {}
-  },
   name: 'gitPush',
   description: 'Pushes the current branch to the specified remote.',
   parametersSchema: gitPushParamsSchema,
@@ -62,22 +47,37 @@ export const gitPush: ToolDefinition<typeof gitPushParamsSchema, GitPushResult> 
     }
     try {
       const pushCmd = `git push ${remote} ${branchToPush}`;
-      const { stdout, stderr } = await execPromise(pushCmd, { cwd: workspaceFolder, timeout: 20000 });
+      const { stdout, stderr } = await execPromise(pushCmd, {
+        cwd: workspaceFolder,
+        timeout: config.backend.tools.git.pushTimeoutMs
+      });
 
       let remoteUrl: string | undefined = undefined;
       let commitHash: string | undefined = undefined;
       let commitsPushed: number | undefined = undefined;
       try {
-        const { stdout: urlOut } = await execPromise(`git remote get-url ${remote}`, { cwd: workspaceFolder });
+        const { stdout: urlOut } = await execPromise(`git remote get-url ${remote}`, {
+          cwd: workspaceFolder,
+          timeout: config.backend.tools.git.defaultTimeoutMs
+        });
         remoteUrl = urlOut.trim();
       } catch { }
       try {
-        const { stdout: hashOut } = await execPromise('git rev-parse HEAD', { cwd: workspaceFolder });
+        const { stdout: hashOut } = await execPromise('git rev-parse HEAD', {
+          cwd: workspaceFolder,
+          timeout: config.backend.tools.git.defaultTimeoutMs
+        });
         commitHash = hashOut.trim();
       } catch { }
       try {
 
-        const { stdout: countOut } = await execPromise(`git rev-list --count ${remote}/${branchToPush}..${branchToPush}`, { cwd: workspaceFolder });
+        const { stdout: countOut } = await execPromise(
+          `git rev-list --count ${remote}/${branchToPush}..${branchToPush}`,
+          {
+            cwd: workspaceFolder,
+            timeout: config.backend.tools.git.defaultTimeoutMs
+          }
+        );
         commitsPushed = parseInt(countOut.trim(), 10) || 0;
       } catch { }
       return {

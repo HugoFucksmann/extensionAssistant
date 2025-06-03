@@ -5,7 +5,6 @@ import * as vscode from 'vscode';
 import { ToolValidator } from './ToolValidator';
 import { generateUniqueId } from '../../shared/utils/generateIds';
 import { EventType, ToolExecutionEventPayload } from '../../features/events/eventTypes';
-import { ToolOutput } from './types';
 import { DynamicStructuredTool } from '@langchain/core/tools';
 
 export class ToolRegistry {
@@ -53,33 +52,32 @@ export class ToolRegistry {
   }
 
 
-  private mapToToolOutput(toolName: string, rawData: any, success: boolean, errorMsg?: string): ToolOutput {
-    const toolDef = this.getTool(toolName);
-    if (toolDef?.mapToOutput) {
-      return toolDef.mapToOutput(rawData, success, errorMsg);
-    }
-
+  private prepareToolResult<T>(
+    toolName: string, 
+    data: T | undefined, 
+    success: boolean, 
+    errorMsg?: string
+  ): ToolResult<T> {
     return {
-      title: toolName,
-      summary: success ? "Tool executed." : `Error: ${errorMsg || "Unknown error"}`,
-      details: !success ? (errorMsg || undefined) : undefined,
-      items: [],
-      meta: {}
+      success,
+      data: success ? data : undefined,
+      error: !success ? errorMsg : undefined
     };
   }
 
-  async executeTool(
+  async executeTool<T = any>(
     name: string,
     rawParams: any,
     executionCtxArgs: { chatId?: string; operationId?: string;[key: string]: any } = {}
-  ): Promise<ToolResult> {
+  ): Promise<ToolResult<T>> {
     const operationId = executionCtxArgs.operationId || generateUniqueId();
     const startTime = Date.now();
     const tool = this.getTool(name);
+    
+    // Obtener la descripción para UI desde la herramienta
     const toolDescriptionForUI = tool && typeof tool.getUIDescription === 'function'
       ? tool.getUIDescription(rawParams)
-      : (tool?.description || `Executing ${name}`);
-
+      : tool?.description || `Ejecutando ${name}`;
 
     const startPayload: ToolExecutionEventPayload = {
       toolName: name,
@@ -90,33 +88,31 @@ export class ToolRegistry {
       source: 'ToolRegistry',
       operationId,
       timestamp: Date.now(),
-
     };
+    
     this.dispatcher.dispatch(EventType.TOOL_EXECUTION_STARTED, startPayload);
 
     if (!tool) {
-      const errorMsg = `Tool not found: ${name}`;
+      const errorMsg = `Herramienta no encontrada: ${name}`;
       const executionTime = Date.now() - startTime;
-      const mappedErrorOutput = this.mapToToolOutput(name, null, false, errorMsg);
-
+      
       return {
         success: false,
         error: errorMsg,
-        executionTime: executionTime,
-        mappedOutput: mappedErrorOutput,
+        executionTime,
       };
     }
+
 
     const validationResult = ToolValidator.validate(tool.parametersSchema, rawParams);
     if (!validationResult.success) {
       const executionTime = Date.now() - startTime;
-      const mappedErrorOutput = this.mapToToolOutput(name, null, false, validationResult.error);
+      const errorMsg = `Error de validación: ${validationResult.error}`;
 
       return {
         success: false,
-        error: validationResult.error,
-        executionTime: executionTime,
-        mappedOutput: mappedErrorOutput,
+        error: errorMsg,
+        executionTime,
       };
     }
     const validatedParams = validationResult.data;
@@ -131,27 +127,19 @@ export class ToolRegistry {
     try {
       const toolExecuteOutcome = await tool.execute(validatedParams, executionContext);
       const executionTime = Date.now() - startTime;
-      const mappedOutput = this.mapToToolOutput(name, toolExecuteOutcome.data, toolExecuteOutcome.success, toolExecuteOutcome.error);
-
-
+      
       return {
-        success: toolExecuteOutcome.success,
-        data: toolExecuteOutcome.data,
-        mappedOutput: mappedOutput,
-        error: toolExecuteOutcome.error,
-        warnings: toolExecuteOutcome.warnings,
-        executionTime: executionTime,
+        ...toolExecuteOutcome,
+        executionTime,
       };
     } catch (error: any) {
       const executionTime = Date.now() - startTime;
-      const errorMsg = `Unexpected error during execution of tool ${name}: ${error.message}`;
-      const mappedErrorOutput = this.mapToToolOutput(name, { originalException: error.toString() }, false, errorMsg);
-
+      const errorMsg = `Error inesperado al ejecutar la herramienta ${name}: ${error.message}`;
+      
       return {
         success: false,
         error: errorMsg,
         executionTime,
-        mappedOutput: mappedErrorOutput,
       };
     }
   }
@@ -161,13 +149,12 @@ export class ToolRegistry {
     if (!toolDef) return undefined;
 
     const langChainFunc = async (input: any, runContext?: any) => {
-      const toolResult = await this.executeTool(toolName, input, { ...contextDefaults, ...runContext });
-      if (toolResult.success) {
-
-        return toolResult.data ?? JSON.stringify(toolResult.mappedOutput) ?? "Success";
-      } else {
-        throw new Error(toolResult.error || `Tool ${toolName} execution failed.`);
+      const toolResult = await this.executeTool(toolName, input, runContext);
+      if (!toolResult.success) {
+        throw new Error(toolResult.error || 'Error desconocido');
       }
+      // Devolver los datos directamente, la UI se encargará del formateo
+      return JSON.stringify(toolResult.data) || "Success";
     };
     return new DynamicStructuredTool({
       name: toolDef.name,
