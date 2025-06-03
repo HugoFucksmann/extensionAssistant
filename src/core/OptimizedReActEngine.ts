@@ -202,18 +202,19 @@ export class OptimizedReActEngine {
           currentState._executedTools = new Set<string>();
         }
 
-        const toolParamsHash = (tool: string, params: any, chatId: string | null) => {
+        // Deduplicación de herramientas: la clave se genera solo con el nombre y los parámetros de la herramienta.
+        // Nota: La deduplicación es válida solo dentro de una ejecución de run(), ya que _executedTools se reinicia por ciclo.
+        const toolParamsHash = (tool: string, params: any) => {
           const ordered = (obj: any) =>
             obj && typeof obj === 'object' && !Array.isArray(obj)
               ? Object.keys(obj).sort().reduce((acc, k) => { acc[k] = ordered(obj[k]); return acc; }, {} as any)
               : obj;
-          return `${chatId || 'nochat'}::${tool}::${JSON.stringify(ordered(params || {}))}`;
+          return `${tool}::${JSON.stringify(ordered(params || {}))}`;
         };
 
         const execKey = toolParamsHash(
           reasoningResult.tool ?? '',
-          reasoningResult.parameters,
-          currentState.chatId ?? null
+          reasoningResult.parameters
         );
 
         if (currentState._executedTools.has(execKey)) {
@@ -310,7 +311,7 @@ export class OptimizedReActEngine {
               toolSuccess: internalToolResult.success,
             };
 
-            // Emitir evento apropiado
+
             if (internalToolResult.success) {
               this.dispatcher.dispatch(EventType.TOOL_EXECUTION_COMPLETED, finalToolEventPayload);
             } else {
@@ -321,7 +322,7 @@ export class OptimizedReActEngine {
               });
             }
 
-            // Verificar si el modelo decide responder después de la herramienta
+
             if (actionResult.nextAction === 'respond') {
               currentState.finalOutput = actionResult.response || 'No specific response content provided by model after tool use.';
               isCompleted = true;

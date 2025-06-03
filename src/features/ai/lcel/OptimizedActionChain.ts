@@ -1,7 +1,8 @@
-import { actionPromptLC, actionOutputParser } from "../prompts/optimized/actionPrompt";
+import { actionPromptLC, actionOutputSchema } from "../prompts/optimized/actionPrompt";
 import { formatForPrompt } from "../prompts/promptUtils";
 import { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { invokeModelWithLogging } from "./ModelInvokeLogger";
+import { createAutoCorrectStep } from "@shared/utils/aiResponseParser";
 
 
 export async function runOptimizedActionChain({
@@ -29,6 +30,22 @@ export async function runOptimizedActionChain({
   };
 
 
-  const chain = actionPromptLC.pipe(model).pipe(actionOutputParser);
-  return await invokeModelWithLogging(chain, promptInput, { caller: 'runOptimizedActionChain' });
+  const { invokeModelWithLogging } = await import('./ModelInvokeLogger');
+
+  // Extraer el contenido del AIMessage antes de parsear
+  const chain = actionPromptLC.pipe(model).pipe((response: any) => {
+    if (response && typeof response === 'object' && 'content' in response) {
+      return response.content;
+    }
+    return response;
+  }).pipe(createAutoCorrectStep(actionOutputSchema, model, {
+    maxAttempts: 2,
+    verbose: process.env.NODE_ENV === 'development'
+  }));
+
+  const result = await invokeModelWithLogging(chain, promptInput, { 
+    caller: 'runOptimizedActionChain'
+  });
+
+  return result;
 }

@@ -1,6 +1,7 @@
-import { reasoningPromptLC, reasoningOutputParser } from "../prompts/optimized/reasoningPrompt";
+import { reasoningPromptLC, reasoningOutputSchema } from "../prompts/optimized/reasoningPrompt";
 import { formatForPrompt } from "../prompts/promptUtils";
 import { BaseChatModel } from "@langchain/core/language_models/chat_models";
+import { createAutoCorrectStep } from "@shared/utils/aiResponseParser";
 
 export async function runOptimizedReasoningChain({
   userQuery,
@@ -27,7 +28,22 @@ export async function runOptimizedReasoningChain({
   };
 
 
-  const chain = reasoningPromptLC.pipe(model).pipe(reasoningOutputParser);
   const { invokeModelWithLogging } = await import('./ModelInvokeLogger');
-  return await invokeModelWithLogging(chain, promptInput, { caller: 'runOptimizedReasoningChain' });
+
+  // Extraer el contenido del AIMessage antes de parsear
+  const chain = reasoningPromptLC.pipe(model).pipe((response: any) => {
+    if (response && typeof response === 'object' && 'content' in response) {
+      return response.content;
+    }
+    return response;
+  }).pipe(createAutoCorrectStep(reasoningOutputSchema, model, {
+    maxAttempts: 2,
+    verbose: process.env.NODE_ENV === 'development'
+  }));
+
+  const result = await invokeModelWithLogging(chain, promptInput, { 
+    caller: 'runOptimizedReasoningChain'
+  });
+
+  return result;
 }

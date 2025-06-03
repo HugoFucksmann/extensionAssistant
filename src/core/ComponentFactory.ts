@@ -10,7 +10,7 @@ import { ConversationManager } from './ConversationManager';
 import { ApplicationLogicService } from './ApplicationLogicService';
 import { InternalEventDispatcher } from './events/InternalEventDispatcher';
 import { OptimizedReActEngine } from './OptimizedReActEngine';
-import { OptimizedPromptManager } from '../features/ai/OptimizedPromptManager';
+
 import { LongTermStorage } from '../features/memory/LongTermStorage';
 
 export class ComponentFactory {
@@ -20,7 +20,7 @@ export class ComponentFactory {
   private static toolRegistryInstance: ToolRegistry;
   private static vscodeContextInstance: VSCodeContext;
   private static modelManagerInstance: ModelManager;
-  private static optimizedPromptManagerInstance: OptimizedPromptManager;
+
   private static optimizedReActEngineInstance: OptimizedReActEngine;
   private static longTermStorageInstance: LongTermStorage;
   private static conversationManagerInstance: ConversationManager;
@@ -77,14 +77,7 @@ export class ComponentFactory {
     return this.longTermStorageInstance;
   }
 
-  public static getOptimizedPromptManager(): OptimizedPromptManager {
-    if (!this.optimizedPromptManagerInstance) {
-      const modelManager = this.getModelManager();
-      this.optimizedPromptManagerInstance = new OptimizedPromptManager(modelManager);
 
-    }
-    return this.optimizedPromptManagerInstance;
-  }
 
   public static getOptimizedReActEngine(extensionContext: vscode.ExtensionContext): OptimizedReActEngine {
     if (!this.optimizedReActEngineInstance) {
@@ -142,10 +135,7 @@ export class ComponentFactory {
       this.optimizedReActEngineInstance = null!;
     }
 
-    if (this.optimizedPromptManagerInstance && typeof (this.optimizedPromptManagerInstance as any).dispose === 'function') {
-      (this.optimizedPromptManagerInstance as any).dispose();
-      this.optimizedPromptManagerInstance = null!;
-    }
+
 
     if (this.longTermStorageInstance && typeof this.longTermStorageInstance.dispose === 'function') {
       await this.longTermStorageInstance.dispose();
