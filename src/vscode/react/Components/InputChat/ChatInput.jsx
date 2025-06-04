@@ -28,7 +28,8 @@ const ChatInput = () => {
     closeDropdown, 
     insertFileMention, 
     updateSearchTerm, 
-    startMentionByButton 
+    startMentionByButton,
+    removeFile 
   } = useFileMention(inputRef, inputText, setInputText);
   
   const { 
@@ -82,18 +83,10 @@ const ChatInput = () => {
 
 
   const handleRemoveFile = (fileToRemovePath) => {
-    setSelectedFiles(prevFiles => prevFiles.filter(f => f !== fileToRemovePath));
-    
-    const fileNameToRemove = fileToRemovePath.split(/[\/\\]/).pop();
-    const escapedFileName = fileNameToRemove.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
-    
-    const chipTextPattern = new RegExp(`${escapedFileName}\\s?`, 'g'); 
-    
-    setInputText(prevText => prevText.replace(chipTextPattern, '').trim());
+    removeFile(fileToRemovePath);
   };
 
   const handleFileSelect = (filePath) => {
- 
     insertFileMention(filePath);
   };
   
@@ -114,21 +107,17 @@ const ChatInput = () => {
         if (filteredMentionFiles.length > 0 && activeIndex >= 0 && activeIndex < filteredMentionFiles.length) {
           handleFileSelect(filteredMentionFiles[activeIndex]);
         } else {
-         
           closeDropdown();
         }
       } else if (e.key === "Escape") {
         e.preventDefault(); 
         closeDropdown();
       }
-     
     } else { 
       if (e.key === "Enter" && !e.shiftKey) {
         handleSubmit(e);
       } else if (e.key === "@") {
-       
         const currentCursorPos = inputRef.current.selectionStart;
-        
         openMentionDropdown(currentCursorPos); 
       }
     }
@@ -144,7 +133,6 @@ const ChatInput = () => {
     }
   };
 
-
   useEffect(() => {
     if (inputRef.current) inputRef.current.focus();
   }, [messages]);
@@ -152,13 +140,13 @@ const ChatInput = () => {
   // Aplicar estilos
   const styles = {
     container: {
+      position: 'relative', // Add position relative for dropdown positioning
       display: 'flex',
       flexDirection: 'column',
       padding: '4px',
       backgroundColor: theme.colors.background,
       border: `1px solid ${theme.colors.border}`,
       borderRadius: theme.borderRadius.medium,
-   
     },
     inputContainer: {
       display: 'flex',
@@ -192,6 +180,7 @@ const ChatInput = () => {
       padding: '4px',
     },
     leftControls: {
+      position: 'relative', // Add relative positioning for model dropdown
       display: 'flex',
       alignItems: 'center',
     },
@@ -277,10 +266,9 @@ const ChatInput = () => {
             placeholder={selectedFiles.length > 0 
               ? "Add more details..." 
               : "Type your message... (Use @ to mention files)"}
-           // disabled={isLoading}
             aria-autocomplete="list"
             aria-expanded={isDropdownOpen}
-            aria-controls={isDropdownOpen ? "file-dropdown-listbox" : undefined} // ID del listbox
+            aria-controls={isDropdownOpen ? "file-dropdown-listbox" : undefined}
             aria-activedescendant={isDropdownOpen && activeIndex >=0 && filteredMentionFiles.length > 0 ? `file-item-${activeIndex}` : undefined}
           />
         </div>
@@ -295,19 +283,6 @@ const ChatInput = () => {
             : theme.colors.disabled} />
         </button>
       </div>
-
-      {isDropdownOpen && (
-        <FileDropdown
-          theme={theme}
-          position={dropdownPosition}
-          searchTerm={searchTerm} // Pasar searchTerm para el mensaje "No matching files"
-          filteredFiles={filteredMentionFiles}
-          isLoading={isLoadingFiles}
-          onSelectFile={handleFileSelect}
-          activeIndex={activeIndex}
-          setActiveIndex={setActiveIndex} // Para que FileItem pueda actualizarlo en hover
-        />
-      )}
 
       <div style={styles.controlsRow}>
         <div style={styles.leftControls}>
@@ -340,6 +315,20 @@ const ChatInput = () => {
           </button>
         </div>
       </div>
+
+      {/* File dropdown rendered at container level for proper z-index */}
+      {isDropdownOpen && (
+        <FileDropdown
+          theme={theme}
+          position={dropdownPosition}
+          searchTerm={searchTerm}
+          filteredFiles={filteredMentionFiles}
+          isLoading={isLoadingFiles}
+          onSelectFile={handleFileSelect}
+          activeIndex={activeIndex}
+          setActiveIndex={setActiveIndex}
+        />
+      )}
     </div>
   );
 };

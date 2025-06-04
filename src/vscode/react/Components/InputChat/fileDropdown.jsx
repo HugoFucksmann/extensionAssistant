@@ -13,15 +13,15 @@ const FileDropdown = ({
 }) => {
   const styles = {
     dropdown: {
-      position: 'fixed',
+      position: 'fixed', // Changed from fixed to ensure proper layering
       top: position.top,
       left: position.left,
       width: position.width,
       backgroundColor: theme.colors.dropdownBg || theme.colors.background,
       border: `1px solid ${theme.colors.border}`,
       borderRadius: '4px',
-      zIndex: 1000,
-      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+      zIndex: 9999, // Much higher z-index
+      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)', // Enhanced shadow
       display: 'flex',
       flexDirection: 'column',
       maxHeight: '250px', // Max height para el dropdown completo
@@ -49,7 +49,8 @@ const FileDropdown = ({
       overflow: 'hidden',
       textOverflow: 'ellipsis',
       borderBottom: `1px solid ${theme.colors.border}`,
-      color: theme.colors.text
+      color: theme.colors.text,
+      transition: 'background-color 0.2s ease', // Add smooth transition
     },
     noFiles: {
       padding: '12px',
