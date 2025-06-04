@@ -102,6 +102,8 @@ export interface ToolExecutionEventPayload {
   toolSuccess: boolean;
   error?: string;
   warnings?: string[];
+  rawOutput?: any;
+  modelAnalysis?: any;
 }
 
 export interface ToolExecutionCompletedPayload {

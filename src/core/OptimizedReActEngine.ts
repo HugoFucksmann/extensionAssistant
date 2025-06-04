@@ -12,8 +12,7 @@ import { runOptimizedResponseChain } from '../features/ai/lcel/OptimizedResponse
 import { ReasoningOutput } from '../features/ai/prompts/optimized/reasoningPrompt';
 import { ActionOutput } from '../features/ai/prompts/optimized/actionPrompt';
 import { ResponseOutput } from '../features/ai/prompts/optimized/responsePrompt';
-import { ReActCycleMemory } from '../features/memory/ReActCycleMemory';
-import { LongTermStorage } from '../features/memory/LongTermStorage';
+import { MemoryManager } from '../features/memory/MemoryManager';
 import { z, ZodObject, ZodOptional, ZodEffects, ZodTypeAny } from 'zod';
 import { ToolResult as InternalToolResult } from '../features/tools/types';
 import { getReactConfig } from '../shared/utils/configUtils';
@@ -26,8 +25,7 @@ export class OptimizedReActEngine {
     private modelManager: ModelManager,
     private toolRegistry: ToolRegistry,
     private dispatcher: InternalEventDispatcher,
-    private longTermStorage: LongTermStorage,
-
+    private memoryManager: MemoryManager
   ) {
     this.dispatcher.systemInfo('OptimizedReActEngine initialized.', { source: 'OptimizedReActEngine' }, 'OptimizedReActEngine');
     this.MAX_ITERATIONS = getReactConfig().maxIterations;
@@ -51,18 +49,14 @@ export class OptimizedReActEngine {
     return this.toolsDescriptionCache;
   }
 
-
   private zodSchemaToDescription(schema: z.ZodTypeAny): string {
     if (!schema) return "No se definieron parámetros.";
-
 
     if (schema.description) {
       return schema.description;
     }
 
-
     try {
-
       if (schema instanceof ZodObject) {
         const shape = schema.shape as Record<string, ZodTypeAny>;
         if (!shape || Object.keys(shape).length === 0) return "El objeto de parámetros no tiene campos definidos.";
@@ -71,7 +65,6 @@ export class OptimizedReActEngine {
           .map(([key, val]: [string, ZodTypeAny]) => {
             let currentVal = val;
             let isOptional = false;
-
 
             if (currentVal instanceof ZodOptional) {
               isOptional = true;
@@ -93,11 +86,9 @@ export class OptimizedReActEngine {
           })
           .join('\n');
       }
-
       else if (schema.description) {
         return schema.description;
       }
-
       else if (schema._def?.typeName) {
         return `Tipo: ${schema._def.typeName.replace('Zod', '').toLowerCase()}`;
       } else {
@@ -128,23 +119,42 @@ export class OptimizedReActEngine {
     state.history.push(entry);
   }
 
+  private async getMemoryContext(chatId: string, userMessage: string): Promise<string> {
+    // Get relevant memories from persistent storage
+    const relevantMemories = await this.memoryManager.getRelevantMemories({
+      objective: userMessage,
+      userMessage,
+      extractedEntities: { filesMentioned: [], functionsMentioned: [] }
+    }, 5);
+
+    // Get recent conversation context from runtime
+    const recentState = this.memoryManager.getRuntime<WindsurfState>(chatId, 'lastState');
+    const recentObjective = this.memoryManager.getRuntime<string>(chatId, 'lastObjective');
+
+    let memoryContext = '';
+
+    if (relevantMemories.length > 0) {
+      memoryContext += 'Relevant past experiences:\n';
+      memoryContext += relevantMemories
+        .map(item => `- ${JSON.stringify(item.content)}`)
+        .join('\n');
+      memoryContext += '\n\n';
+    }
+
+    if (recentState && recentObjective) {
+      memoryContext += `Recent context: Last objective was "${recentObjective}"\n`;
+    }
+
+    return memoryContext.trim();
+  }
+
   public async run(initialState: WindsurfState): Promise<WindsurfState> {
     const currentState = { ...initialState };
     currentState.iterationCount = currentState.iterationCount || 0;
     currentState.history = currentState.history || [];
 
-    const memory = new ReActCycleMemory(
-      this.longTermStorage,
-      currentState.chatId,
-      {
-        userQuery: currentState.userMessage || '',
-        activeFile: currentState.editorContext?.activeFile,
-        workspaceRoot: currentState.projectContext?.workspaceRoot
-      }
-    );
-
-    await memory.retrieveRelevantMemory(currentState.userMessage || '');
-    const memorySummary = memory.getMemorySummary();
+    // Get memory context
+    const memoryContext = await this.getMemoryContext(currentState.chatId, currentState.userMessage || '');
 
     const agentPhaseDispatch = (
       phase: AgentPhaseEventPayload['phase'],
@@ -180,7 +190,7 @@ export class OptimizedReActEngine {
         userQuery: currentState.userMessage || '',
         availableTools: this.toolRegistry.getToolNames(),
         codeContext: JSON.stringify(currentState.editorContext || currentState.projectContext || {}),
-        memoryContext: memorySummary,
+        memoryContext,
         model
       });
 
@@ -188,11 +198,8 @@ export class OptimizedReActEngine {
       this.addHistoryEntry(currentState, 'reasoning', analysisResult, { phase_details: 'initial_analysis' });
       agentPhaseDispatch('initialAnalysis', 'completed', { analysis: analysisResult });
 
-      memory.addToShortTermMemory({
-        type: 'context',
-        content: analysisResult.understanding,
-        relevance: 1.0
-      });
+      // Store analysis in runtime memory
+      this.memoryManager.setRuntime(currentState.chatId, 'currentAnalysis', analysisResult);
 
       const toolResultsAccumulator: Array<{ tool: string, toolCallResult: InternalToolResult }> = [];
       let isCompleted = false;
@@ -213,13 +220,16 @@ export class OptimizedReActEngine {
             name: tr.tool,
             result: tr.toolCallResult.data ?? tr.toolCallResult.error ?? "No data/error from tool"
           })),
-          memoryContext: memory.getMemorySummary(),
+          memoryContext,
           model
         });
 
         console.log('[OptimizedReActEngine] Resultado de razonamiento:', JSON.stringify(reasoningResult, null, 2));
         this.addHistoryEntry(currentState, 'reasoning', reasoningResult);
         agentPhaseDispatch('reasoning', 'completed', { reasoning: reasoningResult });
+
+        // Store reasoning in runtime memory
+        this.memoryManager.setRuntime(currentState.chatId, 'lastReasoning', reasoningResult);
 
         // Si decide responder, completar
         if (reasoningResult.nextAction === 'respond') {
@@ -233,7 +243,6 @@ export class OptimizedReActEngine {
         if (!currentState._executedTools) {
           currentState._executedTools = new Set<string>();
         }
-
 
         const toolParamsHash = (tool: string, params: any) => {
           const ordered = (obj: any) =>
@@ -262,7 +271,6 @@ export class OptimizedReActEngine {
           console.log(`[OptimizedReActEngine] Ejecutando herramienta: ${reasoningResult.tool} con parámetros:`, reasoningResult.parameters);
 
           try {
-
             const internalToolResult: InternalToolResult = await this.toolRegistry.executeTool(
               reasoningResult.tool!,
               reasoningResult.parameters ?? {},
@@ -295,16 +303,13 @@ export class OptimizedReActEngine {
               toolCallResult: internalToolResult
             });
 
-            memory.addToShortTermMemory({
-              type: 'tools',
-              content: {
-                tool: reasoningResult.tool!,
-                result: internalToolResult.success ?
-                  (typeof internalToolResult.data === 'string' ? internalToolResult.data.substring(0, 200) : // Simplificado, ya que mappedOutput no está aquí
-                    'Datos obtenidos correctamente') :
-                  `Error: ${internalToolResult.error}`
-              },
-              relevance: 0.9
+            // Store tool result in runtime memory
+            this.memoryManager.setRuntime(currentState.chatId, `toolResult_${reasoningResult.tool}`, {
+              tool: reasoningResult.tool!,
+              success: internalToolResult.success,
+              data: internalToolResult.data,
+              error: internalToolResult.error,
+              timestamp: Date.now()
             });
 
             // === ANÁLISIS POST-HERRAMIENTA ===
@@ -316,24 +321,23 @@ export class OptimizedReActEngine {
                 tool: tr.tool,
                 result: tr.toolCallResult.data ?? tr.toolCallResult.error ?? "No data/error from tool"
               })),
-              memoryContext: memory.getMemorySummary(),
+              memoryContext,
               model
             });
 
             console.log('[OptimizedReActEngine] Resultado de acción:', JSON.stringify(actionResult, null, 2));
             this.addHistoryEntry(currentState, 'action', actionResult, { phase_details: 'action_interpretation' });
 
-
             const duration = Date.now() - toolExecutionStartTime;
             const toolDescription = this.toolRegistry.getTool(reasoningResult.tool!)?.description;
-            
+
             const finalToolEventPayload: ToolExecutionEventPayload = {
               toolName: reasoningResult.tool!,
               parameters: reasoningResult.parameters ?? undefined,
+              toolDescription: toolDescription || '',
               rawOutput: internalToolResult.data,
               error: internalToolResult.error,
               duration,
-              toolDescription,
               isProcessingStep: false,
               modelAnalysis: actionResult,
               toolSuccess: internalToolResult.success,
@@ -344,10 +348,10 @@ export class OptimizedReActEngine {
             };
 
             // Enviar el evento apropiado según el resultado
-            const eventType = internalToolResult.success 
-              ? EventType.TOOL_EXECUTION_COMPLETED 
+            const eventType = internalToolResult.success
+              ? EventType.TOOL_EXECUTION_COMPLETED
               : EventType.TOOL_EXECUTION_ERROR;
-              
+
             this.dispatcher.dispatch(eventType, finalToolEventPayload);
 
             if (actionResult.nextAction === 'respond') {
@@ -361,7 +365,7 @@ export class OptimizedReActEngine {
 
             const duration = Date.now() - toolExecutionStartTime;
             const toolDescription = this.toolRegistry.getTool(reasoningResult.tool!)?.description;
-            
+
             this.dispatcher.dispatch(EventType.TOOL_EXECUTION_ERROR, {
               toolName: reasoningResult.tool!,
               parameters: reasoningResult.parameters ?? undefined,
@@ -400,7 +404,7 @@ export class OptimizedReActEngine {
             result: tr.toolCallResult.data ?? tr.toolCallResult.error ?? "No data/error from tool"
           })),
           analysisResult,
-          memoryContext: memory.getMemorySummary(),
+          memoryContext,
           model
         }) as ResponseOutput;
 
@@ -408,6 +412,9 @@ export class OptimizedReActEngine {
         this.addHistoryEntry(currentState, 'responseGeneration', responseResult);
         agentPhaseDispatch('finalResponseGeneration', 'completed', { response: responseResult });
       }
+
+      // Store conversation state in memory
+      await this.memoryManager.storeConversation(currentState.chatId, currentState);
 
       currentState.completionStatus = 'completed';
 

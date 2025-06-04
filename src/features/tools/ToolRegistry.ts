@@ -14,29 +14,14 @@ export class ToolRegistry {
 
   }
 
-  private log(level: 'info' | 'warning' | 'error', message: string, details?: Record<string, any>, errorObj?: Error) {
-    const source = 'ToolRegistry';
-    switch (level) {
-      case 'info':
-        this.dispatcher.systemInfo(message, details, source);
-        break;
-      case 'warning':
-        this.dispatcher.systemWarning(message, details, source);
-        break;
-      case 'error':
-        this.dispatcher.systemError(message, errorObj, details, source);
-        break;
-    }
-  }
-
   public registerTools(toolsToRegister: ToolDefinition<any, any>[]): void {
     for (const tool of toolsToRegister) {
       if (this.tools.has(tool.name)) {
-        this.log('warning', `Tool "${tool.name}" is already registered. Overwriting.`, { toolName: tool.name });
+        this.dispatcher.systemWarning(`Tool "${tool.name}" is already registered. Overwriting.`, { toolName: tool.name }, 'ToolRegistry');
       }
       this.tools.set(tool.name, tool);
     }
-    this.log('info', `Registered ${toolsToRegister.length} tools. Total tools: ${this.tools.size}.`, { registeredNow: toolsToRegister.map(t => t.name) });
+    this.dispatcher.systemInfo(`Registered ${toolsToRegister.length} tools. Total tools: ${this.tools.size}.`, { registeredNow: toolsToRegister.map(t => t.name) }, 'ToolRegistry');
   }
 
   getTool(name: string): ToolDefinition<any, any> | undefined {
@@ -52,18 +37,7 @@ export class ToolRegistry {
   }
 
 
-  private prepareToolResult<T>(
-    toolName: string,
-    data: T | undefined,
-    success: boolean,
-    errorMsg?: string
-  ): ToolResult<T> {
-    return {
-      success,
-      data: success ? data : undefined,
-      error: !success ? errorMsg : undefined
-    };
-  }
+
 
   async executeTool<T = any>(
     name: string,

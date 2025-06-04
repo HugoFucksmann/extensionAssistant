@@ -4,13 +4,11 @@ import * as vscode from 'vscode';
 import { ModelManager } from '../features/ai/ModelManager';
 import { ToolRegistry } from '../features/tools/ToolRegistry';
 import { allToolDefinitions } from '../features/tools/definitions';
-import { ConversationMemoryManager } from '../features/memory/ConversationMemoryManager';
 import { ConversationManager } from './ConversationManager';
 import { ApplicationLogicService } from './ApplicationLogicService';
 import { InternalEventDispatcher } from './events/InternalEventDispatcher';
 import { OptimizedReActEngine } from './OptimizedReActEngine';
-
-import { LongTermStorage } from '../features/memory/LongTermStorage';
+import { MemoryManager } from '../features/memory/MemoryManager';
 
 export class ComponentFactory {
   private static applicationLogicServiceInstance: ApplicationLogicService;
@@ -21,8 +19,8 @@ export class ComponentFactory {
   private static modelManagerInstance: ModelManager;
 
   private static optimizedReActEngineInstance: OptimizedReActEngine;
-  private static longTermStorageInstance: LongTermStorage;
   private static conversationManagerInstance: ConversationManager;
+  private static memoryManagerInstance: MemoryManager;
 
   public static getInternalEventDispatcher(): InternalEventDispatcher {
     if (!this.internalEventDispatcherInstance) {
@@ -55,29 +53,25 @@ export class ComponentFactory {
     return this.modelManagerInstance;
   }
 
-  public static getLongTermStorage(extensionContext: vscode.ExtensionContext): LongTermStorage {
-    if (!this.longTermStorageInstance) {
-      this.longTermStorageInstance = new LongTermStorage(extensionContext);
-
+  public static getMemoryManager(extensionContext: vscode.ExtensionContext): MemoryManager {
+    if (!this.memoryManagerInstance) {
+      this.memoryManagerInstance = new MemoryManager(extensionContext);
     }
-    return this.longTermStorageInstance;
+    return this.memoryManagerInstance;
   }
-
-
 
   public static getOptimizedReActEngine(extensionContext: vscode.ExtensionContext): OptimizedReActEngine {
     if (!this.optimizedReActEngineInstance) {
       const modelManager = this.getModelManager();
       const dispatcher = this.getInternalEventDispatcher();
       const toolRegistry = this.getToolRegistry();
-      const longTermStorage = this.getLongTermStorage(extensionContext);
+      const memoryManager = this.getMemoryManager(extensionContext);
       this.optimizedReActEngineInstance = new OptimizedReActEngine(
         modelManager,
         toolRegistry,
         dispatcher,
-        longTermStorage
+        memoryManager
       );
-
     }
     return this.optimizedReActEngineInstance;
   }
@@ -85,18 +79,13 @@ export class ComponentFactory {
 
   public static getApplicationLogicService(extensionContext: vscode.ExtensionContext): ApplicationLogicService {
     if (!this.applicationLogicServiceInstance) {
-
       const reActEngine = this.getOptimizedReActEngine(extensionContext);
-
-
-      const longTermStorage = this.getLongTermStorage(extensionContext);
       const toolRegistry = this.getToolRegistry();
-      const conversationMemoryManager = new ConversationMemoryManager(longTermStorage);
-
       const conversationManager = this.getConversationManager();
+      const memoryManager = this.getMemoryManager(extensionContext);
 
       this.applicationLogicServiceInstance = new ApplicationLogicService(
-        conversationMemoryManager,
+        memoryManager, // Pass the memoryManager instance
         reActEngine,
         conversationManager,
         toolRegistry
@@ -114,17 +103,14 @@ export class ComponentFactory {
   }
 
   public static async dispose(): Promise<void> {
-
     if (this.optimizedReActEngineInstance && typeof this.optimizedReActEngineInstance.dispose === 'function') {
       this.optimizedReActEngineInstance.dispose();
       this.optimizedReActEngineInstance = null!;
     }
 
-
-
-    if (this.longTermStorageInstance && typeof this.longTermStorageInstance.dispose === 'function') {
-      await this.longTermStorageInstance.dispose();
-      this.longTermStorageInstance = null!;
+    if (this.memoryManagerInstance && typeof (this.memoryManagerInstance as any).dispose === 'function') {
+      await (this.memoryManagerInstance as any).dispose();
+      this.memoryManagerInstance = null!;
     }
 
     if (this.modelManagerInstance && typeof (this.modelManagerInstance as any).dispose === 'function') {
