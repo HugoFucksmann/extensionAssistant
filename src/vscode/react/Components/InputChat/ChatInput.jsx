@@ -154,22 +154,22 @@ const ChatInput = () => {
     container: {
       display: 'flex',
       flexDirection: 'column',
-      padding: '8px',
+      padding: '4px',
       backgroundColor: theme.colors.background,
       border: `1px solid ${theme.colors.border}`,
       borderRadius: theme.borderRadius.medium,
-      boxShadow: '0px 0px 10px rgba(0, 0, 0, 0.1)',
+   
     },
     inputContainer: {
       display: 'flex',
       alignItems: 'center',
-      padding: '8px',
+      padding: '4px',
       borderBottom: `1px solid ${theme.colors.border}`,
     },
     input: {
       flex: 1,
       padding: '8px',
-      fontSize: '16px',
+      fontSize: theme.typography.text,
       fontFamily: 'inherit',
       color: theme.colors.text,
       backgroundColor: 'transparent',
@@ -178,7 +178,7 @@ const ChatInput = () => {
     },
     sendButton: {
       padding: '8px',
-      fontSize: '16px',
+      fontSize: theme.typography.text,
       fontFamily: 'inherit',
       color: theme.colors.primary,
       backgroundColor: 'transparent',
@@ -189,15 +189,15 @@ const ChatInput = () => {
     controlsRow: {
       display: 'flex',
       justifyContent: 'space-between',
-      padding: '8px',
+      padding: '4px',
     },
     leftControls: {
       display: 'flex',
       alignItems: 'center',
     },
     modelSelector: {
-      padding: '8px',
-      fontSize: '16px',
+      padding: '4px',
+      fontSize: theme.typography.small,
       fontFamily: 'inherit',
       color: theme.colors.text,
       backgroundColor: 'transparent',
@@ -206,7 +206,8 @@ const ChatInput = () => {
       cursor: 'pointer',
     },
     modelSelectorArrow: {
-      fontSize: '16px',
+      display: 'inline-flex',
+      fontSize: theme.typography.small,
       fontFamily: 'inherit',
       color: theme.colors.text,
       marginLeft: '8px',
@@ -216,8 +217,8 @@ const ChatInput = () => {
       alignItems: 'center',
     },
     fileButton: {
-      padding: '8px',
-      fontSize: '16px',
+      padding: '4px',
+      fontSize: theme.typography.text,
       fontFamily: 'inherit',
       color: theme.colors.primary,
       backgroundColor: 'transparent',
@@ -231,8 +232,8 @@ const ChatInput = () => {
   
 
   return (
-    <div style={styles.container} ref={dropdownRef}> {/* dropdownRef de useFileMention */}
-      {/* Contenedor para los FileChips */}
+    <div style={styles.container} ref={dropdownRef}> 
+      
       {selectedFiles.length > 0 && (
         <div style={{
           display: 'flex',

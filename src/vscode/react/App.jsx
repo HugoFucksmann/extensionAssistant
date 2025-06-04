@@ -4,10 +4,11 @@ import ChatInput from './Components/InputChat/ChatInput';
 import ChatHistory from './Components/historical/ChatHistory';
 import { useApp } from './context/AppContext';
 import ChatMessages from './Components/ChatMessages/new/ChatMessages';
-
+import RecentChats from './Components/historical/RecentChats';
+import LoadingIndicator from './Components/ChatMessages/new/LoadingIndicator';
 
 const App = () => {
-  const {showHistory, theme } = useApp();
+  const { showHistory, theme, messages = [], isLoading } = useApp();
  
   const appContainerStyle = {
     display: 'flex',
@@ -26,10 +27,34 @@ const App = () => {
     overflow: 'hidden',
   };
 
+  const centeredContentStyle = {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: theme.spacing.large,
+    gap: theme.spacing.large,
+  };
+
   const chatInputContainerStyle = {
-    padding: theme.spacing.medium,
+    position: 'relative',
+    padding: 3,
+    borderRadius: theme.borderRadius.medium,
+    backgroundColor: theme.colors.secondary,
+  };
+
+  const loadingOverlayStyle = {
+    position: 'absolute',
+    top: '-60px',
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    backgroundColor: theme.colors.background,
     borderTop: `1px solid ${theme.colors.border}`,
-    backgroundColor: theme.colors.chatInputBg || theme.colors.background,
+    borderBottom: `1px solid ${theme.colors.border}`,
+    backdropFilter: 'blur(10px)',
+    boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.1)',
   };
 
   if (showHistory) {
@@ -40,14 +65,49 @@ const App = () => {
     );
   }
 
+  // Check if we have any displayable messages
+  const displayableMessages = messages.filter(msg => {
+    const phase = msg.metadata?.phase;
+    if (phase && (msg.metadata?.status === 'phase_started' || msg.metadata?.status === 'phase_completed')) {
+      return !!msg.metadata?.toolName; 
+    }
+    return true;
+  });
+
+  const hasMessages = displayableMessages.length > 0;
 
   return (
     <div style={appContainerStyle}>
       <main style={chatAreaStyle}>
+        {!hasMessages ? (
+          // Centered layout when no messages
+          <div style={centeredContentStyle}>
+            <RecentChats />
+            <div style={{ width: '100%', maxWidth: '800px' }}>
+              <div style={chatInputContainerStyle}>
+                {isLoading && (
+                  <div style={loadingOverlayStyle}>
+                    <LoadingIndicator />
+                  </div>
+                )}
+                <ChatInput />
+              </div>
+            </div>
+          </div>
+        ) : (
+          // Normal layout with messages
+          <>
             <ChatMessages />
             <div style={chatInputContainerStyle}>
+              {isLoading && (
+                <div style={loadingOverlayStyle}>
+                  <LoadingIndicator />
+                </div>
+              )}
               <ChatInput />
             </div>
+          </>
+        )}
       </main>
     </div>
   );
