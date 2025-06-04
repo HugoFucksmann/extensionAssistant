@@ -94,14 +94,13 @@ export interface AgentPhaseEventPayload extends BaseEventPayload {
 export interface ToolExecutionEventPayload extends BaseEventPayload {
   toolName: string;
   parameters?: Record<string, any>;
-  result?: ToolOutput;
-  error?: string;
-  duration?: number;
-  toolDescription?: string;
-  isProcessingStep?: boolean;
-  modelAnalysis?: ActionOutput | any;
-  rawToolOutput?: any;
-  toolSuccess?: boolean;
+  rawOutput?: any;          // Datos crudos de la herramienta
+  error?: string;           // Mensaje de error si hubo
+  duration: number;         // Tiempo de ejecución en ms
+  toolDescription?: string; // Descripción de la herramienta
+  isProcessingStep: boolean; // Si es un paso de procesamiento
+  modelAnalysis?: any;      // Análisis del modelo (opcional)
+  toolSuccess: boolean;     // Éxito/fracaso de la ejecución
 }
 
 

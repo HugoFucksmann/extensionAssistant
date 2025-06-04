@@ -16,7 +16,7 @@ import { ReActCycleMemory } from '../features/memory/ReActCycleMemory';
 import { LongTermStorage } from '../features/memory/LongTermStorage';
 import { z, ZodObject, ZodOptional, ZodEffects, ZodTypeAny } from 'zod';
 import { ToolResult as InternalToolResult } from '../features/tools/types';
-import { getConfig } from '../shared/config';
+import { getReactConfig } from '../shared/utils/configUtils';
 
 export class OptimizedReActEngine {
   private toolsDescriptionCache: string | null = null;
@@ -30,8 +30,7 @@ export class OptimizedReActEngine {
 
   ) {
     this.dispatcher.systemInfo('OptimizedReActEngine initialized.', { source: 'OptimizedReActEngine' }, 'OptimizedReActEngine');
-    const config = getConfig(process.env.NODE_ENV === 'production' ? 'production' : 'development');
-    this.MAX_ITERATIONS = config.backend.react.maxIterations;
+    this.MAX_ITERATIONS = getReactConfig().maxIterations;
   }
 
   private getToolsDescription(): string {
@@ -325,31 +324,31 @@ export class OptimizedReActEngine {
             this.addHistoryEntry(currentState, 'action', actionResult, { phase_details: 'action_interpretation' });
 
 
+            const duration = Date.now() - toolExecutionStartTime;
+            const toolDescription = this.toolRegistry.getTool(reasoningResult.tool!)?.description;
+            
             const finalToolEventPayload: ToolExecutionEventPayload = {
               toolName: reasoningResult.tool!,
               parameters: reasoningResult.parameters ?? undefined,
+              rawOutput: internalToolResult.data,
+              error: internalToolResult.error,
+              duration,
+              toolDescription,
+              isProcessingStep: false,
+              modelAnalysis: actionResult,
+              toolSuccess: internalToolResult.success,
               chatId: currentState.chatId,
               source: 'OptimizedReActEngine',
               operationId,
-              timestamp: Date.now(),
-              duration: Date.now() - toolExecutionStartTime,
-              toolDescription: this.toolRegistry.getTool(reasoningResult.tool!)?.description,
-              isProcessingStep: false,
-              modelAnalysis: actionResult,
-              rawToolOutput: internalToolResult.data,
-              toolSuccess: internalToolResult.success,
-              error: internalToolResult.error
+              timestamp: Date.now()
             };
 
-
-            if (internalToolResult.success) {
-              this.dispatcher.dispatch(EventType.TOOL_EXECUTION_COMPLETED, finalToolEventPayload);
-            } else {
-              this.dispatcher.dispatch(EventType.TOOL_EXECUTION_ERROR, {
-                ...finalToolEventPayload,
-              });
-            }
-
+            // Enviar el evento apropiado según el resultado
+            const eventType = internalToolResult.success 
+              ? EventType.TOOL_EXECUTION_COMPLETED 
+              : EventType.TOOL_EXECUTION_ERROR;
+              
+            this.dispatcher.dispatch(eventType, finalToolEventPayload);
 
             if (actionResult.nextAction === 'respond') {
               currentState.finalOutput = actionResult.response || 'No specific response content provided by model after tool use.';
@@ -360,20 +359,23 @@ export class OptimizedReActEngine {
             const errorMessage = `Error durante la ejecución o análisis de la herramienta ${reasoningResult.tool}: ${toolError.message}`;
             this.addHistoryEntry(currentState, 'system_message', errorMessage, { status: 'error' });
 
+            const duration = Date.now() - toolExecutionStartTime;
+            const toolDescription = this.toolRegistry.getTool(reasoningResult.tool!)?.description;
+            
             this.dispatcher.dispatch(EventType.TOOL_EXECUTION_ERROR, {
               toolName: reasoningResult.tool!,
               parameters: reasoningResult.parameters ?? undefined,
+              rawOutput: null,
+              error: toolError.message,
+              duration,
+              toolDescription,
+              isProcessingStep: false,
+              modelAnalysis: null,
+              toolSuccess: false,
               chatId: currentState.chatId,
               source: 'OptimizedReActEngine',
               operationId,
-              timestamp: Date.now(),
-              error: toolError.message,
-              duration: Date.now() - toolExecutionStartTime,
-              toolDescription: this.toolRegistry.getTool(reasoningResult.tool!)?.description,
-              isProcessingStep: false,
-              modelAnalysis: null,
-              rawToolOutput: null,
-              toolSuccess: false,
+              timestamp: Date.now()
             });
           }
 

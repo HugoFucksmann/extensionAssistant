@@ -16,9 +16,17 @@ interface MemoryConfig {
   maxShortTermReActItems: number; // <--- NUEVO para ReActCycleMemory
 }
 
+interface GitToolsConfig {
+  pushTimeoutMs: number;
+  defaultTimeoutMs: number;
+  fetchTimeoutMs: number;
+  pullTimeoutMs: number;
+}
+
 interface ToolsConfig {
   maxConcurrentTools: number;
   timeoutMs: number;
+  git: GitToolsConfig;
 }
 
 interface LoggingConfig {
@@ -46,11 +54,17 @@ export const getConfig = (env: Environment): { backend: BackendConfig } => {
       storageLocation: 'user',
       shortTermExpiry: 24 * 60 * 60 * 1000,
       mediumTermExpiry: 7 * 24 * 60 * 60 * 1000,
-      maxShortTermReActItems: 20, // <--- VALOR POR DEFECTO (antes estaba en ReActCycleMemory)
+      maxShortTermReActItems: 20, // <--- VALOR POR DEFECTO (antes estaba en ReActCycleMemory),
     },
     tools: {
       maxConcurrentTools: 3,
-      timeoutMs: 30000
+      timeoutMs: 30000,
+      git: {
+        pushTimeoutMs: 60000,    // 1 minuto para push
+        defaultTimeoutMs: 30000,  // 30 segundos para operaciones generales
+        fetchTimeoutMs: 45000,    // 45 segundos para fetch
+        pullTimeoutMs: 90000      // 1.5 minutos para pull (puede ser lento con muchos cambios)
+      }
     },
     logging: {
       level: env === 'development' ? 'debug' : 'info',

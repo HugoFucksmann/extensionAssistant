@@ -232,9 +232,55 @@ export class LongTermStorage {
   }
 
 
-  public async dispose(): Promise<void> {
+  /**
+   * Libera los recursos y espera a que todas las operaciones pendientes se completen
+   * @param timeout Tiempo máximo de espera en milisegundos (opcional)
+   */
+  public async dispose(timeoutMs: number = 5000): Promise<void> {
+    // Si no hay operaciones pendientes, retornar inmediatamente
+    if (this.saveQueue.length === 0) {
+      return;
+    }
 
-    this.saveQueue = [];
+    // Crear una promesa que se resuelva cuando se complete la operación actual
+    // o cuando se agote el tiempo de espera
+    return new Promise<void>((resolve) => {
+      let isResolved = false;
+      
+      // Función para completar la limpieza
+      const complete = () => {
+        if (isResolved) return;
+        isResolved = true;
+        this.saveQueue = []; // Limpiar cualquier operación restante
+        resolve();
+      };
 
+      // Establecer un temporizador para el tiempo de espera máximo
+      const timeoutId = setTimeout(() => {
+        console.warn('LongTermStorage: Timeout waiting for pending operations to complete');
+        complete();
+      }, timeoutMs);
+
+      // Agregar una operación a la cola que marcará la finalización
+      this.saveQueue.push(async () => {
+        clearTimeout(timeoutId);
+        complete();
+      });
+
+      // Si no hay operación en curso, forzar el inicio del procesamiento
+      if (!this.isSaving && this.saveQueue.length > 1) {
+        const nextOperation = this.saveQueue.shift();
+        if (nextOperation) {
+          this.isSaving = true;
+          nextOperation()
+            .catch(error => {
+              console.error('Error during final save operation:', error);
+            })
+            .finally(() => {
+              this.isSaving = false;
+            });
+        }
+      }
+    });
   }
 }

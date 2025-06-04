@@ -2,11 +2,11 @@
 import { WindsurfState } from './types';
 import { HistoryEntry } from '../features/chat/types';
 import { ConversationMemoryManager } from '../features/memory/ConversationMemoryManager';
-import { getConfig } from '../shared/config';
+import { getReactConfig } from '../shared/utils/configUtils';
 import { IConversationManager } from './interfaces/IConversationManager';
 import { generateUniqueId } from '../shared/utils/generateIds';
 
-const config = getConfig(process.env.NODE_ENV === 'production' ? 'production' : 'development');
+const reactConfig = getReactConfig();
 
 export class ConversationManager implements IConversationManager {
   private activeConversations: Map<string, WindsurfState> = new Map();
@@ -96,7 +96,7 @@ export class ConversationManager implements IConversationManager {
       userMessage: userMessage,
       chatId: chatId,
       iterationCount: 0,
-      maxIterations: config.backend.react.maxIterations,
+      maxIterations: reactConfig.maxIterations,
       completionStatus: 'in_progress',
       history: userMessage ? [{
         phase: 'user_input',

@@ -10,7 +10,6 @@ import {
 } from '../../features/events/eventTypes';
 import { WebviewStateManager } from './WebviewStateManager';
 import { ChatMessage } from '../../features/chat/types';
-import { mapToolResponse } from './utils/toolResponseMapper';
 import { IConversationManager } from '../../core/interfaces/IConversationManager';
 import { ToolResult } from '../../features/tools/types';
 
@@ -181,6 +180,64 @@ export class WebviewEventHandler {
     return chatMsg;
   }
 
+  private formatToolOutput(toolName: string, output: any, isError: boolean = false): { title: string; summary: string; details: string } {
+    const toolDisplayName = toolName || 'herramienta';
+    
+    if (isError) {
+      const errorMessage = output?.message || output?.error || 'Error desconocido';
+      return {
+        title: `❌ Error en ${toolDisplayName}`,
+        summary: errorMessage,
+        details: typeof output === 'string' ? output : JSON.stringify(output, null, 2)
+      };
+    }
+
+    if (output === null || output === undefined) {
+      return {
+        title: `✅ ${toolDisplayName} completado`,
+        summary: 'La operación se completó correctamente',
+        details: ''
+      };
+    }
+
+    if (typeof output === 'string') {
+      return {
+        title: `✅ ${toolDisplayName} completado`,
+        summary: output.length > 150 ? output.substring(0, 150) + '...' : output,
+        details: output
+      };
+    }
+
+    if (Array.isArray(output)) {
+      return {
+        title: `✅ ${toolDisplayName} completado`,
+        summary: `Se devolvieron ${output.length} elementos`,
+        details: JSON.stringify(output, null, 2)
+      };
+    }
+
+    if (typeof output === 'object') {
+      if (output.message) {
+        return {
+          title: `✅ ${toolDisplayName} completado`,
+          summary: output.message,
+          details: JSON.stringify(output, null, 2)
+        };
+      }
+      return {
+        title: `✅ ${toolDisplayName} completado`,
+        summary: 'Operación completada con éxito',
+        details: JSON.stringify(output, null, 2)
+      };
+    }
+
+    return {
+      title: `✅ ${toolDisplayName} completado`,
+      summary: 'La operación se completó correctamente',
+      details: String(output)
+    };
+  }
+
   private handleToolExecutionStarted(payload: ToolExecutionEventPayload, eventId: string): ChatMessage {
     const chatMsg = this.createBaseChatMessage(eventId, 'system', payload.operationId) as ChatMessage;
     chatMsg.content = `🔧 ${payload.toolDescription || `Ejecutando ${payload.toolName || 'herramienta'}`}...`;
@@ -188,102 +245,106 @@ export class WebviewEventHandler {
       ...chatMsg.metadata,
       status: 'tool_executing',
       toolName: payload.toolName,
-      toolInput: payload.parameters, // Usar 'parameters'
+      toolInput: payload.parameters,
+      operationId: payload.operationId
     };
     return chatMsg;
   }
 
 
+
+
+
   private handleToolExecutionCompleted(payload: ToolExecutionEventPayload, eventId: string): ChatMessage {
     const chatMsg = this.createBaseChatMessage(eventId, 'system', payload.operationId) as ChatMessage;
-
-
-    const toolResultFromEvent: ToolResult<any> = {
-      success: payload.toolSuccess === true,
-      data: payload.rawToolOutput,
-      error: payload.toolSuccess === false ? payload.error : undefined,
-      executionTime: payload.duration,
-      warnings: (payload.rawToolOutput as any)?.warnings || (payload.result as any)?.meta?.warnings
-    };
-
-    const mappedOutput = mapToolResponse(
+    const toolDisplayName = payload.toolDescription || payload.toolName || 'La herramienta';
+    
+    // Formatear la salida
+    const formattedOutput = this.formatToolOutput(
       payload.toolName || 'UnknownTool',
-      toolResultFromEvent
+      payload.rawOutput
     );
 
-    let contentLines: string[] = [];
-    const toolDisplayName = payload.toolDescription || payload.toolName || 'La herramienta';
+    // Construir el contenido del mensaje
+    const contentLines: string[] = [
+      `✅ ${toolDisplayName} finalizó correctamente.`,
+      `📋 ${formattedOutput.summary}`
+    ];
 
-
-    if (!toolResultFromEvent.success) {
-      contentLines.push(`❌ ${toolDisplayName} encontró un error: ${toolResultFromEvent.error || mappedOutput.summary}`);
-    } else {
-      contentLines.push(`✅ ${toolDisplayName} finalizó correctamente.`);
+    // Agregar análisis del modelo si está disponible
+    if (payload.modelAnalysis?.interpretation) {
+      const interpretation = payload.modelAnalysis.interpretation;
+      contentLines.push(`🧠 Análisis: ${interpretation.substring(0, 100)}${interpretation.length > 100 ? '...' : ''}`);
     }
 
-    if (mappedOutput.summary) {
-      const shortMessage = mappedOutput.summary.substring(0, 150);
-      contentLines.push(`📋 Resultado: ${shortMessage}${mappedOutput.summary.length > 150 ? '...' : ''}`);
-    } else if (mappedOutput.details) {
-      const shortMessage = mappedOutput.details.substring(0, 150);
-      contentLines.push(`📋 Resultado: ${shortMessage}${mappedOutput.details.length > 150 ? '...' : ''}`);
-    }
-
-    const modelAnalysis = payload.modelAnalysis as any;
-    if (modelAnalysis?.interpretation) {
-      contentLines.push(`🧠 Análisis: ${modelAnalysis.interpretation.substring(0, 100)}...`);
-    }
-
-    chatMsg.content = contentLines.join('\n') || `${toolDisplayName} procesada.`;
+    // Establecer el contenido y metadatos del mensaje
+    chatMsg.content = contentLines.join('\n');
     chatMsg.metadata = {
       ...chatMsg.metadata,
-      status: toolResultFromEvent.success ? 'success' : 'error',
+      status: 'success',
       toolName: payload.toolName,
       toolInput: payload.parameters,
-      toolOutput: mappedOutput,
-      rawToolOutput: payload.rawToolOutput,
+      toolOutput: {
+        title: formattedOutput.title,
+        summary: formattedOutput.summary,
+        details: formattedOutput.details,
+        items: Array.isArray(payload.rawOutput) ? payload.rawOutput : [payload.rawOutput],
+        meta: {
+          executionTime: payload.duration,
+          success: true
+        }
+      },
+      rawOutput: payload.rawOutput,
       modelAnalysis: payload.modelAnalysis,
-      toolSuccess: toolResultFromEvent.success,
-      toolError: toolResultFromEvent.error,
-      warnings: toolResultFromEvent.warnings,
+      toolSuccess: true,
+      warnings: (payload.rawOutput as any)?.warnings
     };
+
     return chatMsg;
   }
 
   private handleToolExecutionError(payload: ToolExecutionEventPayload, eventId: string): ChatMessage {
     const chatMsg = this.createBaseChatMessage(eventId, 'system', payload.operationId) as ChatMessage;
-
-
-    const toolResultFromEvent: ToolResult<any> = {
-      success: false,
-      data: payload.rawToolOutput,
-      error: payload.error || 'Error desconocido al ejecutar la herramienta.',
-      executionTime: payload.duration,
-      warnings: (payload.rawToolOutput as any)?.warnings || (payload.result as any)?.meta?.warnings
-    };
-
-    const mappedOutput = mapToolResponse(
+    const toolDisplayName = payload.toolDescription || payload.toolName || 'La herramienta';
+    
+    // Formatear el error
+    const errorMessage = payload.error || 'Error desconocido al ejecutar la herramienta.';
+    const formattedOutput = this.formatToolOutput(
       payload.toolName || 'UnknownTool',
-      toolResultFromEvent
+      { error: errorMessage },
+      true
     );
 
-    chatMsg.content = mappedOutput.title;
-    if (mappedOutput.summary && mappedOutput.summary !== mappedOutput.title) {
-      chatMsg.content += `\n${mappedOutput.summary}`;
-    }
+    // Construir el contenido del mensaje
+    chatMsg.content = [
+      `❌ ${toolDisplayName} encontró un error`,
+      `📋 ${formattedOutput.summary}`
+    ].join('\n');
 
+    // Establecer metadatos del mensaje
     chatMsg.metadata = {
       ...chatMsg.metadata,
       status: 'error',
       toolName: payload.toolName,
       toolInput: payload.parameters,
-      error: toolResultFromEvent.error,
-      toolOutput: mappedOutput,
-      rawToolOutput: payload.rawToolOutput,
+      error: errorMessage,
+      toolOutput: {
+        title: formattedOutput.title,
+        summary: formattedOutput.summary,
+        details: formattedOutput.details,
+        items: [],
+        meta: {
+          executionTime: payload.duration,
+          success: false,
+          error: errorMessage
+        }
+      },
+      rawOutput: payload.rawOutput,
       modelAnalysis: payload.modelAnalysis,
       toolSuccess: false,
-      warnings: toolResultFromEvent.warnings,
+      warnings: (payload.rawOutput as any)?.warnings
     };
+
     return chatMsg;
   }
 

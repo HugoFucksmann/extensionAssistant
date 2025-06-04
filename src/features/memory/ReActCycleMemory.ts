@@ -1,7 +1,7 @@
 // src/features/memory/ReActCycleMemory.ts
 
 import { LongTermStorage } from './LongTermStorage';
-import { getConfig } from '../../shared/config';
+import { getMemoryConfig } from '../../shared/utils/configUtils';
 import { generateUniqueId } from '../../shared/utils/generateIds';
 
 
@@ -58,8 +58,7 @@ export class ReActCycleMemory {
         memorySize: 0
       }
     };
-    const config = getConfig(process.env.NODE_ENV === 'production' ? 'production' : 'development');
-    this.MAX_SHORT_TERM_ITEMS = config.backend.memory.maxShortTermReActItems;
+    this.MAX_SHORT_TERM_ITEMS = getMemoryConfig().maxShortTermReActItems;
   }
 
   /**
