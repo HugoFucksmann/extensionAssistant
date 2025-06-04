@@ -7,7 +7,8 @@ import "../styles/ToolRenderer.css"
 const ToolRenderer = ({
   toolName,
   toolInput,
-  toolOutput,
+  toolOutput, // Mantener para compatibilidad hacia atrás
+  toolResult = toolOutput, // Nueva prop con valor por defecto
   status,
   success,
   message,
@@ -19,11 +20,12 @@ const ToolRenderer = ({
 
   // Validaciones de datos
   const safeToolInput = toolInput || {}
-  const safeToolOutput = toolOutput || {}
+  const safeToolResult = toolResult || { success: false, data: {}, error: null }
   const safeStatus = status || "thinking"
-  const safeMessage = message || ""
+  const safeMessage = message || safeToolResult.error || ""
   const safeTimestamp = timestamp || Date.now()
-  const isSuccess = success !== undefined ? success : safeStatus === "success"
+  const isSuccess = success !== undefined ? success : 
+    (safeStatus === "success" || safeToolResult.success === true)
 
   const formatTimestamp = (ts) => {
     if (!ts || isNaN(ts)) {
@@ -177,14 +179,30 @@ const ToolRenderer = ({
   }
 
   const renderToolContent = () => {
+    // Manejar caso de error
+    if (!isSuccess) {
+      return (
+        <div className="tool-error">
+          <span className="error-message">{safeMessage || 'Error al ejecutar la herramienta'}</span>
+        </div>
+      );
+    }
+
+    // Obtener datos del resultado
+    const resultData = safeToolResult.data || {};
+    
     switch (toolName) {
       case "search":
         return (
           <div className="tool-summary">
             <span className="tool-query">"{safeToolInput.query || safeToolInput.q || "Búsqueda"}"</span>
-            {isSuccess && safeToolOutput.results && (
+            {resultData.results && (
               <span className="tool-results">
-                {safeToolOutput.results.length || safeToolOutput.count || 0} resultados
+                {Array.isArray(resultData.results) 
+                  ? `${resultData.results.length} resultados`
+                  : resultData.count 
+                    ? `${resultData.count} resultados`
+                    : 'Sin resultados'}
               </span>
             )}
           </div>
@@ -195,12 +213,10 @@ const ToolRenderer = ({
         return (
           <div className="tool-summary">
             <span className="tool-file">{safeToolInput.file || safeToolInput.path || "archivo"}</span>
-            {isSuccess && (
-              <>
-                {safeToolOutput.size && <span className="file-size">{safeToolOutput.size}</span>}
-                {safeToolOutput.type && <span className="file-type">{safeToolOutput.type}</span>}
-              </>
-            )}
+            <>
+              {resultData.size && <span className="file-size">{resultData.size}</span>}
+              {resultData.type && <span className="file-type">{resultData.type}</span>}
+            </>
           </div>
         )
 
@@ -209,18 +225,16 @@ const ToolRenderer = ({
         return (
           <div className="tool-summary">
             <span className="tool-file">{safeToolInput.file || safeToolInput.path || "archivo"}</span>
-            {isSuccess && (
-              <>
-                {(safeToolOutput.linesAdded || safeToolOutput.linesRemoved) && (
-                  <span className="tool-changes">
-                    +{safeToolOutput.linesAdded || 0} -{safeToolOutput.linesRemoved || 0}
-                  </span>
-                )}
-                {safeToolOutput.modifications && (
-                  <span className="tool-modifications">{safeToolOutput.modifications} modificación</span>
-                )}
-              </>
-            )}
+            <>
+              {(resultData.linesAdded || resultData.linesRemoved) && (
+                <span className="tool-changes">
+                  +{resultData.linesAdded || 0} -{resultData.linesRemoved || 0}
+                </span>
+              )}
+              {resultData.modifications && (
+                <span className="tool-modifications">{resultData.modifications} modificación</span>
+              )}
+            </>
           </div>
         )
 
@@ -228,9 +242,13 @@ const ToolRenderer = ({
         return (
           <div className="tool-summary">
             <span className="tool-pattern">/{safeToolInput.pattern || safeToolInput.query || "patrón"}/</span>
-            {isSuccess && safeToolOutput.matches && (
+            {resultData.matches && (
               <span className="tool-matches">
-                {safeToolOutput.matches.length || safeToolOutput.count || 0} coincidencias
+                {Array.isArray(resultData.matches)
+                  ? `${resultData.matches.length} coincidencias`
+                  : resultData.count
+                    ? `${resultData.count} coincidencias`
+                    : 'Sin coincidencias'}
               </span>
             )}
           </div>
@@ -241,8 +259,8 @@ const ToolRenderer = ({
         return (
           <div className="console-summary">
             <code className="command-line">$ {safeToolInput.command || safeToolInput.cmd || "comando"}</code>
-            {isSuccess && safeToolOutput.exitCode !== undefined && (
-              <span className="exit-code">exit: {safeToolOutput.exitCode}</span>
+            {resultData.exitCode !== undefined && (
+              <span className="exit-code">exit: {resultData.exitCode}</span>
             )}
           </div>
         )
@@ -251,6 +269,13 @@ const ToolRenderer = ({
         return (
           <div className="tool-summary">
             <span>{safeMessage || `Ejecutando ${toolName}...`}</span>
+            {resultData && (
+              <pre className="raw-data">
+                {typeof resultData === 'object' 
+                  ? JSON.stringify(resultData, null, 2) 
+                  : String(resultData)}
+              </pre>
+            )}
           </div>
         )
     }
@@ -395,18 +420,20 @@ const ToolRenderer = ({
 
   // Determinar si mostrar botón de expandir
   const hasExpandableContent = () => {
+    const resultData = safeToolResult.data || {};
+    
     switch (toolName) {
       case "file_examine":
       case "file_read":
-        return safeToolInput.path || safeToolOutput.content || safeToolOutput.totalLines
+        return safeToolInput.path || resultData.content || resultData.totalLines
       case "file_edit":
       case "file_write":
-        return safeToolInput.operation || safeToolOutput.diff
+        return safeToolInput.operation || resultData.diff
       case "project_search":
-        return safeToolInput.fileTypes || safeToolInput.directory || safeToolOutput.matches
+        return safeToolInput.fileTypes || safeToolInput.directory || resultData.matches
       case "console_command":
       case "terminal":
-        return safeToolOutput.output || safeToolOutput.stdout || safeToolOutput.stderr
+        return resultData.output || resultData.stdout || resultData.stderr
       default:
         return false
     }
@@ -424,16 +451,11 @@ const ToolRenderer = ({
           <div className="tool-controls">
             <span className="tool-timestamp">{formatTimestamp(safeTimestamp)}</span>
             {hasExpandableContent() && (
-              <button className="expand-button" onClick={() => setIsExpanded(!isExpanded)}>
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  style={{ transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)" }}
-                >
-                  <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z" />
-                </svg>
+              <button
+                className={`expand-button ${isExpanded ? "expanded" : ""}`}
+                onClick={() => setIsExpanded(!isExpanded)}
+              >
+                {isExpanded ? "Ocultar detalles" : "Mostrar detalles"}
               </button>
             )}
           </div>

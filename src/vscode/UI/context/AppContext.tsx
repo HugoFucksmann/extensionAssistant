@@ -1,6 +1,6 @@
 // src/vscode/react/context/AppContext.tsx
 
-import '../../types';
+import '../../webView/types/VSCodeContext';
 import React, { createContext, useContext, useEffect, useReducer } from 'react';
 import { ChatMessage, Chat } from '../../../features/chat/types';
 

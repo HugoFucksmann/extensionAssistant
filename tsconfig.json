@@ -9,6 +9,8 @@
     "types": ["vscode", "node", "jest"],
     "paths": {
       "@vscode/*": ["src/vscode/*"],
+      "@vscode/ui/*": ["src/vscode/UI/*"],
+      "@vscode/react/*": ["src/vscode/UI/*"],
       "@core/*": ["src/core/*"],
       "@features/*": ["src/features/*"],
       "@shared/*": ["src/shared/*"],
@@ -17,8 +19,8 @@
       "@tools/*": ["src/features/tools/*"],
       "@events/*": ["src/features/events/*"],
       "@shared/types": ["src/shared/types.ts"],
-      "@components/*": ["src/vscode/react/Components/*"],
-      "@context/*": ["src/vscode/react/context/*"]
+      "@components/*": ["src/vscode/UI/Components/*"],
+      "@context/*": ["src/vscode/UI/context/*"]
     },
     "strict": true,
     "esModuleInterop": true,

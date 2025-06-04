@@ -38,6 +38,10 @@ Object.entries(tsconfigPaths).forEach(([key, value]) => {
   alias[cleanKey] = resolve(__dirname, cleanValue);
 });
 
+// Agregar alias explícito para UI
+alias['@vscode/ui'] = resolve(__dirname, 'src/vscode/UI');
+alias['@vscode/react'] = resolve(__dirname, 'src/vscode/UI');
+
 // Common esbuild configuration
 const baseConfig = {
   bundle: true,
@@ -68,7 +72,7 @@ const extensionConfig = {
 // Webview configuration
 const webviewConfig = {
   ...baseConfig,
-  entryPoints: ['src/vscode/react/webview.jsx'],
+  entryPoints: ['src/vscode/UI/webview.jsx'],
   outfile: 'out/webView/webview.js',
   platform: 'browser',
   target: 'es2020',

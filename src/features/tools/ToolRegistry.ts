@@ -87,7 +87,9 @@ export class ToolRegistry {
       source: 'ToolRegistry',
       operationId,
       timestamp: Date.now(),
-
+      duration: 0, // Valor inicial
+      isProcessingStep: false, // Valor inicial
+      toolSuccess: false // Valor inicial (se actualizará luego según el resultado)
     };
 
     this.dispatcher.dispatch(EventType.TOOL_EXECUTION_STARTED, startPayload);

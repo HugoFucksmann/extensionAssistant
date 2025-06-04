@@ -2,12 +2,12 @@
 import * as vscode from 'vscode';
 
 export function getReactHtmlContent(options: {
-  scriptUri: vscode.Uri;
-  nonce: string;
+    scriptUri: vscode.Uri;
+    nonce: string;
 }): string {
-  const { scriptUri, nonce } = options;
+    const { scriptUri, nonce } = options;
 
-  return `<!DOCTYPE html>
+    return `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">

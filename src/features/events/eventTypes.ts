@@ -1,7 +1,5 @@
 // src/features/events/eventTypes.ts
 import { ActionOutput } from '@features/ai/prompts/optimized/actionPrompt';
-import { ToolOutput } from '@vscode/webView/utils/toolResponseMapper';
-
 
 /**
  * All supported event types in the system
@@ -91,16 +89,28 @@ export interface AgentPhaseEventPayload extends BaseEventPayload {
 
 
 
-export interface ToolExecutionEventPayload extends BaseEventPayload {
+export interface ToolExecutionEventPayload {
   toolName: string;
-  parameters?: Record<string, any>;
-  rawOutput?: any;          // Datos crudos de la herramienta
-  error?: string;           // Mensaje de error si hubo
-  duration: number;         // Tiempo de ejecución en ms
-  toolDescription?: string; // Descripción de la herramienta
-  isProcessingStep: boolean; // Si es un paso de procesamiento
-  modelAnalysis?: any;      // Análisis del modelo (opcional)
-  toolSuccess: boolean;     // Éxito/fracaso de la ejecución
+  parameters: any;
+  toolDescription: string;
+  chatId?: string;
+  source: string;
+  operationId: string;
+  timestamp: number;
+  duration: number;
+  isProcessingStep: boolean;
+  toolSuccess: boolean;
+  error?: string;
+  warnings?: string[];
+}
+
+export interface ToolExecutionCompletedPayload {
+  toolName: string;
+  success: boolean;
+  data?: any;
+  error?: string;
+  executionTime?: number;
+  operationId: string;
 }
 
 
@@ -147,6 +157,7 @@ export type EventPayload =
   | LlmRequestCompletedPayload
   | AgentPhaseEventPayload
   | ToolExecutionEventPayload
+  | ToolExecutionCompletedPayload
   | ResponseEventPayload
   | SystemEventPayload
   | UserInteractionRequiredPayload

@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { WebviewProvider } from './vscode/webView/webviewProvider';
+import { WebviewProvider } from './vscode/webView/core/WebviewProvider';
 import { ComponentFactory } from './core/ComponentFactory';
 import { CommandManager } from './CommandManager';
 

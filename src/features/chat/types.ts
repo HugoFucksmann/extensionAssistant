@@ -1,5 +1,5 @@
 // src/features/chat/types.ts
-import { ToolOutput, ToolExecution } from '../tools/types';
+import { ToolExecution } from '../tools/types';
 import { WindsurfState } from '../../core/types';
 
 export interface HistoryEntry extends Omit<ChatMessage, 'id' | 'sender' | 'timestamp' | 'files'> {
@@ -26,7 +26,7 @@ export interface ChatMessage {
     success?: boolean;
     toolName?: string;
     toolInput?: any;
-    toolOutput?: ToolOutput;
+    toolOutput?: any;
     isFinalToolResponse?: boolean;
     status?: 'info' | 'success' | 'error' | 'thinking' | 'tool_executing' | 'user_input_pending' | 'skipped' | 'processing_tool_result' | 'phase_started' | 'phase_completed'; // Added phase statuses
     phase?: string; // Added for agent phase updates
