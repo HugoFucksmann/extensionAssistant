@@ -2,6 +2,7 @@
 
 import { LongTermStorage } from './LongTermStorage';
 import { getConfig } from '../../shared/config';
+import { generateUniqueId } from '../../shared/utils/generateIds';
 
 
 export type ReActCycleMemoryType =
@@ -65,7 +66,7 @@ export class ReActCycleMemory {
    * Añade un elemento a la memoria a corto plazo
    */
   public addToShortTermMemory(item: Omit<ReActCycleMemoryItem, 'id' | 'timestamp'>): string {
-    const id = `mem_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    const id = `mem_${generateUniqueId()}`;
     const memoryItem: ReActCycleMemoryItem = {
       ...item,
       id,
@@ -115,7 +116,7 @@ export class ReActCycleMemory {
    * Persiste un elemento importante en la memoria a largo plazo
    */
   public async persistToLongTermMemory(item: Omit<ReActCycleMemoryItem, 'id' | 'timestamp'>): Promise<string> {
-    const id = `ltm_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    const id = `ltm_${generateUniqueId()}`;
 
     await this.storage.store(id, item.content, {
       type: item.type,

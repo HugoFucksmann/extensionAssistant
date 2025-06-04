@@ -5,13 +5,12 @@ import LoadingIndicator from "./LoadingIndicator";
 import "../styles/LoadingIndicator.css"; 
 import { useApp } from "../../../context/AppContext";
 
-
 const ChatMessages = () => {
-  const { messages = [], isLoading, } = useApp(); 
+  const { messages = [], isLoading } = useApp(); 
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
- 
+    // Existing logic
   }, [messages]);
 
   const scrollToBottom = () => {
@@ -22,19 +21,14 @@ const ChatMessages = () => {
     scrollToBottom();
   }, [messages]);
 
-
   const displayableMessages = messages.filter(msg => {
     const phase = msg.metadata?.phase;
    
     if (phase && (msg.metadata?.status === 'phase_started' || msg.metadata?.status === 'phase_completed')) {
-     
       return !!msg.metadata?.toolName; 
     }
     return true;
   });
-
-
-
 
   return (
     <div className="chat-messages">
@@ -51,7 +45,11 @@ const ChatMessages = () => {
         <div ref={messagesEndRef} />
       </div>
    
-      {isLoading && <LoadingIndicator />}
+      {isLoading && (
+        <div className="loading-indicator-overlay">
+          <LoadingIndicator />
+        </div>
+      )}
     </div>
   );
 };

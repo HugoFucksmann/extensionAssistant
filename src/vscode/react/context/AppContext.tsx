@@ -242,13 +242,23 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
             
           }
           break;
-        case 'agentPhaseUpdate':
-          
-          if (state.isLoading) { 
-            dispatch({ type: 'SET_LOADING_TEXT', payload: payload.content || DEFAULT_LOADING_TEXT });
-          }
-        
-          break;
+          case 'agentPhaseUpdate':
+           
+            const phaseContent = payload.content || DEFAULT_LOADING_TEXT;
+            const isPhaseStarted = payload.metadata?.status === 'phase_started';
+            const isPhaseCompleted = payload.metadata?.status === 'phase_completed';
+            
+            if (isPhaseStarted) {
+              dispatch({ type: 'SET_LOADING', payload: { loading: true, text: phaseContent } });
+            } else if (isPhaseCompleted) {
+              dispatch({ type: 'SET_LOADING', payload: { loading: false } });
+            } else {
+             
+              if (state.isLoading) {
+                dispatch({ type: 'SET_LOADING_TEXT', payload: phaseContent });
+              }
+            }
+            break;
         case 'systemError':
           dispatch({
             type: 'ADD_MESSAGE', payload: {

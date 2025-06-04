@@ -4,7 +4,7 @@ import { HistoryEntry } from '../features/chat/types';
 import { ConversationMemoryManager } from '../features/memory/ConversationMemoryManager';
 import { getConfig } from '../shared/config';
 import { IConversationManager } from './interfaces/IConversationManager';
-import * as crypto from 'crypto';
+import { generateUniqueId } from '../shared/utils/generateIds';
 
 const config = getConfig(process.env.NODE_ENV === 'production' ? 'production' : 'development');
 
@@ -14,7 +14,7 @@ export class ConversationManager implements IConversationManager {
 
 
   public generateChatId(): string {
-    return `chat_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+    return `chat_${generateUniqueId()}`;
   }
 
   public getActiveChatId(): string | null {

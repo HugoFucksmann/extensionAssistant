@@ -96,12 +96,6 @@ export class ApplicationLogicService {
     params: any,
     executionContextArgs: { chatId?: string; [key: string]: any } = {}
   ): Promise<ToolResult> {
-    if (!this.toolRegistry) {
-   
-      return { success: false, error: 'ToolRegistry not available', executionTime: 0 };
-    }
-  
-   
     return this.toolRegistry.executeTool(toolName, params, executionContextArgs);
   }
 

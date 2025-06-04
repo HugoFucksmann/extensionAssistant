@@ -24,7 +24,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     private readonly conversationManager: IConversationManager
   ) {
     this.stateManager = new WebviewStateManager();
-    // Instanciar WebviewEventHandler PRIMERO si WebviewMessageHandler depende de él
+
     this.eventHandler = new WebviewEventHandler(
       this.internalEventDispatcher,
       this.conversationManager,
@@ -37,7 +37,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
       this.stateManager,
       this.postMessage.bind(this),
       this.internalEventDispatcher,
-      this.eventHandler // <--- ARGUMENTO AÑADIDO
+      this.eventHandler
     );
   }
 
@@ -45,8 +45,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     this.view = webviewView;
     this.setupWebview();
     this.setupMessageHandling();
-    // Asegurarse de que eventHandler esté completamente inicializado antes de suscribirse
-    // this.eventHandler ya está inicializado en el constructor
+
     this.eventHandler.subscribeToEvents();
   }
 

@@ -13,21 +13,9 @@ export class WebviewStateManager {
     this.currentModel = model;
   }
 
-
-  public setSidebarVisibility(visible: boolean): void {
-    this.isSidebarVisible = visible;
-  }
-
-
   public getSidebarVisibility(): boolean {
     return this.isSidebarVisible;
   }
-
-
-  public setDarkMode(enabled: boolean): void {
-    this.isDarkMode = enabled;
-  }
-
 
   public getDarkMode(): boolean {
     return this.isDarkMode;

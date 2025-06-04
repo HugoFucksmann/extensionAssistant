@@ -31,11 +31,9 @@ export class ExtensionActivator {
   }
 
   private registerWebview(): void {
-    if (!this.webviewProvider) return;
-
     const webviewRegistration = vscode.window.registerWebviewViewProvider(
       'aiChat.chatView',
-      this.webviewProvider,
+      this.webviewProvider!,
       { webviewOptions: { retainContextWhenHidden: true } }
     );
 
@@ -43,9 +41,7 @@ export class ExtensionActivator {
   }
 
   private registerCommands(): void {
-    if (!this.commandManager) return;
-
-    const commands = this.commandManager.getCommands();
+    const commands = this.commandManager!.getCommands();
     commands.forEach(command => {
       this.context.subscriptions.push(command);
     });

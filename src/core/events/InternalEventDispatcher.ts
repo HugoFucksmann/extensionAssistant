@@ -1,6 +1,6 @@
 // src/core/events/InternalEventDispatcher.ts
 import { EventType, EventPayload, WindsurfEvent, EventFilter } from '../../features/events/eventTypes'; // Reutiliza tus tipos de eventos existentes
-import { v4 as uuidv4 } from 'uuid';
+import { generateUniqueId } from '../../shared/utils/generateIds';
 import EventEmitter from 'eventemitter3'; 
 
 export class InternalEventDispatcher {
@@ -27,7 +27,7 @@ export class InternalEventDispatcher {
         timestamp: payload.timestamp || Date.now(), 
       },
       timestamp: Date.now(),
-      id: forcedId || uuidv4(),
+      id: forcedId || generateUniqueId(),
     };
 
   

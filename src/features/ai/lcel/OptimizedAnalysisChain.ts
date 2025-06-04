@@ -2,7 +2,7 @@
 import { analysisOutputSchema, analysisPromptLC } from "../prompts/optimized/analysisPrompt";
 import { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { createAutoCorrectStep } from "../../../shared/utils/aiResponseParser";
-import { invokeModelWithLogging } from "./ModelInvokeLogger"; // <--- IMPORTACIÓN ESTÁTICA
+import { invokeModelWithLogging } from "./ModelInvokeLogger";
 
 export async function runOptimizedAnalysisChain({
   userQuery,
@@ -49,9 +49,9 @@ export async function runOptimizedAnalysisChain({
     const chain = prompt.pipe(model).pipe(parseStep);
 
     try {
-      // const { invokeModelWithLogging } = await import('./ModelInvokeLogger'); // <--- LÍNEA ELIMINADA
 
-      return await invokeModelWithLogging(chain, { // <--- USO DIRECTO
+
+      return await invokeModelWithLogging(chain, {
         userQuery,
         availableTools: availableTools.join(', '),
         codeContext: codeContext || '',

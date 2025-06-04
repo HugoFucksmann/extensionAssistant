@@ -5,7 +5,6 @@ import {
   WindsurfEvent,
   ToolExecutionEventPayload,
   SystemEventPayload,
-  ErrorOccurredEventPayload,
   ResponseEventPayload,
   AgentPhaseEventPayload,
 } from '../../features/events/eventTypes';
@@ -103,7 +102,7 @@ export class WebviewEventHandler {
         break;
 
       case EventType.SYSTEM_ERROR:
-        chatMessage = this.handleSystemError(event.payload as SystemEventPayload | ErrorOccurredEventPayload, event.id);
+        chatMessage = this.handleSystemError(event.payload as SystemEventPayload, event.id);
         messageTypeForPost = 'systemError';
         break;
     }
@@ -288,7 +287,7 @@ export class WebviewEventHandler {
     return chatMsg;
   }
 
-  private handleSystemError(payload: SystemEventPayload | ErrorOccurredEventPayload, eventId: string): ChatMessage {
+  private handleSystemError(payload: SystemEventPayload, eventId: string): ChatMessage {
     const chatMsg = this.createBaseChatMessage(eventId, 'system') as ChatMessage;
     let errorMessageText = 'Error inesperado del sistema.';
 

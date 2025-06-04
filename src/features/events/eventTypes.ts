@@ -112,12 +112,7 @@ export interface ResponseEventPayload extends BaseEventPayload {
   duration?: number;
 }
 
-export interface ErrorOccurredEventPayload extends BaseEventPayload {
-  errorMessage: string;
-  errorStack?: string;
-  errorType?: string;
-  details?: Record<string, any>;
-}
+
 export interface SystemEventPayload extends BaseEventPayload {
   message: string;
   level: 'info' | 'warning' | 'error';
