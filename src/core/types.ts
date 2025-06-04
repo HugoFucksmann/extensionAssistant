@@ -1,6 +1,6 @@
 // src/core/types.ts
-import {  HistoryEntry } from '../features/chat/types';
-import {  ToolExecution } from '../features/tools/types';
+import { HistoryEntry } from '../features/chat/types';
+import { ToolExecution } from '../features/tools/types';
 
 
 export interface WindsurfState {
@@ -19,8 +19,8 @@ export interface WindsurfState {
   projectContext?: any;
   editorContext?: any;
   finalOutput?: any;
-  timestamp?: number; // Added from ConversationManager logic
-  _executedTools?: Set<string>; // Added from OptimizedReActEngine logic
+  timestamp?: number;
+  _executedTools?: Set<string>;
   [key: string]: any;
 }
 
@@ -51,7 +51,7 @@ export interface ActionResult {
   toolName: string;
   params: Record<string, any>;
   success: boolean;
-  result?: any; // This is raw result from tool, history will store ToolOutput
+  result?: any;
   error?: string;
   timestamp: number;
 }

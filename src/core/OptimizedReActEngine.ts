@@ -14,7 +14,7 @@ import { ActionOutput } from '../features/ai/prompts/optimized/actionPrompt';
 import { ResponseOutput } from '../features/ai/prompts/optimized/responsePrompt';
 import { ReActCycleMemory } from '../features/memory/ReActCycleMemory';
 import { LongTermStorage } from '../features/memory/LongTermStorage';
-import { z, ZodObject, ZodOptional, ZodEffects, ZodTypeAny } from 'zod'; // ZodObject y ZodOptional añadidos
+import { z, ZodObject, ZodOptional, ZodEffects, ZodTypeAny } from 'zod';
 import { ToolResult as InternalToolResult } from '../features/tools/types';
 import { getConfig } from '../shared/config';
 
@@ -45,25 +45,25 @@ export class OptimizedReActEngine {
           this.zodSchemaToDescription(tool.parametersSchema) :
           'No requiere parámetros';
 
-        return `${tool.name}: ${tool.description}\nParámetros:\n${paramsDescription}`; // Ajuste para mejor formato
+        return `${tool.name}: ${tool.description}\nParámetros:\n${paramsDescription}`;
       })
       .join('\n\n');
 
     return this.toolsDescriptionCache;
   }
 
-  // REFACTORIZACIÓN DE zodSchemaToDescription
+
   private zodSchemaToDescription(schema: z.ZodTypeAny): string {
     if (!schema) return "No se definieron parámetros.";
 
-    // Si el esquema tiene una descripción de alto nivel, úsala.
+
     if (schema.description) {
       return schema.description;
     }
 
-    // Intentar manejar diferentes tipos de esquemas Zod de forma más segura
+
     try {
-      // Caso para ZodObject
+
       if (schema instanceof ZodObject) {
         const shape = schema.shape as Record<string, ZodTypeAny>;
         if (!shape || Object.keys(shape).length === 0) return "El objeto de parámetros no tiene campos definidos.";
@@ -73,14 +73,14 @@ export class OptimizedReActEngine {
             let currentVal = val;
             let isOptional = false;
 
-            // Desenvolver ZodOptional y ZodEffects para llegar al tipo subyacente
+
             if (currentVal instanceof ZodOptional) {
               isOptional = true;
               currentVal = currentVal._def.innerType;
             }
             if (currentVal instanceof ZodEffects) {
               currentVal = currentVal._def.schema;
-              // Comprobar de nuevo si el esquema interno es opcional
+
               if (currentVal instanceof ZodOptional) {
                 isOptional = true;
                 currentVal = currentVal._def.innerType;
@@ -94,11 +94,11 @@ export class OptimizedReActEngine {
           })
           .join('\n');
       }
-      // Caso para otros tipos con descripción (aunque ya cubierto arriba)
+
       else if (schema.description) {
         return schema.description;
       }
-      // Fallback para tipos simples o desconocidos
+
       else if (schema._def?.typeName) {
         return `Tipo: ${schema._def.typeName.replace('Zod', '').toLowerCase()}`;
       } else {
@@ -235,8 +235,7 @@ export class OptimizedReActEngine {
           currentState._executedTools = new Set<string>();
         }
 
-        // Deduplicación de herramientas: la clave se genera solo con el nombre y los parámetros de la herramienta.
-        // Nota: La deduplicación es válida solo dentro de una ejecución de run(), ya que _executedTools se reinicia por ciclo.
+
         const toolParamsHash = (tool: string, params: any) => {
           const ordered = (obj: any) =>
             obj && typeof obj === 'object' && !Array.isArray(obj)
@@ -264,7 +263,7 @@ export class OptimizedReActEngine {
           console.log(`[OptimizedReActEngine] Ejecutando herramienta: ${reasoningResult.tool} con parámetros:`, reasoningResult.parameters);
 
           try {
-            // ToolRegistry emite TOOL_EXECUTION_STARTED automáticamente
+
             const internalToolResult: InternalToolResult = await this.toolRegistry.executeTool(
               reasoningResult.tool!,
               reasoningResult.parameters ?? {},
@@ -284,7 +283,7 @@ export class OptimizedReActEngine {
                 name: reasoningResult.tool!,
                 parameters: toolExecParams,
                 status: internalToolResult.success ? 'completed' : 'error',
-                result: internalToolResult.data, // CAMBIO: Usar internalToolResult.data en lugar de mappedOutput para el historial
+                result: internalToolResult.data,
                 error: internalToolResult.error,
                 startTime: toolExecutionStartTime,
                 endTime: Date.now(),
@@ -347,7 +346,7 @@ export class OptimizedReActEngine {
               this.dispatcher.dispatch(EventType.TOOL_EXECUTION_COMPLETED, finalToolEventPayload);
             } else {
               this.dispatcher.dispatch(EventType.TOOL_EXECUTION_ERROR, {
-                ...finalToolEventPayload, // error y toolSuccess ya están en finalToolEventPayload
+                ...finalToolEventPayload,
               });
             }
 

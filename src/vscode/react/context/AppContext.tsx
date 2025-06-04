@@ -13,19 +13,21 @@ interface AppState {
   messages: ChatMessage[];
   chatList: Chat[];
   currentChatId: string | null;
-  isLoading: boolean;
+  isLoading: boolean; 
   showHistory: boolean;
   currentModel: string;
   isDarkMode: boolean;
   theme: ThemeType;
   testModeEnabled: boolean;
+  activeFeedbackOperationId: string | null; 
+  loadingText: string; 
 }
 
 type AppAction =
   | { type: 'SET_MESSAGES'; payload: ChatMessage[] }
   | { type: 'ADD_MESSAGE'; payload: ChatMessage }
-  | { type: 'UPDATE_MESSAGE'; payload: { id: string; [key: string]: any } }
-  | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'UPDATE_MESSAGE'; payload: { id: string; operationId?: string; [key: string]: any } }
+  | { type: 'SET_LOADING'; payload: { loading: boolean; text?: string } } 
   | { type: 'SET_CHAT_ID'; payload: string | null }
   | { type: 'SET_SHOW_HISTORY'; payload: boolean }
   | { type: 'NEW_CHAT_STARTED'; payload: { chatId: string } }
@@ -35,10 +37,16 @@ type AppAction =
   | { type: 'TOGGLE_DARK_MODE' }
   | { type: 'SET_THEME'; payload: ThemeType }
   | { type: 'SET_TEST_MODE'; payload: boolean }
-  | { type: 'SESSION_READY'; payload: { chatId: string; messages: ChatMessage[]; model?: string; history?: Chat[]; testMode?: boolean } };
+  | { type: 'SESSION_READY'; payload: { chatId: string; messages: ChatMessage[]; model?: string; history?: Chat[]; testMode?: boolean } }
+  | { type: 'SET_LOADING_TEXT'; payload: string }
+  | { type: 'SET_ACTIVE_FEEDBACK_OPERATION_ID'; payload: string | null };
 
-const body = document.body as any;
-const initialIsDarkMode = body.classList.contains('vscode-dark');
+
+
+const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined';
+const body = isBrowser ? document.body : null;
+const initialIsDarkMode = isBrowser && body ? body.classList.contains('vscode-dark') : false;
+const DEFAULT_LOADING_TEXT = 'AI is thinking...';
 
 const initialState: AppState = {
   messages: [],
@@ -50,6 +58,8 @@ const initialState: AppState = {
   isDarkMode: initialIsDarkMode,
   theme: getTheme(initialIsDarkMode),
   testModeEnabled: false,
+  activeFeedbackOperationId: null,
+  loadingText: DEFAULT_LOADING_TEXT,
 };
 
 function appReducer(state: AppState, action: AppAction): AppState {
@@ -63,25 +73,38 @@ function appReducer(state: AppState, action: AppAction): AppState {
         chatList: action.payload.history || state.chatList,
         isLoading: false,
         testModeEnabled: action.payload.testMode !== undefined ? action.payload.testMode : state.testModeEnabled,
+        loadingText: DEFAULT_LOADING_TEXT,
+        activeFeedbackOperationId: null,
       };
     case 'SET_MESSAGES':
-      return { ...state, messages: action.payload, isLoading: false };
-    case 'SET_LOADING':
-      return { ...state, isLoading: action.payload };
+      return { ...state, messages: action.payload, isLoading: false, loadingText: DEFAULT_LOADING_TEXT, activeFeedbackOperationId: null };
+    case 'SET_LOADING': 
+      return {
+        ...state,
+        isLoading: action.payload.loading,
+        loadingText: action.payload.loading ? (action.payload.text || state.loadingText) : DEFAULT_LOADING_TEXT,
+       
+      };
+    case 'SET_LOADING_TEXT':
+      return { ...state, loadingText: action.payload };
+    case 'SET_ACTIVE_FEEDBACK_OPERATION_ID':
+      return { ...state, activeFeedbackOperationId: action.payload };
     case 'SET_CHAT_ID':
       return { ...state, currentChatId: action.payload };
     case 'SET_SHOW_HISTORY':
       return { ...state, showHistory: action.payload };
     case 'NEW_CHAT_STARTED':
-      return { 
-        ...state, 
-        messages: [], 
-        currentChatId: action.payload.chatId, 
-        isLoading: false, 
+      return {
+        ...state,
+        messages: [],
+        currentChatId: action.payload.chatId,
+        isLoading: false,
         showHistory: false,
+        loadingText: DEFAULT_LOADING_TEXT,
+        activeFeedbackOperationId: null,
       };
     case 'CLEAR_MESSAGES':
-      return { ...state, messages: [], isLoading: false };
+      return { ...state, messages: [], isLoading: false, loadingText: DEFAULT_LOADING_TEXT, activeFeedbackOperationId: null };
     case 'SET_CHAT_LIST':
       return { ...state, chatList: action.payload };
     case 'SET_CURRENT_MODEL':
@@ -96,20 +119,19 @@ function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, testModeEnabled: action.payload };
     case 'ADD_MESSAGE': {
       const msg = action.payload;
-      const msgId = msg.metadata?.operationId || msg.operationId || msg.id;
       
-      // Simplificar la lógica: siempre agregar mensajes únicos
-      const existingIndex = state.messages.findIndex(m => 
-        (m.metadata?.operationId || m.operationId || m.id) === msgId
-      );
-      
+      const uniqueMsgKey = msg.operationId || msg.id; 
+
+      const existingIndex = state.messages.findIndex(m => (m.operationId || m.id) === uniqueMsgKey);
+
       if (existingIndex !== -1) {
-        // Actualizar mensaje existente
+       
         const updatedMessages = [...state.messages];
         updatedMessages[existingIndex] = {
-          ...updatedMessages[existingIndex],
-          ...msg,
-          id: msgId,
+          ...updatedMessages[existingIndex], 
+          ...msg, 
+          id: updatedMessages[existingIndex].id, 
+          operationId: msg.operationId || updatedMessages[existingIndex].operationId,
           metadata: {
             ...updatedMessages[existingIndex].metadata,
             ...msg.metadata,
@@ -117,27 +139,25 @@ function appReducer(state: AppState, action: AppAction): AppState {
         };
         return { ...state, messages: updatedMessages };
       } else {
-        // Agregar nuevo mensaje
-        return { ...state, messages: [...state.messages, { ...msg, id: msgId }] };
+      
+        return { ...state, messages: [...state.messages, msg] };
       }
     }
-    case 'UPDATE_MESSAGE': {
+    case 'UPDATE_MESSAGE': { 
       const { id, operationId, ...rest } = action.payload;
-      const msgId = operationId || id;
-      const idx = state.messages.findIndex(msg => 
-        (msg.metadata?.operationId || msg.operationId || msg.id) === msgId
-      );
+      const msgIdToUpdate = operationId || id;
+      const idx = state.messages.findIndex(msg => (msg.operationId || msg.id) === msgIdToUpdate);
       
       if (idx === -1) {
-        console.warn(`[AppContext] UPDATE_MESSAGE: Message with id ${msgId} not found for update.`);
-        return state;
+        console.warn(`[AppContext] UPDATE_MESSAGE: Message with id/operationId ${msgIdToUpdate} not found for update.`);
+        return state; 
       }
       
       const updatedMessages = [...state.messages];
       updatedMessages[idx] = {
         ...updatedMessages[idx],
         ...rest,
-        id: updatedMessages[idx].id,
+       
         timestamp: rest.timestamp || updatedMessages[idx].timestamp,
         metadata: {
           ...updatedMessages[idx].metadata,
@@ -159,6 +179,7 @@ interface AppContextType extends AppState {
   loadChat: (chatId: string) => void;
   switchModel: (modelType: string) => void;
   toggleDarkMode: () => void;
+  
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -183,6 +204,8 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
 
     const handleMessage = (event: MessageEvent) => {
       const { type, payload } = event.data;
+      console.log('[WebView EventSource] Received message from extension:', type, payload);
+
 
       switch (type) {
         case 'sessionReady':
@@ -195,33 +218,50 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
               content: payload.content || '',
               sender: 'assistant',
               timestamp: payload.timestamp || Date.now(),
-              metadata: payload.metadata || { status: 'completed' }, 
+              metadata: payload.metadata || { status: 'completed' },
+              operationId: payload.operationId,
             }
           });
-          dispatch({ type: 'SET_LOADING', payload: false }); 
+          dispatch({ type: 'SET_LOADING', payload: { loading: false } }); 
+          dispatch({ type: 'SET_ACTIVE_FEEDBACK_OPERATION_ID', payload: null }); 
           break;
         case 'newChatStarted':
           dispatch({ type: 'NEW_CHAT_STARTED', payload: { chatId: payload.chatId } });
           break;
-        case 'agentActionUpdate':
-          // Manejar actualizaciones de herramientas
+        case 'agentActionUpdate': 
           dispatch({ type: 'ADD_MESSAGE', payload });
+          if (payload.metadata?.status === 'tool_executing') {
+            dispatch({ type: 'SET_ACTIVE_FEEDBACK_OPERATION_ID', payload: payload.operationId || payload.id });
+            dispatch({ type: 'SET_LOADING_TEXT', payload: payload.content || `Ejecutando ${payload.metadata.toolName}...` });
+            dispatch({ type: 'SET_LOADING', payload: { loading: true } }); 
+          } else if (payload.metadata?.status === 'success' || payload.metadata?.status === 'error') {
+         
+            if (state.isLoading) { 
+                 dispatch({ type: 'SET_LOADING_TEXT', payload: DEFAULT_LOADING_TEXT });
+            }
+            
+          }
           break;
         case 'agentPhaseUpdate':
-          // Nuevo: manejar actualizaciones de fases del agente
-          dispatch({ type: 'ADD_MESSAGE', payload });
+          
+          if (state.isLoading) { 
+            dispatch({ type: 'SET_LOADING_TEXT', payload: payload.content || DEFAULT_LOADING_TEXT });
+          }
+        
           break;
         case 'systemError':
           dispatch({
             type: 'ADD_MESSAGE', payload: {
-              id: payload.id || `err_${Date.now()}`, 
-              content: payload.content, 
+              id: payload.id || `err_${Date.now()}`,
+              content: payload.content,
               sender: 'system',
               timestamp: payload.timestamp || Date.now(),
-              metadata: payload.metadata || { status: 'error' }, 
+              metadata: payload.metadata || { status: 'error' },
+              operationId: payload.operationId,
             }
           });
-          dispatch({ type: 'SET_LOADING', payload: false });
+          dispatch({ type: 'SET_LOADING', payload: { loading: false } }); 
+          dispatch({ type: 'SET_ACTIVE_FEEDBACK_OPERATION_ID', payload: null });
           break;
         case 'chatHistory':
           dispatch({ type: 'SET_CHAT_LIST', payload: payload.history || [] });
@@ -234,7 +274,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         case 'modelSwitched':
           dispatch({ type: 'SET_CURRENT_MODEL', payload: payload.modelType });
           break;
-        case 'themeChanged':
+        case 'themeChanged': 
           const newThemeIsDark = payload.theme === 'dark';
           if (state.isDarkMode !== newThemeIsDark) {
             dispatch({ type: 'TOGGLE_DARK_MODE' });
@@ -243,7 +283,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         case 'testModeChanged':
           dispatch({ type: 'SET_TEST_MODE', payload: payload.enabled });
           break;
-        case 'showHistory':
+        case 'showHistory': 
           dispatch({ type: 'SET_SHOW_HISTORY', payload: true });
           if (state.chatList.length === 0) {
             postMessageToBackend('command', { command: 'getChatHistory' });
@@ -253,7 +293,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     win.addEventListener('message', handleMessage);
-    postMessageToBackend('uiReady');
+    postMessageToBackend('uiReady'); 
 
     const observer = new MutationObserver(() => {
       const isDark = body.classList.contains('vscode-dark');
@@ -261,15 +301,16 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
         dispatch({ type: 'TOGGLE_DARK_MODE' });
       }
     });
-    observer.observe(body, { 
-      attributes: true, 
-      attributeFilter: ['class'] 
+    observer.observe(body, {
+      attributes: true,
+      attributeFilter: ['class']
     });
 
     return () => {
       win.removeEventListener('message', handleMessage);
       observer.disconnect();
     };
+
   }, [state.isDarkMode, state.chatList.length]); 
 
   const sendMessage = (text: string, files: string[] = []) => {
@@ -281,7 +322,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       files: files,
     };
     dispatch({ type: 'ADD_MESSAGE', payload: userMessage });
-    dispatch({ type: 'SET_LOADING', payload: true });
+    dispatch({ type: 'SET_LOADING', payload: { loading: true, text: DEFAULT_LOADING_TEXT } }); // Iniciar carga global
     postMessageToBackend('userMessageSent', { text, files });
   };
 

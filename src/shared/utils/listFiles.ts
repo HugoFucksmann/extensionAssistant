@@ -2,7 +2,7 @@
 
 type ListedFile = { path: string; type: 'file' | 'directory' | 'symbolicLink' | 'unknown' };
 
-// Utilidad para listar archivos en el workspace (NO como tool)
+
 export async function listFilesUtil(vscodeAPI: typeof import('vscode'), pattern = '**/*', maxResults = 1000): Promise<ListedFile[]> {
   const workspaceFolder = vscodeAPI.workspace.workspaceFolders?.[0];
   if (!workspaceFolder) return [];
@@ -15,7 +15,7 @@ export async function listFilesUtil(vscodeAPI: typeof import('vscode'), pattern 
       if (stat.type === vscodeAPI.FileType.File) fileType = 'file';
       else if (stat.type === vscodeAPI.FileType.Directory) fileType = 'directory';
       else if (stat.type === vscodeAPI.FileType.SymbolicLink) fileType = 'symbolicLink';
-    } catch (e) {}
+    } catch (e) { }
     return { path: vscodeAPI.workspace.asRelativePath(uri, false), type: fileType };
   });
   return Promise.all(filesPromises);

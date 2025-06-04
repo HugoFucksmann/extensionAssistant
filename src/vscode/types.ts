@@ -1,20 +1,6 @@
 // src/vscode/types.ts
 import * as vscode from 'vscode';
 
-// LAS SIGUIENTES LÍNEAS HAN SIDO ELIMINADAS:
-// declare global {
-//   const window: any;
-//   const document: any;
-//   const MutationObserver: {
-//     new(callback: (mutations: any[], observer: any) => void): MutationObserver;
-//   };
-// }
-//
-// interface MutationObserver {
-//   observe(target: any, config: { attributes: boolean; attributeFilter: string[] }): void;
-//   disconnect(): void;
-// }
-
 export interface VSCodeContext {
   extensionUri: vscode.Uri;
   extensionPath: string;

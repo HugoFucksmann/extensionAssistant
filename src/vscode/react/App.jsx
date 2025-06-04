@@ -1,30 +1,14 @@
 import React from 'react';
 import { getThemeCSSVariables } from './theme/theme';
-
 import ChatInput from './Components/InputChat/ChatInput';
 import ChatHistory from './Components/historical/ChatHistory';
-import EmptyChatView from './Components/EmptyChatView';
 import { useApp } from './context/AppContext';
 import ChatMessages from './Components/ChatMessages/new/ChatMessages';
 
 
-
-
-
-const LoadingIndicator = () => {
-  const { theme } = useApp();
-  return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', color: theme.colors.text }}>
-      Loading initial chat...
-    </div>
-  );
-};
-
 const App = () => {
-  const { messages, isLoading, showHistory, theme, activeFeedbackOperationId } = useApp();
-  const isEmpty = messages.length === 0;
-
-  
+  const {showHistory, theme } = useApp();
+ 
   const appContainerStyle = {
     display: 'flex',
     flexDirection: 'column',
@@ -32,20 +16,20 @@ const App = () => {
     ...getThemeCSSVariables(theme),
     backgroundColor: theme.colors.background,
     color: theme.colors.text,
-    overflow: 'hidden', 
+    overflow: 'hidden',
   };
 
   const chatAreaStyle = {
-    flex: 1, 
+    flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    overflow: 'hidden', 
+    overflow: 'hidden',
   };
 
   const chatInputContainerStyle = {
     padding: theme.spacing.medium,
     borderTop: `1px solid ${theme.colors.border}`,
-    backgroundColor: theme.colors.chatInputBg || theme.colors.background, 
+    backgroundColor: theme.colors.chatInputBg || theme.colors.background,
   };
 
   if (showHistory) {
@@ -56,26 +40,14 @@ const App = () => {
     );
   }
 
- 
-  const showTopLevelLoading = isLoading && isEmpty && !activeFeedbackOperationId;
-
-  const showEmptyView = isEmpty && !activeFeedbackOperationId && !showTopLevelLoading;
 
   return (
     <div style={appContainerStyle}>
       <main style={chatAreaStyle}>
-        {showTopLevelLoading ? (
-          <LoadingIndicator />
-        ) : showEmptyView ? (
-          <EmptyChatView />
-        ) : (
-          <>
             <ChatMessages />
             <div style={chatInputContainerStyle}>
               <ChatInput />
             </div>
-          </>
-        )}
       </main>
     </div>
   );

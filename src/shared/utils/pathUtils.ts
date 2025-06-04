@@ -13,9 +13,9 @@ async function findFilesByPattern(
   try {
     const escapedName = fileName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const pattern = fuzzyMatch ? `**/*${escapedName}*` : `**/${escapedName}`;
-    
+
     const files = await vscodeAPI.workspace.findFiles(pattern, '**/node_modules/**');
-    
+
     return files.map(uri => ({
       uri,
       relativePath: vscodeAPI.workspace.asRelativePath(uri, false)
@@ -34,7 +34,7 @@ async function getWorkspaceSample(vscodeAPI: typeof vscode, maxFiles: number = 1
     const extensions = ['.ts', '.js', '.tsx', '.jsx', '.html', '.css', '.json'];
     const pattern = `**/*{${extensions.join(',')}}`;
     const files = await vscodeAPI.workspace.findFiles(pattern, '**/node_modules/**', maxFiles);
-    
+
     return files.map(uri => vscodeAPI.workspace.asRelativePath(uri, false));
   } catch (error) {
     console.error('Error getting workspace sample:', error);
@@ -48,10 +48,10 @@ async function getWorkspaceSample(vscodeAPI: typeof vscode, maxFiles: number = 1
 function normalizePath(filePath: string): string {
   let normalized = filePath.replace(/\\/g, '/').replace(/\/+/g, '/');
   normalized = normalized.replace(/(\/|^)\.\/(?!\.)/g, '$1');
-  
+
   const parts = normalized.split('/');
   const result = [];
-  
+
   for (const part of parts) {
     if (part === '..') {
       if (result.length > 0 && result[result.length - 1] !== '..') {
@@ -63,7 +63,7 @@ function normalizePath(filePath: string): string {
       result.push(part);
     }
   }
-  
+
   return result.join('/');
 }
 
@@ -84,7 +84,7 @@ export interface FileResolutionResult {
 export function buildWorkspaceUri(vscodeAPI: typeof vscode, relativePath: string): vscode.Uri | undefined {
   const workspaceFolders = vscodeAPI.workspace.workspaceFolders;
   if (!workspaceFolders?.length) return undefined;
-  
+
   try {
     const normalizedPath = normalizePath(relativePath);
     const cleanPath = normalizedPath.startsWith('./') ? normalizedPath.substring(2) : normalizedPath;
@@ -104,7 +104,7 @@ export async function resolveFileFromInput(
   maxSuggestions: number = 10
 ): Promise<FileResolutionResult> {
   const cleanInput = input.trim();
-  
+
   if (!cleanInput) {
     return {
       success: false,
@@ -122,7 +122,7 @@ export async function resolveFileFromInput(
       uri,
       relativePath: vscodeAPI.workspace.asRelativePath(uri, false)
     };
-  } catch {}
+  } catch { }
 
   // Try workspace-relative path
   try {
@@ -135,12 +135,12 @@ export async function resolveFileFromInput(
         relativePath: vscodeAPI.workspace.asRelativePath(uri, false)
       };
     }
-  } catch {}
+  } catch { }
 
   // Search by exact filename
   const fileName = path.basename(cleanInput);
   const exactMatches = await findFilesByPattern(vscodeAPI, fileName, false);
-  
+
   if (exactMatches.length === 1) {
     return {
       success: true,
@@ -151,12 +151,12 @@ export async function resolveFileFromInput(
 
   if (exactMatches.length > 1) {
     // Try to disambiguate by partial path match
-    const pathMatch = exactMatches.find(match => 
-      match.relativePath === cleanInput || 
+    const pathMatch = exactMatches.find(match =>
+      match.relativePath === cleanInput ||
       match.relativePath.endsWith(cleanInput) ||
       cleanInput.endsWith(match.relativePath)
     );
-    
+
     if (pathMatch) {
       return {
         success: true,
@@ -174,7 +174,7 @@ export async function resolveFileFromInput(
 
   // Fuzzy search fallback
   const fuzzyMatches = await findFilesByPattern(vscodeAPI, fileName, true);
-  
+
   if (fuzzyMatches.length > 0) {
     return {
       success: false,
@@ -183,7 +183,7 @@ export async function resolveFileFromInput(
     };
   }
 
-  // No matches - return workspace sample
+
   return {
     success: false,
     error: `File not found: ${cleanInput}`,

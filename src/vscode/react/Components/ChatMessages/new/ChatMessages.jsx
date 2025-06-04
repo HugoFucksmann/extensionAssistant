@@ -1,68 +1,59 @@
+import React, { useEffect, useRef } from "react";
+import MessageItem from "./MessageItem";
+import "../styles/ChatMessages.css"; 
+import LoadingIndicator from "./LoadingIndicator";
+import "../styles/LoadingIndicator.css"; 
+import { useApp } from "../../../context/AppContext";
 
-import React, { useEffect, useRef } from "react"
-import MessageItem from "./MessageItem"
-import "../styles/ChatMessages.css"
-import { useApp } from "@vscode/react/context/AppContext"
-import LoadingIndicator from "./LoadingIndicator"
 
 const ChatMessages = () => {
-  const { messages = [], isLoading } = useApp()
-  const messagesEndRef = useRef(null)
-
-  
-    useEffect(() => {
-      console.log('Mensajes de chat recibidos:', messages);
-    }, [messages]);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
+  const { messages = [], isLoading, } = useApp(); 
+  const messagesEndRef = useRef(null);
 
   useEffect(() => {
-    scrollToBottom()
-  }, [messages])
-
-
  
-  
+  }, [messages]);
 
-  return (<>
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+
+  const displayableMessages = messages.filter(msg => {
+    const phase = msg.metadata?.phase;
+   
+    if (phase && (msg.metadata?.status === 'phase_started' || msg.metadata?.status === 'phase_completed')) {
+     
+      return !!msg.metadata?.toolName; 
+    }
+    return true;
+  });
+
+
+
+
+  return (
     <div className="chat-messages">
       <div className="messages-container">
-        {messages.length === 0 ? (
+        {displayableMessages.length === 0 && !isLoading ? ( 
           <div className="empty-messages">
-            <p>No messages yet. Start a conversation!</p>
+          
           </div>
         ) : (
-          (() => {
-            // Filtro: solo el último mensaje por toolName+toolInput+sender
-            const toolMsgMap = new Map();
-            const result = [];
-            for (let i = messages.length - 1; i >= 0; i--) {
-              const m = messages[i];
-              const meta = m?.metadata || {};
-              if (meta.toolName && meta.toolInput && (m.sender === 'system' || m.sender === 'feedback')) {
-                const key = `${meta.toolName}::${JSON.stringify(meta.toolInput)}::${m.sender}`;
-                if (!toolMsgMap.has(key)) {
-                  toolMsgMap.set(key, true);
-                  result.unshift(m);
-                }
-              } else {
-                // Mensajes normales, siempre incluir (puede haber varios)
-                result.unshift(m);
-              }
-            }
-            return result.map((message, index) => (
-              <MessageItem key={message?.id || `msg-${index}`} message={message} />
-            ));
-          })()
+          displayableMessages.map((message, index) => (
+            <MessageItem key={message?.operationId || message?.id || `msg-${index}`} message={message} />
+          ))
         )}
         <div ref={messagesEndRef} />
       </div>
+   
+      {isLoading && <LoadingIndicator />}
     </div>
-    {!isLoading && <LoadingIndicator />}
-    </>
-  )
-}
+  );
+};
 
-export default ChatMessages
+export default ChatMessages;

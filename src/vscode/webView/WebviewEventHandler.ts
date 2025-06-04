@@ -11,7 +11,7 @@ import {
 } from '../../features/events/eventTypes';
 import { WebviewStateManager } from './WebviewStateManager';
 import { ChatMessage } from '../../features/chat/types';
-import { mapToolResponse, ToolOutput } from './utils/toolResponseMapper';
+import { mapToolResponse } from './utils/toolResponseMapper';
 import { IConversationManager } from '../../core/interfaces/IConversationManager';
 import { ToolResult } from '../../features/tools/types';
 
@@ -61,9 +61,9 @@ export class WebviewEventHandler {
     let chatMessage: ChatMessage | null = null;
     let messageTypeForPost: string | null = null;
 
-    // Filtrar eventos que no son para el chat activo, excepto errores del sistema
+
     if (event.type !== EventType.SYSTEM_ERROR && event.payload.chatId && event.payload.chatId !== this.currentChatId) {
-      // console.log(`[WebviewEventHandler] Event ${event.type} for different chat ${event.payload.chatId}, current is ${this.currentChatId}. Skipping UI update.`);
+
       return;
     }
 
@@ -86,8 +86,7 @@ export class WebviewEventHandler {
 
       case EventType.RESPONSE_GENERATED:
         const responsePayload = event.payload as ResponseEventPayload;
-        // Ya no filtramos por isFinal aquí, el motor ReAct solo debería enviar un RESPONSE_GENERATED final.
-        // El filtrado por chatId ya se hace arriba.
+
         chatMessage = this.handleResponseGenerated(responsePayload, event.id);
         messageTypeForPost = 'assistantResponse';
         break;
@@ -116,7 +115,7 @@ export class WebviewEventHandler {
 
   private createBaseChatMessage(eventId: string, sender: ChatMessage['sender'], operationId?: string): Partial<ChatMessage> {
     return {
-      id: operationId || eventId, // Usar operationId si está disponible para agrupar mensajes de una misma operación
+      id: operationId || eventId,
       operationId: operationId,
       timestamp: Date.now(),
       sender: sender,
@@ -199,18 +198,18 @@ export class WebviewEventHandler {
   private handleToolExecutionCompleted(payload: ToolExecutionEventPayload, eventId: string): ChatMessage {
     const chatMsg = this.createBaseChatMessage(eventId, 'system', payload.operationId) as ChatMessage;
 
-    // Construir ToolResult a partir del payload del evento
+
     const toolResultFromEvent: ToolResult<any> = {
-      success: payload.toolSuccess === true, // payload.toolSuccess puede ser true, false, o undefined (asumir true si undefined)
+      success: payload.toolSuccess === true,
       data: payload.rawToolOutput,
       error: payload.toolSuccess === false ? payload.error : undefined,
       executionTime: payload.duration,
-      warnings: (payload.rawToolOutput as any)?.warnings || (payload.result as any)?.meta?.warnings // Intentar obtener warnings
+      warnings: (payload.rawToolOutput as any)?.warnings || (payload.result as any)?.meta?.warnings
     };
 
     const mappedOutput = mapToolResponse(
       payload.toolName || 'UnknownTool',
-      toolResultFromEvent // Usar el ToolResult construido
+      toolResultFromEvent
     );
 
     let contentLines: string[] = [];
@@ -255,10 +254,10 @@ export class WebviewEventHandler {
   private handleToolExecutionError(payload: ToolExecutionEventPayload, eventId: string): ChatMessage {
     const chatMsg = this.createBaseChatMessage(eventId, 'system', payload.operationId) as ChatMessage;
 
-    // Construir ToolResult a partir del payload del evento
+
     const toolResultFromEvent: ToolResult<any> = {
-      success: false, // Es un error, así que success es false
-      data: payload.rawToolOutput, // Puede haber datos parciales o de contexto
+      success: false,
+      data: payload.rawToolOutput,
       error: payload.error || 'Error desconocido al ejecutar la herramienta.',
       executionTime: payload.duration,
       warnings: (payload.rawToolOutput as any)?.warnings || (payload.result as any)?.meta?.warnings
@@ -266,7 +265,7 @@ export class WebviewEventHandler {
 
     const mappedOutput = mapToolResponse(
       payload.toolName || 'UnknownTool',
-      toolResultFromEvent // Usar el ToolResult construido
+      toolResultFromEvent
     );
 
     chatMsg.content = mappedOutput.title;
@@ -316,8 +315,8 @@ export class WebviewEventHandler {
     chatMsg.content = payload.responseContent;
     chatMsg.metadata = {
       ...chatMsg.metadata,
-      status: 'success', // Asumimos éxito si se genera una respuesta
-      // isFinalToolResponse: payload.metadata?.isFinalToolResponse, // Quitado, ya que ReAct solo debería enviar una final
+      status: 'success',
+
       processingTime: payload.duration,
       ...(payload.metadata || {}),
     };

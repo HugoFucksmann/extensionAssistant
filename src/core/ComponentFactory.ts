@@ -1,6 +1,5 @@
 // src/core/ComponentFactory.ts
 import * as vscode from 'vscode';
-import { VSCodeContext } from '../vscode/types';
 
 import { ModelManager } from '../features/ai/ModelManager';
 import { ToolRegistry } from '../features/tools/ToolRegistry';
@@ -18,7 +17,7 @@ export class ComponentFactory {
   private static internalEventDispatcherInstance: InternalEventDispatcher;
 
   private static toolRegistryInstance: ToolRegistry;
-  private static vscodeContextInstance: VSCodeContext;
+
   private static modelManagerInstance: ModelManager;
 
   private static optimizedReActEngineInstance: OptimizedReActEngine;
@@ -33,20 +32,7 @@ export class ComponentFactory {
     return this.internalEventDispatcherInstance;
   }
 
-  private static getVSCodeContext(extensionContext: vscode.ExtensionContext): VSCodeContext {
-    if (!this.vscodeContextInstance) {
-      this.vscodeContextInstance = {
-        extensionUri: extensionContext.extensionUri,
-        extensionPath: extensionContext.extensionPath,
-        subscriptions: extensionContext.subscriptions,
-        outputChannel: vscode.window.createOutputChannel("Extension Assistant Log"),
-        globalState: extensionContext.globalState,
-        workspaceState: extensionContext.workspaceState,
-      };
 
-    }
-    return this.vscodeContextInstance;
-  }
 
   public static getToolRegistry(): ToolRegistry {
     if (!this.toolRegistryInstance) {
@@ -99,15 +85,15 @@ export class ComponentFactory {
 
   public static getApplicationLogicService(extensionContext: vscode.ExtensionContext): ApplicationLogicService {
     if (!this.applicationLogicServiceInstance) {
-      // Get the reActEngine first, which will create its dependencies
+
       const reActEngine = this.getOptimizedReActEngine(extensionContext);
 
-      // Get the instances that were created by getOptimizedReActEngine
+
       const longTermStorage = this.getLongTermStorage(extensionContext);
       const toolRegistry = this.getToolRegistry();
       const conversationMemoryManager = new ConversationMemoryManager(longTermStorage);
-      // const conversationManager = new ConversationManager(); // <--- LÍNEA ANTIGUA
-      const conversationManager = this.getConversationManager(); // <--- LÍNEA NUEVA: Usar el getter del singleton
+
+      const conversationManager = this.getConversationManager();
 
       this.applicationLogicServiceInstance = new ApplicationLogicService(
         conversationMemoryManager,
@@ -128,7 +114,7 @@ export class ComponentFactory {
   }
 
   public static async dispose(): Promise<void> {
-    // Descartar instancias en orden inverso al de creación
+
     if (this.optimizedReActEngineInstance && typeof this.optimizedReActEngineInstance.dispose === 'function') {
       this.optimizedReActEngineInstance.dispose();
       this.optimizedReActEngineInstance = null!;
