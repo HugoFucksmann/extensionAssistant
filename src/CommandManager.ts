@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
-import { WebviewProvider } from './vscode/webView/webviewProvider';
+import { WebviewProvider } from './vscode/webView/core/WebviewProvider';
 
 export class CommandManager {
-  constructor(private readonly webviewProvider: WebviewProvider) {}
+  constructor(private readonly webviewProvider: WebviewProvider) { }
 
   public getCommands(): vscode.Disposable[] {
     return [
@@ -37,5 +37,5 @@ export class CommandManager {
     });
   }
 
- 
+
 }
