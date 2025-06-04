@@ -1,3 +1,5 @@
+// src/vscode/webView/webviewProvider.ts
+
 import * as vscode from 'vscode';
 import { getReactHtmlContent } from './htmlTemplate';
 import { ApplicationLogicService } from '../../core/ApplicationLogicService';
@@ -22,18 +24,20 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     private readonly conversationManager: IConversationManager
   ) {
     this.stateManager = new WebviewStateManager();
-    this.messageHandler = new WebviewMessageHandler(
-      this.appLogicService,
-      this.conversationManager,
-      this.stateManager,
-      this.postMessage.bind(this),
-      this.internalEventDispatcher
-    );
+    // Instanciar WebviewEventHandler PRIMERO si WebviewMessageHandler depende de él
     this.eventHandler = new WebviewEventHandler(
       this.internalEventDispatcher,
       this.conversationManager,
       this.stateManager,
       this.postMessage.bind(this)
+    );
+    this.messageHandler = new WebviewMessageHandler(
+      this.appLogicService,
+      this.conversationManager,
+      this.stateManager,
+      this.postMessage.bind(this),
+      this.internalEventDispatcher,
+      this.eventHandler // <--- ARGUMENTO AÑADIDO
     );
   }
 
@@ -41,6 +45,8 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     this.view = webviewView;
     this.setupWebview();
     this.setupMessageHandling();
+    // Asegurarse de que eventHandler esté completamente inicializado antes de suscribirse
+    // this.eventHandler ya está inicializado en el constructor
     this.eventHandler.subscribeToEvents();
   }
 

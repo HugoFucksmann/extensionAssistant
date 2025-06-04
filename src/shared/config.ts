@@ -1,3 +1,4 @@
+// src/shared/config.ts
 
 type Environment = 'development' | 'production';
 
@@ -7,14 +8,12 @@ interface ReactConfig {
   maxTokens: number;
 }
 
-
-
 interface MemoryConfig {
   persistenceEnabled: boolean;
   storageLocation: string;
-  shortTermExpiry: number;
-  mediumTermExpiry: number;
-
+  shortTermExpiry: number; // Ya existe
+  mediumTermExpiry: number; // Ya existe
+  maxShortTermReActItems: number; // <--- NUEVO para ReActCycleMemory
 }
 
 interface ToolsConfig {
@@ -22,9 +21,8 @@ interface ToolsConfig {
   timeoutMs: number;
 }
 
-
 interface LoggingConfig {
-  level: 'debug' | 'info'; // Nivel global para la consola
+  level: 'debug' | 'info';
   logToConsole: boolean;
   logToFile: boolean;
 }
@@ -39,7 +37,7 @@ interface BackendConfig {
 export const getConfig = (env: Environment): { backend: BackendConfig } => {
   const baseBackendConfig: BackendConfig = {
     react: {
-      maxIterations: 15,
+      maxIterations: 10, // <--- VALOR POR DEFECTO (antes estaba en OptimizedReActEngine)
       temperature: 0.2,
       maxTokens: 4096
     },
@@ -48,7 +46,7 @@ export const getConfig = (env: Environment): { backend: BackendConfig } => {
       storageLocation: 'user',
       shortTermExpiry: 24 * 60 * 60 * 1000,
       mediumTermExpiry: 7 * 24 * 60 * 60 * 1000,
-
+      maxShortTermReActItems: 20, // <--- VALOR POR DEFECTO (antes estaba en ReActCycleMemory)
     },
     tools: {
       maxConcurrentTools: 3,
@@ -57,14 +55,11 @@ export const getConfig = (env: Environment): { backend: BackendConfig } => {
     logging: {
       level: env === 'development' ? 'debug' : 'info',
       logToConsole: true,
-      logToFile: true
+      logToFile: true // Asumiendo que quieres mantener esto configurable aquí
     }
   };
-
 
   return {
     backend: baseBackendConfig,
   };
 };
-
-

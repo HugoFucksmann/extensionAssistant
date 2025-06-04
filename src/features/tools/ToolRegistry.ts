@@ -53,9 +53,9 @@ export class ToolRegistry {
 
 
   private prepareToolResult<T>(
-    toolName: string, 
-    data: T | undefined, 
-    success: boolean, 
+    toolName: string,
+    data: T | undefined,
+    success: boolean,
     errorMsg?: string
   ): ToolResult<T> {
     return {
@@ -73,7 +73,7 @@ export class ToolRegistry {
     const operationId = executionCtxArgs.operationId || generateUniqueId();
     const startTime = Date.now();
     const tool = this.getTool(name);
-    
+
     // Obtener la descripción para UI desde la herramienta
     const toolDescriptionForUI = tool && typeof tool.getUIDescription === 'function'
       ? tool.getUIDescription(rawParams)
@@ -83,19 +83,19 @@ export class ToolRegistry {
       toolName: name,
       parameters: rawParams,
       toolDescription: toolDescriptionForUI,
-      toolParams: rawParams,
       chatId: executionCtxArgs.chatId,
       source: 'ToolRegistry',
       operationId,
       timestamp: Date.now(),
+
     };
-    
+
     this.dispatcher.dispatch(EventType.TOOL_EXECUTION_STARTED, startPayload);
 
     if (!tool) {
       const errorMsg = `Herramienta no encontrada: ${name}`;
       const executionTime = Date.now() - startTime;
-      
+
       return {
         success: false,
         error: errorMsg,
@@ -127,7 +127,7 @@ export class ToolRegistry {
     try {
       const toolExecuteOutcome = await tool.execute(validatedParams, executionContext);
       const executionTime = Date.now() - startTime;
-      
+
       return {
         ...toolExecuteOutcome,
         executionTime,
@@ -135,7 +135,7 @@ export class ToolRegistry {
     } catch (error: any) {
       const executionTime = Date.now() - startTime;
       const errorMsg = `Error inesperado al ejecutar la herramienta ${name}: ${error.message}`;
-      
+
       return {
         success: false,
         error: errorMsg,

@@ -101,12 +101,13 @@ export class ComponentFactory {
     if (!this.applicationLogicServiceInstance) {
       // Get the reActEngine first, which will create its dependencies
       const reActEngine = this.getOptimizedReActEngine(extensionContext);
-      
+
       // Get the instances that were created by getOptimizedReActEngine
       const longTermStorage = this.getLongTermStorage(extensionContext);
       const toolRegistry = this.getToolRegistry();
       const conversationMemoryManager = new ConversationMemoryManager(longTermStorage);
-      const conversationManager = new ConversationManager();
+      // const conversationManager = new ConversationManager(); // <--- LÍNEA ANTIGUA
+      const conversationManager = this.getConversationManager(); // <--- LÍNEA NUEVA: Usar el getter del singleton
 
       this.applicationLogicServiceInstance = new ApplicationLogicService(
         conversationMemoryManager,

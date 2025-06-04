@@ -1,31 +1,31 @@
 // src/features/memory/ReActCycleMemory.ts
 
 import { LongTermStorage } from './LongTermStorage';
+import { getConfig } from '../../shared/config';
 
 
+export type ReActCycleMemoryType =
+  | 'context'
+  | 'codebase'
+  | 'user'
+  | 'tools'
+  | 'reasoning';
 
-export type ReActCycleMemoryType = 
-  | 'context' 
-  | 'codebase' 
-  | 'user'     
-  | 'tools'     
-  | 'reasoning'; 
 
-// Estructura de un elemento de memoria
 export interface ReActCycleMemoryItem {
   id: string;
   type: ReActCycleMemoryType;
   content: any;
-  relevance: number;  // 0-1, qué tan relevante es para el contexto actual
+  relevance: number;
   timestamp: number;
   metadata?: Record<string, any>;
 }
 
-// Estado de memoria del agente durante una conversación
+
 export interface ReActCycleMemoryState {
   chatId: string;
-  shortTermMemory: ReActCycleMemoryItem[];  // Memoria de la conversación actual
-  relevantLongTermMemory: ReActCycleMemoryItem[];  // Memoria relevante recuperada del almacenamiento
+  shortTermMemory: ReActCycleMemoryItem[];
+  relevantLongTermMemory: ReActCycleMemoryItem[];
   currentContext: {
     userQuery: string;
     codeContext?: string;
@@ -40,8 +40,8 @@ export interface ReActCycleMemoryState {
 
 export class ReActCycleMemory {
   private state: ReActCycleMemoryState;
-  private static MAX_SHORT_TERM_ITEMS = 20;
-  
+  private readonly MAX_SHORT_TERM_ITEMS: number;
+
   constructor(
     private storage: LongTermStorage,
     chatId: string,
@@ -57,6 +57,8 @@ export class ReActCycleMemory {
         memorySize: 0
       }
     };
+    const config = getConfig(process.env.NODE_ENV === 'production' ? 'production' : 'development');
+    this.MAX_SHORT_TERM_ITEMS = config.backend.memory.maxShortTermReActItems;
   }
 
   /**
@@ -69,16 +71,16 @@ export class ReActCycleMemory {
       id,
       timestamp: Date.now()
     };
-    
+
     this.state.shortTermMemory.push(memoryItem);
-    
+
     // Limitar el tamaño de la memoria a corto plazo
-    if (this.state.shortTermMemory.length > ReActCycleMemory.MAX_SHORT_TERM_ITEMS) {
+    if (this.state.shortTermMemory.length > this.MAX_SHORT_TERM_ITEMS) {
       // Eliminar los elementos menos relevantes primero
       this.state.shortTermMemory.sort((a, b) => b.relevance - a.relevance);
-      this.state.shortTermMemory = this.state.shortTermMemory.slice(0, ReActCycleMemory.MAX_SHORT_TERM_ITEMS);
+      this.state.shortTermMemory = this.state.shortTermMemory.slice(0, this.MAX_SHORT_TERM_ITEMS);
     }
-    
+
     this.updateMetadata();
     return id;
   }
@@ -89,19 +91,19 @@ export class ReActCycleMemory {
   public async retrieveRelevantMemory(query: string, limit: number = 5): Promise<ReActCycleMemoryItem[]> {
     try {
       const results = await this.storage.search(query, limit);
-      
+
       const memoryItems: ReActCycleMemoryItem[] = results.map(result => ({
         id: result.key,
         type: result.metadata.type || 'context',
         content: result.data,
-        relevance: 0.8, // Valor por defecto, se podría calcular basado en la similitud
+        relevance: 0.8,
         timestamp: new Date(result.metadata.updatedAt || Date.now()).getTime(),
         metadata: result.metadata
       }));
-      
+
       this.state.relevantLongTermMemory = memoryItems;
       this.updateMetadata();
-      
+
       return memoryItems;
     } catch (error) {
       console.error('Error retrieving relevant memory:', error);
@@ -114,13 +116,13 @@ export class ReActCycleMemory {
    */
   public async persistToLongTermMemory(item: Omit<ReActCycleMemoryItem, 'id' | 'timestamp'>): Promise<string> {
     const id = `ltm_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-    
+
     await this.storage.store(id, item.content, {
       type: item.type,
       relevance: item.relevance,
       ...item.metadata
     });
-    
+
     return id;
   }
 
@@ -144,31 +146,36 @@ export class ReActCycleMemory {
       ...this.state.shortTermMemory,
       ...this.state.relevantLongTermMemory
     ].sort((a, b) => b.relevance - a.relevance);
-    
+
+    // Función auxiliar para formatear el contenido
+    const formatContent = (content: any): string => {
+      return typeof content === 'string' ? content : JSON.stringify(content);
+    };
+
     // Generar resumen estructurado
     const contextItems = allMemory.filter(item => item.type === 'context');
     const codebaseItems = allMemory.filter(item => item.type === 'codebase');
     const userItems = allMemory.filter(item => item.type === 'user');
     const toolItems = allMemory.filter(item => item.type === 'tools');
-    
+
     let summary = '';
-    
+
     if (contextItems.length > 0) {
-      summary += '## Contexto\n' + contextItems.map(item => `- ${JSON.stringify(item.content)}`).join('\n') + '\n\n';
+      summary += '## Contexto\n' + contextItems.map(item => `- ${formatContent(item.content)}`).join('\n') + '\n\n';
     }
-    
+
     if (codebaseItems.length > 0) {
-      summary += '## Codebase\n' + codebaseItems.map(item => `- ${JSON.stringify(item.content)}`).join('\n') + '\n\n';
+      summary += '## Codebase\n' + codebaseItems.map(item => `- ${formatContent(item.content)}`).join('\n') + '\n\n';
     }
-    
+
     if (userItems.length > 0) {
-      summary += '## Usuario\n' + userItems.map(item => `- ${JSON.stringify(item.content)}`).join('\n') + '\n\n';
+      summary += '## Usuario\n' + userItems.map(item => `- ${formatContent(item.content)}`).join('\n') + '\n\n';
     }
-    
+
     if (toolItems.length > 0) {
-      summary += '## Herramientas\n' + toolItems.map(item => `- ${JSON.stringify(item.content)}`).join('\n') + '\n\n';
+      summary += '## Herramientas\n' + toolItems.map(item => `- ${formatContent(item.content)}`).join('\n') + '\n\n';
     }
-    
+
     return summary.trim();
   }
 

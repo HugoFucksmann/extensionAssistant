@@ -1,6 +1,8 @@
+// src/features/ai/lcel/OptimizedAnalysisChain.ts
 import { analysisOutputSchema, analysisPromptLC } from "../prompts/optimized/analysisPrompt";
 import { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { createAutoCorrectStep } from "../../../shared/utils/aiResponseParser";
+import { invokeModelWithLogging } from "./ModelInvokeLogger"; // <--- IMPORTACIÓN ESTÁTICA
 
 export async function runOptimizedAnalysisChain({
   userQuery,
@@ -47,18 +49,15 @@ export async function runOptimizedAnalysisChain({
     const chain = prompt.pipe(model).pipe(parseStep);
 
     try {
+      // const { invokeModelWithLogging } = await import('./ModelInvokeLogger'); // <--- LÍNEA ELIMINADA
 
-      const { invokeModelWithLogging } = await import('./ModelInvokeLogger');
-
-
-      return await invokeModelWithLogging(chain, {
+      return await invokeModelWithLogging(chain, { // <--- USO DIRECTO
         userQuery,
         availableTools: availableTools.join(', '),
         codeContext: codeContext || '',
         memoryContext: memoryContext || ''
       }, {
         caller: 'runOptimizedAnalysisChain',
-
         responseFormatter: (r: unknown) => JSON.stringify(r, null, 2)
       });
 

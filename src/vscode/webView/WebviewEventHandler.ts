@@ -61,6 +61,13 @@ export class WebviewEventHandler {
     let chatMessage: ChatMessage | null = null;
     let messageTypeForPost: string | null = null;
 
+    // Filtrar eventos que no son para el chat activo, excepto errores del sistema
+    if (event.type !== EventType.SYSTEM_ERROR && event.payload.chatId && event.payload.chatId !== this.currentChatId) {
+      // console.log(`[WebviewEventHandler] Event ${event.type} for different chat ${event.payload.chatId}, current is ${this.currentChatId}. Skipping UI update.`);
+      return;
+    }
+
+
     switch (event.type) {
       case EventType.TOOL_EXECUTION_STARTED:
         chatMessage = this.handleToolExecutionStarted(event.payload as ToolExecutionEventPayload, event.id);
@@ -79,10 +86,10 @@ export class WebviewEventHandler {
 
       case EventType.RESPONSE_GENERATED:
         const responsePayload = event.payload as ResponseEventPayload;
-        if (responsePayload.isFinal && responsePayload.chatId === this.currentChatId) {
-          chatMessage = this.handleResponseGenerated(responsePayload, event.id);
-          messageTypeForPost = 'assistantResponse';
-        }
+        // Ya no filtramos por isFinal aquí, el motor ReAct solo debería enviar un RESPONSE_GENERATED final.
+        // El filtrado por chatId ya se hace arriba.
+        chatMessage = this.handleResponseGenerated(responsePayload, event.id);
+        messageTypeForPost = 'assistantResponse';
         break;
 
 
@@ -109,7 +116,7 @@ export class WebviewEventHandler {
 
   private createBaseChatMessage(eventId: string, sender: ChatMessage['sender'], operationId?: string): Partial<ChatMessage> {
     return {
-      id: operationId || eventId,
+      id: operationId || eventId, // Usar operationId si está disponible para agrupar mensajes de una misma operación
       operationId: operationId,
       timestamp: Date.now(),
       sender: sender,
@@ -183,40 +190,35 @@ export class WebviewEventHandler {
       ...chatMsg.metadata,
       status: 'tool_executing',
       toolName: payload.toolName,
-      toolInput: payload.toolParams || payload.parameters,
+      toolInput: payload.parameters, // Usar 'parameters'
     };
     return chatMsg;
   }
 
+
   private handleToolExecutionCompleted(payload: ToolExecutionEventPayload, eventId: string): ChatMessage {
     const chatMsg = this.createBaseChatMessage(eventId, 'system', payload.operationId) as ChatMessage;
 
-    // Assuming payload.result IS the ToolResult object from the tool execution
-    // If payload.result is not the full ToolResult, this needs adjustment.
-    // For now, we construct it if it's not in the expected shape or if payload.toolSuccess is present.
-    let toolResult: ToolResult<any>;
-    if (payload.result && typeof payload.result === 'object' && 'success' in payload.result) {
-      toolResult = payload.result as ToolResult<any>;
-    } else {
-      // Fallback: construct ToolResult from individual payload fields
-      toolResult = {
-        success: payload.toolSuccess !== false, // Default to true if toolSuccess is undefined
-        data: payload.toolSuccess !== false ? payload.result : undefined,
-        error: payload.toolSuccess === false ? payload.error : undefined,
-        // executionTime is not directly available here, mapToolResponse will handle it if present in result.data
-      };
-    }
+    // Construir ToolResult a partir del payload del evento
+    const toolResultFromEvent: ToolResult<any> = {
+      success: payload.toolSuccess === true, // payload.toolSuccess puede ser true, false, o undefined (asumir true si undefined)
+      data: payload.rawToolOutput,
+      error: payload.toolSuccess === false ? payload.error : undefined,
+      executionTime: payload.duration,
+      warnings: (payload.rawToolOutput as any)?.warnings || (payload.result as any)?.meta?.warnings // Intentar obtener warnings
+    };
 
     const mappedOutput = mapToolResponse(
       payload.toolName || 'UnknownTool',
-      toolResult
+      toolResultFromEvent // Usar el ToolResult construido
     );
 
     let contentLines: string[] = [];
     const toolDisplayName = payload.toolDescription || payload.toolName || 'La herramienta';
 
-    if (!toolResult.success) {
-      contentLines.push(`❌ ${toolDisplayName} encontró un error: ${toolResult.error || mappedOutput.summary}`);
+
+    if (!toolResultFromEvent.success) {
+      contentLines.push(`❌ ${toolDisplayName} encontró un error: ${toolResultFromEvent.error || mappedOutput.summary}`);
     } else {
       contentLines.push(`✅ ${toolDisplayName} finalizó correctamente.`);
     }
@@ -224,7 +226,7 @@ export class WebviewEventHandler {
     if (mappedOutput.summary) {
       const shortMessage = mappedOutput.summary.substring(0, 150);
       contentLines.push(`📋 Resultado: ${shortMessage}${mappedOutput.summary.length > 150 ? '...' : ''}`);
-    } else if (mappedOutput.details) { // Fallback if summary is not insightful
+    } else if (mappedOutput.details) {
       const shortMessage = mappedOutput.details.substring(0, 150);
       contentLines.push(`📋 Resultado: ${shortMessage}${mappedOutput.details.length > 150 ? '...' : ''}`);
     }
@@ -237,15 +239,15 @@ export class WebviewEventHandler {
     chatMsg.content = contentLines.join('\n') || `${toolDisplayName} procesada.`;
     chatMsg.metadata = {
       ...chatMsg.metadata,
-      status: toolResult.success ? 'success' : 'error',
+      status: toolResultFromEvent.success ? 'success' : 'error',
       toolName: payload.toolName,
-      toolInput: payload.toolParams || payload.parameters,
-      toolOutput: mappedOutput, // Store the mapped output
-      rawToolOutput: toolResult.data, // Store the data part of the ToolResult
+      toolInput: payload.parameters,
+      toolOutput: mappedOutput,
+      rawToolOutput: payload.rawToolOutput,
       modelAnalysis: payload.modelAnalysis,
-      toolSuccess: toolResult.success, // From ToolResult
-      toolError: toolResult.error,     // From ToolResult
-      warnings: toolResult.warnings,   // From ToolResult
+      toolSuccess: toolResultFromEvent.success,
+      toolError: toolResultFromEvent.error,
+      warnings: toolResultFromEvent.warnings,
     };
     return chatMsg;
   }
@@ -253,24 +255,21 @@ export class WebviewEventHandler {
   private handleToolExecutionError(payload: ToolExecutionEventPayload, eventId: string): ChatMessage {
     const chatMsg = this.createBaseChatMessage(eventId, 'system', payload.operationId) as ChatMessage;
 
-    let toolResult: ToolResult<any>;
-    // Prefer payload.result if it's a ToolResult object, otherwise construct from payload.error
-    if (payload.result && typeof payload.result === 'object' && 'success' in payload.result && (payload.result as ToolResult<any>).success === false) {
-      toolResult = payload.result as ToolResult<any>;
-    } else {
-      toolResult = {
-        success: false,
-        error: payload.error || 'Error desconocido al ejecutar la herramienta.',
-        data: payload.result, // This might contain some context or be undefined
-      };
-    }
+    // Construir ToolResult a partir del payload del evento
+    const toolResultFromEvent: ToolResult<any> = {
+      success: false, // Es un error, así que success es false
+      data: payload.rawToolOutput, // Puede haber datos parciales o de contexto
+      error: payload.error || 'Error desconocido al ejecutar la herramienta.',
+      executionTime: payload.duration,
+      warnings: (payload.rawToolOutput as any)?.warnings || (payload.result as any)?.meta?.warnings
+    };
 
     const mappedOutput = mapToolResponse(
       payload.toolName || 'UnknownTool',
-      toolResult
+      toolResultFromEvent // Usar el ToolResult construido
     );
 
-    chatMsg.content = mappedOutput.title; // Use title from mappedOutput
+    chatMsg.content = mappedOutput.title;
     if (mappedOutput.summary && mappedOutput.summary !== mappedOutput.title) {
       chatMsg.content += `\n${mappedOutput.summary}`;
     }
@@ -279,13 +278,13 @@ export class WebviewEventHandler {
       ...chatMsg.metadata,
       status: 'error',
       toolName: payload.toolName,
-      toolInput: payload.toolParams || payload.parameters,
-      error: toolResult.error, // From (constructed or actual) ToolResult
-      toolOutput: mappedOutput, // Store the mapped output
-      rawToolOutput: toolResult.data, // Store the data part of the ToolResult
+      toolInput: payload.parameters,
+      error: toolResultFromEvent.error,
+      toolOutput: mappedOutput,
+      rawToolOutput: payload.rawToolOutput,
       modelAnalysis: payload.modelAnalysis,
-      toolSuccess: false, // Explicitly false
-      warnings: toolResult.warnings,
+      toolSuccess: false,
+      warnings: toolResultFromEvent.warnings,
     };
     return chatMsg;
   }
@@ -317,8 +316,8 @@ export class WebviewEventHandler {
     chatMsg.content = payload.responseContent;
     chatMsg.metadata = {
       ...chatMsg.metadata,
-      status: 'success',
-      isFinalToolResponse: payload.metadata?.isFinalToolResponse,
+      status: 'success', // Asumimos éxito si se genera una respuesta
+      // isFinalToolResponse: payload.metadata?.isFinalToolResponse, // Quitado, ya que ReAct solo debería enviar una final
       processingTime: payload.duration,
       ...(payload.metadata || {}),
     };

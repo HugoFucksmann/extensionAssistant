@@ -1,9 +1,10 @@
+// src/features/ai/lcel/OptimizedActionChain.ts
 import { actionPromptLC, actionOutputSchema } from "../prompts/optimized/actionPrompt";
 import { formatForPrompt } from "../prompts/promptUtils";
 import { BaseChatModel } from "@langchain/core/language_models/chat_models";
-import { invokeModelWithLogging } from "./ModelInvokeLogger";
+// import { invokeModelWithLogging } from "./ModelInvokeLogger"; // Ya no es necesario aquí si se importa en el otro archivo
 import { createAutoCorrectStep } from "@shared/utils/aiResponseParser";
-
+import { invokeModelWithLogging } from "./ModelInvokeLogger"; // <--- IMPORTACIÓN ESTÁTICA
 
 export async function runOptimizedActionChain({
   userQuery,
@@ -29,8 +30,7 @@ export async function runOptimizedActionChain({
     memoryContext: memoryContext || ''
   };
 
-
-  const { invokeModelWithLogging } = await import('./ModelInvokeLogger');
+  // const { invokeModelWithLogging } = await import('./ModelInvokeLogger'); // <--- LÍNEA ELIMINADA
 
   // Extraer el contenido del AIMessage antes de parsear
   const chain = actionPromptLC.pipe(model).pipe((response: any) => {
@@ -43,7 +43,7 @@ export async function runOptimizedActionChain({
     verbose: process.env.NODE_ENV === 'development'
   }));
 
-  const result = await invokeModelWithLogging(chain, promptInput, { 
+  const result = await invokeModelWithLogging(chain, promptInput, { // <--- USO DIRECTO
     caller: 'runOptimizedActionChain'
   });
 

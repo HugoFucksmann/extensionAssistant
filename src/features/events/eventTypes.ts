@@ -1,6 +1,7 @@
 // src/features/events/eventTypes.ts
 import { ActionOutput } from '@features/ai/prompts/optimized/actionPrompt';
-import { ToolOutput } from '../tools/types';
+import { ToolOutput } from '@vscode/webView/utils/toolResponseMapper';
+
 
 /**
  * All supported event types in the system
@@ -97,7 +98,6 @@ export interface ToolExecutionEventPayload extends BaseEventPayload {
   error?: string;
   duration?: number;
   toolDescription?: string;
-  toolParams?: Record<string, any>;
   isProcessingStep?: boolean;
   modelAnalysis?: ActionOutput | any;
   rawToolOutput?: any;

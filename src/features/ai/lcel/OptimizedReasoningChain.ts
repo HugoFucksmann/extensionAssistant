@@ -1,7 +1,9 @@
+// src/features/ai/lcel/OptimizedReasoningChain.ts
 import { reasoningPromptLC, reasoningOutputSchema } from "../prompts/optimized/reasoningPrompt";
 import { formatForPrompt } from "../prompts/promptUtils";
 import { BaseChatModel } from "@langchain/core/language_models/chat_models";
 import { createAutoCorrectStep } from "@shared/utils/aiResponseParser";
+import { invokeModelWithLogging } from "./ModelInvokeLogger"; // <--- IMPORTACIÓN ESTÁTICA
 
 export async function runOptimizedReasoningChain({
   userQuery,
@@ -27,8 +29,7 @@ export async function runOptimizedReasoningChain({
     memoryContext: memoryContext || ''
   };
 
-
-  const { invokeModelWithLogging } = await import('./ModelInvokeLogger');
+  // const { invokeModelWithLogging } = await import('./ModelInvokeLogger'); // <--- LÍNEA ELIMINADA
 
   // Extraer el contenido del AIMessage antes de parsear
   const chain = reasoningPromptLC.pipe(model).pipe((response: any) => {
@@ -41,7 +42,7 @@ export async function runOptimizedReasoningChain({
     verbose: process.env.NODE_ENV === 'development'
   }));
 
-  const result = await invokeModelWithLogging(chain, promptInput, { 
+  const result = await invokeModelWithLogging(chain, promptInput, { // <--- USO DIRECTO
     caller: 'runOptimizedReasoningChain'
   });
 

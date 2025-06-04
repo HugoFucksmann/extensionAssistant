@@ -14,20 +14,24 @@ import { ActionOutput } from '../features/ai/prompts/optimized/actionPrompt';
 import { ResponseOutput } from '../features/ai/prompts/optimized/responsePrompt';
 import { ReActCycleMemory } from '../features/memory/ReActCycleMemory';
 import { LongTermStorage } from '../features/memory/LongTermStorage';
-import { z } from 'zod';
+import { z, ZodObject, ZodOptional, ZodEffects, ZodTypeAny } from 'zod'; // ZodObject y ZodOptional añadidos
 import { ToolResult as InternalToolResult } from '../features/tools/types';
+import { getConfig } from '../shared/config';
 
 export class OptimizedReActEngine {
   private toolsDescriptionCache: string | null = null;
-  private MAX_ITERATIONS = 10;
+  private readonly MAX_ITERATIONS: number;
 
   constructor(
     private modelManager: ModelManager,
     private toolRegistry: ToolRegistry,
     private dispatcher: InternalEventDispatcher,
-    private longTermStorage: LongTermStorage
+    private longTermStorage: LongTermStorage,
+
   ) {
     this.dispatcher.systemInfo('OptimizedReActEngine initialized.', { source: 'OptimizedReActEngine' }, 'OptimizedReActEngine');
+    const config = getConfig(process.env.NODE_ENV === 'production' ? 'production' : 'development');
+    this.MAX_ITERATIONS = config.backend.react.maxIterations;
   }
 
   private getToolsDescription(): string {
@@ -41,39 +45,68 @@ export class OptimizedReActEngine {
           this.zodSchemaToDescription(tool.parametersSchema) :
           'No requiere parámetros';
 
-        return `${tool.name}: ${tool.description}\nParámetros: ${paramsDescription}`;
+        return `${tool.name}: ${tool.description}\nParámetros:\n${paramsDescription}`; // Ajuste para mejor formato
       })
       .join('\n\n');
 
     return this.toolsDescriptionCache;
   }
 
+  // REFACTORIZACIÓN DE zodSchemaToDescription
   private zodSchemaToDescription(schema: z.ZodTypeAny): string {
-    if (!schema || !schema._def) return "No se definieron parámetros.";
+    if (!schema) return "No se definieron parámetros.";
 
+    // Si el esquema tiene una descripción de alto nivel, úsala.
+    if (schema.description) {
+      return schema.description;
+    }
+
+    // Intentar manejar diferentes tipos de esquemas Zod de forma más segura
     try {
-      if (schema._def.typeName === 'ZodObject') {
-        const shape = schema._def.shape;
-        if (!shape) return "Esquema de objeto sin forma definida.";
+      // Caso para ZodObject
+      if (schema instanceof ZodObject) {
+        const shape = schema.shape as Record<string, ZodTypeAny>;
+        if (!shape || Object.keys(shape).length === 0) return "El objeto de parámetros no tiene campos definidos.";
 
         return Object.entries(shape)
-          .map(([key, val]: [string, any]) => {
-            const isOptional = val._def?.typeName === 'ZodOptional' || val.isOptional();
-            const innerType = isOptional ? (val._def?.innerType || val._def?.schema || val) : val;
-            const typeDesc = innerType._def?.typeName?.replace('Zod', '').toLowerCase() || 'unknown';
-            const description = innerType.description ? ` - ${innerType.description}` : '';
+          .map(([key, val]: [string, ZodTypeAny]) => {
+            let currentVal = val;
+            let isOptional = false;
 
-            return `- ${key}${isOptional ? ' (opcional)' : ' (requerido)'}: ${typeDesc}${description}`;
+            // Desenvolver ZodOptional y ZodEffects para llegar al tipo subyacente
+            if (currentVal instanceof ZodOptional) {
+              isOptional = true;
+              currentVal = currentVal._def.innerType;
+            }
+            if (currentVal instanceof ZodEffects) {
+              currentVal = currentVal._def.schema;
+              // Comprobar de nuevo si el esquema interno es opcional
+              if (currentVal instanceof ZodOptional) {
+                isOptional = true;
+                currentVal = currentVal._def.innerType;
+              }
+            }
+
+            const typeName = (currentVal._def?.typeName || 'unknown').replace('Zod', '').toLowerCase();
+            const description = currentVal.description ? ` - ${currentVal.description}` : '';
+
+            return `  - ${key}${isOptional ? ' (opcional)' : ' (requerido)'}: ${typeName}${description}`;
           })
           .join('\n');
-      } else if (schema.description) {
+      }
+      // Caso para otros tipos con descripción (aunque ya cubierto arriba)
+      else if (schema.description) {
         return schema.description;
+      }
+      // Fallback para tipos simples o desconocidos
+      else if (schema._def?.typeName) {
+        return `Tipo: ${schema._def.typeName.replace('Zod', '').toLowerCase()}`;
       } else {
-        return `Parámetro de tipo: ${schema._def.typeName?.replace('Zod', '').toLowerCase() || 'desconocido'}`;
+        return "No se pudo determinar la estructura detallada de los parámetros. Consulte la definición de la herramienta.";
       }
     } catch (error) {
       console.error('Error al convertir esquema Zod a descripción:', error);
-      return "Error al procesar el esquema de parámetros.";
+      return "Error al procesar el esquema de parámetros. Consulte la definición de la herramienta.";
     }
   }
 
@@ -251,7 +284,7 @@ export class OptimizedReActEngine {
                 name: reasoningResult.tool!,
                 parameters: toolExecParams,
                 status: internalToolResult.success ? 'completed' : 'error',
-                result: internalToolResult.mappedOutput,
+                result: internalToolResult.data, // CAMBIO: Usar internalToolResult.data en lugar de mappedOutput para el historial
                 error: internalToolResult.error,
                 startTime: toolExecutionStartTime,
                 endTime: Date.now(),
@@ -269,9 +302,8 @@ export class OptimizedReActEngine {
               content: {
                 tool: reasoningResult.tool!,
                 result: internalToolResult.success ?
-                  (typeof internalToolResult.mappedOutput?.summary === 'string' ? internalToolResult.mappedOutput.summary.substring(0, 200) :
-                    typeof internalToolResult.data === 'string' ? internalToolResult.data.substring(0, 200) :
-                      'Datos obtenidos correctamente') :
+                  (typeof internalToolResult.data === 'string' ? internalToolResult.data.substring(0, 200) : // Simplificado, ya que mappedOutput no está aquí
+                    'Datos obtenidos correctamente') :
                   `Error: ${internalToolResult.error}`
               },
               relevance: 0.9
@@ -293,7 +325,7 @@ export class OptimizedReActEngine {
             console.log('[OptimizedReActEngine] Resultado de acción:', JSON.stringify(actionResult, null, 2));
             this.addHistoryEntry(currentState, 'action', actionResult, { phase_details: 'action_interpretation' });
 
-            // === EVENTO FINAL DE HERRAMIENTA ===
+
             const finalToolEventPayload: ToolExecutionEventPayload = {
               toolName: reasoningResult.tool!,
               parameters: reasoningResult.parameters ?? undefined,
@@ -301,14 +333,13 @@ export class OptimizedReActEngine {
               source: 'OptimizedReActEngine',
               operationId,
               timestamp: Date.now(),
-              result: internalToolResult.mappedOutput,
               duration: Date.now() - toolExecutionStartTime,
               toolDescription: this.toolRegistry.getTool(reasoningResult.tool!)?.description,
-              toolParams: reasoningResult.parameters ?? undefined,
               isProcessingStep: false,
               modelAnalysis: actionResult,
               rawToolOutput: internalToolResult.data,
               toolSuccess: internalToolResult.success,
+              error: internalToolResult.error
             };
 
 
@@ -316,9 +347,7 @@ export class OptimizedReActEngine {
               this.dispatcher.dispatch(EventType.TOOL_EXECUTION_COMPLETED, finalToolEventPayload);
             } else {
               this.dispatcher.dispatch(EventType.TOOL_EXECUTION_ERROR, {
-                ...finalToolEventPayload,
-                error: internalToolResult.error || "Tool execution failed post-analysis.",
-                toolSuccess: false,
+                ...finalToolEventPayload, // error y toolSuccess ya están en finalToolEventPayload
               });
             }
 
@@ -342,7 +371,6 @@ export class OptimizedReActEngine {
               error: toolError.message,
               duration: Date.now() - toolExecutionStartTime,
               toolDescription: this.toolRegistry.getTool(reasoningResult.tool!)?.description,
-              toolParams: reasoningResult.parameters ?? undefined,
               isProcessingStep: false,
               modelAnalysis: null,
               rawToolOutput: null,
