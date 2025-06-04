@@ -11,9 +11,9 @@ import { JsonMarkdownStructuredOutputParser } from "langchain/output_parsers";
 export const reasoningOutputSchema = z.object({
   reasoning: z.string().describe('Razonamiento detallado sobre cómo resolver la tarea'),
   nextAction: z.enum(['use_tool', 'respond']).describe('Acción a realizar'),
-  tool: z.string().nullable().optional(),       // <-- .optional()
-  parameters: z.record(z.any()).nullable().optional(), // <-- .optional()
-  response: z.string().nullable().optional() // <-- .optional() para hacerlo opcional
+  tool: z.string().nullable().optional().describe('Nombre de la herramienta a usar si nextAction es "use_tool", de lo contrario null.'),
+  parameters: z.record(z.any()).nullable().optional().describe('Parámetros para la herramienta si nextAction es "use_tool", de lo contrario null.'),
+  response: z.string().nullable().optional().describe('Respuesta para el usuario si nextAction es "respond", de lo contrario null.')
 });
 
 // Tipo para la salida del razonamiento
@@ -31,15 +31,15 @@ No incluyas texto explicativo, markdown ni nada fuera del objeto JSON.
 INSTRUCCIONES:
 1. Devuelve solo el JSON.
 2. nextAction: Usa solo 'use_tool' o 'respond'.
-3. tool y parameters: Si nextAction = 'use_tool', proporciona ambos usando la DESCRIPCIÓN DE HERRAMIENTAS.
-4. response: Si nextAction = 'respond', completa ese campo.
+3. tool y parameters: Si nextAction = 'use_tool', proporciona ambos usando la DESCRIPCIÓN DE HERRAMIENTAS. Asegúrate de que el nombre de la herramienta sea exacto.
+4. response: Si nextAction = 'respond', completa ese campo con la respuesta para el usuario.
 5. reasoning: Explica brevemente el razonamiento detrás de la decisión.
 
 DESCRIPCIÓN DE HERRAMIENTAS (nombre, descripción, esquema de parámetros Zod):
 {toolsDescription}
 
 ESQUEMA JSON ESPERADO:
-{{
+{{ // MODIFICADO: Doble llave para escapar
   "reasoning": "string",
   "nextAction": "use_tool", // o "respond"
   "tool": "string | null",
@@ -52,10 +52,10 @@ ESQUEMA JSON ESPERADO:
 Análisis Previo:
 {analysisResult}
 
-Resultados de Herramientas Anteriores (si los hay):
+Resultados de Herramientas Anteriores (si los hay, puede estar vacío):
 {previousToolResults}
 
-Memoria Relevante:
+Memoria Relevante (si aplica):
 {memoryContext}
 `]
 ]);

@@ -2,7 +2,7 @@
 import * as vscode from 'vscode';
 import { z } from 'zod';
 import { ToolDefinition, ToolResult, } from '../../types';
-import { buildWorkspaceUri } from '@shared/utils/pathUtils';
+import { resolveFileFromInput } from '@shared/utils/pathUtils';
 
 
 // Esquema Zod para los parámetros
@@ -44,11 +44,11 @@ export const getDocumentDiagnostics: ToolDefinition<typeof getDocumentDiagnostic
 
     try {
       if (filePath) {
-        const resolvedUri = buildWorkspaceUri(context.vscodeAPI, filePath);
-        if (!resolvedUri) {
+        const resolution = await resolveFileFromInput(context.vscodeAPI, filePath);
+        if (!resolution || !resolution.uri) {
           return { success: false, error: `Could not resolve path in workspace: "${filePath}". Ensure a workspace is open and the path is valid.` };
         }
-        targetUri = resolvedUri;
+        targetUri = resolution.uri;
         documentPathForReturn = context.vscodeAPI.workspace.asRelativePath(targetUri, false);
 
         await context.vscodeAPI.workspace.openTextDocument(targetUri);

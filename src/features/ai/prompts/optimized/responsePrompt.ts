@@ -28,19 +28,25 @@ INSTRUCCIONES:
 3. No incluyas explicaciones adicionales, markdown ni ningún texto fuera del objeto JSON.
 
 ESQUEMA JSON ESPERADO:
-{ "response": "string" }
+{{ // MODIFICADO: Doble llave para escapar
+  "response": "string"
+}}
 
 ANÁLISIS INICIAL:
 {analysisResult}
 
-RESULTADOS DE HERRAMIENTAS UTILIZADAS:
+RESULTADOS DE HERRAMIENTAS UTILIZADAS (puede estar vacío si no se usaron herramientas o se omitieron):
 {toolResults}
+
+MEMORIA RELEVANTE (si aplica):
+{memoryContext}
 `
   ],
   [
     "user",
     `
 Consulta Original del Usuario: "{userQuery}"
+Por favor, genera la respuesta final en el formato JSON especificado.
 `
   ]
 ]);

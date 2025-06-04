@@ -7,7 +7,7 @@ import { allToolDefinitions } from '../features/tools/definitions';
 import { ConversationManager } from './ConversationManager';
 import { ApplicationLogicService } from './ApplicationLogicService';
 import { InternalEventDispatcher } from './events/InternalEventDispatcher';
-import { OptimizedReActEngine } from './OptimizedReActEngine';
+import { OptimizedReActEngine } from '../features/ai/core/OptimizedReActEngine';
 import { MemoryManager } from '../features/memory/MemoryManager';
 
 export class ComponentFactory {

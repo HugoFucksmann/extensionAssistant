@@ -37,7 +37,7 @@ HERRAMIENTAS DISPONIBLES:
 {availableTools}
 
 ESQUEMA JSON ESPERADO:
-{{
+{{ // MODIFICADO: Doble llave para escapar
   "understanding": "string",
   "taskType": "string (Uno de: 'code_explanation', 'code_generation', 'code_modification', 'debugging', 'information_request', 'tool_execution')",
   "requiredTools": "string[]",
@@ -47,10 +47,10 @@ ESQUEMA JSON ESPERADO:
 `],
   ["user", `CONSULTA: "{userQuery}"
 
-CONTEXTO DE CÓDIGO:
+CONTEXTO DE CÓDIGO (si aplica):
 {codeContext}
 
-MEMORIA RELEVANTE:
+MEMORIA RELEVANTE (si aplica):
 {memoryContext}
 `]
 ]);

@@ -1,13 +1,17 @@
 // src/core/ApplicationLogicService.ts
 import { WindsurfState } from './types';
 import { MemoryManager } from '../features/memory/MemoryManager';
-import { OptimizedReActEngine } from './OptimizedReActEngine';
+import { OptimizedReActEngine } from '../features/ai/core/OptimizedReActEngine';
+import { ModelManager } from '../features/ai/ModelManager';
+import { InternalEventDispatcher } from './events/InternalEventDispatcher';
+import { getConfig } from '../shared/config';
 import { ToolRegistry } from '../features/tools/ToolRegistry';
 import { ConversationManager } from './ConversationManager';
 import { ToolResult } from '../features/tools/types';
 import { addErrorToHistory } from './utils/historyUtils';
+import { Disposable } from './interfaces/Disposable';
 
-type ReActEngineType =  OptimizedReActEngine;
+type ReActEngineType = OptimizedReActEngine;
 
 export interface ProcessUserMessageResult {
   success: boolean;
@@ -15,8 +19,6 @@ export interface ProcessUserMessageResult {
   updatedState?: WindsurfState;
   error?: string;
 }
-
-import { Disposable } from './interfaces/Disposable';
 
 export class ApplicationLogicService implements Disposable {
   constructor(

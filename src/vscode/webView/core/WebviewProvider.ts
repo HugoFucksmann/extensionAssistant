@@ -143,12 +143,19 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
 
     public startNewChat(): void {
         try {
-            const newChatId = this.backendAdapter.createNewChat();
+            // Crear nuevo chat a través del conversationManager
+            const newChatId = this.conversationManager.createNewChat();
+            
+            // Asegurarse de que el chat está marcado como activo
+            const activeChatId = this.conversationManager.getActiveChatId();
+            
+            // Actualizar el contexto del mensaje
             this.messageContext.setCurrentChatId(newChatId);
-
+            
+            // Notificar a la UI
             this.postMessage('newChatStarted', {
                 chatId: newChatId,
-                activeChatId: this.backendAdapter.getActiveChatId()
+                activeChatId: activeChatId
             });
         } catch (error) {
             this.errorManager.handleUnexpectedError(

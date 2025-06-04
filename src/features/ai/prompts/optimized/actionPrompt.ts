@@ -7,9 +7,9 @@ import { JsonMarkdownStructuredOutputParser } from "langchain/output_parsers";
 export const actionOutputSchema = z.object({
   interpretation: z.string().describe('Interpretación del resultado de la herramienta'),
   nextAction: z.enum(['use_tool', 'respond']).describe('Siguiente acción a realizar'),
-  tool: z.string().nullable().describe('Nombre de la herramienta a utilizar o null si no aplica'),
-  parameters: z.record(z.any()).nullable().describe('Parámetros para la herramienta o null si no aplica'),
-  response: z.string().nullable().describe('Respuesta final para el usuario o null si no aplica')
+  tool: z.string().nullable().optional().describe('Nombre de la herramienta a utilizar si nextAction es "use_tool", o null si no aplica'),
+  parameters: z.record(z.any()).nullable().optional().describe('Parámetros para la herramienta si nextAction es "use_tool", o null si no aplica'),
+  response: z.string().nullable().optional().describe('Respuesta final para el usuario si nextAction es "respond", o null si no aplica')
 });
 
 // Tipo para la salida de la acción
@@ -25,16 +25,16 @@ Eres un asistente de IA experto en programación. Has ejecutado una herramienta 
 INSTRUCCIONES:
 1. **Interpretación**: Analiza el resultado de la herramienta ejecutada.
 2. **Siguiente Acción**: Decide si debes usar otra herramienta ('use_tool') o si puedes responder directamente ('respond').
-3. **tool y parameters**: Si eliges 'use_tool', proporciona el nombre exacto de la herramienta y sus parámetros.
+3. **tool y parameters**: Si eliges 'use_tool', proporciona el nombre exacto de la herramienta y sus parámetros. Consulta la lista de herramientas disponibles si es necesario.
 4. **response**: Si eliges 'respond', proporciona la respuesta para el usuario.
 5. Devuelve únicamente un objeto JSON válido. No uses markdown ni agregues explicaciones fuera del objeto.
 
 ESQUEMA JSON ESPERADO:
-{{
+{{ // MODIFICADO: Doble llave para escapar
   "interpretation": "string",
   "nextAction": "use_tool", // o "respond", ningún otro valor es válido
-  "tool": "string | null (Uno de: 'getFileContents', 'searchInWorkspace', 'writeToFile')",
-  "parameters": object | null,
+  "tool": "string | null", // Ejemplo: 'getFileContents', 'searchInWorkspace', 'writeToFile'
+  "parameters": "object | null",
   "response": "string | null"
 }}
 `
@@ -43,15 +43,12 @@ ESQUEMA JSON ESPERADO:
     "user",
     `
 Consulta Original del Usuario: {userQuery}
-Acciones Previas (si las hay): {previousActions}
+Acciones Previas (si las hay, puede estar vacío): {previousActions}
 Resultado de la Última Herramienta ({lastToolName}): {lastToolResult}
 Memoria Relevante (si aplica): {memoryContext}
 `
   ]
 ]);
-
-
-
 
 // OutputParser basado en Zod y LangChain
 export const actionOutputParser = new JsonMarkdownStructuredOutputParser(actionOutputSchema);

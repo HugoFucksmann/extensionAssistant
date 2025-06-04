@@ -116,12 +116,19 @@ export class MessageRouter {
 
     private handleNewChatRequest(): void {
         try {
+            // Crear nuevo chat a través del backend
             const newChatId = this.backend.createNewChat();
+            
+            // Obtener el chat activo después de crearlo
+            const activeChatId = this.backend.getActiveChatId();
+            
+            // Actualizar el contexto local
             this.context.setCurrentChatId(newChatId);
 
+            // Notificar a la UI
             this.postMessage('newChatStarted', {
                 chatId: newChatId,
-                activeChatId: this.backend.getActiveChatId()
+                activeChatId: activeChatId
             });
         } catch (error: any) {
             this.errorManager.handleUnexpectedError(error, 'MessageRouter.handleNewChatRequest', this.context.currentChatId);
