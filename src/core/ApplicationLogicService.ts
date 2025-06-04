@@ -1,11 +1,11 @@
 // src/core/ApplicationLogicService.ts
 import { WindsurfState } from './types';
-import { ConversationMemoryManager } from '../features/memory/ConversationMemoryManager';
+import { MemoryManager } from '../features/memory/MemoryManager';
 import { OptimizedReActEngine } from './OptimizedReActEngine';
 import { ToolRegistry } from '../features/tools/ToolRegistry';
 import { ConversationManager } from './ConversationManager';
 import { ToolResult } from '../features/tools/types';
-
+import { addErrorToHistory } from './utils/historyUtils';
 
 type ReActEngineType =  OptimizedReActEngine;
 
@@ -18,7 +18,7 @@ export interface ProcessUserMessageResult {
 
 export class ApplicationLogicService {
   constructor(
-    private conversationMemoryManager: ConversationMemoryManager,
+    private memoryManager: MemoryManager,
     private reActEngine: ReActEngineType, 
     private conversationManager: ConversationManager,
     private toolRegistry: ToolRegistry
@@ -45,7 +45,7 @@ export class ApplicationLogicService {
     try {
       const resultState = await this.reActEngine.run(state);
       this.conversationManager.updateConversationState(chatId, resultState);
-      await this.conversationMemoryManager.storeConversation(chatId, resultState);
+      await this.memoryManager.storeConversation(chatId, resultState);
 
       return {
         success: resultState.completionStatus === 'completed',
@@ -64,7 +64,7 @@ export class ApplicationLogicService {
       this.addErrorToHistory(finalErrorState, error.message);
       
       this.conversationManager.updateConversationState(chatId, finalErrorState);
-      await this.conversationMemoryManager.storeConversation(chatId, finalErrorState);
+      await this.memoryManager.storeConversation(chatId, finalErrorState);
       
       return {
         success: false,
@@ -75,20 +75,11 @@ export class ApplicationLogicService {
   }
 
   private addErrorToHistory(state: WindsurfState, errorMessage: string): void {
-    if (!state.history) {
-        state.history = [];
-    }
-    state.history.push({
-        phase: 'system_message', 
-        content: `Critical error in ApplicationLogicService: ${errorMessage}`,
-        timestamp: Date.now(),
-        iteration: state.iterationCount || 0, 
-        metadata: { status: 'error' }
-    });
+    addErrorToHistory(state, `Critical error in ApplicationLogicService: ${errorMessage}`);
   }
 
   public async clearConversation(chatId?: string): Promise<boolean> {
-    return this.conversationManager.clearConversation(chatId, this.conversationMemoryManager);
+    return this.conversationManager.clearConversation(chatId, this.memoryManager);
   }
 
   public async invokeTool(
@@ -100,8 +91,8 @@ export class ApplicationLogicService {
   }
 
   public dispose(): void {
-    if (this.conversationMemoryManager && typeof (this.conversationMemoryManager as any).dispose === 'function') {
-        (this.conversationMemoryManager as any).dispose();
+    if (this.memoryManager && typeof (this.memoryManager as any).dispose === 'function') {
+        (this.memoryManager as any).dispose();
     }
   
     

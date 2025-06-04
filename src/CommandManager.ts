@@ -2,15 +2,24 @@ import * as vscode from 'vscode';
 import { WebviewProvider } from './vscode/webView/core/WebviewProvider';
 
 export class CommandManager {
+  private commands: vscode.Disposable[] = [];
+
   constructor(private readonly webviewProvider: WebviewProvider) { }
 
   public getCommands(): vscode.Disposable[] {
-    return [
+    const newCommands = [
       this.createOpenChatCommand(),
       this.createHistoryCommand(),
       this.createNewChatCommand(),
       this.createSettingsCommand(),
     ];
+    this.commands = newCommands;
+    return newCommands;
+  }
+
+  public dispose(): void {
+    this.commands.forEach(command => command.dispose());
+    this.commands = [];
   }
 
   private createOpenChatCommand(): vscode.Disposable {
@@ -36,6 +45,4 @@ export class CommandManager {
       vscode.commands.executeCommand('workbench.action.openSettings', 'extensionAssistant');
     });
   }
-
-
 }

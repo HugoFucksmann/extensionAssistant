@@ -1,12 +1,13 @@
 // src/core/ConversationManager.ts
 import { WindsurfState } from './types';
 import { HistoryEntry } from '../features/chat/types';
-import { ConversationMemoryManager } from '../features/memory/ConversationMemoryManager';
-import { getReactConfig } from '../shared/utils/configUtils';
+import { MemoryManager } from '../features/memory/MemoryManager';
+import { getConfig } from '../shared/config';
 import { IConversationManager } from './interfaces/IConversationManager';
 import { generateUniqueId } from '../shared/utils/generateIds';
 
-const reactConfig = getReactConfig();
+const config = getConfig(process.env.NODE_ENV === 'production' ? 'production' : 'development');
+const reactConfig = config.backend.react;
 
 export class ConversationManager implements IConversationManager {
   private activeConversations: Map<string, WindsurfState> = new Map();
@@ -128,14 +129,14 @@ export class ConversationManager implements IConversationManager {
 
 
 
-  public clearConversation(chatId?: string, conversationMemoryManager?: ConversationMemoryManager): boolean {
+  public clearConversation(chatId?: string, memoryManager?: MemoryManager): boolean {
     const targetChatId = chatId || this.activeChatId;
     if (!targetChatId) return false;
 
     const wasDeleted = this.activeConversations.delete(targetChatId);
 
-    if (conversationMemoryManager && wasDeleted) {
-      conversationMemoryManager.clearConversationMemory(targetChatId);
+    if (memoryManager && wasDeleted) {
+      memoryManager.clearRuntime(targetChatId);
     }
 
 

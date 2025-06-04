@@ -15,7 +15,9 @@ import { ResponseOutput } from '../features/ai/prompts/optimized/responsePrompt'
 import { MemoryManager } from '../features/memory/MemoryManager';
 import { z, ZodObject, ZodOptional, ZodEffects, ZodTypeAny } from 'zod';
 import { ToolResult as InternalToolResult } from '../features/tools/types';
-import { getReactConfig } from '../shared/utils/configUtils';
+import { getConfig } from '../shared/config';
+const reactConfig = getConfig(process.env.NODE_ENV === 'production' ? 'production' : 'development').backend.react;
+import { addErrorToHistory } from './utils/historyUtils';
 
 export class OptimizedReActEngine {
   private toolsDescriptionCache: string | null = null;
@@ -28,7 +30,7 @@ export class OptimizedReActEngine {
     private memoryManager: MemoryManager
   ) {
     this.dispatcher.systemInfo('OptimizedReActEngine initialized.', { source: 'OptimizedReActEngine' }, 'OptimizedReActEngine');
-    this.MAX_ITERATIONS = getReactConfig().maxIterations;
+    this.MAX_ITERATIONS = reactConfig.maxIterations;
   }
 
   private getToolsDescription(): string {
@@ -359,34 +361,14 @@ export class OptimizedReActEngine {
               isCompleted = true;
             }
 
-          } catch (toolError: any) {
-            const errorMessage = `Error durante la ejecución o análisis de la herramienta ${reasoningResult.tool}: ${toolError.message}`;
-            this.addHistoryEntry(currentState, 'system_message', errorMessage, { status: 'error' });
-
-            const duration = Date.now() - toolExecutionStartTime;
-            const toolDescription = this.toolRegistry.getTool(reasoningResult.tool!)?.description;
-
-            this.dispatcher.dispatch(EventType.TOOL_EXECUTION_ERROR, {
-              toolName: reasoningResult.tool!,
-              parameters: reasoningResult.parameters ?? undefined,
-              rawOutput: null,
-              error: toolError.message,
-              duration,
-              toolDescription,
-              isProcessingStep: false,
-              modelAnalysis: null,
-              toolSuccess: false,
-              chatId: currentState.chatId,
-              source: 'OptimizedReActEngine',
-              operationId,
-              timestamp: Date.now()
-            });
+          } catch (error: any) {
+            addErrorToHistory(currentState, `Error executing tool ${reasoningResult.tool}: ${error}`);
           }
 
         } else if (reasoningResult.nextAction === 'use_tool' && !reasoningResult.tool) {
           const errorMsg = "Model decided to use a tool but did not specify which tool.";
           console.warn(`[OptimizedReActEngine] ${errorMsg}`);
-          this.addHistoryEntry(currentState, 'system_message', errorMsg, { status: 'error' });
+          addErrorToHistory(currentState, errorMsg);
           currentState.finalOutput = "I tried to use a tool, but I'm unsure which one. Can you clarify?";
           isCompleted = true;
         }
