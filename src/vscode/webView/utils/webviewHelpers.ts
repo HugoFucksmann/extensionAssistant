@@ -157,13 +157,6 @@ export class WebviewHelpers {
     }
 
     /**
-     * Generates a unique ID
-     */
-    public static generateId(): string {
-        return Date.now().toString(36) + Math.random().toString(36).substr(2);
-    }
-
-    /**
      * Safely parses JSON with error handling
      */
     public static safeJsonParse<T>(jsonString: string, fallback: T): T {
