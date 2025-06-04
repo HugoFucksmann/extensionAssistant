@@ -43,6 +43,12 @@ export class AIResponseParser {
     this.defaultModel = model;
   }
 
+  /**
+   * Usa JSON.stringify(schema._def) como clave de caché.
+   * ¡ATENCIÓN!: Para esquemas Zod complejos, esto podría no ser único o eficiente.
+   * Si se detectan colisiones en producción, reemplazar por una función hash robusta (por ejemplo, object-hash).
+   * TODO: Mejorar si aparecen problemas de unicidad.
+   */
   private getParser<T extends ZodTypeAny>(schema: T): JsonMarkdownStructuredOutputParser<z.infer<typeof schema>> {
     const schemaKey = JSON.stringify(schema._def);
     if (!this.parserCache.has(schemaKey)) {
@@ -153,11 +159,17 @@ export class AIResponseParser {
       return 'shape' in schema._def && schema._def.shape
         ? JSON.stringify(schema._def.shape, null, 2)
         : 'Expected schema structure (see validation error for details)';
-    } catch {
+    } catch (error) {
+      console.error('[AIResponseParser] Error generating schema description:', error);
       return 'Schema information unavailable';
     }
   }
 
+  /**
+   * Extrae el primer bloque JSON usando un regex greedy.
+   * ¡ATENCIÓN!: Si hay múltiples objetos JSON en el texto, podría capturar más de lo debido.
+   * TODO: Mejorar el regex o la lógica si se detectan problemas con respuestas que contienen varios objetos JSON.
+   */
   private cleanJsonResponse(response: string): string {
     const cleaned = response
       .replace(/```json\s*/g, '')

@@ -50,6 +50,7 @@ export class ExtensionActivator {
   public deactivate(): void {
     this.webviewProvider?.dispose();
     this.webviewProvider = undefined;
+    this.commandManager?.dispose();
     this.commandManager = undefined;
   }
 }

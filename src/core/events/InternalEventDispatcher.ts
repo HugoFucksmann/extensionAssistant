@@ -3,7 +3,9 @@ import { EventType, EventPayload, WindsurfEvent, EventFilter } from '../../featu
 import { generateUniqueId } from '../../shared/utils/generateIds';
 import EventEmitter from 'eventemitter3'; 
 
-export class InternalEventDispatcher {
+import { Disposable } from '../interfaces/Disposable';
+
+export class InternalEventDispatcher implements Disposable {
   private emitter: EventEmitter;
   private eventHistory: WindsurfEvent[] = []; 
   private maxHistorySize: number = 200; 

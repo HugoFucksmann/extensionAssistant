@@ -9,7 +9,9 @@ import { generateUniqueId } from '../shared/utils/generateIds';
 const config = getConfig(process.env.NODE_ENV === 'production' ? 'production' : 'development');
 const reactConfig = config.backend.react;
 
-export class ConversationManager implements IConversationManager {
+import { Disposable } from './interfaces/Disposable';
+
+export class ConversationManager implements IConversationManager, Disposable {
   private activeConversations: Map<string, WindsurfState> = new Map();
   private activeChatId: string | null = null;
 

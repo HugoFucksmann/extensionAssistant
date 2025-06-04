@@ -15,7 +15,9 @@ export interface ModelConfig {
   baseUrl?: string;
 }
 
-export class ModelManager {
+import { Disposable } from '../../core/interfaces/Disposable';
+
+export class ModelManager implements Disposable {
   private models: Map<ModelProvider, BaseChatModel>;
   private activeProvider: ModelProvider;
   private config: Record<ModelProvider, ModelConfig>;

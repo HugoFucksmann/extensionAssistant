@@ -108,18 +108,18 @@ export class ComponentFactory {
       this.optimizedReActEngineInstance = null!;
     }
 
-    if (this.memoryManagerInstance && typeof (this.memoryManagerInstance as any).dispose === 'function') {
-      await (this.memoryManagerInstance as any).dispose();
+    if (this.memoryManagerInstance && typeof this.memoryManagerInstance.dispose === 'function') {
+      await this.memoryManagerInstance.dispose();
       this.memoryManagerInstance = null!;
     }
 
-    if (this.modelManagerInstance && typeof (this.modelManagerInstance as any).dispose === 'function') {
-      (this.modelManagerInstance as any).dispose();
+    if (this.modelManagerInstance && typeof this.modelManagerInstance.dispose === 'function') {
+      this.modelManagerInstance.dispose();
       this.modelManagerInstance = null!;
     }
 
-    if (this.toolRegistryInstance && typeof (this.toolRegistryInstance as any).dispose === 'function') {
-      (this.toolRegistryInstance as any).dispose();
+    // ToolRegistry no implementa dispose(); solo limpiar la instancia
+    if (this.toolRegistryInstance) {
       this.toolRegistryInstance = null!;
     }
 
@@ -128,8 +128,8 @@ export class ComponentFactory {
       this.internalEventDispatcherInstance = null!;
     }
 
-    if (this.applicationLogicServiceInstance && typeof (this.applicationLogicServiceInstance as any).dispose === 'function') {
-      (this.applicationLogicServiceInstance as any).dispose();
+    if (this.applicationLogicServiceInstance && typeof this.applicationLogicServiceInstance.dispose === 'function') {
+      this.applicationLogicServiceInstance.dispose();
       this.applicationLogicServiceInstance = null!;
     }
 

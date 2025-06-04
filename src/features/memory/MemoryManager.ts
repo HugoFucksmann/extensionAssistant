@@ -13,7 +13,9 @@ export interface MemoryItem {
     metadata?: Record<string, any>;
 }
 
-export class MemoryManager {
+import { Disposable } from '../../core/interfaces/Disposable';
+
+export class MemoryManager implements Disposable {
     private runtimeMemory = new Map<string, any>();
     private storagePath: vscode.Uri;
 

@@ -14,7 +14,7 @@ export function activate(context: vscode.ExtensionContext) {
   } catch (error) {
     console.error('Error activating extension:', error);
     vscode.window.showErrorMessage(
-      'Error al activar la extensión. Por favor, revisa la consola para más detalles.'
+      'Error activating the extension. Please check the console for more details.'
     );
   }
 }

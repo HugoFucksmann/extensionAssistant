@@ -16,7 +16,9 @@ export interface ProcessUserMessageResult {
   error?: string;
 }
 
-export class ApplicationLogicService {
+import { Disposable } from './interfaces/Disposable';
+
+export class ApplicationLogicService implements Disposable {
   constructor(
     private memoryManager: MemoryManager,
     private reActEngine: ReActEngineType, 

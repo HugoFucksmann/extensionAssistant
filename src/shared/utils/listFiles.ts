@@ -17,7 +17,9 @@ export async function listFilesUtil(
 
   try {
     // Logging para debug
-    console.log('[listFilesUtil] Buscando archivos en:', workspaceFolder.uri.fsPath);
+    if (process.env.NODE_ENV === 'development') {
+      console.debug('[listFilesUtil] Buscando archivos en:', workspaceFolder.uri.fsPath);
+    }
 
     // Buscar archivos usando findFiles directamente
     const files = await vscodeAPI.workspace.findFiles(
@@ -33,7 +35,9 @@ export async function listFilesUtil(
     }));
 
     // Logging para debug
-    console.log('[listFilesUtil] Archivos encontrados:', listedFiles.length);
+    if (process.env.NODE_ENV === 'development') {
+      console.debug('[listFilesUtil] Archivos encontrados:', listedFiles.length);
+    }
     return listedFiles;
   } catch (error) {
     console.error('[listFilesUtil] Error al buscar archivos:', error);
