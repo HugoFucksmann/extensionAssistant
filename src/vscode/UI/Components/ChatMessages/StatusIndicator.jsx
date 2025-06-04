@@ -1,5 +1,5 @@
 import React from "react"
-import "../styles/StatusIndicator.css"
+import "./styles/StatusIndicator.css"
 
 
 

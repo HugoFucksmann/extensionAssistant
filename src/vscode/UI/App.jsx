@@ -3,9 +3,9 @@ import { getThemeCSSVariables } from './theme/theme';
 import ChatInput from './Components/InputChat/ChatInput';
 import ChatHistory from './Components/historical/ChatHistory';
 import { useApp } from './context/AppContext';
-import ChatMessages from './Components/ChatMessages/new/ChatMessages';
+import ChatMessages from './Components/ChatMessages/ChatMessages';
 import RecentChats from './Components/historical/RecentChats';
-import LoadingIndicator from './Components/ChatMessages/new/LoadingIndicator';
+import LoadingIndicator from './Components/ChatMessages/LoadingIndicator';
 
 const App = () => {
   const { showHistory, theme, messages = [], isLoading } = useApp();
@@ -39,20 +39,20 @@ const App = () => {
 
   const chatInputContainerStyle = {
     position: 'relative',
-    padding: 3,
+    padding: theme.spacing.medium,
     borderRadius: theme.borderRadius.medium,
     backgroundColor: theme.colors.secondary,
+    flexShrink: 0, // Prevent input from shrinking
   };
 
-  const loadingOverlayStyle = {
+  const loadingIndicatorStyle = {
     position: 'absolute',
-    top: '-60px',
+    bottom: '100%', // Position right above the input
     left: 0,
     right: 0,
     zIndex: 1000,
     backgroundColor: theme.colors.background,
     borderTop: `1px solid ${theme.colors.border}`,
-    borderBottom: `1px solid ${theme.colors.border}`,
     backdropFilter: 'blur(10px)',
     boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.1)',
   };
@@ -86,7 +86,7 @@ const App = () => {
             <div style={{ width: '100%', maxWidth: '800px' }}>
               <div style={chatInputContainerStyle}>
                 {isLoading && (
-                  <div style={loadingOverlayStyle}>
+                  <div style={loadingIndicatorStyle}>
                     <LoadingIndicator />
                   </div>
                 )}
@@ -97,10 +97,17 @@ const App = () => {
         ) : (
           // Normal layout with messages
           <>
-            <ChatMessages />
+            <div style={{ 
+              flex: 1, 
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column'
+            }}>
+              <ChatMessages />
+            </div>
             <div style={chatInputContainerStyle}>
               {isLoading && (
-                <div style={loadingOverlayStyle}>
+                <div style={loadingIndicatorStyle}>
                   <LoadingIndicator />
                 </div>
               )}

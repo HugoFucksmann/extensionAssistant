@@ -1,7 +1,7 @@
 import React from "react"
 import StatusIndicator from "./StatusIndicator"
 import ToolRenderer from "./ToolRenderer"
-import "../styles/MessageItem.css"
+import "./styles/MessageItem.css"
 
 
 const MessageItem = ({ message }) => {

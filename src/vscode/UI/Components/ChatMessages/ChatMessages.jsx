@@ -1,10 +1,10 @@
 import React, { useEffect, useRef } from "react";
 import MessageItem from "./MessageItem";
-import "../styles/ChatMessages.css"; 
-import { useApp } from "../../../context/AppContext";
+import "./styles/ChatMessages.css"; 
+import { useApp } from "../../context/AppContext";
 
 const ChatMessages = () => {
-  const { messages = [] } = useApp(); 
+  const { messages = [], isLoading } = useApp(); 
   const messagesEndRef = useRef(null);
 
   useEffect(() => {

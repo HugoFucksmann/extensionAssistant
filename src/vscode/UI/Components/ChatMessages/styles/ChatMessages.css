@@ -1,16 +1,18 @@
 .chat-messages {
   flex: 1;
-  overflow-y: auto;
-  padding: var(--spacing-large);
   display: flex;
   flex-direction: column;
+  height: 100%;
 }
 
 .messages-container {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-large);
+  padding-bottom: 40px; /* Space for loading indicator */
   display: flex;
   flex-direction: column;
   gap: var(--spacing-medium);
-  min-height: 100%;
 }
 
 .empty-messages {
@@ -24,20 +26,20 @@
 }
 
 /* Scrollbar personalizado */
-.chat-messages::-webkit-scrollbar {
+.messages-container::-webkit-scrollbar {
   width: 8px;
 }
 
-.chat-messages::-webkit-scrollbar-track {
+.messages-container::-webkit-scrollbar-track {
   background: transparent;
 }
 
-.chat-messages::-webkit-scrollbar-thumb {
+.messages-container::-webkit-scrollbar-thumb {
   background: var(--border);
   border-radius: 4px;
 }
 
-.chat-messages::-webkit-scrollbar-thumb:hover {
+.messages-container::-webkit-scrollbar-thumb:hover {
   background: var(--text);
   opacity: 0.7;
 }

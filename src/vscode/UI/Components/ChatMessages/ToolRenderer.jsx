@@ -1,5 +1,5 @@
 import React, { useState } from "react"
-import "../styles/ToolRenderer.css"
+import "./styles/ToolRenderer.css"
 
 const ToolRenderer = ({
   toolName,
