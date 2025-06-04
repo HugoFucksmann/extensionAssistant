@@ -169,7 +169,7 @@ export class WebviewMessageHandler {
     try {
       const { listFilesUtil } = await import('../../shared/utils/listFiles');
       const files = await listFilesUtil(require('vscode'), '**/*');
-      const filePaths = files.filter(f => f.type === 'file').map(f => f.path);
+      const filePaths = files.map(f => f.path);
       this.postMessage('projectFiles', { files: filePaths });
     } catch (error: any) {
       const errorMsg = error.message || 'Failed to list project files';

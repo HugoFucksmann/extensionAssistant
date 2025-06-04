@@ -6,10 +6,12 @@ export const useProjectFiles = (shouldFetch = false) => {
   const { postMessage } = useApp();
   const [projectFiles, setProjectFiles] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [lastFetchTime, setLastFetchTime] = useState(null);
 
   // Solicitar archivos cuando shouldFetch cambia a true
   useEffect(() => {
     if (shouldFetch) {
+      console.log('[useProjectFiles] Solicitando archivos...');
       setIsLoading(true);
       postMessage("command", { command: "getProjectFiles" });
     }
@@ -20,17 +22,48 @@ export const useProjectFiles = (shouldFetch = false) => {
     const handleMessage = (event) => {
       const message = event.data;
       if (message.type === "projectFiles") {
-        // Filtrar directorios no deseados y archivos
-        const filteredFiles = message.payload.files.filter(file => 
-          !file.includes('node_modules/') && 
-          !file.includes('node_modules\\') &&
-          !file.includes('.git/') &&
-          !file.includes('.git\\') &&
-          !file.endsWith('/') &&
-          !file.endsWith('\\')
-        );
+        console.log('[useProjectFiles] Recibiendo archivos del proyecto...');
+        console.log('[useProjectFiles] Archivos recibidos:', message.payload.files.length);
+
+        // Extensiones de archivos de imagen a excluir
+        const imageExtensions = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.svg', '.ico'];
+        
+        // Filtrar archivos no deseados
+        const filteredFiles = message.payload.files.filter(file => {
+          const lowerFile = file.toLowerCase();
+          
+          // Excluir directorios no deseados
+          if (lowerFile.includes('node_modules/') || 
+              lowerFile.includes('node_modules\\') ||
+              lowerFile.includes('.git/') ||
+              lowerFile.includes('.git\\') ||
+              lowerFile.endsWith('/') ||
+              lowerFile.endsWith('\\')) {
+            return false;
+          }
+          
+          // Excluir archivos de imagen
+          const extension = file.substring(file.lastIndexOf('.')).toLowerCase();
+          if (imageExtensions.includes(extension)) {
+            console.log('[useProjectFiles] Excluyendo archivo de imagen:', file);
+            return false;
+          }
+          
+          return true;
+        });
+
+        console.log('[useProjectFiles] Archivos después de filtrado:', filteredFiles.length);
+        
+        // Verificar archivos en src/
+        const srcFiles = filteredFiles.filter(f => f.includes('src/'));
+        console.log('[useProjectFiles] Archivos encontrados en src/:', srcFiles.length);
+        if (srcFiles.length > 0) {
+          console.log('[useProjectFiles] Ejemplo de archivos en src/:', srcFiles.slice(0, 3));
+        }
+
         setProjectFiles(filteredFiles);
         setIsLoading(false);
+        setLastFetchTime(Date.now());
       }
     };
     
@@ -42,30 +75,33 @@ export const useProjectFiles = (shouldFetch = false) => {
   // El searchTerm que llega aquí es el texto DESPUÉS del '@'
   const getFilteredFiles = (searchTerm) => {
     if (!searchTerm) { // Si no hay término de búsqueda (después del @), mostrar todos los archivos
-        return projectFiles;
+      console.log('[useProjectFiles] Mostrando todos los archivos (sin búsqueda)');
+      return projectFiles;
     }
     
     const lowerSearchTerm = searchTerm.toLowerCase();
     
-    return projectFiles.filter(file => {
-      const fileName = file.split(/[\/\\]/).pop().toLowerCase(); // Nombre de archivo con extensión, ej: "app.js"
-      const extension = fileName.includes('.') ? fileName.substring(fileName.lastIndexOf('.')) : ''; // Extensión, ej: ".js"
-
-      if (lowerSearchTerm.startsWith('.')) { // Si el término de búsqueda es una extensión, ej: ".js"
-        return extension === lowerSearchTerm;
-      } else { // Si no, buscar en el nombre completo del archivo (sin ruta)
-        return fileName.includes(lowerSearchTerm);
+    const filtered = projectFiles.filter(file => {
+      const fileName = file.split(/[\\/]/).pop().toLowerCase(); // Nombre de archivo con extensión, ej: "app.js"
+      const matches = fileName.includes(lowerSearchTerm);
+      if (!matches) {
+        console.log('[useProjectFiles] No match:', fileName, 'for', searchTerm);
       }
+      return matches;
     });
+
+    console.log('[useProjectFiles] Archivos filtrados:', filtered.length);
+    return filtered;
   };
 
-  return { 
-    projectFiles, 
-    isLoading, 
+  return {
+    projectFiles,
+    isLoading,
     getFilteredFiles,
+    lastFetchTime,
     refreshFiles: () => {
-        setIsLoading(true); // Indicar carga al refrescar
-        postMessage("command", { command: "getProjectFiles" });
+      setIsLoading(true); // Indicar carga al refrescar
+      postMessage("command", { command: "getProjectFiles" });
     }
   };
 };

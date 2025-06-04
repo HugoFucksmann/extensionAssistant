@@ -4,6 +4,7 @@ import * as path from 'path';
 import { z } from 'zod';
 import { ToolDefinition, ToolResult } from '../../types';
 import { resolveFileFromInput } from '../../../../shared/utils/pathUtils';
+import { listFilesUtil } from '../../../../shared/utils/listFiles';
 
 // Esquema Zod para los parámetros
 export const getFileContentsParamsSchema = z.object({
@@ -107,15 +108,58 @@ async function getSimilarFiles(vscodeAPI: typeof vscode, fileUri: vscode.Uri): P
   try {
     const relativePath = vscodeAPI.workspace.asRelativePath(fileUri, false);
     const dirName = path.dirname(relativePath);
+    const fileName = path.basename(relativePath);
 
-    const pattern = `${dirName}/**`;
-    const filesInSameDir = await vscodeAPI.workspace.findFiles(pattern, '**/node_modules/**', 10);
+    // Usar listFilesUtil para obtener archivos en el mismo directorio
+    const files = await listFilesUtil(vscodeAPI, `${dirName}/*`);
 
-    return filesInSameDir
-      .map(uri => vscodeAPI.workspace.asRelativePath(uri, false))
-      .filter(path => path !== relativePath);
+    // Filtrar archivos en el mismo directorio y ordenar por similitud con el nombre del archivo
+    return files
+      .map(file => file.path)
+      .filter(path => {
+        // Excluir el archivo actual
+        if (path === relativePath) return false;
+        
+        // Incluir archivos en el mismo directorio
+        const fileDir = path.split('/').slice(0, -1).join('/');
+        return fileDir === dirName;
+      })
+      .sort((a, b) => {
+        // Ordenar por similitud con el nombre del archivo
+        const aName = path.basename(a);
+        const bName = path.basename(b);
+        
+        // Priorizar archivos con nombres similares
+        const aScore = similarity(fileName, aName);
+        const bScore = similarity(fileName, bName);
+        
+        return bScore - aScore; // Orden descendente por puntuación de similitud
+      })
+      .slice(0, 5); // Limitar a 5 resultados
   } catch (error) {
     console.error('Error getting similar files:', error);
     return [];
   }
+}
+
+/**
+ * Calcula la similitud entre dos cadenas usando la distancia de Levenshtein
+ */
+function similarity(s1: string, s2: string): number {
+  const longer = s1.length > s2.length ? s1 : s2;
+  const shorter = s1.length > s2.length ? s2 : s1;
+  
+  if (longer.length === 0) return 1.0;
+  
+  // Si uno es prefijo del otro, dar mayor puntuación
+  if (longer.startsWith(shorter)) return 0.9;
+  
+  // Si comparten el mismo prefijo de 3 caracteres, dar puntuación media
+  if (s1.substring(0, 3) === s2.substring(0, 3)) return 0.6;
+  
+  // Si comparten el mismo sufijo, dar puntuación media-baja
+  if (s1.endsWith(s2) || s2.endsWith(s1)) return 0.4;
+  
+  // Si no hay coincidencias, puntuación baja
+  return 0.1;
 }

@@ -11,12 +11,43 @@ async function findFilesByPattern(
   fuzzyMatch: boolean = false
 ): Promise<Array<{ uri: vscode.Uri; relativePath: string }>> {
   try {
-    const escapedName = fileName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const pattern = fuzzyMatch ? `**/*${escapedName}*` : `**/${escapedName}`;
+    // Primero intentamos con una búsqueda exacta
+    let patterns = [
+      `**/${fileName}`,  // Búsqueda exacta
+      `**/${fileName}.*`, // Intenta con cualquier extensión
+      `**/*${fileName}*`  // Búsqueda parcial
+    ];
 
-    const files = await vscodeAPI.workspace.findFiles(pattern, '**/node_modules/**');
+    // Si es búsqueda difusa, agregamos más patrones
+    if (fuzzyMatch) {
+      const baseName = path.basename(fileName, path.extname(fileName));
+      patterns.push(
+        `**/*${baseName}*`,  // Coincidencia parcial del nombre base
+        `**/${baseName}.*`  // Nombre base con cualquier extensión
+      );
+    }
 
-    return files.map(uri => ({
+    // Eliminar duplicados
+    patterns = [...new Set(patterns)];
+    
+    // Buscar archivos que coincidan con cualquiera de los patrones
+    const searchPromises = patterns.map(pattern => 
+      vscodeAPI.workspace.findFiles(
+        pattern, 
+        '**/{node_modules,.git,.next,out,build,dist}/**', // Excluir carpetas comunes
+        100 // Límite de resultados por patrón
+      )
+    );
+
+    const results = await Promise.all(searchPromises);
+    const files = results.flat();
+    
+    // Eliminar duplicados por URI
+    const uniqueFiles = Array.from(new Map(
+      files.map(file => [file.toString(), file])
+    ).values());
+
+    return uniqueFiles.map(uri => ({
       uri,
       relativePath: vscodeAPI.workspace.asRelativePath(uri, false)
     }));
@@ -96,15 +127,61 @@ export function buildWorkspaceUri(vscodeAPI: typeof vscode, relativePath: string
 }
 
 /**
- * Intelligently resolves file from user input with multiple fallback strategies
+ * Normaliza un nombre de archivo para búsqueda insensible a mayúsculas/minúsculas
  */
-export async function resolveFileFromInput(
-  vscodeAPI: typeof vscode,
-  input: string,
-  maxSuggestions: number = 10
-): Promise<FileResolutionResult> {
-  const cleanInput = input.trim();
+function normalizeForSearch(filename: string): string {
+  // Eliminar espacios y convertir a minúsculas
+  return filename.toLowerCase().trim();
+}
 
+/**
+ * Compara dos nombres de archivo ignorando mayúsculas/minúsculas y espacios
+ */
+function filenamesMatch(a: string, b: string): boolean {
+  return normalizeForSearch(a) === normalizeForSearch(b);
+}
+
+/**
+ * Obtiene sugerencias de archivos similares basadas en el nombre
+ */
+async function getSimilarFileSuggestions(
+  vscodeAPI: typeof vscode,
+  filename: string,
+  maxResults: number
+): Promise<string[]> {
+  // Buscar archivos con nombres similares
+  const allFiles = await vscodeAPI.workspace.findFiles('**/*', '**/node_modules/**,**/.git/**', 1000);
+  
+  // Normalizar el nombre de búsqueda
+  const searchTerm = normalizeForSearch(filename);
+  
+  // Filtrar y ordenar por similitud
+  return allFiles
+    .map(uri => ({
+      path: vscodeAPI.workspace.asRelativePath(uri, false),
+      name: path.basename(uri.fsPath)
+    }))
+    .filter(file => {
+      const name = normalizeForSearch(file.name);
+      return name.includes(searchTerm) || searchTerm.includes(name);
+    })
+    .sort((a, b) => {
+      // Ordenar por longitud de nombre (más corto primero)
+      return a.name.length - b.name.length;
+    })
+    .map(file => file.path)
+    .slice(0, maxResults);
+}
+
+/**
+ * Intenta encontrar un archivo con diferentes estrategias
+ */
+async function tryFindFile(
+  vscodeAPI: typeof vscode,
+  filename: string,
+  maxSuggestions: number
+): Promise<FileResolutionResult> {
+  const cleanInput = filename.trim();
   if (!cleanInput) {
     return {
       success: false,
@@ -113,80 +190,91 @@ export async function resolveFileFromInput(
     };
   }
 
-  // Try absolute path
-  try {
-    const uri = vscode.Uri.file(cleanInput);
-    await vscodeAPI.workspace.fs.stat(uri);
+  // 1. Búsqueda exacta
+  const exactMatches = await findFilesByPattern(vscodeAPI, cleanInput, false);
+  
+  // 2. Si no hay coincidencias exactas, buscar archivos con el mismo nombre (ignorando mayúsculas)
+  const allMatches = exactMatches.length > 0 
+    ? exactMatches 
+    : await findFilesByPattern(vscodeAPI, cleanInput, true);
+
+  // 3. Filtrar por coincidencia de nombre de archivo (insensible a mayúsculas)
+  const matchingFiles = allMatches.filter(match => {
+    const matchName = path.basename(match.relativePath);
+    return filenamesMatch(matchName, cleanInput);
+  });
+
+  // Manejar los resultados
+  if (matchingFiles.length === 1) {
     return {
       success: true,
-      uri,
-      relativePath: vscodeAPI.workspace.asRelativePath(uri, false)
+      uri: matchingFiles[0].uri,
+      relativePath: matchingFiles[0].relativePath
     };
-  } catch { }
+  }
 
-  // Try workspace-relative path
+  if (matchingFiles.length > 1) {
+    return {
+      success: false,
+      error: `Multiple files found matching "${path.basename(cleanInput)}"`,
+      suggestions: matchingFiles.map(m => m.relativePath).slice(0, maxSuggestions)
+    };
+  }
+
+  // Si no se encontró el archivo exacto, buscar sugerencias
+  const suggestions = await getSimilarFileSuggestions(vscodeAPI, cleanInput, maxSuggestions);
+  
+  return {
+    success: false,
+    error: `File not found: ${cleanInput}`,
+    suggestions: suggestions.length > 0 
+      ? suggestions 
+      : await getWorkspaceSample(vscodeAPI, maxSuggestions)
+  };
+}
+
+/**
+ * Inteligently resolves file from user input with multiple fallback strategies
+ */
+export async function resolveFileFromInput(
+  vscodeAPI: typeof vscode,
+  input: string,
+  maxSuggestions: number = 10
+): Promise<FileResolutionResult> {
   try {
-    const uri = buildWorkspaceUri(vscodeAPI, cleanInput);
-    if (uri) {
+    // 1. Intentar con la ruta exacta
+    try {
+      const uri = vscode.Uri.file(input);
       await vscodeAPI.workspace.fs.stat(uri);
       return {
         success: true,
         uri,
         relativePath: vscodeAPI.workspace.asRelativePath(uri, false)
       };
-    }
-  } catch { }
+    } catch {}
 
-  // Search by exact filename
-  const fileName = path.basename(cleanInput);
-  const exactMatches = await findFilesByPattern(vscodeAPI, fileName, false);
+    // 2. Intentar con ruta relativa al workspace
+    try {
+      const uri = buildWorkspaceUri(vscodeAPI, input);
+      if (uri) {
+        await vscodeAPI.workspace.fs.stat(uri);
+        return {
+          success: true,
+          uri,
+          relativePath: vscodeAPI.workspace.asRelativePath(uri, false)
+        };
+      }
+    } catch {}
 
-  if (exactMatches.length === 1) {
-    return {
-      success: true,
-      uri: exactMatches[0].uri,
-      relativePath: exactMatches[0].relativePath
-    };
-  }
-
-  if (exactMatches.length > 1) {
-    // Try to disambiguate by partial path match
-    const pathMatch = exactMatches.find(match =>
-      match.relativePath === cleanInput ||
-      match.relativePath.endsWith(cleanInput) ||
-      cleanInput.endsWith(match.relativePath)
-    );
-
-    if (pathMatch) {
-      return {
-        success: true,
-        uri: pathMatch.uri,
-        relativePath: pathMatch.relativePath
-      };
-    }
-
+    // 3. Búsqueda inteligente por nombre de archivo
+    return await tryFindFile(vscodeAPI, input, maxSuggestions);
+  } catch (error: unknown) {
+    console.error('Error in resolveFileFromInput:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return {
       success: false,
-      error: `Multiple files found with name "${fileName}"`,
-      suggestions: exactMatches.map(m => m.relativePath)
+      error: `Error searching for file: ${errorMessage}`,
+      suggestions: await getWorkspaceSample(vscodeAPI, maxSuggestions)
     };
   }
-
-  // Fuzzy search fallback
-  const fuzzyMatches = await findFilesByPattern(vscodeAPI, fileName, true);
-
-  if (fuzzyMatches.length > 0) {
-    return {
-      success: false,
-      error: `File "${fileName}" not found`,
-      suggestions: fuzzyMatches.slice(0, maxSuggestions).map(m => m.relativePath)
-    };
-  }
-
-
-  return {
-    success: false,
-    error: `File not found: ${cleanInput}`,
-    suggestions: await getWorkspaceSample(vscodeAPI, maxSuggestions)
-  };
 }

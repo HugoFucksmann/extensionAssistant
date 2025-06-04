@@ -21,16 +21,16 @@ const FileDropdown = ({
       border: `1px solid ${theme.colors.border}`,
       borderRadius: '4px',
       zIndex: 9999, // Much higher z-index
-      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)', // Enhanced shadow
+      
       display: 'flex',
       flexDirection: 'column',
       maxHeight: '250px', // Max height para el dropdown completo
     },
     header: {
-      padding: '8px 12px',
+      padding: '4px 4px',
       borderBottom: `1px solid ${theme.colors.border}`,
       fontWeight: 'bold',
-      fontSize: '12px',
+      fontSize: '10px',
       color: theme.colors.text,
       flexShrink: 0, // Evitar que el header se encoja
     },
@@ -42,9 +42,9 @@ const FileDropdown = ({
       flexGrow: 1, // Permitir que la lista crezca para llenar el espacio
     },
     fileItem: {
-      padding: '6px 12px',
+      padding: '4px 4px',
       cursor: 'pointer',
-      fontSize: '12px',
+      fontSize: '10px',
       whiteSpace: 'nowrap',
       overflow: 'hidden',
       textOverflow: 'ellipsis',
@@ -53,10 +53,10 @@ const FileDropdown = ({
       transition: 'background-color 0.2s ease', // Add smooth transition
     },
     noFiles: {
-      padding: '12px',
+      padding: '6px',
       textAlign: 'center',
       color: theme.colors.textMuted,
-      fontSize: '12px'
+      fontSize: '10px'
     }
   };
 
@@ -77,11 +77,32 @@ const FileDropdown = ({
   // Componente para cada archivo en la lista
   const FileItem = ({ file, isActive, index }) => {
     const fileName = file.split(/[\/\\]/).pop();
+    // Obtener la ruta relativa sin el nombre del archivo
+    const filePath = file.replace(new RegExp(`${fileName}$`), '');
     
     const fileItemStyle = {
       ...styles.fileItem,
       backgroundColor: isActive ? (theme.colors.primary || '#007acc') : 'transparent',
       color: isActive ? (theme.colors.primaryText || '#ffffff') : theme.colors.text,
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '2px',
+      padding: '8px 12px',
+    };
+    
+    const fileNameStyle = {
+      fontWeight: 'bold',
+      fontSize: '12px',
+      lineHeight: '1.1',
+    };
+    
+    const filePathStyle = {
+      fontSize: '11px',
+      color: isActive ? 'rgba(255, 255, 255, 0.8)' : 'rgba(121, 121, 121, 0.6)',
+      fontStyle: 'italic',
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
     };
     
     return (
@@ -96,7 +117,8 @@ const FileDropdown = ({
         aria-selected={isActive}
         id={`file-item-${index}`} // Para aria-activedescendant
       >
-        {fileName}
+        <div style={fileNameStyle}>{fileName}</div>
+        <div style={filePathStyle}>{filePath}</div>
       </li>
     );
   };
