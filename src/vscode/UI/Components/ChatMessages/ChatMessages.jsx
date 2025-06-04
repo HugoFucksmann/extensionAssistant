@@ -4,26 +4,21 @@ import "./styles/ChatMessages.css";
 import { useApp } from "../../context/AppContext";
 
 const ChatMessages = () => {
-  const { messages = [], isLoading } = useApp(); 
+  const { messages = [] } = useApp(); 
   const messagesEndRef = useRef(null);
 
+  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    // Existing logic
-  }, [messages]);
-
-  const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
   }, [messages]);
 
+  // Filter messages for display
   const displayableMessages = messages.filter(msg => {
-    const phase = msg.metadata?.phase;
-   
-    if (phase && (msg.metadata?.status === 'phase_started' || msg.metadata?.status === 'phase_completed')) {
-      return !!msg.metadata?.toolName; 
+    const { phase, status, toolName } = msg.metadata || {};
+    
+    // Show phase messages only if they have a tool name
+    if (phase && (status === 'phase_started' || status === 'phase_completed')) {
+      return !!toolName;
     }
     return true;
   });
@@ -32,7 +27,10 @@ const ChatMessages = () => {
     <div className="chat-messages">
       <div className="messages-container">
         {displayableMessages.map((message, index) => (
-          <MessageItem key={message?.operationId || message?.id || `msg-${index}`} message={message} />
+          <MessageItem 
+            key={message?.operationId || message?.id || `msg-${index}`} 
+            message={message} 
+          />
         ))}
         <div ref={messagesEndRef} />
       </div>

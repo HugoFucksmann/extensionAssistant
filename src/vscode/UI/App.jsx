@@ -5,7 +5,7 @@ import ChatHistory from './Components/historical/ChatHistory';
 import { useApp } from './context/AppContext';
 import ChatMessages from './Components/ChatMessages/ChatMessages';
 import RecentChats from './Components/historical/RecentChats';
-import LoadingIndicator from './Components/ChatMessages/LoadingIndicator';
+import LoadingIndicator from './Components/LoadingIndicator/LoadingIndicator';
 
 const App = () => {
   const { showHistory, theme, messages = [], isLoading } = useApp();
