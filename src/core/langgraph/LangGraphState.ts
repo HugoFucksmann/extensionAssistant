@@ -33,8 +33,13 @@ export interface OptimizedGraphState {
 // especialmente cómo combinar actualizaciones (reducer) y cuál es el valor por defecto.
 export const GraphStateAnnotation = Annotation.Root({
     messages: Annotation<BaseMessage[]>({
-        reducer: (current, update) => [...(current || []), ...update], // Añade nuevos mensajes a la lista
-        default: () => [] // Por defecto, una lista vacía de mensajes
+        reducer: (current, update) => {
+            // Importación dinámica para evitar dependencias circulares
+            // eslint-disable-next-line @typescript-eslint/no-var-requires
+            const { deduplicateMessages } = require('./LangGraphEngine');
+            return deduplicateMessages([...(current || []), ...(update || [])]);
+        },
+        default: () => []
     }),
     context: Annotation<OptimizedGraphState['context']>({
         reducer: (current, update) => ({ ...current, ...update }), // Sobrescribe con la nueva información

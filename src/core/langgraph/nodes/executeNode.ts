@@ -13,7 +13,6 @@ import { generateUniqueId } from '../../../shared/utils/generateIds';
 import { getConfig } from '../../../shared/config2';
 
 export interface ExecuteNodeDependencies extends BaseNodeDependencies {
-    toolRegistry: ToolRegistry;
     executedToolsInSession: Set<string>; // Para deduplicación
 }
 
@@ -81,24 +80,52 @@ export async function executeNodeFunc(
     let updatedMetadata = { ...state.metadata };
 
     try {
-        const userQuery = state.messages.find((m): m is HumanMessage => m._getType() === 'human')?.content as string || state.context.working;
+        // --- CAMBIO CRÍTICO AQUÍ ---
+        const humanMessages = state.messages.filter((m): m is HumanMessage => m.getType() === 'human' || m._getType?.() === 'human');
+        const userQuery = humanMessages.length > 0
+            ? humanMessages[humanMessages.length - 1].content as string
+            : state.context.working;
+
+        const queryForExecution = userQuery || state.context.working;
+        if (!queryForExecution) {
+            // Añadir un mensaje de error o manejarlo adecuadamente
+            const errorMsg = "No user query or working context for execution.";
+            dispatcher.systemError(errorMsg, new Error(errorMsg), { chatId: state.metadata.chatId }, 'LangGraphEngine.executeNode');
+            return {
+                messages: [...state.messages, new AIMessage(errorMsg)],
+                metadata: { ...state.metadata, isCompleted: true, finalOutput: errorMsg },
+                validation: { ...(state.validation || { errors: [], corrections: [] }), errors: [...(state.validation?.errors || []), errorMsg] },
+                context: { ...state.context, iteration: currentGraphIteration }
+            };
+        }
+
         const model = modelManager.getActiveModel();
+
+        // Logging detallado para depuración
+        console.log(`[executeNodeFunc] Chat ID: ${state.metadata.chatId}, Iteration: ${currentGraphIteration}`);
+        console.log(`[executeNodeFunc] state.messages:`, JSON.stringify(state.messages.map(m => ({
+            type: m.getType?.() || m._getType?.(),
+            content: m.content,
+            name: (m as any).name || undefined
+        })), null, 2));
+        console.log(`[executeNodeFunc] Extracted userQuery: ${queryForExecution}`);
+        console.log(`[executeNodeFunc] Context working: ${state.context.working}`);
 
         // --- 1. Reasoning Phase ---
         const reasoningPhaseStart = Date.now();
         dispatcher.dispatch(EventType.AGENT_PHASE_STARTED, { phase: 'reasoning', chatId: state.metadata.chatId, iteration: currentGraphIteration, source: 'LangGraphEngine.executeNode.reasoning' } as AgentPhaseEventPayload);
 
         const memoryForReasoning = await hybridMemory.getRelevantContext(
-            state.metadata.chatId, userQuery, state.context.working, updatedMessages
+            state.metadata.chatId, queryForExecution, state.context.working, updatedMessages // Usar queryForExecution
         );
         updatedContext.memory = memoryForReasoning; // Guardar memoria usada
 
         const reasoningResult: ReasoningOutput = await runOptimizedReasoningChain({
-            userQuery,
+            userQuery: queryForExecution, // Usar queryForExecution
             analysisResult: { understanding: state.context.working, initialPlan: state.execution.plan },
             toolsDescription: formatToolsDescription(toolRegistry),
             previousToolResults: updatedMessages
-                .filter((m): m is ToolMessage => m._getType() === 'tool')
+                .filter((m): m is ToolMessage => (m.getType?.() || m._getType?.()) === 'tool')
                 .map(tm => ({ name: tm.name || 'unknown_tool', result: tm.content })),
             memoryContext: memoryForReasoning,
             model
@@ -175,13 +202,17 @@ export async function executeNodeFunc(
             dispatcher.dispatch(EventType.AGENT_PHASE_STARTED, { phase: 'actionInterpretation', chatId: state.metadata.chatId, iteration: currentGraphIteration, source: 'LangGraphEngine.executeNode.action' } as AgentPhaseEventPayload);
 
             const actionResult: ActionOutput = await runOptimizedActionChain({
-                userQuery,
+                userQuery: queryForExecution,
                 lastToolName: toolName,
                 lastToolResult: toolCallResult.success ? toolCallResult.data : { error: toolCallResult.error },
-                previousActions: updatedMessages // Pasar todos los mensajes actuales para el contexto de la acción
-                    .filter(m => m._getType() === 'tool' || (m._getType() === 'ai' && (m.content as string).startsWith("Reasoning:"))) // Simplificación
+                previousActions: updatedMessages
+                    .filter(m => {
+                        const type = m.getType?.();
+                        return type === 'tool' || (type === 'ai' && (m.content as string).startsWith("Reasoning:"));
+                    })
                     .map(m => {
-                        if (m._getType() === 'tool') return { tool: (m as ToolMessage).name || 'unknown', result: m.content };
+                        const type = m.getType?.();
+                        if (type === 'tool') return { tool: (m as ToolMessage).name || 'unknown', result: m.content };
                         return { tool: 'thought', result: m.content };
                     }),
                 memoryContext: memoryForReasoning, // Reusar memoria de razonamiento o recalcular

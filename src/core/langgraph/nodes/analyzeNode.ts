@@ -7,21 +7,22 @@ import { PerformanceMonitor } from '../../monitoring/PerformanceMonitor';
 import { runOptimizedAnalysisChain } from '../../../features/ai/lcel/OptimizedAnalysisChain';
 import { AnalysisOutput } from '../../../features/ai/prompts/optimized/analysisPrompt';
 import { EventType, AgentPhaseEventPayload } from '@features/events/eventTypes';
-import { AIMessage, SystemMessage } from '@langchain/core/messages';
+import { AIMessage, HumanMessage } from '@langchain/core/messages'; // <-- AÑADIDO HumanMessage
+import { ToolRegistry } from '../../../features/tools/ToolRegistry';
 
 export interface NodeDependencies {
     modelManager: ModelManager;
+    toolRegistry: ToolRegistry;
     dispatcher: InternalEventDispatcher;
     hybridMemory: HybridMemorySystem;
     performanceMonitor: PerformanceMonitor;
-    // No necesitamos toolRegistry ni executedToolsInSession aquí
 }
 
 export async function analyzeNodeFunc(
     state: OptimizedGraphState,
-    dependencies: Pick<NodeDependencies, 'modelManager' | 'dispatcher' | 'hybridMemory' | 'performanceMonitor'>
+    dependencies: Pick<NodeDependencies, 'modelManager' | 'dispatcher' | 'hybridMemory' | 'performanceMonitor' | 'toolRegistry'>
 ): Promise<Partial<OptimizedGraphState>> {
-    const { modelManager, dispatcher, hybridMemory, performanceMonitor } = dependencies;
+    const { modelManager, dispatcher, hybridMemory, performanceMonitor, toolRegistry } = dependencies;
     const startTime = Date.now();
     const phaseName = 'initialAnalysis';
 
@@ -34,30 +35,43 @@ export async function analyzeNodeFunc(
     } as AgentPhaseEventPayload);
 
     try {
-        const userQuery = state.messages.find(m => m._getType() === 'human')?.content as string || state.context.working;
-        if (!userQuery) {
-            throw new Error("No user query found in state for analysis.");
+        // --- CAMBIO CRÍTICO AQUÍ ---
+        // Obtener el ÚLTIMO mensaje humano como la consulta actual
+        const humanMessages = state.messages.filter((m): m is HumanMessage => m._getType() === 'human');
+        const userQuery = humanMessages.length > 0
+            ? humanMessages[humanMessages.length - 1].content as string
+            : state.context.working; // Fallback si no hay mensajes humanos (poco probable aquí)
+
+        if (!userQuery && !state.context.working) { // Condición de error más robusta
+            throw new Error("No user query or working context found in state for analysis.");
         }
+
+        const queryForAnalysis = userQuery || state.context.working;
+
+        // Logging detallado para depuración
+        console.log(`[analyzeNodeFunc] Chat ID: ${state.metadata.chatId}, Iteration: ${state.context.iteration}`);
+        console.log(`[analyzeNodeFunc] state.messages:`, JSON.stringify(state.messages.map(m => ({
+            type: m.getType?.() || m._getType?.(),
+            content: m.content,
+            name: (m as any).name || undefined
+        })), null, 2));
+        console.log(`[analyzeNodeFunc] Extracted userQuery: ${queryForAnalysis}`);
+        console.log(`[analyzeNodeFunc] Context working: ${state.context.working}`);
+
 
         const memoryContext = await hybridMemory.getRelevantContext(
             state.metadata.chatId,
-            userQuery,
-            state.context.working, // Pasar el 'objective' actual
-            state.messages // Pasar todos los mensajes actuales del grafo
+            queryForAnalysis, // Usar la consulta correcta
+            state.context.working,
+            state.messages
         );
 
         const model = modelManager.getActiveModel();
-        // Las herramientas disponibles se obtendrían de ToolRegistry, pero analyzeNode no las usa directamente,
-        // sino que runOptimizedAnalysisChain las necesita. Esto es un pequeño desajuste.
-        // Idealmente, ToolRegistry sería una dependencia aquí para pasar los nombres.
-        // Por ahora, lo simulamos o asumimos que runOptimizedAnalysisChain puede obtenerlas.
-        // SOLUCIÓN TEMPORAL: Dejar que runOptimizedAnalysisChain falle si no puede obtenerlas, o pasar un array vacío.
-        // Para una solución real, ToolRegistry debería ser una dependencia.
 
         const analysisResult: AnalysisOutput = await runOptimizedAnalysisChain({
-            userQuery,
-            availableTools: [], // Placeholder: ToolRegistry debería proveer esto
-            codeContext: "", // Placeholder: obtener de editor/project context si está en WindsurfState
+            userQuery: queryForAnalysis, // Usar la consulta correcta
+            availableTools: toolRegistry.getToolNames(),
+            codeContext: "",
             memoryContext,
             model
         });
@@ -70,13 +84,13 @@ export async function analyzeNodeFunc(
             context: {
                 ...state.context,
                 working: analysisResult.understanding || state.context.working,
-                memory: memoryContext, // Guardar el contexto de memoria usado
+                memory: memoryContext,
             },
             execution: {
                 ...state.execution,
                 plan: analysisResult.initialPlan,
             },
-            messages: newMessages, // Añadir mensaje de IA con el resultado del análisis
+            messages: [...(state.messages || []), ...newMessages],
         };
 
         dispatcher.dispatch(EventType.AGENT_PHASE_COMPLETED, {
@@ -103,11 +117,10 @@ export async function analyzeNodeFunc(
         } as AgentPhaseEventPayload);
         performanceMonitor.trackNodeExecution('analyzeNode', Date.now() - startTime, error.message);
 
-        // Marcar como completado con error para que el grafo pueda terminar
         return {
-            messages: [new AIMessage(`Error during analysis: ${error.message}`)],
+            messages: [...(state.messages || []), new AIMessage(`Error during analysis: ${error.message}`)],
             metadata: { ...state.metadata, isCompleted: true, finalOutput: `Analysis failed: ${error.message}` },
-            validation: { errors: [`Analysis error: ${error.message}`], corrections: [] }
+            validation: { ...(state.validation || { corrections: [] }), errors: [...(state.validation?.errors || []), `Analysis error: ${error.message}`] }
         };
     }
 }

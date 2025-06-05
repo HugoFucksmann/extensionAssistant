@@ -22,6 +22,23 @@ import { respondNodeFunc } from './nodes/respondNode';
 import { getConfig } from "@shared/config2";
 import { HistoryEntry } from "@features/chat/types";
 
+// --- UTILIDAD DE DEDUPLICACIÓN ---
+export function deduplicateMessages(messages: any[]): any[] {
+    if (!Array.isArray(messages) || messages.length < 2) return messages;
+    const seen = new Set<string>();
+    const result = [];
+    for (const msg of messages) {
+        const type = msg.getType ? msg.getType() : undefined;
+        const name = msg.name || msg.tool || '';
+        const hash = `${type}|${msg.content}|${name}`;
+        if (!seen.has(hash)) {
+            seen.add(hash);
+            result.push(msg);
+        }
+    }
+    return result;
+}
+
 export class LangGraphEngine implements Disposable {
     // Using any to bypass type checking issues with LangGraph's internal types
     private graph: any;
@@ -38,7 +55,7 @@ export class LangGraphEngine implements Disposable {
     ) {
         this.hybridMemory = new HybridMemorySystem(this.memoryManager, this.modelManager);
         this.maxIterations = getConfig(process.env.NODE_ENV === 'production' ? 'production' : 'development').backend.langgraph.maxIterations;
-        
+
         // Initialize the graph after all other properties are set
         this.graph = this.buildOptimizedGraph();
 
@@ -144,7 +161,19 @@ export class LangGraphEngine implements Disposable {
     // State conversion methods
     private convertToGraphState(initialState: WindsurfState): OptimizedGraphState {
         const userMessageContent = initialState.userMessage || '';
-        const initialMessages: BaseMessage[] = [new HumanMessage(userMessageContent)];
+        let initialMessages: BaseMessage[] = [];
+        // Si initialState.messages existe, úsalo y sólo agrega el mensaje humano si no está ya presente
+        if (Array.isArray((initialState as any).messages) && (initialState as any).messages.length > 0) {
+            initialMessages = [...(initialState as any).messages];
+            const lastHuman = initialMessages.filter(m => (m.getType?.()) === 'human').pop();
+            if (!lastHuman || lastHuman.content !== userMessageContent) {
+                initialMessages.push(new HumanMessage(userMessageContent));
+            }
+        } else {
+            initialMessages = [new HumanMessage(userMessageContent)];
+        }
+        // Deduplicar por si acaso
+        initialMessages = deduplicateMessages(initialMessages);
 
         return {
             messages: initialMessages,
@@ -242,6 +271,10 @@ export class LangGraphEngine implements Disposable {
             finalGraphState = errorGraphState;
         }
 
+        // --- DEDUPLICACIÓN DE MENSAJES ---
+        if (finalGraphState.messages && Array.isArray(finalGraphState.messages)) {
+            finalGraphState.messages = deduplicateMessages(finalGraphState.messages);
+        }
         const finalWindsurfState = this.convertFromGraphState(finalGraphState, initialState);
 
         if (finalWindsurfState.finalOutput) {
