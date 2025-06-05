@@ -128,7 +128,7 @@
     "@langchain/core": "^0.3.57",
     "@langchain/google-gauth": "^0.2.9",
     "@langchain/google-genai": "^0.2.9",
-    "@langchain/langgraph": "^0.2.72",
+    "@langchain/langgraph": "^0.2.3",
     "@langchain/ollama": "^0.2.0",
     "eventemitter3": "^5.0.1",
     "langchain": "^0.3.27",
