@@ -8,10 +8,10 @@ import { addErrorToHistory } from './utils/historyUtils';
 import { Disposable } from './interfaces/Disposable';
 
 // NUEVA IMPORTACIÓN
-import { LangGraphAdapter } from './langgraph/LangGraphAdapter';
+import { LangGraphEngine } from './langgraph/LangGraphEngine';
 
 // El tipo para el motor de ejecución ahora es el adaptador
-type AgentExecutionEngineType = LangGraphAdapter;
+type AgentExecutionEngineType = LangGraphEngine;
 
 export interface ProcessUserMessageResult {
   success: boolean;
@@ -46,7 +46,7 @@ export class ApplicationLogicService implements Disposable {
     }
 
     try {
-      // Llama al método run del adaptador
+      // Llama al método run del motor LangGraphEngine
       const resultState = await this.agentEngine.run(state);
       this.conversationManager.updateConversationState(chatId, resultState);
       // El almacenamiento de la conversación ahora podría ser manejado dentro del motor
@@ -98,7 +98,7 @@ export class ApplicationLogicService implements Disposable {
   }
 
   public dispose(): void {
-    // El motor principal (LangGraphAdapter) se dispone a través de ComponentFactory.
+    // El motor principal (LangGraphEngine) se dispone a través de ComponentFactory.
     // memoryManager también se dispone centralmente.
     // No hay nada específico que ApplicationLogicService necesite disponer por sí mismo
     // si sus dependencias se gestionan externamente.

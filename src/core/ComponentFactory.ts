@@ -8,7 +8,7 @@ import { ConversationManager } from './ConversationManager';
 import { ApplicationLogicService } from './ApplicationLogicService';
 import { InternalEventDispatcher } from './events/InternalEventDispatcher';
 import { MemoryManager } from '../features/memory/MemoryManager';
-import { LangGraphAdapter } from './langgraph/LangGraphAdapter';
+import { LangGraphEngine } from './langgraph/LangGraphEngine';
 import { PerformanceMonitor } from './monitoring/PerformanceMonitor';
 import { Disposable } from './interfaces/Disposable';
 
@@ -20,7 +20,7 @@ export class ComponentFactory {
   private static conversationManagerInstance: ConversationManager;
   private static memoryManagerInstance: MemoryManager;
   private static performanceMonitorInstance: PerformanceMonitor;
-  private static langGraphAdapterInstance: LangGraphAdapter;
+  private static langGraphEngineInstance: LangGraphEngine;
 
   public static getInternalEventDispatcher(): InternalEventDispatcher {
     if (!this.internalEventDispatcherInstance) {
@@ -59,15 +59,15 @@ export class ComponentFactory {
     return this.performanceMonitorInstance;
   }
 
-  public static getAgentExecutionEngine(extensionContext: vscode.ExtensionContext): LangGraphAdapter {
-    if (!this.langGraphAdapterInstance) {
+  public static getAgentExecutionEngine(extensionContext: vscode.ExtensionContext): LangGraphEngine {
+    if (!this.langGraphEngineInstance) {
       const modelManager = this.getModelManager();
       const toolRegistry = this.getToolRegistry();
       const dispatcher = this.getInternalEventDispatcher();
       const memoryManager = this.getMemoryManager(extensionContext);
       const performanceMonitor = this.getPerformanceMonitor();
 
-      this.langGraphAdapterInstance = new LangGraphAdapter(
+      this.langGraphEngineInstance = new LangGraphEngine(
         modelManager,
         toolRegistry,
         dispatcher,
@@ -75,7 +75,7 @@ export class ComponentFactory {
         performanceMonitor
       );
     }
-    return this.langGraphAdapterInstance;
+    return this.langGraphEngineInstance;
   }
 
   public static getApplicationLogicService(extensionContext: vscode.ExtensionContext): ApplicationLogicService {
@@ -103,9 +103,9 @@ export class ComponentFactory {
   }
 
   public static async dispose(): Promise<void> {
-    if (this.langGraphAdapterInstance && typeof this.langGraphAdapterInstance.dispose === 'function') {
-      this.langGraphAdapterInstance.dispose();
-      (this.langGraphAdapterInstance as any) = null;
+    if (this.langGraphEngineInstance && typeof this.langGraphEngineInstance.dispose === 'function') {
+      this.langGraphEngineInstance.dispose();
+      (this.langGraphEngineInstance as any) = null;
     }
 
     if (this.performanceMonitorInstance && typeof (this.performanceMonitorInstance as any).reset === 'function') {
