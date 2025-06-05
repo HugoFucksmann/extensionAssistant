@@ -4,11 +4,14 @@ import { ModelManager } from '../../../features/ai/ModelManager';
 import { InternalEventDispatcher } from '../../events/InternalEventDispatcher';
 import { HybridMemorySystem } from '../HybridMemorySystem';
 import { PerformanceMonitor } from '../../monitoring/PerformanceMonitor';
-import { runOptimizedAnalysisChain } from '../../../features/ai/lcel/OptimizedAnalysisChain';
-import { AnalysisOutput } from '../../../features/ai/prompts/optimized/analysisPrompt';
 import { EventType, AgentPhaseEventPayload } from '@features/events/eventTypes';
-import { AIMessage, HumanMessage } from '@langchain/core/messages'; // <-- AÑADIDO HumanMessage
+import { AIMessage, HumanMessage, BaseMessage } from '@langchain/core/messages';
 import { ToolRegistry } from '../../../features/tools/ToolRegistry';
+
+// NUEVAS IMPORTACIONES DIRECTAS
+import { analysisOutputSchema, analysisPromptLC, AnalysisOutput } from "../../../features/ai/prompts/optimized/analysisPrompt";
+import { createAutoCorrectStep } from "../../../shared/utils/aiResponseParser";
+import { invokeModelWithLogging } from '../ModelInvokeLogger';
 
 export interface NodeDependencies {
     modelManager: ModelManager;
@@ -35,48 +38,52 @@ export async function analyzeNodeFunc(
     } as AgentPhaseEventPayload);
 
     try {
-        // --- CAMBIO CRÍTICO AQUÍ ---
-        // Obtener el ÚLTIMO mensaje humano como la consulta actual
         const humanMessages = state.messages.filter((m): m is HumanMessage => m._getType() === 'human');
         const userQuery = humanMessages.length > 0
             ? humanMessages[humanMessages.length - 1].content as string
-            : state.context.working; // Fallback si no hay mensajes humanos (poco probable aquí)
+            : state.context.working;
 
-        if (!userQuery && !state.context.working) { // Condición de error más robusta
+        if (!userQuery && !state.context.working) {
             throw new Error("No user query or working context found in state for analysis.");
         }
-
         const queryForAnalysis = userQuery || state.context.working;
-
-        // Logging detallado para depuración
-        console.log(`[analyzeNodeFunc] Chat ID: ${state.metadata.chatId}, Iteration: ${state.context.iteration}`);
-        console.log(`[analyzeNodeFunc] state.messages:`, JSON.stringify(state.messages.map(m => ({
-            type: m.getType?.() || m._getType?.(),
-            content: m.content,
-            name: (m as any).name || undefined
-        })), null, 2));
-        console.log(`[analyzeNodeFunc] Extracted userQuery: ${queryForAnalysis}`);
-        console.log(`[analyzeNodeFunc] Context working: ${state.context.working}`);
-
 
         const memoryContext = await hybridMemory.getRelevantContext(
             state.metadata.chatId,
-            queryForAnalysis, // Usar la consulta correcta
+            queryForAnalysis,
             state.context.working,
             state.messages
         );
 
         const model = modelManager.getActiveModel();
+        const availableTools = toolRegistry.getToolNames();
 
-        const analysisResult: AnalysisOutput = await runOptimizedAnalysisChain({
-            userQuery: queryForAnalysis, // Usar la consulta correcta
-            availableTools: toolRegistry.getToolNames(),
-            codeContext: "",
-            memoryContext,
-            model
+        // LÓGICA DE OptimizedAnalysisChain INTEGRADA AQUÍ
+        const promptInput = {
+            userQuery: queryForAnalysis,
+            availableTools: availableTools.join(', '),
+            codeContext: "", // Asumiendo que no se usa o se obtiene de otra forma si es necesario
+            memoryContext: memoryContext || ''
+        };
+
+        const parseStep = createAutoCorrectStep(analysisOutputSchema, model, {
+            maxAttempts: 2,
+            verbose: process.env.NODE_ENV === 'development',
         });
 
-        const newMessages: AIMessage[] = [new AIMessage({
+        const chain = analysisPromptLC.pipe(model).pipe(parseStep);
+
+        const analysisResult: AnalysisOutput = await invokeModelWithLogging(
+            chain,
+            promptInput,
+            {
+                caller: 'analyzeNodeFunc',
+                responseFormatter: (r: unknown) => JSON.stringify(r, null, 2)
+            }
+        );
+        // FIN LÓGICA INTEGRADA
+
+        const newMessages: BaseMessage[] = [...(state.messages || []), new AIMessage({
             content: `Analysis complete. Understanding: ${analysisResult.understanding}. Plan: ${analysisResult.initialPlan.join(', ')}`
         })];
 
@@ -90,7 +97,7 @@ export async function analyzeNodeFunc(
                 ...state.execution,
                 plan: analysisResult.initialPlan,
             },
-            messages: [...(state.messages || []), ...newMessages],
+            messages: newMessages,
         };
 
         dispatcher.dispatch(EventType.AGENT_PHASE_COMPLETED, {

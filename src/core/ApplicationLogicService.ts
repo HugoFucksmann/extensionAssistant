@@ -1,10 +1,6 @@
 // src/core/ApplicationLogicService.ts
 import { WindsurfState } from './types';
 import { MemoryManager } from '../features/memory/MemoryManager';
-// import { OptimizedReActEngine } from '../features/ai/core/OptimizedReActEngine'; // Ya no se importa directamente
-import { ModelManager } from '../features/ai/ModelManager'; // No se usa directamente aquí, pero se mantiene por si acaso
-import { InternalEventDispatcher } from './events/InternalEventDispatcher'; // No se usa directamente aquí
-import { getConfig } from '../shared/config';
 import { ToolRegistry } from '../features/tools/ToolRegistry';
 import { ConversationManager } from './ConversationManager';
 import { ToolResult } from '../features/tools/types';

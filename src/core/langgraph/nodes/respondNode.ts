@@ -1,10 +1,19 @@
 // src/core/langgraph/nodes/respondNode.ts
 import { OptimizedGraphState } from '../LangGraphState';
-import { NodeDependencies } from './analyzeNode'; // Usar la base
-import { runOptimizedResponseChain } from '../../../features/ai/lcel/OptimizedResponseChain';
-import { ResponseOutput } from '../../../features/ai/prompts/optimized/responsePrompt';
+import { NodeDependencies } from './analyzeNode';
 import { EventType, AgentPhaseEventPayload } from '@features/events/eventTypes';
-import { AIMessage, HumanMessage } from '@langchain/core/messages'; // Asegúrate que HumanMessage esté
+import { AIMessage, HumanMessage, BaseMessage } from '@langchain/core/messages';
+
+// NUEVAS IMPORTACIONES DIRECTAS
+import { responsePromptLC, responseOutputSchema, ResponseOutput } from "../../../features/ai/prompts/optimized/responsePrompt";
+import { createAutoCorrectStep } from "../../../shared/utils/aiResponseParser";
+import { invokeModelWithLogging } from "../ModelInvokeLogger";
+
+
+function formatForPrompt(obj: unknown): string {
+    return typeof obj === 'string' ? obj : JSON.stringify(obj);
+}
+
 
 export async function respondNodeFunc(
     state: OptimizedGraphState,
@@ -22,48 +31,50 @@ export async function respondNodeFunc(
         source: 'LangGraphEngine.respondNode'
     } as AgentPhaseEventPayload);
 
-    let finalResponseContent = state.metadata.finalOutput; // Usar si ya fue establecido por un nodo anterior
+    let finalResponseContent = state.metadata.finalOutput;
 
     try {
         if (!finalResponseContent) {
-            // --- CAMBIO CRÍTICO AQUÍ ---
             const humanMessages = state.messages.filter((m): m is HumanMessage => m.getType() === 'human' || m._getType?.() === 'human');
-            const userQuery = humanMessages.length > 0 
-                ? humanMessages[humanMessages.length - 1].content as string 
+            const userQuery = humanMessages.length > 0
+                ? humanMessages[humanMessages.length - 1].content as string
                 : state.context.working;
 
             const queryForResponse = userQuery || state.context.working;
-            
-            // Logging detallado para depuración
-            console.log(`[respondNodeFunc] Chat ID: ${state.metadata.chatId}, Iteration: ${state.context.iteration}`);
-            console.log(`[respondNodeFunc] state.messages:`, JSON.stringify(state.messages.map(m => ({
-                type: m.getType?.() || m._getType?.(),
-                content: m.content,
-                name: (m as any).name || undefined
-            })), null, 2));
-            console.log(`[respondNodeFunc] Extracted userQuery: ${queryForResponse}`);
-            console.log(`[respondNodeFunc] Context working: ${state.context.working}`);
-            
+
             if (!queryForResponse) {
                 finalResponseContent = "No specific query found to generate a response.";
             } else {
                 const model = modelManager.getActiveModel();
                 const memoryForResponse = await hybridMemory.getRelevantContext(
                     state.metadata.chatId,
-                    queryForResponse, // Usar queryForResponse
+                    queryForResponse,
                     state.context.working,
                     state.messages
                 );
 
-                const responseResult: ResponseOutput = await runOptimizedResponseChain({
-                    userQuery: queryForResponse, // Usar queryForResponse
-                    toolResults: state.messages
+                // LÓGICA DE OptimizedResponseChain INTEGRADA AQUÍ
+                const promptInput = {
+                    userQuery: queryForResponse,
+                    toolResults: formatForPrompt(state.messages
                         .filter(m => (m.getType?.() || m._getType?.()) === 'tool')
-                        .map(tm => ({ tool: (tm as any).name || 'unknown_tool', result: tm.content })),
-                    analysisResult: { understanding: state.context.working, initialPlan: state.execution.plan },
-                    memoryContext: memoryForResponse,
-                    model
+                        .map(tm => ({ tool: (tm as any).name || 'unknown_tool', result: tm.content })) || []),
+                    analysisResult: formatForPrompt({ understanding: state.context.working, initialPlan: state.execution.plan }),
+                    memoryContext: memoryForResponse || ''
+                };
+
+                const parseStep = createAutoCorrectStep(responseOutputSchema, model, {
+                    maxAttempts: 2,
+                    verbose: process.env.NODE_ENV === 'development',
                 });
+
+                const chain = responsePromptLC.pipe(model).pipe(parseStep);
+                const responseResult: ResponseOutput = await invokeModelWithLogging(
+                    chain,
+                    promptInput,
+                    { caller: 'respondNodeFunc' }
+                );
+                // FIN LÓGICA INTEGRADA
                 finalResponseContent = responseResult.response;
             }
         }
@@ -72,8 +83,13 @@ export async function respondNodeFunc(
             finalResponseContent = "I've completed the process, but I don't have a specific message to share at this time.";
         }
 
+        // Asegurarse de que messages sea un array antes de hacer spread
+        const currentMessages = Array.isArray(state.messages) ? state.messages : [];
+        const updatedMessages: BaseMessage[] = [...currentMessages, new AIMessage(finalResponseContent)];
+
+
         const partialUpdate: Partial<OptimizedGraphState> = {
-            messages: [new AIMessage(finalResponseContent)], // La respuesta final como un mensaje de IA
+            messages: updatedMessages, // Usar el array actualizado
             metadata: {
                 ...state.metadata,
                 isCompleted: true,
@@ -106,8 +122,11 @@ export async function respondNodeFunc(
         } as AgentPhaseEventPayload);
         performanceMonitor.trackNodeExecution('respondNode', Date.now() - startTime, error.message);
 
+        const currentMessages = Array.isArray(state.messages) ? state.messages : [];
+        const updatedMessagesOnError: BaseMessage[] = [...currentMessages, new AIMessage(errorMessage)];
+
         return {
-            messages: [new AIMessage(errorMessage)],
+            messages: updatedMessagesOnError,
             metadata: { ...state.metadata, isCompleted: true, finalOutput: errorMessage },
             validation: { ...(state.validation || { corrections: [] }), errors: [...(state.validation?.errors || []), errorMessage] }
         };

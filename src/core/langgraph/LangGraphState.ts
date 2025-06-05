@@ -1,48 +1,50 @@
 // src/core/langgraph/LangGraphState.ts
 import { Annotation } from "@langchain/langgraph";
 import { BaseMessage } from "@langchain/core/messages";
+// ASUMIENDO que deduplicateMessages se mueve a una utilidad o se importa estáticamente
+// Por ejemplo, si se mueve a: import { deduplicateMessages } from '../../shared/utils/messageUtils';
+// O si LangGraphEngine lo exporta directamente y no hay ciclo:
+import { deduplicateMessages } from './LangGraphEngine'; // Mantener si no hay problemas
 
 // Optimized State Structure for LangGraph
 export interface OptimizedGraphState {
     messages: BaseMessage[];
     context: {
-        working: string;      // Contexto activo de la tarea actual
-        memory: string;       // Memoria relevante recuperada
-        iteration: number;    // Contador de iteraciones del grafo
+        working: string;
+        memory: string;
+        iteration: number;
     };
     execution: {
-        plan: string[];       // Plan de acción generado por el análisis
-        tools_used: string[]; // Herramientas que ya se han ejecutado en esta conversación
-        current_tool?: string; // Herramienta seleccionada en la iteración actual
-        current_params?: any;  // Parámetros para la herramienta actual
+        plan: string[];
+        tools_used: string[];
+        current_tool?: string;
+        current_params?: any;
     };
-    validation?: {          // Opcional, solo cuando se necesita validación explícita
+    validation?: {
         errors: string[];
         corrections: string[];
     };
     metadata: {
-        chatId: string;       // ID del chat actual
-        startTime: number;    // Timestamp de inicio del procesamiento del grafo
-        isCompleted: boolean; // Indica si el grafo ha finalizado su ejecución
-        finalOutput?: string;  // La respuesta final generada para el usuario
+        chatId: string;
+        startTime: number;
+        isCompleted: boolean;
+        finalOutput?: string;
     };
 }
 
-// State annotation for LangGraph
-// Esto le dice a LangGraph cómo manejar cada parte del estado,
-// especialmente cómo combinar actualizaciones (reducer) y cuál es el valor por defecto.
 export const GraphStateAnnotation = Annotation.Root({
     messages: Annotation<BaseMessage[]>({
         reducer: (current, update) => {
-            // Importación dinámica para evitar dependencias circulares
-            // eslint-disable-next-line @typescript-eslint/no-var-requires
-            const { deduplicateMessages } = require('./LangGraphEngine');
+            // Idealmente, esta función debería estar en un archivo de utilidades
+            // para evitar importaciones dinámicas o potenciales ciclos.
+            // const { deduplicateMessages } = require('./LangGraphEngine'); // Evitar si es posible
             return deduplicateMessages([...(current || []), ...(update || [])]);
         },
         default: () => []
     }),
+    // ... resto de las anotaciones sin cambios
     context: Annotation<OptimizedGraphState['context']>({
-        reducer: (current, update) => ({ ...current, ...update }), // Sobrescribe con la nueva información
+        reducer: (current, update) => ({ ...current, ...update }),
         default: () => ({ working: "", memory: "", iteration: 0 })
     }),
     execution: Annotation<OptimizedGraphState['execution']>({
@@ -51,7 +53,7 @@ export const GraphStateAnnotation = Annotation.Root({
     }),
     validation: Annotation<OptimizedGraphState['validation']>({
         reducer: (current, update) => update ? { ...(current || { errors: [], corrections: [] }), ...update } : current,
-        default: () => undefined // Por defecto, no hay estado de validación
+        default: () => undefined
     }),
     metadata: Annotation<OptimizedGraphState['metadata']>({
         reducer: (current, update) => ({ ...current, ...update }),

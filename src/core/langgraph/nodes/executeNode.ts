@@ -1,26 +1,33 @@
 // src/core/langgraph/nodes/executeNode.ts
 import { OptimizedGraphState } from '../LangGraphState';
-import { NodeDependencies as BaseNodeDependencies } from './analyzeNode';
+import { NodeDependencies as BaseNodeDependencies } from './analyzeNode'; // analyzeNode ya exporta NodeDependencies
 import { ToolRegistry } from '../../../features/tools/ToolRegistry';
-import { runOptimizedReasoningChain } from '../../../features/ai/lcel/OptimizedReasoningChain';
-import { ReasoningOutput } from '../../../features/ai/prompts/optimized/reasoningPrompt';
-import { runOptimizedActionChain } from '../../../features/ai/lcel/OptimizedActionChain';
-import { ActionOutput } from '../../../features/ai/prompts/optimized/actionPrompt';
 import { EventType, AgentPhaseEventPayload, ToolExecutionEventPayload } from '@features/events/eventTypes';
 import { AIMessage, HumanMessage, SystemMessage, ToolMessage, BaseMessage } from '@langchain/core/messages';
 import { ToolResult } from '../../../features/tools/types';
 import { generateUniqueId } from '../../../shared/utils/generateIds';
 import { getConfig } from '../../../shared/config2';
 
+// NUEVAS IMPORTACIONES DIRECTAS
+import { reasoningPromptLC, reasoningOutputSchema, ReasoningOutput } from "../../../features/ai/prompts/optimized/reasoningPrompt";
+import { actionPromptLC, actionOutputSchema, ActionOutput } from "../../../features/ai/prompts/optimized/actionPrompt";
+import { createAutoCorrectStep } from "../../../shared/utils/aiResponseParser";
+import { invokeModelWithLogging } from "../ModelInvokeLogger";
+
+
+function formatForPrompt(obj: unknown): string {
+    return typeof obj === 'string' ? obj : JSON.stringify(obj);
+}
+
+
 export interface ExecuteNodeDependencies extends BaseNodeDependencies {
-    executedToolsInSession: Set<string>; // Para deduplicación
+    executedToolsInSession: Set<string>;
 }
 
 function formatToolsDescription(toolRegistry: ToolRegistry): string {
     return toolRegistry.getAllTools().map(tool => {
         let paramsDesc = "No parameters.";
         if (tool.parametersSchema) {
-            // Intentar obtener una descripción más legible del esquema Zod
             try {
                 const shape = (tool.parametersSchema as any).shape || (tool.parametersSchema._def as any)?.shape;
                 if (shape) {
@@ -80,7 +87,6 @@ export async function executeNodeFunc(
     let updatedMetadata = { ...state.metadata };
 
     try {
-        // --- CAMBIO CRÍTICO AQUÍ ---
         const humanMessages = state.messages.filter((m): m is HumanMessage => m.getType() === 'human' || m._getType?.() === 'human');
         const userQuery = humanMessages.length > 0
             ? humanMessages[humanMessages.length - 1].content as string
@@ -88,7 +94,6 @@ export async function executeNodeFunc(
 
         const queryForExecution = userQuery || state.context.working;
         if (!queryForExecution) {
-            // Añadir un mensaje de error o manejarlo adecuadamente
             const errorMsg = "No user query or working context for execution.";
             dispatcher.systemError(errorMsg, new Error(errorMsg), { chatId: state.metadata.chatId }, 'LangGraphEngine.executeNode');
             return {
@@ -101,40 +106,49 @@ export async function executeNodeFunc(
 
         const model = modelManager.getActiveModel();
 
-        // Logging detallado para depuración
-        console.log(`[executeNodeFunc] Chat ID: ${state.metadata.chatId}, Iteration: ${currentGraphIteration}`);
-        console.log(`[executeNodeFunc] state.messages:`, JSON.stringify(state.messages.map(m => ({
-            type: m.getType?.() || m._getType?.(),
-            content: m.content,
-            name: (m as any).name || undefined
-        })), null, 2));
-        console.log(`[executeNodeFunc] Extracted userQuery: ${queryForExecution}`);
-        console.log(`[executeNodeFunc] Context working: ${state.context.working}`);
-
         // --- 1. Reasoning Phase ---
         const reasoningPhaseStart = Date.now();
         dispatcher.dispatch(EventType.AGENT_PHASE_STARTED, { phase: 'reasoning', chatId: state.metadata.chatId, iteration: currentGraphIteration, source: 'LangGraphEngine.executeNode.reasoning' } as AgentPhaseEventPayload);
 
         const memoryForReasoning = await hybridMemory.getRelevantContext(
-            state.metadata.chatId, queryForExecution, state.context.working, updatedMessages // Usar queryForExecution
+            state.metadata.chatId, queryForExecution, state.context.working, updatedMessages
         );
-        updatedContext.memory = memoryForReasoning; // Guardar memoria usada
+        updatedContext.memory = memoryForReasoning;
 
-        const reasoningResult: ReasoningOutput = await runOptimizedReasoningChain({
-            userQuery: queryForExecution, // Usar queryForExecution
-            analysisResult: { understanding: state.context.working, initialPlan: state.execution.plan },
+        // LÓGICA DE OptimizedReasoningChain INTEGRADA AQUÍ
+        const reasoningPromptInput = {
+            userQuery: queryForExecution,
+            analysisResult: formatForPrompt({ understanding: state.context.working, initialPlan: state.execution.plan }),
             toolsDescription: formatToolsDescription(toolRegistry),
-            previousToolResults: updatedMessages
+            previousToolResults: formatForPrompt(updatedMessages
                 .filter((m): m is ToolMessage => (m.getType?.() || m._getType?.()) === 'tool')
-                .map(tm => ({ name: tm.name || 'unknown_tool', result: tm.content })),
-            memoryContext: memoryForReasoning,
-            model
+                .map(tm => ({ name: tm.name || 'unknown_tool', result: tm.content }))),
+            memoryContext: memoryForReasoning || ''
+        };
+
+        const reasoningParseStep = createAutoCorrectStep(reasoningOutputSchema, model, {
+            maxAttempts: 2,
+            verbose: process.env.NODE_ENV === 'development'
         });
+
+        const reasoningChain = reasoningPromptLC.pipe(model).pipe((response: any) => { // Extract content if necessary
+            if (response && typeof response === 'object' && 'content' in response) {
+                return response.content;
+            }
+            return response;
+        }).pipe(reasoningParseStep);
+
+        const reasoningResult: ReasoningOutput = await invokeModelWithLogging(
+            reasoningChain,
+            reasoningPromptInput,
+            { caller: 'executeNodeFunc.reasoning' }
+        );
+        // FIN LÓGICA INTEGRADA
+
         dispatcher.dispatch(EventType.AGENT_PHASE_COMPLETED, { phase: 'reasoning', chatId: state.metadata.chatId, iteration: currentGraphIteration, data: reasoningResult, source: 'LangGraphEngine.executeNode.reasoning', duration: Date.now() - reasoningPhaseStart } as AgentPhaseEventPayload);
         performanceMonitor.trackNodeExecution('executeNode.reasoning', Date.now() - reasoningPhaseStart);
 
         updatedMessages.push(new AIMessage({ content: `Reasoning: ${reasoningResult.reasoning}. Next Action: ${reasoningResult.nextAction}${reasoningResult.tool ? ` (${reasoningResult.tool})` : ''}` }));
-
 
         if (reasoningResult.nextAction === 'respond') {
             performanceMonitor.trackNodeExecution('executeNode.respondAfterReasoning', Date.now() - startTime);
@@ -155,7 +169,6 @@ export async function executeNodeFunc(
                 dispatcher.systemWarning(`Tool ${toolName} with same params already executed. Skipping.`, { toolName, toolParams, chatId: state.metadata.chatId }, 'LangGraphEngine.executeNode');
                 performanceMonitor.trackNodeExecution('executeNode.deduplicatedTool', Date.now() - startTime);
                 updatedMessages.push(new AIMessage(dedupMsg));
-                // No marcar como completado, el grafo decidirá el siguiente paso (probablemente otro ciclo de execute o validate)
                 return { messages: updatedMessages, context: updatedContext };
             }
             executedToolsInSession.add(toolKey);
@@ -196,16 +209,16 @@ export async function executeNodeFunc(
             }
             updatedExecution.tools_used = [...new Set([...updatedExecution.tools_used, toolName])];
 
-
             // --- 3. Post-Tool Analysis (Action Phase) ---
             const actionPhaseStart = Date.now();
             dispatcher.dispatch(EventType.AGENT_PHASE_STARTED, { phase: 'actionInterpretation', chatId: state.metadata.chatId, iteration: currentGraphIteration, source: 'LangGraphEngine.executeNode.action' } as AgentPhaseEventPayload);
 
-            const actionResult: ActionOutput = await runOptimizedActionChain({
+            // LÓGICA DE OptimizedActionChain INTEGRADA AQUÍ
+            const actionPromptInput = {
                 userQuery: queryForExecution,
                 lastToolName: toolName,
-                lastToolResult: toolCallResult.success ? toolCallResult.data : { error: toolCallResult.error },
-                previousActions: updatedMessages
+                lastToolResult: formatForPrompt(toolCallResult.success ? toolCallResult.data : { error: toolCallResult.error }),
+                previousActions: formatForPrompt(updatedMessages
                     .filter(m => {
                         const type = m.getType?.();
                         return type === 'tool' || (type === 'ai' && (m.content as string).startsWith("Reasoning:"));
@@ -214,15 +227,29 @@ export async function executeNodeFunc(
                         const type = m.getType?.();
                         if (type === 'tool') return { tool: (m as ToolMessage).name || 'unknown', result: m.content };
                         return { tool: 'thought', result: m.content };
-                    }),
-                memoryContext: memoryForReasoning, // Reusar memoria de razonamiento o recalcular
-                model
+                    })),
+                memoryContext: memoryForReasoning || '', // Reusar memoria de razonamiento
+            };
+
+            const actionParseStep = createAutoCorrectStep(actionOutputSchema, model, {
+                maxAttempts: 2,
+                verbose: process.env.NODE_ENV === 'development'
             });
+
+            const actionChain = actionPromptLC.pipe(model).pipe(actionParseStep);
+
+            const actionResult: ActionOutput = await invokeModelWithLogging(
+                actionChain,
+                actionPromptInput,
+                { caller: 'executeNodeFunc.actionInterpretation' }
+            );
+            // FIN LÓGICA INTEGRADA
+
             dispatcher.dispatch(EventType.AGENT_PHASE_COMPLETED, { phase: 'actionInterpretation', chatId: state.metadata.chatId, iteration: currentGraphIteration, data: actionResult, source: 'LangGraphEngine.executeNode.action', duration: Date.now() - actionPhaseStart } as AgentPhaseEventPayload);
             performanceMonitor.trackNodeExecution('executeNode.actionInterpretation', Date.now() - actionPhaseStart);
 
             updatedMessages.push(new AIMessage({ content: actionResult.interpretation || `Interpreted result of ${toolName}.` }));
-            updatedContext.working = actionResult.interpretation || updatedContext.working; // Actualizar el contexto de trabajo
+            updatedContext.working = actionResult.interpretation || updatedContext.working;
 
             if (actionResult.nextAction === 'respond' && actionResult.response) {
                 performanceMonitor.trackNodeExecution('executeNode.toolAndRespond', Date.now() - startTime);
@@ -231,7 +258,6 @@ export async function executeNodeFunc(
                 updatedMetadata.finalOutput = actionResult.response;
                 return { messages: updatedMessages, metadata: updatedMetadata, execution: updatedExecution, context: updatedContext, validation: updatedValidation };
             }
-            // Si no es 'respond', el bucle continuará.
             performanceMonitor.trackNodeExecution('executeNode.toolAndContinue', Date.now() - startTime);
             return { messages: updatedMessages, execution: updatedExecution, context: updatedContext, validation: updatedValidation };
         }
@@ -251,7 +277,7 @@ export async function executeNodeFunc(
         performanceMonitor.trackNodeExecution('executeNode.criticalError', Date.now() - startTime, criticalErrorMsg);
 
         updatedMessages.push(new AIMessage(criticalErrorMsg));
-        updatedMetadata.isCompleted = true; // Marcar como completado para salir del bucle
+        updatedMetadata.isCompleted = true;
         updatedMetadata.finalOutput = "A critical error occurred during processing.";
         updatedValidation.errors.push(criticalErrorMsg);
         return { messages: updatedMessages, metadata: updatedMetadata, validation: updatedValidation, context: updatedContext, execution: updatedExecution };
