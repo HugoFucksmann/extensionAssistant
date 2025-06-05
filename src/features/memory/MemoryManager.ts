@@ -52,7 +52,7 @@ export class MemoryManager implements Disposable {
         }
     }
 
-    // Long-term Storage (persistente)
+
     public async storePersistent(key: string, data: any, metadata?: Record<string, any>): Promise<void> {
         const filePath = this.getFilePath(key);
         const content = {
@@ -98,7 +98,7 @@ export class MemoryManager implements Disposable {
         }
     }
 
-    // Search across persistent storage
+
     public async search(query: string, limit = 10): Promise<MemoryItem[]> {
         try {
             const files = await vscode.workspace.fs.readDirectory(this.storagePath);
@@ -120,7 +120,7 @@ export class MemoryManager implements Disposable {
                         });
                     }
                 } catch {
-                    // Ignore file read errors
+
                 }
             }
 
@@ -131,14 +131,14 @@ export class MemoryManager implements Disposable {
         }
     }
 
-    // Conversation-specific methods
+
     public async storeConversation(chatId: string, state: WindsurfState): Promise<void> {
         // Store in runtime memory
         this.setRuntime(chatId, 'lastState', state);
         this.setRuntime(chatId, 'lastObjective', state.objective);
         this.setRuntime(chatId, 'conversationHistory', state.history);
 
-        // Extract and store insights persistently
+
         const insights = this.extractInsights(state);
         if (insights.length > 0) {
             await this.storePersistent(`insights_${chatId}_${Date.now()}`, insights, {

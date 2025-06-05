@@ -35,24 +35,24 @@ export interface ToolDefinition<
   ParamsSchema extends z.ZodType<any, any, any>,
   ResultData = any
 > {
-  /** Nombre único de la herramienta */
+
   name: string;
 
-  /** Descripción de la herramienta */
+
   description: string;
 
-  /** Esquema de validación de parámetros */
+
   parametersSchema: ParamsSchema;
 
-  /** Si es true, mostrará un indicador de carga en la UI */
+
   uiFeedback?: boolean;
 
-  /** Función que ejecuta la lógica de la herramienta */
+
   execute: (
     params: z.infer<ParamsSchema>,
     context: ToolExecutionContext
   ) => Promise<ToolResult<ResultData>>;
 
-  /** Descripción para la UI (opcional) */
+
   getUIDescription?: (params: any) => string;
 }

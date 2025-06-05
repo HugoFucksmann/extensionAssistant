@@ -40,9 +40,9 @@ async function findFiles(
   try {
     const baseName = path.basename(fileName, path.extname(fileName));
     const patterns = [
-      `**/${fileName}`,      // Exact match
-      `**/${fileName}.*`,    // With any extension
-      `**/*${baseName}*`     // Partial match
+      `**/${fileName}`,
+      `**/${fileName}.*`,
+      `**/*${baseName}*`
     ];
 
     const results = await Promise.all(

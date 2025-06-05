@@ -26,7 +26,7 @@ export class EventDispatchHelper {
             chatId,
             data,
             error,
-            source: 'OptimizedReActEngine', // Or more specific if needed
+            source: 'OptimizedReActEngine',
             timestamp: Date.now(),
             iteration: iterationCount
         };
@@ -34,11 +34,11 @@ export class EventDispatchHelper {
     }
 
     dispatchToolExecutionEvent(
-        toolRegistry: ToolRegistry, // Pass ToolRegistry to get description
+        toolRegistry: ToolRegistry,
         toolName: string,
         parameters: any,
         toolResult: InternalToolResult,
-        actionResult: any, // Model's analysis of the tool result
+        actionResult: any,
         chatId: string,
         operationId: string,
         duration: number
@@ -52,11 +52,11 @@ export class EventDispatchHelper {
             rawOutput: toolResult.data,
             error: toolResult.error,
             duration,
-            isProcessingStep: false, // This might need adjustment based on context
+            isProcessingStep: false,
             modelAnalysis: actionResult,
             toolSuccess: toolResult.success,
             chatId,
-            source: 'OptimizedReActEngine.ReActIterationEngine', // Be specific
+            source: 'OptimizedReActEngine.ReActIterationEngine',
             operationId,
             timestamp: Date.now()
         };

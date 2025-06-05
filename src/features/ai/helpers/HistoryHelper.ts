@@ -15,9 +15,9 @@ export class HistoryHelper {
             phase: phase,
             content: typeof content === 'string' ? content : JSON.stringify(content),
             metadata: {
-                status: 'success', // Default status
+                status: 'success',
                 ...metadata,
-                iteration: state.iterationCount, // Ensure iteration is always set
+                iteration: state.iterationCount,
             }
         };
         if (!state.history) {
@@ -32,7 +32,7 @@ export class HistoryHelper {
         }
 
         state.history.push({
-            phase: 'system_message', // Or a more specific error phase if defined
+            phase: 'system_message',
             content: errorMessage,
             timestamp: Date.now(),
             iteration: state.iterationCount || 0,

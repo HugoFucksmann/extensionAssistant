@@ -1,18 +1,18 @@
 // src/core/events/InternalEventDispatcher.ts
 import { EventType, EventPayload, WindsurfEvent, EventFilter } from '../../features/events/eventTypes'; // Reutiliza tus tipos de eventos existentes
 import { generateUniqueId } from '../../shared/utils/generateIds';
-import EventEmitter from 'eventemitter3'; 
+import EventEmitter from 'eventemitter3';
 
 import { Disposable } from '../interfaces/Disposable';
 
 export class InternalEventDispatcher implements Disposable {
   private emitter: EventEmitter;
-  private eventHistory: WindsurfEvent[] = []; 
-  private maxHistorySize: number = 200; 
+  private eventHistory: WindsurfEvent[] = [];
+  private maxHistorySize: number = 200;
 
   constructor() {
     this.emitter = new EventEmitter();
-   
+
   }
 
   /**
@@ -25,24 +25,24 @@ export class InternalEventDispatcher implements Disposable {
     const event: WindsurfEvent = {
       type,
       payload: {
-        ...payload, 
-        timestamp: payload.timestamp || Date.now(), 
+        ...payload,
+        timestamp: payload.timestamp || Date.now(),
       },
       timestamp: Date.now(),
       id: forcedId || generateUniqueId(),
     };
 
-  
+
     this.eventHistory.push(event);
     if (this.eventHistory.length > this.maxHistorySize) {
       this.eventHistory.shift();
     }
 
-   
-    this.emitter.emit(type, event);
-    //this.emitter.emit('*', event);
 
-   
+    this.emitter.emit(type, event);
+
+
+
     return event;
   }
 
@@ -93,10 +93,10 @@ export class InternalEventDispatcher implements Disposable {
   }
 
   private passesFilter(event: WindsurfEvent, filter: EventFilter): boolean {
-  
+
     if (filter.types && !filter.types.includes(event.type)) return false;
     if (filter.chatId && event.payload.chatId !== filter.chatId) return false;
-  
+
     return true;
   }
 
@@ -107,7 +107,7 @@ export class InternalEventDispatcher implements Disposable {
     console.log('[InternalEventDispatcher] Disposed and all listeners removed.');
   }
 
-  
+
   public systemInfo(message: string, details?: Record<string, any>, source?: string): void {
     this.dispatch(EventType.SYSTEM_INFO, { message, details, source, level: 'info' });
   }

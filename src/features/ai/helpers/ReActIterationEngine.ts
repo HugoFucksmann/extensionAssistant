@@ -24,13 +24,13 @@ export interface SingleIterationResult {
     toolResult?: { tool: string, toolCallResult: InternalToolResult };
     finalOutput?: string;
     stopLoop?: boolean;
-    reasonForStop?: 'deduplication' | string; // NUEVO: Para dar contexto a por qué se detuvo
+    reasonForStop?: 'deduplication' | string;
 }
 
 export class ReActIterationEngine {
     constructor(
         private modelManager: ModelManager,
-        private toolRegistry: ToolRegistry, // Necesario para EventDispatchHelper
+        private toolRegistry: ToolRegistry,
         private dispatcher: InternalEventDispatcher,
         private memoryManager: MemoryManager,
         private toolDescriptionHelper: ToolDescriptionHelper,
@@ -41,7 +41,7 @@ export class ReActIterationEngine {
     async runInitialAnalysis(
         currentState: WindsurfState,
         memoryContext: string
-    ): Promise<AnalysisOutput> { // MODIFICADO: Tipar retorno
+    ): Promise<AnalysisOutput> {
         this.eventDispatchHelper.dispatchAgentPhase(
             'initialAnalysis',
             'started',
@@ -77,7 +77,7 @@ export class ReActIterationEngine {
 
     async runSingleIteration(
         currentState: WindsurfState,
-        analysisResult: AnalysisOutput, // MODIFICADO: Tipar
+        analysisResult: AnalysisOutput,
         memoryContext: string,
         toolResultsAccumulator: Array<{ tool: string, toolCallResult: InternalToolResult }>,
         deduplicationHelper: DeduplicationHelper
@@ -130,7 +130,7 @@ export class ReActIterationEngine {
 
     private async runReasoningPhase(
         currentState: WindsurfState,
-        analysisResult: AnalysisOutput, // MODIFICADO: Tipar
+        analysisResult: AnalysisOutput,
         memoryContext: string,
         toolResultsAccumulator: Array<{ tool: string, toolCallResult: InternalToolResult }>
     ): Promise<ReasoningOutput> {
@@ -222,8 +222,7 @@ export class ReActIterationEngine {
                 timestamp: Date.now()
             });
 
-            // MODIFICADO: Pasar el toolResultsAccumulator *actual* para previousActions,
-            // ya que la herramienta actual aún no se ha añadido al acumulador en el bucle principal.
+
             const actionResult: ActionOutput = await this.runPostToolAnalysis(
                 currentState,
                 toolName,
@@ -262,7 +261,7 @@ export class ReActIterationEngine {
         currentState: WindsurfState,
         toolName: string,
         toolResult: InternalToolResult,
-        // MODIFICADO: El acumulador aquí representa las herramientas *antes* de la actual
+
         previousToolResultsAccumulator: Array<{ tool: string, toolCallResult: InternalToolResult }>,
         memoryContext: string
     ): Promise<ActionOutput> {
@@ -288,10 +287,10 @@ export class ReActIterationEngine {
     async generateFinalResponse(
         currentState: WindsurfState,
         toolResultsAccumulator: Array<{ tool: string, toolCallResult: InternalToolResult }>,
-        analysisResult: AnalysisOutput, // MODIFICADO: Tipar
+        analysisResult: AnalysisOutput,
         memoryContext: string
     ): Promise<void> {
-        // Evitar generar respuesta si ya hay un error grave o un output por deduplicación
+
         if (currentState.error || (currentState.finalOutput && currentState.finalOutput.includes("repetidamente"))) {
             console.log("[ReActIterationEngine] Omitiendo generateFinalResponse debido a error previo o salida por deduplicación.");
             return;
@@ -332,10 +331,10 @@ export class ReActIterationEngine {
             console.error(`[ReActIterationEngine] ${errorMsg}`);
             this.historyHelper.addErrorToHistory(currentState, errorMsg);
             currentState.finalOutput = "Tuve problemas al generar la respuesta final.";
-            currentState.error = errorMsg; // Registrar el error en el estado
+            currentState.error = errorMsg;
             this.eventDispatchHelper.dispatchAgentPhase(
                 'finalResponseGeneration',
-                'completed', // Se considera 'completed' con error
+                'completed',
                 currentState.chatId,
                 currentState.iterationCount,
                 undefined,

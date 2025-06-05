@@ -48,14 +48,14 @@ export class ToolDescriptionHelper {
                             currentVal = currentVal._def.innerType;
                         }
                         if (currentVal instanceof ZodEffects) {
-                            // Traverse ZodEffects to get to the underlying schema
+
                             let effectSchema = currentVal;
                             while (effectSchema instanceof ZodEffects) {
                                 effectSchema = effectSchema._def.schema;
                             }
                             currentVal = effectSchema;
 
-                            // Check again for ZodOptional after unwrapping ZodEffects
+
                             if (currentVal instanceof ZodOptional) {
                                 isOptional = true;
                                 currentVal = currentVal._def.innerType;

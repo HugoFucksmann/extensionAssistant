@@ -29,17 +29,17 @@ export interface ChatMessage {
     toolOutput?: any;
     isFinalToolResponse?: boolean;
     status?: 'info' | 'success' | 'error' | 'thinking' | 'tool_executing' | 'user_input_pending' | 'skipped' | 'processing_tool_result' | 'phase_started' | 'phase_completed'; // Added phase statuses
-    phase?: string; // Added for agent phase updates
-    iteration?: number; // Added for agent phase updates
-    source?: string; // Added for agent phase updates
-    phaseData?: any; // Added for agent phase updates
-    details?: any; // For system errors
-    errorObject?: any; // For system errors
-    level?: 'info' | 'warning' | 'error'; // For system errors
-    rawToolOutput?: any; // From ToolExecutionCompleted
-    modelAnalysis?: any; // From ToolExecutionCompleted
-    toolSuccess?: boolean; // From ToolExecutionCompleted
-    toolError?: string; // From ToolExecutionCompleted
+    phase?: string;
+    iteration?: number;
+    source?: string;
+    phaseData?: any;
+    details?: any;
+    errorObject?: any;
+    level?: 'info' | 'warning' | 'error';
+    rawToolOutput?: any;
+    modelAnalysis?: any;
+    toolSuccess?: boolean;
+    toolError?: string;
     [key: string]: any;
   };
 }

@@ -85,7 +85,7 @@ export class ComponentFactory {
       const memoryManager = this.getMemoryManager(extensionContext);
 
       this.applicationLogicServiceInstance = new ApplicationLogicService(
-        memoryManager, // Pass the memoryManager instance
+        memoryManager,
         reActEngine,
         conversationManager,
         toolRegistry
@@ -118,7 +118,7 @@ export class ComponentFactory {
       this.modelManagerInstance = null!;
     }
 
-    // ToolRegistry no implementa dispose(); solo limpiar la instancia
+
     if (this.toolRegistryInstance) {
       this.toolRegistryInstance = null!;
     }

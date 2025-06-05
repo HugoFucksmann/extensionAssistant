@@ -1,7 +1,5 @@
 // src/core/OptimizedReActEngine.ts
 
-// HistoryEntry is not directly used here anymore, but might be in helpers
-// import { HistoryEntry } from '../features/chat/types';
 import { ToolRegistry } from '../../tools/ToolRegistry';
 import { InternalEventDispatcher } from '../../../core/events/InternalEventDispatcher';
 
@@ -49,7 +47,7 @@ export class OptimizedReActEngine {
         this.deduplicationHelper = new DeduplicationHelper();
         this.iterationEngine = new ReActIterationEngine(
             modelManager,
-            toolRegistry, // MODIFICADO: Pasar toolRegistry a ReActIterationEngine (ya estaba, pero para EventDispatchHelper dentro de él)
+            toolRegistry,
             dispatcher,
             memoryManager,
             this.toolDescriptionHelper,
@@ -86,8 +84,7 @@ export class OptimizedReActEngine {
                 memoryContext
             );
 
-            // MODIFICADO: Solo generar respuesta final si no hay ya una y no se completó por 'respond'
-            // y si el bucle no se detuvo por una razón que ya debería tener un finalOutput (como deduplicación manejada abajo)
+
             if (!currentState.finalOutput && !isCompleted) {
                 await this.iterationEngine.generateFinalResponse(
                     currentState,
@@ -98,7 +95,7 @@ export class OptimizedReActEngine {
             }
 
             await this.memoryManager.storeConversation(currentState.chatId, currentState);
-            // Solo marcar como 'completed' si no falló o ya tiene un estado de completitud.
+
             if (currentState.completionStatus !== 'failed' && !currentState.finalOutput) {
                 currentState.finalOutput = "Proceso finalizado, pero no se generó una respuesta explícita.";
             }
@@ -118,7 +115,7 @@ export class OptimizedReActEngine {
 
     private async runMainIterationLoop(
         currentState: WindsurfState,
-        analysisResult: AnalysisOutput, // MODIFICADO: Tipar analysisResult
+        analysisResult: AnalysisOutput,
         memoryContext: string
     ): Promise<{ isCompleted: boolean; toolResultsAccumulator: Array<{ tool: string, toolCallResult: InternalToolResult }> }> {
         const toolResultsAccumulator: Array<{ tool: string, toolCallResult: InternalToolResult }> = [];
@@ -147,12 +144,10 @@ export class OptimizedReActEngine {
             }
 
             if (iterationResult.stopLoop) {
-                // MODIFICADO: Si el bucle se detiene (ej. por deduplicación) y no hay una salida final,
-                // establecer una aquí para evitar la llamada a generateFinalResponse o darle un contexto.
+
                 if (!currentState.finalOutput && iterationResult.reasonForStop === 'deduplication') {
                     currentState.finalOutput = "La acción requerida ya se realizó o se intentó repetidamente. No se realizarán más intentos para esta acción específica.";
-                    // Opcionalmente, podrías querer que isCompleted sea true aquí si consideras que la deduplicación es un tipo de finalización.
-                    // isCompleted = true; // Esto evitaría la llamada a generateFinalResponse
+
                 }
                 break;
             }
@@ -166,7 +161,7 @@ export class OptimizedReActEngine {
         const errorMessage = error.message || 'Error desconocido durante la ejecución del motor.';
         currentState.error = errorMessage;
         currentState.completionStatus = 'failed';
-        // Asegurarse de que historyHelper esté disponible o usar la función directamente si es necesario
+
         this.historyHelper.addErrorToHistory(currentState, `Error en OptimizedReActEngine: ${errorMessage}`);
 
 
