@@ -1,6 +1,6 @@
 import React from "react"
 import StatusIndicator from "./StatusIndicator"
-import ToolRenderer from "./ToolRenderer"
+import ToolRenderer from "./ToolsRender/ToolRenderer"
 import "./styles/MessageItem.css"
 
 const formatTimestamp = (timestamp) => {

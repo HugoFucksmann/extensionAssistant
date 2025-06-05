@@ -72,7 +72,6 @@ export class MessageFormatter {
                         success: true
                     }
                 },
-                rawOutput: payload.rawOutput,
                 modelAnalysis: payload.modelAnalysis,
                 toolSuccess: true,
                 warnings: (payload.rawOutput as any)?.warnings

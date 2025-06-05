@@ -45,12 +45,36 @@ export function createMessageHandler(
                 break;
 
             case 'agentActionUpdate':
-                dispatch({ type: 'ADD_MESSAGE', payload });
+                // Determinar si es una actualización o un nuevo mensaje
+                const hasOperationId = payload.operationId;
+                const existingMessageIndex = hasOperationId ?
+                    state.messages.findIndex(m => m.operationId === payload.operationId) : -1;
+
+                if (hasOperationId && existingMessageIndex !== -1) {
+                    // Actualizar mensaje existente
+                    dispatch({
+                        type: 'UPDATE_MESSAGE',
+                        payload: {
+                            id: state.messages[existingMessageIndex].id,
+                            operationId: payload.operationId,
+                            content: payload.content,
+                            metadata: payload.metadata,
+                            timestamp: payload.timestamp
+                        }
+                    });
+                } else {
+                    // Crear nuevo mensaje
+                    dispatch({ type: 'ADD_MESSAGE', payload });
+                }
+
+                // Manejar estados de loading
                 if (payload.metadata?.status === 'tool_executing') {
                     dispatch({ type: 'SET_ACTIVE_FEEDBACK_OPERATION_ID', payload: payload.operationId || payload.id });
                     dispatch({ type: 'SET_LOADING_TEXT', payload: payload.content || `Ejecutando ${payload.metadata.toolName}...` });
                     dispatch({ type: 'SET_LOADING', payload: { loading: true } });
                 } else if (payload.metadata?.status === 'success' || payload.metadata?.status === 'error') {
+                    dispatch({ type: 'SET_LOADING', payload: { loading: false } });
+                    dispatch({ type: 'SET_ACTIVE_FEEDBACK_OPERATION_ID', payload: null });
                     if (state.isLoading) {
                         dispatch({ type: 'SET_LOADING_TEXT', payload: DEFAULT_LOADING_TEXT });
                     }

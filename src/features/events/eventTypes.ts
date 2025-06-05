@@ -106,7 +106,7 @@ export interface ToolExecutionEventPayload {
   modelAnalysis?: any;
 }
 
-export interface ToolExecutionCompletedPayload {
+export interface ToolExecutionCompletedPayload extends BaseEventPayload {
   toolName: string;
   success: boolean;
   data?: any;

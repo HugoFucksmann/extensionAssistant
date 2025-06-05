@@ -89,23 +89,50 @@ export class EventSubscriber {
             toolInput: payload.parameters,
             operationId: payload.operationId
         };
+        baseMessage.operationId = payload.operationId; // Asegurar que el operationId esté en el mensaje
         return { messageType: 'agentActionUpdate', chatMessage: baseMessage };
     }
 
     private handleToolExecutionCompleted(event: WindsurfEvent, baseMessage: ChatMessage): { messageType: string; chatMessage: ChatMessage } {
         const payload = event.payload as any;
         const formatted = this.messageFormatter.formatToolExecutionCompleted(payload);
-        baseMessage.content = formatted.content;
-        baseMessage.metadata = { ...baseMessage.metadata, ...formatted.metadata };
-        return { messageType: 'agentActionUpdate', chatMessage: baseMessage };
+
+        // Para tool completion, enviamos una actualización del mensaje existente
+        const updateMessage = {
+            id: baseMessage.id,
+            operationId: payload.operationId,
+            sender: 'system' as const,
+            content: formatted.content,
+            metadata: {
+                ...baseMessage.metadata,
+                ...formatted.metadata,
+                status: 'success' // Asegurar que el status sea success
+            },
+            timestamp: baseMessage.timestamp
+        };
+
+        return { messageType: 'agentActionUpdate', chatMessage: updateMessage };
     }
 
     private handleToolExecutionError(event: WindsurfEvent, baseMessage: ChatMessage): { messageType: string; chatMessage: ChatMessage } {
         const payload = event.payload as any;
         const formatted = this.messageFormatter.formatToolExecutionError(payload);
-        baseMessage.content = formatted.content;
-        baseMessage.metadata = { ...baseMessage.metadata, ...formatted.metadata };
-        return { messageType: 'agentActionUpdate', chatMessage: baseMessage };
+
+        // Para tool error, enviamos una actualización del mensaje existente
+        const updateMessage = {
+            id: baseMessage.id,
+            operationId: payload.operationId,
+            sender: 'system' as const,
+            content: formatted.content,
+            metadata: {
+                ...baseMessage.metadata,
+                ...formatted.metadata,
+                status: 'error' // Asegurar que el status sea error
+            },
+            timestamp: baseMessage.timestamp
+        };
+
+        return { messageType: 'agentActionUpdate', chatMessage: updateMessage };
     }
 
     private handleResponseGenerated(event: WindsurfEvent, baseMessage: ChatMessage): { messageType: string; chatMessage: ChatMessage } {
