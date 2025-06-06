@@ -1,0 +1,86 @@
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-indicator.small {
+  gap: 4px;
+}
+
+.status-indicator.large {
+  gap: 8px;
+}
+
+.status-box {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  position: relative;
+}
+
+.status-indicator.small .status-box {
+  width: 6px;
+  height: 6px;
+}
+
+.status-indicator.large .status-box {
+  width: 12px;
+  height: 12px;
+}
+
+.status-box.processing {
+  background: var(--vscode-progressBar-background);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.status-box.success {
+  background: var(--vscode-terminal-ansiGreen);
+}
+
+.status-box.error {
+  background: var(--vscode-errorForeground);
+}
+
+.status-box.pending {
+  background: var(--vscode-terminal-ansiYellow);
+  animation: blink 2s ease-in-out infinite;
+}
+
+.status-box.skipped {
+  background: var(--vscode-descriptionForeground);
+  opacity: 0.6;
+}
+
+.status-box.info {
+  background: var(--vscode-terminal-ansiBlue);
+}
+
+.status-label {
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+  font-weight: 500;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.1);
+  }
+}
+
+@keyframes blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  51%,
+  100% {
+    opacity: 0.3;
+  }
+}

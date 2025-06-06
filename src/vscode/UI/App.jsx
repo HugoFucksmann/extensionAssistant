@@ -1,9 +1,10 @@
 import React from 'react';
+import './global.css';
 import { getThemeCSSVariables } from './theme/theme';
 import ChatInput from './Components/InputChat/ChatInput';
 import ChatHistory from './Components/historical/ChatHistory';
 import { useApp } from './context/AppContext';
-import ChatMessages from './Components/ChatMessages/ChatMessages';
+import { ChatMessages } from './Components/chatM/ChatMessages';
 import RecentChats from './Components/historical/RecentChats';
 import LoadingIndicator from './Components/LoadingIndicator/LoadingIndicator';
 
@@ -85,11 +86,11 @@ const App = () => {
             <RecentChats />
             <div style={{ width: '100%', maxWidth: '800px' }}>
               <div style={chatInputContainerStyle}>
-                {isLoading && (
+               {/*  {isLoading && (
                   <div style={loadingIndicatorStyle}>
                     <LoadingIndicator />
                   </div>
-                )}
+                )} */}
                 <ChatInput />
               </div>
             </div>
@@ -103,14 +104,14 @@ const App = () => {
               display: 'flex',
               flexDirection: 'column'
             }}>
-              <ChatMessages />
+              <ChatMessages messages={messages} />
             </div>
             <div style={chatInputContainerStyle}>
-              {isLoading && (
+             {/*  {isLoading && (
                 <div style={loadingIndicatorStyle}>
                   <LoadingIndicator />
                 </div>
-              )}
+              )} */}
               <ChatInput />
             </div>
           </>

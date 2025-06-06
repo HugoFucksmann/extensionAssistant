@@ -1,0 +1,100 @@
+:root {
+  /* Dark theme with blue-grays */
+  --background: #0d1117;
+  --background-secondary: #161b22;
+  --background-tertiary: #21262d;
+  --background-hover: #30363d;
+  --background-active: #373e47;
+
+  --border: #30363d;
+  --border-hover: #484f58;
+  --border-focus: #388bfd;
+
+  --text-primary: #f0f6fc;
+  --text-secondary: #8b949e;
+  --text-muted: #656d76;
+
+  --accent-blue: #388bfd;
+  --accent-blue-hover: #4493f8;
+  --accent-blue-muted: #1f6feb;
+
+  --status-success: #3fb950;
+  --status-warning: #d29922;
+  --status-error: #f85149;
+  --status-info: #58a6ff;
+
+  --glass-bg: rgba(13, 17, 23, 0.8);
+  --glass-border: rgba(48, 54, 61, 0.5);
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 24px;
+
+  /* VS Code compatibility */
+  --vscode-editor-background: var(--background);
+  --vscode-editor-foreground: var(--text-primary);
+  --vscode-sideBar-background: var(--background-secondary);
+  --vscode-widget-border: var(--border);
+  --vscode-button-background: var(--accent-blue);
+  --vscode-button-foreground: var(--text-primary);
+  --vscode-button-hoverBackground: var(--accent-blue-hover);
+  --vscode-button-border: var(--border);
+  --vscode-input-background: var(--background-tertiary);
+  --vscode-input-foreground: var(--text-primary);
+  --vscode-input-border: var(--border);
+  --vscode-focusBorder: var(--accent-blue);
+  --vscode-descriptionForeground: var(--text-secondary);
+  --vscode-textPreformat-foreground: var(--text-primary);
+  --vscode-textCodeBlock-background: var(--background-tertiary);
+  --vscode-list-hoverBackground: var(--background-hover);
+  --vscode-list-activeSelectionBackground: var(--background-active);
+  --vscode-badge-background: var(--accent-blue-muted);
+  --vscode-badge-foreground: var(--text-primary);
+  --vscode-terminal-ansiGreen: var(--status-success);
+  --vscode-terminal-ansiYellow: var(--status-warning);
+  --vscode-terminal-ansiBlue: var(--status-info);
+  --vscode-errorForeground: var(--status-error);
+  --vscode-inputValidation-errorBackground: rgba(248, 81, 73, 0.1);
+  --vscode-notifications-background: var(--background-secondary);
+  --vscode-notifications-border: var(--border);
+  --vscode-textLink-foreground: var(--accent-blue);
+  --vscode-symbolIcon-functionForeground: var(--accent-blue);
+  --vscode-symbolIcon-fileForeground: var(--text-secondary);
+  --vscode-progressBar-background: var(--status-warning);
+  --vscode-font-family: "SF Mono", "Monaco", "Inconsolata", "Roboto Mono", "Courier New", monospace;
+
+  --status-color-thinking: #f59e0b;
+  --text: var(--text-primary);
+  --spacing-medium: var(--spacing-md);
+  --spacing-large: var(--spacing-lg);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--background);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen", "Ubuntu", "Cantarell", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+  font-family: var(--vscode-font-family);
+}
