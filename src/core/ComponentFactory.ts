@@ -136,8 +136,8 @@ export class ComponentFactory {
     await disposeSafely(this.modelManagerInstance);
     this.modelManagerInstance = undefined as any;
 
-    // Components without async dispose
-    this.toolRegistryInstance = undefined as any; // No dispose method
+
+    this.toolRegistryInstance = undefined as any;
     this.performanceMonitorInstance?.reset();
     this.performanceMonitorInstance = undefined as any;
 

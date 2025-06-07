@@ -3,22 +3,22 @@ import { InternalEventDispatcher } from '../../../core/events/InternalEventDispa
 import { EventType, WindsurfEvent } from '../../../features/events/eventTypes';
 import { MessageFormatter } from '../formatters/MessageFormatter';
 import { ChatMessage } from '../../../features/chat/types';
-// CAMBIO: Se importa WebviewStateManager para acceder al estado centralizado.
+
 import { WebviewStateManager } from '../core/WebviewStateManager';
 
 export class EventSubscriber {
     private subscriptions: { unsubscribe: () => void }[] = [];
-    // CAMBIO: Se elimina el estado local `currentChatId`.
+
 
     constructor(
         private readonly internalEventDispatcher: InternalEventDispatcher,
         private readonly messageFormatter: MessageFormatter,
-        // CAMBIO: Se inyecta el stateManager.
+
         private readonly stateManager: WebviewStateManager,
         private readonly postMessage: (type: string, payload: any) => void
     ) { }
 
-    // CAMBIO: Se elimina el método `setCurrentChatId`. El estado se leerá directamente.
+
 
     public subscribeToEvents(): void {
         this.unsubscribeAll();
@@ -45,10 +45,10 @@ export class EventSubscriber {
     }
 
     private handleEvent(event: WindsurfEvent): void {
-        // CAMBIO: Se obtiene el chatId actual desde el stateManager en el momento del evento.
+
         const currentChatId = this.stateManager.getChatState().currentChatId;
 
-        // Skip events for different chat sessions (except system errors)
+
         if (event.type !== EventType.SYSTEM_ERROR &&
             event.payload.chatId &&
             event.payload.chatId !== currentChatId) {
@@ -61,9 +61,7 @@ export class EventSubscriber {
         }
     }
 
-    // El resto de la clase (processEvent y los métodos handle*) no necesita cambios.
-    // ... (resto de los métodos sin cambios)
-    // ...
+
     private processEvent(event: WindsurfEvent): { messageType: string; chatMessage: ChatMessage } | null {
         const payload = event.payload as any;
         const baseMessage = this.messageFormatter.createBaseChatMessage(event.id, 'system', payload.operationId) as ChatMessage;

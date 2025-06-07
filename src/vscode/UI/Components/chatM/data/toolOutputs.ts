@@ -165,12 +165,12 @@ export function validateToolData(
   }
 }
 
-// Función para obtener todas las herramientas disponibles
+
 export function getAllToolNames(): string[] {
   return Object.keys(TOOL_DEFINITIONS)
 }
 
-// Función para obtener la definición de una herramienta
+
 export function getToolDefinition(toolName: string): ToolDefinition | undefined {
   return TOOL_DEFINITIONS[toolName]
 }

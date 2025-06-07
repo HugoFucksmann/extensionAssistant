@@ -1,10 +1,4 @@
-/**
- * Tipos de salida para las herramientas del sistema
- */
-
-// ==============================================
-// Tipos base
-// ==============================================
+// src/features/tools/toolOutputTypes.ts
 
 export interface BaseToolOutput<T = any> {
   title: string;
@@ -19,9 +13,7 @@ export interface BaseToolOutput<T = any> {
   };
 }
 
-// ==============================================
-// Workspace Tools
-// ==============================================
+
 
 export interface ProjectSummaryToolOutput extends BaseToolOutput<{
   projectName: string;
@@ -32,11 +24,8 @@ export interface ProjectSummaryToolOutput extends BaseToolOutput<{
     type: 'file' | 'directory' | 'other';
   }>;
   detectedPrimaryLanguage: string;
-}> {}
+}> { }
 
-// ==============================================
-// Git Tools
-// ==============================================
 
 export interface GitFileStatus {
   path: string;
@@ -57,7 +46,7 @@ export interface GitStatusToolOutput extends BaseToolOutput<{
   untrackedFilesCount: number;
   conflictedFilesCount: number;
   files: GitFileStatus[];
-}> {}
+}> { }
 
 export interface FileCommitSummary {
   file: string;
@@ -75,7 +64,7 @@ export interface GitCommitToolOutput extends BaseToolOutput<{
   commitDate?: string;
   author?: string;
   filesChangedSummary?: FileCommitSummary[];
-}> {}
+}> { }
 
 export interface GitPushToolOutput extends BaseToolOutput<{
   success: boolean;
@@ -86,7 +75,7 @@ export interface GitPushToolOutput extends BaseToolOutput<{
   branch?: string;
   commitHash?: string;
   pushedCommits?: number;
-}> {}
+}> { }
 
 export interface GitPullToolOutput extends BaseToolOutput<{
   success: boolean;
@@ -97,7 +86,7 @@ export interface GitPullToolOutput extends BaseToolOutput<{
   branch?: string;
   commitHash?: string;
   commitsPulled?: number;
-}> {}
+}> { }
 
 export interface FileDiffSummary {
   file: string;
@@ -112,11 +101,9 @@ export interface GitDiffToolOutput extends BaseToolOutput<{
   diffSummary?: string;
   filesChanged?: FileDiffSummary[];
   isStaged: boolean;
-}> {}
+}> { }
 
-// ==============================================
-// Filesystem Tools
-// ==============================================
+
 
 export interface FileContentsToolOutput extends BaseToolOutput<{
   filePath: string;
@@ -128,31 +115,29 @@ export interface FileContentsToolOutput extends BaseToolOutput<{
   mimeType: string;
   isBinary: boolean;
   lineCount: number;
-}> {}
+}> { }
 
 export interface CreateFileOrDirectoryToolOutput extends BaseToolOutput<{
   path: string;
   type: 'file' | 'directory';
   created: boolean;
   alreadyExists: boolean;
-}> {}
+}> { }
 
 export interface DeletePathToolOutput extends BaseToolOutput<{
   path: string;
   deleted: boolean;
   error?: string;
-}> {}
+}> { }
 
 export interface WriteToFileToolOutput extends BaseToolOutput<{
   filePath: string;
   success: boolean;
   bytesWritten: number;
   error?: string;
-}> {}
+}> { }
 
-// ==============================================
-// Edit Tools
-// ==============================================
+
 
 export interface ActiveEditorInfoToolOutput extends BaseToolOutput<{
   filePath: string;
@@ -172,7 +157,7 @@ export interface ActiveEditorInfoToolOutput extends BaseToolOutput<{
     startLine: number;
     endLine: number;
   }>;
-}> {}
+}> { }
 
 export interface DocumentDiagnosticsToolOutput extends BaseToolOutput<{
   filePath: string;
@@ -190,11 +175,8 @@ export interface DocumentDiagnosticsToolOutput extends BaseToolOutput<{
   }>;
   hasErrors: boolean;
   hasWarnings: boolean;
-}> {}
+}> { }
 
-// ==============================================
-// Terminal Tools
-// ==============================================
 
 export interface RunInTerminalToolOutput extends BaseToolOutput<{
   command: string;
@@ -205,23 +187,20 @@ export interface RunInTerminalToolOutput extends BaseToolOutput<{
   executionTime: number;
   pid?: number;
   shellProcessId?: string;
-}> {}
+}> { }
 
-// ==============================================
-// Mapeo de tipos
-// ==============================================
 
 export type ToolOutputMap = {
   // Workspace
   getProjectSummary: ProjectSummaryToolOutput;
-  
+
   // Git
   getGitStatus: GitStatusToolOutput;
   gitCommit: GitCommitToolOutput;
   gitPush: GitPushToolOutput;
   gitPull: GitPullToolOutput;
   gitDiff: GitDiffToolOutput;
-  
+
   // Filesystem
   getFileContents: FileContentsToolOutput;
   file_examine: FileContentsToolOutput;
@@ -229,35 +208,27 @@ export type ToolOutputMap = {
   createFileOrDirectory: CreateFileOrDirectoryToolOutput;
   deletePath: DeletePathToolOutput;
   writeToFile: WriteToFileToolOutput;
-  
+
   // Edit
   getActiveEditorInfo: ActiveEditorInfoToolOutput;
   getDocumentDiagnostics: DocumentDiagnosticsToolOutput;
-  
+
   // Terminal
   terminal: RunInTerminalToolOutput;
   runInTerminal: RunInTerminalToolOutput;
   console_command: RunInTerminalToolOutput;
 };
 
-/**
- * Tipo que representa el nombre de cualquier herramienta
- */
+
 export type ToolName = keyof ToolOutputMap;
 
-/**
- * Tipo genérico para obtener el tipo de salida de una herramienta
- */
+
 export type ToolOutputType<T extends ToolName> = ToolOutputMap[T];
 
-/**
- * Tipo que representa la salida de cualquier herramienta
- */
+
 export type AnyToolOutput = ToolOutputMap[ToolName];
 
-/**
- * Función de utilidad para crear respuestas de herramienta tipadas
- */
+
 export function createToolOutput<T extends ToolName>(
   toolName: T,
   data: ToolOutputMap[T]['items'][0],

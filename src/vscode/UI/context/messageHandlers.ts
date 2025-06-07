@@ -21,7 +21,7 @@ export function createMessageHandler(
                 break;
 
             case 'assistantResponse':
-                // Ensure we don't overwrite content with empty values
+
                 const responsePayload = {
                     id: payload.id || `asst_${Date.now()}`,
                     content: payload.content || '',
@@ -31,7 +31,7 @@ export function createMessageHandler(
                     operationId: payload.operationId,
                 };
 
-                // Only add if we have actual content or it's a new message
+
                 if (responsePayload.content || !responsePayload.operationId) {
                     dispatch({ type: 'ADD_MESSAGE', payload: responsePayload });
                 }
@@ -45,13 +45,13 @@ export function createMessageHandler(
                 break;
 
             case 'agentActionUpdate':
-                // Determinar si es una actualización o un nuevo mensaje
+
                 const hasOperationId = payload.operationId;
                 const existingMessageIndex = hasOperationId ?
                     state.messages.findIndex(m => m.operationId === payload.operationId) : -1;
 
                 if (hasOperationId && existingMessageIndex !== -1) {
-                    // Actualizar mensaje existente
+
                     dispatch({
                         type: 'UPDATE_MESSAGE',
                         payload: {
@@ -63,11 +63,10 @@ export function createMessageHandler(
                         }
                     });
                 } else {
-                    // Crear nuevo mensaje
+
                     dispatch({ type: 'ADD_MESSAGE', payload });
                 }
 
-                // Manejar estados de loading
                 if (payload.metadata?.status === 'tool_executing') {
                     dispatch({ type: 'SET_ACTIVE_FEEDBACK_OPERATION_ID', payload: payload.operationId || payload.id });
                     dispatch({ type: 'SET_LOADING_TEXT', payload: payload.content || `Ejecutando ${payload.metadata.toolName}...` });
@@ -147,7 +146,7 @@ export function createMessageHandler(
 
             case 'responseReceived':
                 console.log('[MessageHandler] Received AI response:', payload);
-                // Add the AI response as a new message
+
                 dispatch({
                     type: 'ADD_MESSAGE',
                     payload: {
@@ -158,7 +157,7 @@ export function createMessageHandler(
                         metadata: { status: 'success' },
                     }
                 });
-                // Set loading to false
+
                 dispatch({ type: 'SET_LOADING', payload: { loading: false } });
                 break;
         }

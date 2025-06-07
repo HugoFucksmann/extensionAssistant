@@ -3,9 +3,7 @@ import { ChatMessage } from '../../../features/chat/types';
 
 export class WebviewHelpers {
 
-    /**
-     * Validates that a message payload contains required fields
-     */
+
     public static validateMessagePayload(payload: any, requiredFields: string[]): boolean {
         if (!payload || typeof payload !== 'object') {
             return false;
@@ -17,9 +15,7 @@ export class WebviewHelpers {
         });
     }
 
-    /**
-     * Sanitizes text content for display in webview
-     */
+
     public static sanitizeContent(content: string): string {
         if (typeof content !== 'string') {
             return '';
@@ -33,9 +29,7 @@ export class WebviewHelpers {
             .replace(/\//g, '&#x2F;');
     }
 
-    /**
-     * Truncates text to specified length with ellipsis
-     */
+
     public static truncateText(text: string, maxLength: number): string {
         if (!text || text.length <= maxLength) {
             return text;
@@ -44,9 +38,6 @@ export class WebviewHelpers {
         return text.substring(0, maxLength - 3) + '...';
     }
 
-    /**
-     * Formats timestamp for display
-     */
     public static formatTimestamp(timestamp: number): string {
         const date = new Date(timestamp);
         const now = new Date();
@@ -68,9 +59,7 @@ export class WebviewHelpers {
         }
     }
 
-    /**
-     * Extracts error message from various error types
-     */
+
     public static extractErrorMessage(error: any): string {
         if (typeof error === 'string') {
             return error;
@@ -83,9 +72,7 @@ export class WebviewHelpers {
         return 'Error desconocido';
     }
 
-    /**
-     * Creates a deep clone of an object
-     */
+
     public static deepClone<T>(obj: T): T {
         if (obj === null || typeof obj !== 'object') {
             return obj;
@@ -109,9 +96,7 @@ export class WebviewHelpers {
         return cloned;
     }
 
-    /**
-     * Checks if a ChatMessage is valid
-     */
+
     public static isValidChatMessage(message: any): message is ChatMessage {
         return (
             message &&
@@ -123,9 +108,6 @@ export class WebviewHelpers {
         );
     }
 
-    /**
-     * Debounces a function call
-     */
     public static debounce<T extends (...args: any[]) => any>(
         func: T,
         wait: number
@@ -138,9 +120,7 @@ export class WebviewHelpers {
         };
     }
 
-    /**
-     * Throttles a function call
-     */
+
     public static throttle<T extends (...args: any[]) => any>(
         func: T,
         limit: number
@@ -156,9 +136,7 @@ export class WebviewHelpers {
         };
     }
 
-    /**
-     * Safely parses JSON with error handling
-     */
+
     public static safeJsonParse<T>(jsonString: string, fallback: T): T {
         try {
             return JSON.parse(jsonString);
@@ -168,9 +146,6 @@ export class WebviewHelpers {
         }
     }
 
-    /**
-     * Safely stringifies an object with error handling
-     */
     public static safeJsonStringify(obj: any, fallback: string = '{}'): string {
         try {
             return JSON.stringify(obj, null, 2);
@@ -180,24 +155,16 @@ export class WebviewHelpers {
         }
     }
 
-    /**
-     * Checks if a string is empty or only whitespace
-     */
     public static isEmptyOrWhitespace(str: string): boolean {
         return !str || str.trim().length === 0;
     }
 
-    /**
-     * Capitalizes the first letter of a string
-     */
+
     public static capitalizeFirst(str: string): string {
         if (!str) return str;
         return str.charAt(0).toUpperCase() + str.slice(1);
     }
 
-    /**
-     * Converts camelCase to human readable format
-     */
     public static camelCaseToHuman(str: string): string {
         return str
             .replace(/([A-Z])/g, ' $1')

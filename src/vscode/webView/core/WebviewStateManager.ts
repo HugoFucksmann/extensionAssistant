@@ -62,7 +62,7 @@ export class WebviewStateManager {
         return this.state.ui.isDarkMode;
     }
 
-    // Enhanced state management methods
+
     public getState(): WebviewState {
         return { ...this.state };
     }
@@ -145,11 +145,11 @@ export class WebviewStateManager {
         this.updateUIState({ currentView: view });
     }
 
-    // Subscription management
+
     public subscribeToStateChanges(callback: StateChangeCallback): () => void {
         this.subscribers.push(callback);
 
-        // Return unsubscribe function
+
         return () => {
             const index = this.subscribers.indexOf(callback);
             if (index > -1) {
@@ -183,7 +183,7 @@ export class WebviewStateManager {
         this.notifySubscribers(['ui', 'chat', 'system']);
     }
 
-    // Private helper methods
+
     private getChangedFields(section: keyof WebviewState, updates: any): string[] {
         const changedFields: string[] = [];
         const currentSection = this.state[section] as any;

@@ -19,28 +19,26 @@ export class GraphBuilder {
     ) { }
 
     public buildGraph(): any {
-        // Creamos el grafo con los canales de estado definidos
+
         const workflow = new StateGraph<SimplifiedOptimizedGraphState>({
             channels: StateAnnotations.getAnnotations(),
         });
 
-        // Instanciar nodos con dependencias
+
         const analyzeNode = new AnalyzeNode(this.dependencies, this.observability);
         const executeNode = new ExecuteNode(this.dependencies, this.observability);
         const validateNode = new ValidateNode(this.dependencies, this.observability);
         const respondNode = new RespondNode(this.dependencies, this.observability);
 
-        // Agregar nodos al grafo
         workflow.addNode(GraphPhase.ANALYSIS, analyzeNode.execute.bind(analyzeNode));
         workflow.addNode(GraphPhase.EXECUTION, executeNode.execute.bind(executeNode));
         workflow.addNode(GraphPhase.VALIDATION, validateNode.execute.bind(validateNode));
         workflow.addNode(GraphPhase.RESPONSE, respondNode.execute.bind(respondNode));
 
-        // Definir el flujo del grafo
-        // Conectamos el nodo START al primer nodo del flujo
+
         workflow.addEdge(START, GraphPhase.ANALYSIS as any);
 
-        // Agregar aristas condicionales
+
         workflow.addConditionalEdges(GraphPhase.ANALYSIS as any, TransitionLogic.determineNextNode.bind(TransitionLogic), {
             [GraphPhase.EXECUTION]: GraphPhase.EXECUTION as any,
             [GraphPhase.ERROR]: END,

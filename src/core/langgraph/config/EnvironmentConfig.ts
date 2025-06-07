@@ -10,18 +10,18 @@ export class EnvironmentConfig {
             case 'development':
                 return {
                     ...baseConfig,
-                    maxGraphIterations: 50, // Más permisivo para debugging
+                    maxGraphIterations: 50,
                     maxNodeIterations: {
                         ...baseConfig.maxNodeIterations,
                         [GraphPhase.EXECUTION]: 15,
                     },
-                    // Aquí se podrían añadir flags para logging verboso, etc.
+
                 };
 
             case 'production':
                 return {
                     ...baseConfig,
-                    maxGraphIterations: 15, // Más estricto en producción
+                    maxGraphIterations: 15,
                     maxNodeIterations: {
                         ...baseConfig.maxNodeIterations,
                         [GraphPhase.EXECUTION]: 5,

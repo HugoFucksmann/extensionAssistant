@@ -46,7 +46,7 @@ export class LangGraphEngine {
     ) {
         this.config = { ...DEFAULT_ENGINE_CONFIG, ...config };
 
-        // Crear el contenedor de dependencias con todas las instancias necesarias
+
         this.dependencies = ServiceRegistry.createContainer(
             modelManager,
             toolRegistry,
@@ -94,8 +94,7 @@ export class LangGraphEngine {
         return finalState;
     }
 
-    // La integración en stream es más compleja y se omite por brevedad,
-    // pero seguiría un patrón similar de registrar inicio/fin.
+
     public async *stream(
         // ...
     ): AsyncGenerator<SimplifiedOptimizedGraphState> {
@@ -103,7 +102,7 @@ export class LangGraphEngine {
     }
 
     public dispose(): void {
-        // Lógica de limpieza si es necesaria (e.g., listeners de observabilidad)
+
         console.log("[LangGraphEngine] Disposed.");
     }
 }

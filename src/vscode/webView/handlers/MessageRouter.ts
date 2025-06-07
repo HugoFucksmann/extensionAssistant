@@ -4,7 +4,7 @@ import { ErrorManager } from './ErrorManager';
 import { IWebviewBackend } from '../core/WebviewBackendAdapter';
 import { WebviewStateManager } from '../core/WebviewStateManager';
 
-// CAMBIO: Se elimina la interfaz MessageContext.
+
 
 export class MessageRouter {
     constructor(
@@ -13,7 +13,7 @@ export class MessageRouter {
         private readonly commandProcessor: CommandProcessor,
         private readonly errorManager: ErrorManager,
         private readonly postMessage: (type: string, payload: any) => void,
-        // CAMBIO: Se inyecta una función para iniciar un nuevo chat, eliminando la dependencia inversa.
+
         private readonly startNewChat: () => string
     ) { }
 
@@ -31,11 +31,11 @@ export class MessageRouter {
                     await this.handleSwitchModel(message.payload);
                     break;
                 case 'newChatRequestedByUI':
-                    // CAMBIO: Se delega la creación del chat a la función inyectada.
+
                     this.startNewChat();
                     break;
                 case 'command':
-                    // CAMBIO: El commandProcessor ya no necesita el contexto.
+
                     await this.commandProcessor.processCommand(message.payload);
                     break;
                 default:
@@ -48,7 +48,7 @@ export class MessageRouter {
     }
 
     private async handleUIReady(): Promise<void> {
-        // CAMBIO: Lógica simplificada. Si no hay chat, se crea uno usando el flujo centralizado.
+
         let chatId = this.backend.getActiveChatId();
         if (!chatId) {
             chatId = this.startNewChat();
@@ -61,7 +61,7 @@ export class MessageRouter {
                 null
             );
         }
-        // La notificación a la UI ('sessionReady') ahora es responsabilidad del flujo `startNewChat`.
+
     }
 
     private async handleUserMessage(payload: { text: string; files?: string[] }): Promise<void> {
@@ -72,12 +72,12 @@ export class MessageRouter {
                 return;
             }
 
-            // CAMBIO: Si no hay chat, se crea uno de forma centralizada.
+
             if (!chatId) {
                 chatId = this.startNewChat();
             }
 
-            // La llamada al backend se mantiene asíncrona.
+
             this.backend.processMessage(chatId, payload.text, {
                 files: payload.files || []
             }).catch(error => {
@@ -90,7 +90,7 @@ export class MessageRouter {
         }
     }
 
-    // CAMBIO: Se elimina handleNewChatRequest, ahora se maneja directamente en handleMessage.
+
 
     private async handleSwitchModel(payload: { modelType: string }): Promise<void> {
         const chatId = this.stateManager.getChatState().currentChatId;

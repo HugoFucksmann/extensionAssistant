@@ -47,22 +47,22 @@ export interface SessionReadyMessage extends BaseMessage {
 
 export interface AgentActionUpdateMessage extends BaseMessage {
     type: 'agentActionUpdate';
-    payload: any; // ChatMessage
+    payload: any;
 }
 
 export interface AssistantResponseMessage extends BaseMessage {
     type: 'assistantResponse';
-    payload: any; // ChatMessage
+    payload: any;
 }
 
 export interface AgentPhaseUpdateMessage extends BaseMessage {
     type: 'agentPhaseUpdate';
-    payload: any; // ChatMessage
+    payload: any;
 }
 
 export interface SystemErrorMessage extends BaseMessage {
     type: 'systemError';
-    payload: any; // ChatMessage
+    payload: any;
 }
 
 export interface NewChatStartedMessage extends BaseMessage {

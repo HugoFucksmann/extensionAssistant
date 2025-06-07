@@ -329,8 +329,7 @@ npm ERR!     /Users/user/.npm/_logs/2023-12-07T10_30_45_123Z-debug.log`,
     },
   })
 
-  // Agregar herramientas adicionales para completar la validación
-  // file_read (alias de file_examine)
+
   messages.push({
     id: "tool-file-read-success",
     content: "Archivo leído correctamente",

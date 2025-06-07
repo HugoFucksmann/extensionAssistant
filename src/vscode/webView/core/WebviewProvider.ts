@@ -27,7 +27,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     private errorManager!: ErrorManager;
     private eventSubscriber!: EventSubscriber;
 
-    // CAMBIO: Se elimina la propiedad `messageContext`.
+
 
     constructor(
         private readonly extensionUri: vscode.Uri,
@@ -44,22 +44,22 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
         this.messageFormatter = new MessageFormatter();
         this.errorManager = new ErrorManager(this.internalEventDispatcher);
 
-        // CAMBIO: La inicialización de los manejadores es más limpia y directa.
+
         this.commandProcessor = new CommandProcessor(
             this.backendAdapter,
             this.errorManager,
-            this.stateManager, // Se inyecta el stateManager
+            this.stateManager,
             this.postMessage.bind(this)
         );
 
         this.eventSubscriber = new EventSubscriber(
             this.internalEventDispatcher,
             this.messageFormatter,
-            this.stateManager, // Se inyecta el stateManager
+            this.stateManager,
             this.postMessage.bind(this)
         );
 
-        // CAMBIO: Se elimina la inicialización de `messageContext`.
+
 
         this.messageRouter = new MessageRouter(
             this.backendAdapter,
@@ -67,7 +67,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
             this.commandProcessor,
             this.errorManager,
             this.postMessage.bind(this),
-            // CAMBIO: Se pasa la función `startNewChat` directamente, evitando dependencias inversas.
+
             this.startNewChat.bind(this)
         );
 
@@ -85,7 +85,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     }
 
     private setupWebview(): void {
-        // ... (sin cambios)
+
         if (!this.view) return;
 
         this.view.webview.options = {
@@ -110,7 +110,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
                     await this.messageRouter.handleMessage(message);
                 } catch (error) {
                     console.error('[WebviewProvider] Error handling message:', error);
-                    // CAMBIO: Se obtiene el chatId del estado centralizado para el reporte de errores.
+
                     const chatId = this.stateManager.getChatState().currentChatId;
                     this.errorManager.handleUnexpectedError(
                         error as Error,
@@ -134,22 +134,22 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
             const newChatId = this.backendAdapter.createNewChat();
             const activeChatId = this.backendAdapter.getActiveChatId();
 
-            // Actualiza el estado centralizado
+
             this.stateManager.updateChatState({
                 currentChatId: newChatId,
                 activeChatId: activeChatId
             });
 
-            // Notifica a la UI
+
             this.postMessage('newChatStarted', {
                 chatId: newChatId,
                 activeChatId: activeChatId
             });
 
-            // También se puede enviar el estado inicial de la sesión aquí
+
             this.postMessage('sessionReady', {
                 chatId: newChatId,
-                messages: [], // O cargar mensajes si existen
+                messages: [],
             });
 
             return newChatId;
@@ -173,12 +173,12 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     }
 
     public getCurrentChatId(): string | null {
-        // CAMBIO: Se obtiene el chatId directamente del estado centralizado.
+
         return this.stateManager.getChatState().currentChatId;
     }
 
     private postMessage(type: string, payload: any): void {
-        // ... (sin cambios)
+
         if (this.view) {
             this.view.webview.postMessage({ type, payload });
         } else {
