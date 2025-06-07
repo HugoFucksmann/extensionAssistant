@@ -1,4 +1,5 @@
 // src/vscode/webView/core/WebviewBackendAdapter.ts
+import * as vscode from 'vscode'; // Se utiliza el import estándar
 import { ApplicationLogicService } from '../../../core/ApplicationLogicService';
 import { IConversationManager } from '../../../core/interfaces/IConversationManager';
 
@@ -26,6 +27,7 @@ export class WebviewBackendAdapter implements IWebviewBackend {
         private readonly conversationManager: IConversationManager
     ) { }
 
+    // [ASÍNCRONO] La respuesta conversacional NO se retorna aquí. La UI debe escuchar los eventos emitidos por el backend.
     public async processMessage(
         chatId: string,
         text: string,
@@ -38,6 +40,7 @@ export class WebviewBackendAdapter implements IWebviewBackend {
                 { files: options.files || [] }
             );
 
+            // No retornar la respuesta conversacional aquí, solo control de flujo y estado.
             return {
                 success: result.success,
                 error: result.error,
@@ -68,7 +71,8 @@ export class WebviewBackendAdapter implements IWebviewBackend {
 
     public async getProjectFiles(): Promise<string[]> {
         const { listFilesUtil } = await import('../../../shared/utils/listFiles');
-        const files = await listFilesUtil(require('vscode'), '**/*');
+        // Se utiliza el 'vscode' importado en la parte superior del archivo
+        const files = await listFilesUtil(vscode, '**/*');
         return files.map(f => f.path);
     }
 }

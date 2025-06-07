@@ -10,8 +10,14 @@ import { InternalEventDispatcher } from './events/InternalEventDispatcher';
 import { MemoryManager } from '../features/memory/MemoryManager';
 import { LangGraphEngine } from './langgraph/LangGraphEngine';
 import { PerformanceMonitor } from './monitoring/PerformanceMonitor';
+import { CacheManager } from './utils/CacheManager';
+import { SystemInitializer } from './langgraph/initialization/SystemInitializer';
 import { Disposable } from './interfaces/Disposable';
 
+/**
+ * A singleton factory for creating and managing core application components.
+ * Ensures that components are initialized only once and in the correct order.
+ */
 export class ComponentFactory {
   private static applicationLogicServiceInstance: ApplicationLogicService;
   private static internalEventDispatcherInstance: InternalEventDispatcher;
@@ -21,6 +27,14 @@ export class ComponentFactory {
   private static memoryManagerInstance: MemoryManager;
   private static performanceMonitorInstance: PerformanceMonitor;
   private static langGraphEngineInstance: LangGraphEngine;
+  private static cacheManagerInstance: CacheManager;
+
+  public static getCacheManager(): CacheManager {
+    if (!this.cacheManagerInstance) {
+      this.cacheManagerInstance = new CacheManager();
+    }
+    return this.cacheManagerInstance;
+  }
 
   public static getInternalEventDispatcher(): InternalEventDispatcher {
     if (!this.internalEventDispatcherInstance) {
@@ -32,7 +46,10 @@ export class ComponentFactory {
   public static getToolRegistry(): ToolRegistry {
     if (!this.toolRegistryInstance) {
       const dispatcher = this.getInternalEventDispatcher();
-      this.toolRegistryInstance = new ToolRegistry(dispatcher);
+      const performanceMonitor = this.getPerformanceMonitor();
+      const cacheManager = this.getCacheManager();
+
+      this.toolRegistryInstance = new ToolRegistry(dispatcher, performanceMonitor, cacheManager);
       this.toolRegistryInstance.registerTools(allToolDefinitions);
     }
     return this.toolRegistryInstance;
@@ -59,35 +76,20 @@ export class ComponentFactory {
     return this.performanceMonitorInstance;
   }
 
-  public static getAgentExecutionEngine(extensionContext: vscode.ExtensionContext): LangGraphEngine {
+  public static async getLangGraphEngine(extensionContext: vscode.ExtensionContext): Promise<LangGraphEngine> {
     if (!this.langGraphEngineInstance) {
-      const modelManager = this.getModelManager();
-      const toolRegistry = this.getToolRegistry();
-      const dispatcher = this.getInternalEventDispatcher();
-      const memoryManager = this.getMemoryManager(extensionContext);
-      const performanceMonitor = this.getPerformanceMonitor();
-
-      this.langGraphEngineInstance = new LangGraphEngine(
-        modelManager,
-        toolRegistry,
-        dispatcher,
-        memoryManager,
-        performanceMonitor
-      );
+      this.langGraphEngineInstance = await SystemInitializer.initialize(extensionContext);
     }
     return this.langGraphEngineInstance;
   }
 
-  public static getApplicationLogicService(extensionContext: vscode.ExtensionContext): ApplicationLogicService {
+  public static async getApplicationLogicService(extensionContext: vscode.ExtensionContext): Promise<ApplicationLogicService> {
     if (!this.applicationLogicServiceInstance) {
-      const agentEngine = this.getAgentExecutionEngine(extensionContext);
-      const toolRegistry = this.getToolRegistry();
+      const engine = await this.getLangGraphEngine(extensionContext);
       const conversationManager = this.getConversationManager();
-      const memoryManager = this.getMemoryManager(extensionContext);
-
+      const toolRegistry = this.getToolRegistry();
       this.applicationLogicServiceInstance = new ApplicationLogicService(
-        memoryManager,
-        agentEngine,
+        engine,
         conversationManager,
         toolRegistry
       );
@@ -102,46 +104,43 @@ export class ComponentFactory {
     return this.conversationManagerInstance;
   }
 
+  /**
+   * Disposes of all managed singleton components in the reverse order of creation.
+   * This is crucial for a clean shutdown of the extension.
+   */
   public static async dispose(): Promise<void> {
-    if (this.langGraphEngineInstance && typeof this.langGraphEngineInstance.dispose === 'function') {
-      this.langGraphEngineInstance.dispose();
-      (this.langGraphEngineInstance as any) = null;
-    }
-
-    if (this.performanceMonitorInstance && typeof (this.performanceMonitorInstance as any).reset === 'function') {
-      (this.performanceMonitorInstance as any).reset();
-      (this.performanceMonitorInstance as any) = null;
-    }
-
-    if (this.memoryManagerInstance && typeof this.memoryManagerInstance.dispose === 'function') {
-      await this.memoryManagerInstance.dispose();
-      (this.memoryManagerInstance as any) = null;
-    }
-
-    if (this.modelManagerInstance && typeof this.modelManagerInstance.dispose === 'function') {
-      this.modelManagerInstance.dispose();
-      (this.modelManagerInstance as any) = null;
-    }
-
-    if (this.toolRegistryInstance) {
-      (this.toolRegistryInstance as any) = null;
-    }
-
-    if (this.internalEventDispatcherInstance && typeof this.internalEventDispatcherInstance.dispose === 'function') {
-      this.internalEventDispatcherInstance.dispose();
-      (this.internalEventDispatcherInstance as any) = null;
-    }
-
-    if (this.applicationLogicServiceInstance && typeof this.applicationLogicServiceInstance.dispose === 'function') {
-      this.applicationLogicServiceInstance.dispose();
-      (this.applicationLogicServiceInstance as any) = null;
-    }
-
-    if (this.conversationManagerInstance) {
-      if (typeof this.conversationManagerInstance.dispose === 'function') {
-        this.conversationManagerInstance.dispose();
+    const disposeSafely = async (component: Disposable | undefined) => {
+      if (component && typeof component.dispose === 'function') {
+        await Promise.resolve(component.dispose());
       }
-      (this.conversationManagerInstance as any) = null;
-    }
+    };
+
+    await disposeSafely(this.applicationLogicServiceInstance);
+    this.applicationLogicServiceInstance = undefined as any;
+
+    await disposeSafely(this.langGraphEngineInstance);
+    this.langGraphEngineInstance = undefined as any;
+
+    await disposeSafely(this.memoryManagerInstance);
+    this.memoryManagerInstance = undefined as any;
+
+    await disposeSafely(this.modelManagerInstance);
+    this.modelManagerInstance = undefined as any;
+
+    // Components without async dispose
+    this.toolRegistryInstance = undefined as any; // No dispose method
+    this.performanceMonitorInstance?.reset();
+    this.performanceMonitorInstance = undefined as any;
+
+    await disposeSafely(this.conversationManagerInstance);
+    this.conversationManagerInstance = undefined as any;
+
+    await disposeSafely(this.internalEventDispatcherInstance);
+    this.internalEventDispatcherInstance = undefined as any;
+
+    await disposeSafely(this.cacheManagerInstance);
+    this.cacheManagerInstance = undefined as any;
+
+    console.log('[ComponentFactory] All components disposed.');
   }
 }

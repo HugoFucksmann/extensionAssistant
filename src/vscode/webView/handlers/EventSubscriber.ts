@@ -57,7 +57,9 @@ export class EventSubscriber {
     }
 
     private processEvent(event: WindsurfEvent): { messageType: string; chatMessage: ChatMessage } | null {
-        const baseMessage = this.messageFormatter.createBaseChatMessage(event.id, 'system') as ChatMessage;
+        const payload = event.payload as any;
+        // Pass operationId to ensure message ID is consistent for tool updates
+        const baseMessage = this.messageFormatter.createBaseChatMessage(event.id, 'system', payload.operationId) as ChatMessage;
 
         switch (event.type) {
             case EventType.TOOL_EXECUTION_STARTED:
@@ -87,9 +89,8 @@ export class EventSubscriber {
             status: 'tool_executing',
             toolName: payload.toolName,
             toolInput: payload.parameters,
-            operationId: payload.operationId
         };
-        baseMessage.operationId = payload.operationId; // Asegurar que el operationId esté en el mensaje
+        // baseMessage.id and baseMessage.operationId are already set correctly by createBaseChatMessage
         return { messageType: 'agentActionUpdate', chatMessage: baseMessage };
     }
 
@@ -97,42 +98,30 @@ export class EventSubscriber {
         const payload = event.payload as any;
         const formatted = this.messageFormatter.formatToolExecutionCompleted(payload);
 
-        // Para tool completion, enviamos una actualización del mensaje existente
-        const updateMessage = {
-            id: baseMessage.id,
-            operationId: payload.operationId,
-            sender: 'system' as const,
-            content: formatted.content,
-            metadata: {
-                ...baseMessage.metadata,
-                ...formatted.metadata,
-                status: 'success' // Asegurar que el status sea success
-            },
-            timestamp: baseMessage.timestamp
+        // Modify the baseMessage directly to ensure the ID (which is the operationId) is preserved for the update.
+        baseMessage.content = formatted.content;
+        baseMessage.metadata = {
+            ...baseMessage.metadata,
+            ...formatted.metadata,
+            status: 'success' // Ensure status is success
         };
 
-        return { messageType: 'agentActionUpdate', chatMessage: updateMessage };
+        return { messageType: 'agentActionUpdate', chatMessage: baseMessage };
     }
 
     private handleToolExecutionError(event: WindsurfEvent, baseMessage: ChatMessage): { messageType: string; chatMessage: ChatMessage } {
         const payload = event.payload as any;
         const formatted = this.messageFormatter.formatToolExecutionError(payload);
 
-        // Para tool error, enviamos una actualización del mensaje existente
-        const updateMessage = {
-            id: baseMessage.id,
-            operationId: payload.operationId,
-            sender: 'system' as const,
-            content: formatted.content,
-            metadata: {
-                ...baseMessage.metadata,
-                ...formatted.metadata,
-                status: 'error' // Asegurar que el status sea error
-            },
-            timestamp: baseMessage.timestamp
+        // Modify the baseMessage directly to ensure the ID (the operationId) is preserved for the update.
+        baseMessage.content = formatted.content;
+        baseMessage.metadata = {
+            ...baseMessage.metadata,
+            ...formatted.metadata,
+            status: 'error' // Ensure status is error
         };
 
-        return { messageType: 'agentActionUpdate', chatMessage: updateMessage };
+        return { messageType: 'agentActionUpdate', chatMessage: baseMessage };
     }
 
     private handleResponseGenerated(event: WindsurfEvent, baseMessage: ChatMessage): { messageType: string; chatMessage: ChatMessage } {

@@ -84,6 +84,8 @@ export class MessageRouter {
             }
 
             let chatId = this.context.currentChatId;
+            console.log('[MessageRouter] Current chat ID:', chatId);
+
             if (!chatId) {
                 chatId = this.backend.createNewChat();
                 if (!chatId) {
@@ -97,20 +99,27 @@ export class MessageRouter {
                 this.context.setCurrentChatId(chatId);
             }
 
-            const result = await this.backend.processMessage(chatId, payload.text, {
+            console.log('[MessageRouter] Calling backend.processMessage in the background...');
+            // Do not await. Let the process run and rely on events for feedback.
+            this.backend.processMessage(chatId, payload.text, {
                 files: payload.files || []
+            }).catch(error => {
+                // Catch any unexpected errors from the async process start itself
+                console.error('[MessageRouter] Backend processing failed to start:', error);
+                this.postMessage('systemError', {
+                    content: error instanceof Error ? error.message : 'Error inesperado al iniciar el procesamiento',
+                    metadata: { status: 'error' }
+                });
             });
 
-            if (!result.success) {
-                this.errorManager.handleProcessingError(
-                    result.error || 'Processing failed to produce a response.',
-                    'MessageRouter.handleUserMessage',
-                    chatId,
-                    { originalError: result.error, updatedStateError: result.updatedState?.error }
-                );
-            }
-        } catch (error: any) {
-            this.errorManager.handleUnexpectedError(error, 'MessageRouter.handleUserMessage', this.context.currentChatId);
+            // The function now returns immediately. All feedback will be sent via EventSubscriber.
+
+        } catch (error) {
+            console.error('[MessageRouter] Exception in handleUserMessage:', error);
+            this.postMessage('systemError', {
+                content: error instanceof Error ? error.message : 'Error inesperado',
+                metadata: { status: 'error' }
+            });
         }
     }
 
@@ -118,10 +127,10 @@ export class MessageRouter {
         try {
             // Crear nuevo chat a través del backend
             const newChatId = this.backend.createNewChat();
-            
+
             // Obtener el chat activo después de crearlo
             const activeChatId = this.backend.getActiveChatId();
-            
+
             // Actualizar el contexto local
             this.context.setCurrentChatId(newChatId);
 

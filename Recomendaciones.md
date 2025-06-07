@@ -1,5 +1,3 @@
-Okay, vamos a examinar cada archivo que has proporcionado y evaluar su utilidad para la nueva arquitectura LangGraph v3.2.
-
 Evaluación de Archivos:
 
 PerformanceMonitor.ts

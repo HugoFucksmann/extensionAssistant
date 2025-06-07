@@ -14,9 +14,16 @@ export function useAppEffects(
         const doc = document as any;
         const body = doc.body as any;
 
+        console.log('[useAppEffects] Setting up message handler');
         const handleMessage = createMessageHandler(dispatch, postMessage, state);
 
-        win.addEventListener('message', handleMessage);
+        const wrappedHandler = (event: MessageEvent) => {
+            console.log('[useAppEffects] Received message from extension:', event.data.type);
+            handleMessage(event);
+        };
+
+        win.addEventListener('message', wrappedHandler);
+        console.log('[useAppEffects] Message handler registered, sending uiReady');
         postMessage('uiReady');
 
         const observer = new MutationObserver(() => {
@@ -31,7 +38,7 @@ export function useAppEffects(
         });
 
         return () => {
-            win.removeEventListener('message', handleMessage);
+            win.removeEventListener('message', wrappedHandler);
             observer.disconnect();
         };
     }, [state.isDarkMode, state.chatList.length]);

@@ -1,9 +1,13 @@
 // src/features/chat/types.ts
 import { ToolExecution } from '../tools/types';
-import { WindsurfState } from '../../core/types';
+import { SimplifiedOptimizedGraphState } from '../../core/langgraph/state/GraphState';
+
+// [MIGRACIÓN] El historial ahora refleja las fases reales del motor LangGraph.
+// Actualiza cualquier lógica de historial/visualización para consumir GraphPhase.
+import { GraphPhase } from '../../core/langgraph/state/GraphState';
 
 export interface HistoryEntry extends Omit<ChatMessage, 'id' | 'sender' | 'timestamp' | 'files'> {
-  phase: 'user_input' | 'reasoning' | 'action_planning' | 'action' | 'reflection' | 'correction' | 'responseGeneration' | 'system_message' | 'toolOutputAnalysis';
+  phase: GraphPhase; // 'ANALYSIS' | 'EXECUTION' | 'VALIDATION' | 'RESPONSE' | 'COMPLETED' | 'ERROR'
   iteration?: number;
   content: string;
   timestamp: number;
@@ -13,6 +17,7 @@ export interface HistoryEntry extends Omit<ChatMessage, 'id' | 'sender' | 'times
     [key: string]: any;
   };
 }
+
 
 export interface ChatMessage {
   id: string;
@@ -51,7 +56,7 @@ export interface Chat {
   createdAt: number;
   updatedAt: number;
   metadata?: {
-    windsurfState?: WindsurfState;
+    graphState?: SimplifiedOptimizedGraphState;
     [key: string]: any;
   };
 }

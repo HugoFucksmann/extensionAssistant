@@ -3,6 +3,7 @@ import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { ChatOllama } from '@langchain/ollama';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import * as vscode from 'vscode';
+import { Disposable } from '../../core/interfaces/Disposable';
 
 export type ModelProvider = 'gemini' | 'ollama';
 
@@ -14,8 +15,6 @@ export interface ModelConfig {
   apiKey?: string;
   baseUrl?: string;
 }
-
-import { Disposable } from '../../core/interfaces/Disposable';
 
 export class ModelManager implements Disposable {
   private models: Map<ModelProvider, BaseChatModel>;
@@ -30,19 +29,20 @@ export class ModelManager implements Disposable {
     this.initializeModels();
     this.ensureActiveProviderIsValid();
 
-    console.log(`[ModelManager] Inicializado. Proveedor preferido: ${this.getUserPreferredProvider()}, Proveedor activo: ${this.activeProvider}`);
+    console.log(`[ModelManager] Initialized. Preferred provider: ${this.getUserPreferredProvider()}, Active provider: ${this.activeProvider}`);
 
     this.configChangeDisposable = vscode.workspace.onDidChangeConfiguration(e => {
       if (e.affectsConfiguration('extensionAssistant')) {
-        console.log('[ModelManager] Configuración cambiada, reinicializando...');
+        console.log('[ModelManager] Configuration changed, re-initializing...');
         const oldPreferredProvider = this.getUserPreferredProvider();
         this.config = this.loadDetailedConfiguration();
-        this.activeProvider = this.getUserPreferredProvider(); // Re-evaluar preferencia
+        this.activeProvider = this.getUserPreferredProvider(); // Re-evaluate preference
         this.initializeModels();
         this.ensureActiveProviderIsValid();
 
         if (oldPreferredProvider !== this.activeProvider) {
-          console.log(`[ModelManager] Proveedor activo cambiado a: ${this.activeProvider} debido a cambio de configuración o disponibilidad.`);
+          vscode.window.showInformationMessage(`AI model provider switched to: ${this.activeProvider}`);
+          console.log(`[ModelManager] Active provider switched to: ${this.activeProvider} due to configuration change or availability.`);
         }
       }
     });
@@ -50,26 +50,24 @@ export class ModelManager implements Disposable {
 
   private getUserPreferredProvider(): ModelProvider {
     const config = vscode.workspace.getConfiguration('extensionAssistant');
-
     return config.get<ModelProvider>('modelType', 'gemini');
   }
 
   private loadDetailedConfiguration(): Record<ModelProvider, ModelConfig> {
     const vsCodeConfig = vscode.workspace.getConfiguration('extensionAssistant');
-
     return {
       gemini: {
         provider: 'gemini',
-        modelName: 'gemini-2.0-flash-exp',
-        temperature: 0.2,
-        maxTokens: 4096,
+        modelName: vsCodeConfig.get<string>('google.model', 'gemini-1.5-flash-latest'),
+        temperature: vsCodeConfig.get<number>('google.temperature', 0.2),
+        maxTokens: 8192,
         apiKey: vsCodeConfig.get<string>('google.apiKey') || process.env.GOOGLE_API_KEY,
       },
       ollama: {
         provider: 'ollama',
-        modelName: 'qwen2.5-coder:7b',
-        temperature: 0.2,
-        baseUrl: 'http://localhost:11434',
+        modelName: vsCodeConfig.get<string>('ollama.model', 'gemma3:4b'),
+        temperature: vsCodeConfig.get<number>('ollama.temperature', 0.2),
+        baseUrl: vsCodeConfig.get<string>('ollama.baseUrl', 'http://localhost:11434'),
         maxTokens: 4096,
       }
     };
@@ -77,47 +75,39 @@ export class ModelManager implements Disposable {
 
   private initializeModels(): void {
     this.models.clear();
-    const detailedConfigs = this.config;
+    const geminiConfig = this.config.gemini;
 
-
-
-    const geminiConfig = detailedConfigs.gemini;
     if (geminiConfig.apiKey) {
-
       if (!/^AIzaSy[0-9A-Za-z_-]{33}$/.test(geminiConfig.apiKey)) {
-        console.warn('[ModelManager] Clave de API de Google inválida. Formato esperado: AIzaSy seguido de 33 caracteres alfanuméricos.');
-        this.models.delete('gemini');
-        return;
-      }
-
-      try {
-        this.models.set('gemini', new ChatGoogleGenerativeAI({
-          model: geminiConfig.modelName,
-          temperature: geminiConfig.temperature,
-          maxOutputTokens: geminiConfig.maxTokens,
-          apiKey: geminiConfig.apiKey,
-        }));
-        console.log('[ModelManager] Modelo Gemini inicializado.');
-      } catch (error: any) {
-        console.warn('[ModelManager] Error al inicializar Gemini:', error.message);
-        this.models.delete('gemini');
+        vscode.window.showWarningMessage('Invalid Google API Key format. Gemini model disabled.');
+        console.warn('[ModelManager] Invalid Google API Key format. It should start with "AIzaSy".');
+      } else {
+        try {
+          this.models.set('gemini', new ChatGoogleGenerativeAI({
+            model: geminiConfig.modelName,
+            temperature: geminiConfig.temperature,
+            maxOutputTokens: geminiConfig.maxTokens,
+            apiKey: geminiConfig.apiKey,
+          }));
+          console.log('[ModelManager] Gemini model initialized.');
+        } catch (error: any) {
+          vscode.window.showErrorMessage(`Error initializing Gemini: ${error.message}`);
+          console.warn('[ModelManager] Error initializing Gemini:', error.message);
+        }
       }
     } else {
-      console.warn("[ModelManager] Clave de API de Google no proporcionada. Modelo Gemini no disponible.");
-      this.models.delete('gemini');
+      console.log("[ModelManager] Google API Key not provided. Gemini model is not available.");
     }
-
 
     try {
       this.models.set('ollama', new ChatOllama({
-        model: detailedConfigs.ollama.modelName,
-        temperature: detailedConfigs.ollama.temperature,
-        baseUrl: detailedConfigs.ollama.baseUrl,
-
+        model: this.config.ollama.modelName,
+        temperature: this.config.ollama.temperature,
+        baseUrl: this.config.ollama.baseUrl,
       }));
-
+      console.log('[ModelManager] Ollama model initialized.');
     } catch (error: any) {
-      console.warn('[ModelManager] No se pudo conectar con Ollama. ¿Está en ejecución?', error.message);
+      console.warn('[ModelManager] Could not initialize Ollama. Is it running?', error.message);
     }
   }
 
@@ -127,17 +117,16 @@ export class ModelManager implements Disposable {
     if (this.models.has(preferredProvider)) {
       this.activeProvider = preferredProvider;
     } else if (this.models.size > 0) {
-
       const fallbackProvider = Array.from(this.models.keys())[0];
-      console.warn(`[ModelManager] Proveedor preferido '${preferredProvider}' no disponible. Usando fallback: '${fallbackProvider}'.`);
       this.activeProvider = fallbackProvider;
+      vscode.window.showWarningMessage(`Preferred model '${preferredProvider}' is not available. Falling back to '${fallbackProvider}'.`);
+      console.warn(`[ModelManager] Preferred provider '${preferredProvider}' not available. Using fallback: '${fallbackProvider}'.`);
     } else {
-
-      console.error('[ModelManager] No hay modelos disponibles. Por favor, asegúrate de tener Ollama en ejecución o configura una clave de API de Google.');
+      this.activeProvider = 'ollama'; // Default to prevent crash
+      vscode.window.showErrorMessage('No AI models available. Please configure Google API Key or ensure Ollama is running.');
+      console.error('[ModelManager] No models available. Please ensure Ollama is running or configure a Google API key.');
     }
   }
-
-
 
   public dispose(): void {
     this.configChangeDisposable.dispose();
@@ -146,20 +135,23 @@ export class ModelManager implements Disposable {
   public getActiveModel(): BaseChatModel {
     const model = this.models.get(this.activeProvider);
     if (!model) {
-      throw new Error(`Modelo para el proveedor activo '${this.activeProvider}' no está disponible.`);
+      this.ensureActiveProviderIsValid(); // Attempt to recover
+      const recoveredModel = this.models.get(this.activeProvider);
+      if (!recoveredModel) {
+        throw new Error(`Critical: No AI model available for active provider '${this.activeProvider}'.`);
+      }
+      return recoveredModel;
     }
-
     return model;
   }
 
   public setActiveProvider(provider: ModelProvider): void {
-
     if (!this.models.has(provider)) {
-      console.warn(`[ModelManager] Intento de activar proveedor no disponible: '${provider}'. No se realizaron cambios.`);
-
+      vscode.window.showWarningMessage(`Attempted to switch to unavailable model provider: '${provider}'.`);
+      console.warn(`[ModelManager] Attempted to activate unavailable provider: '${provider}'. No changes made.`);
       return;
     }
     this.activeProvider = provider;
-    console.log(`[ModelManager] Proveedor activo cambiado manualmente a: ${provider}`);
+    console.log(`[ModelManager] Active provider manually switched to: ${provider}`);
   }
 }

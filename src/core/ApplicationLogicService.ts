@@ -1,78 +1,64 @@
 // src/core/ApplicationLogicService.ts
-import { WindsurfState } from './types';
-import { MemoryManager } from '../features/memory/MemoryManager';
-import { ToolRegistry } from '../features/tools/ToolRegistry';
+import { SimplifiedOptimizedGraphState } from './langgraph/state/GraphState';
 import { ConversationManager } from './ConversationManager';
 import { ToolResult } from '../features/tools/types';
-import { addErrorToHistory } from './utils/historyUtils';
 import { Disposable } from './interfaces/Disposable';
-
-// NUEVA IMPORTACIÓN
 import { LangGraphEngine } from './langgraph/LangGraphEngine';
-
-// El tipo para el motor de ejecución ahora es el adaptador
-type AgentExecutionEngineType = LangGraphEngine;
+import { ToolRegistry } from '../features/tools/ToolRegistry';
 
 export interface ProcessUserMessageResult {
   success: boolean;
   finalResponse?: string;
-  updatedState?: WindsurfState;
+  updatedState?: SimplifiedOptimizedGraphState;
   error?: string;
 }
 
 export class ApplicationLogicService implements Disposable {
   constructor(
-    private memoryManager: MemoryManager,
-    private agentEngine: AgentExecutionEngineType, // Cambiado a AgentExecutionEngineType
+    private agentEngine: LangGraphEngine,
     private conversationManager: ConversationManager,
     private toolRegistry: ToolRegistry
-  ) {
-
-  }
+  ) { }
 
   public async processUserMessage(
     chatId: string,
     userMessage: string,
     contextData: Record<string, any> = {}
   ): Promise<ProcessUserMessageResult> {
-    const { state, isNew } = this.conversationManager.getOrCreateConversationState(
-      chatId || undefined,
+    // 1. Obtener o crear el estado de la conversación para registrar el mensaje del usuario
+    const { state: convState, isNew } = this.conversationManager.getOrCreateConversationState(
+      chatId,
       userMessage,
       contextData
     );
-
     if (isNew) {
       this.conversationManager.setActiveChatId(chatId);
     }
 
     try {
-      // Llama al método run del motor LangGraphEngine
-      const resultState = await this.agentEngine.run(state);
-      this.conversationManager.updateConversationState(chatId, resultState);
-      // El almacenamiento de la conversación ahora podría ser manejado dentro del motor
-      // o seguir aquí. Si LangGraphEngine lo hace, se puede quitar de aquí.
-      // Por ahora, lo dejamos para consistencia.
-      await this.memoryManager.storeConversation(chatId, resultState);
+      // 2. Invocar el motor LangGraph. No esperamos el resultado aquí.
+      // La UI se actualizará a través de eventos.
+      const resultGraphState = await this.agentEngine.run(userMessage, chatId);
 
+      // 3. El procesamiento de la respuesta final es responsabilidad de los eventos generados por el grafo.
+      // Solo se actualiza el estado interno para consistencia.
+      convState.error = resultGraphState.error;
+      this.conversationManager.updateConversationState(chatId, convState);
+
+      // Retornamos solo el éxito o error; la UI debe escuchar los eventos para la respuesta.
       return {
-        success: resultState.completionStatus === 'completed',
-        finalResponse: resultState.finalOutput,
-        updatedState: resultState,
-        error: resultState.completionStatus !== 'completed'
-          ? (resultState.error || 'Processing did not complete successfully.')
-          : undefined,
+        success: !resultGraphState.error,
+        updatedState: convState,
+        error: resultGraphState.error,
       };
+
+
     } catch (error: any) {
-      const currentState = this.conversationManager.getConversationState(chatId);
-      const finalErrorState = currentState || state;
+      const finalErrorState = this.conversationManager.getConversationState(chatId) || convState;
+      finalErrorState.error = error.message || 'Unknown critical error in ApplicationLogicService.';
+this.conversationManager.updateConversationState(chatId, finalErrorState);
 
-      finalErrorState.completionStatus = 'failed';
-      finalErrorState.error = error.message || 'Unknown critical error during message processing.';
-      this.addErrorToHistory(finalErrorState, error.message); // Usa la función helper
-
-      this.conversationManager.updateConversationState(chatId, finalErrorState);
-      await this.memoryManager.storeConversation(chatId, finalErrorState);
-
+      // Devolver el error para que el llamador sepa que el proceso falló.
       return {
         success: false,
         error: finalErrorState.error,
@@ -81,27 +67,12 @@ export class ApplicationLogicService implements Disposable {
     }
   }
 
-  private addErrorToHistory(state: WindsurfState, errorMessage: string): void {
-    addErrorToHistory(state, `Critical error in ApplicationLogicService: ${errorMessage}`);
-  }
-
   public async clearConversation(chatId?: string): Promise<boolean> {
-    return this.conversationManager.clearConversation(chatId, this.memoryManager);
+    return this.conversationManager.clearConversation(chatId);
   }
 
-  public async invokeTool(
-    toolName: string,
-    params: any,
-    executionContextArgs: { chatId?: string;[key: string]: any } = {}
-  ): Promise<ToolResult> {
-    return this.toolRegistry.executeTool(toolName, params, executionContextArgs);
-  }
 
   public dispose(): void {
-    // El motor principal (LangGraphEngine) se dispone a través de ComponentFactory.
-    // memoryManager también se dispone centralmente.
-    // No hay nada específico que ApplicationLogicService necesite disponer por sí mismo
-    // si sus dependencias se gestionan externamente.
     console.log('[ApplicationLogicService] Disposed.');
   }
 }

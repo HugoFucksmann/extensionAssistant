@@ -9,14 +9,14 @@ export class ExtensionActivator {
 
   constructor(private readonly context: vscode.ExtensionContext) { }
 
-  public activate(): void {
-    this.initializeServices();
+  public async activate(): Promise<void> {
+    await this.initializeServices();
     this.registerWebview();
     this.registerCommands();
   }
 
-  private initializeServices(): void {
-    const appLogicService = ComponentFactory.getApplicationLogicService(this.context);
+  private async initializeServices(): Promise<void> {
+    const appLogicService = await ComponentFactory.getApplicationLogicService(this.context);
     const dispatcher = ComponentFactory.getInternalEventDispatcher();
     const conversationManager = ComponentFactory.getConversationManager();
 

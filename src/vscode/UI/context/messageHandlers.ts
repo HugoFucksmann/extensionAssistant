@@ -144,6 +144,23 @@ export function createMessageHandler(
                     postMessage('command', { command: 'getChatHistory' });
                 }
                 break;
+
+            case 'responseReceived':
+                console.log('[MessageHandler] Received AI response:', payload);
+                // Add the AI response as a new message
+                dispatch({
+                    type: 'ADD_MESSAGE',
+                    payload: {
+                        id: `ai_${Date.now()}`,
+                        content: payload.response || '',
+                        sender: 'assistant',
+                        timestamp: Date.now(),
+                        metadata: { status: 'success' },
+                    }
+                });
+                // Set loading to false
+                dispatch({ type: 'SET_LOADING', payload: { loading: false } });
+                break;
         }
     };
 }

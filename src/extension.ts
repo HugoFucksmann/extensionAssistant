@@ -4,12 +4,11 @@ import { ComponentFactory } from './core/ComponentFactory';
 
 let activator: ExtensionActivator | undefined;
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
  
-  
   try {
     activator = new ExtensionActivator(context);
-    activator.activate();
+    await activator.activate();
   
   } catch (error) {
     console.error('Error activating extension:', error);

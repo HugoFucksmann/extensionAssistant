@@ -2,8 +2,6 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { WindsurfState } from '@core/types';
-import { HistoryEntry } from '@features/chat/types';
 
 export interface MemoryItem {
     id: string;
@@ -35,7 +33,7 @@ export class MemoryManager implements Disposable {
         }
     }
 
-    // Runtime Memory (volátil)
+
     public setRuntime(chatId: string, key: string, value: any): void {
         this.runtimeMemory.set(`${chatId}:${key}`, value);
     }
@@ -131,29 +129,6 @@ export class MemoryManager implements Disposable {
         }
     }
 
-
-    public async storeConversation(chatId: string, state: WindsurfState): Promise<void> {
-        // Store in runtime memory
-        this.setRuntime(chatId, 'lastState', state);
-        this.setRuntime(chatId, 'lastObjective', state.objective);
-        this.setRuntime(chatId, 'conversationHistory', state.history);
-
-
-        const insights = this.extractInsights(state);
-        if (insights.length > 0) {
-            await this.storePersistent(`insights_${chatId}_${Date.now()}`, insights, {
-                chatId,
-                objective: state.objective,
-                type: 'insights'
-            });
-        }
-    }
-
-    private extractInsights(state: WindsurfState): any[] {
-        return state.history
-            .filter((entry: HistoryEntry) => entry.phase === 'reflection')
-            .flatMap((entry: HistoryEntry) => entry.metadata?.insights || []);
-    }
 
     public async getRelevantMemories(context: any, limit = 5): Promise<MemoryItem[]> {
         const query = [

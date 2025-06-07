@@ -50,11 +50,6 @@ export class WebviewStateManager {
 
     private subscribers: StateChangeCallback[] = [];
 
-    // Legacy methods for backward compatibility
-    public getCurrentModel(): string | null {
-        return this.state.system.currentModel;
-    }
-
     public setCurrentModel(model: string): void {
         this.updateSystemState({ currentModel: model });
     }

@@ -1309,110 +1309,10 @@ export class MetricsCollector {
 }
 ```
 
-### 8.5 Testing Framework
-```typescript
-// testing/NodeTestFramework.ts
-export class NodeTestFramework {
-  private mockDependencies: DependencyContainer;
-  private mockObservability: ObservabilityManager;
 
-  constructor() {
-    this.mockDependencies = new DependencyContainer();
-    this.mockObservability = this.createMockObservability();
-    this.setupMockServices();
-  }
+## 8. Optimizaciones de Rendimiento
 
-  private setupMockServices(): void {
-    // Mock IMemoryService
-    this.mockDependencies.register('IMemoryService', {
-      getStructuredContext: jest.fn().mockResolvedValue({
-        workingMemorySnapshot: 'mock working memory',
-        retrievedKnowledgeChunks: ['mock chunk 1', 'mock chunk 2'],
-        recentMessagesFormatted: ['user: test', 'ai: response'],
-        chatHistorySummary: 'mock summary'
-      }),
-      updateWorkingMemory: jest.fn().mockResolvedValue(undefined)
-    });
-
-    // Mock IAnalysisService
-    this.mockDependencies.register('IAnalysisService', {
-      analyzeQuery: jest.fn().mockResolvedValue({
-        understanding: 'mock analysis',
-        initialPlan: ['task1', 'task2', 'task3']
-      })
-    });
-
-    // Mock otros servicios...
-  }
-
-  async testNode<T extends BaseNode>(
-    NodeClass: new (deps: DependencyContainer, obs: ObservabilityManager) => T,
-    inputState: SimplifiedOptimizedGraphState,
-    expectedOutput: Partial<SimplifiedOptimizedGraphState>
-  ): Promise<void> {
-    
-    const node = new NodeClass(this.mockDependencies, this.mockObservability);
-    const result = await node.execute(inputState);
-    
-    expect(result).toMatchObject(expectedOutput);
-  }
-
-  createMockState(overrides: Partial<SimplifiedOptimizedGraphState> = {}): SimplifiedOptimizedGraphState {
-    return {
-      messages: [],
-      userInput: 'test input',
-      chatId: 'test-chat',
-      currentPhase: GraphPhase.ANALYSIS,
-      currentPlan: [],
-      toolsUsed: [],
-      workingMemory: '',
-      retrievedMemory: '',
-      requiresValidation: false,
-      isCompleted: false,
-      iteration: 0,
-      nodeIterations: {
-        [GraphPhase.ANALYSIS]: 0,
-        [GraphPhase.EXECUTION]: 0,
-        [GraphPhase.VALIDATION]: 0,
-        [GraphPhase.RESPONSE]: 0,
-        [GraphPhase.COMPLETED]: 0,
-        [GraphPhase.ERROR]: 0
-      },
-      maxGraphIterations: 10,
-      maxNodeIterations: { [GraphPhase.EXECUTION]: 3 },
-      startTime: Date.now(),
-      ...overrides
-    };
-  }
-}
-
-// Ejemplo de test
-describe('AnalyzeNode', () => {
-  let testFramework: NodeTestFramework;
-
-  beforeEach(() => {
-    testFramework = new NodeTestFramework();
-  });
-
-  it('should analyze user input and create plan', async () => {
-    const inputState = testFramework.createMockState({
-      userInput: 'Help me find information about climate change'
-    });
-
-    const expectedOutput = {
-      currentPlan: ['task1', 'task2', 'task3'],
-      workingMemory: 'mock analysis',
-      currentPhase: GraphPhase.ANALYSIS
-    };
-
-    await testFramework.testNode(AnalyzeNode, inputState, expectedOutput);
-  });
-});
-```
-
-## 9. Optimizaciones de Rendimiento
-
-### 9.1 Cache Inteligente
+### 8.1 Cache Inteligente
 ```typescript
 // utils/CacheManager.ts
 export class CacheManager {
@@ -1470,7 +1370,7 @@ export class CacheManager {
 }
 ```
 
-### 9.2 Paralelización Inteligente
+### 8.2 Paralelización Inteligente
 ```typescript
 // services/ParallelExecutionService.ts
 export class ParallelExecutionService {
@@ -1553,9 +1453,9 @@ class Semaphore {
 }
 ```
 
-## 10. Monitorización y Alertas
+## 9. Monitorización y Alertas
 
-### 10.1 Sistema de Alertas
+### 9.1 Sistema de Alertas
 ```typescript
 // monitoring/AlertSystem.ts
 export class AlertSystem {
@@ -1617,9 +1517,9 @@ export class AlertSystem {
 }
 ```
 
-## 11. Despliegue y Configuración
+## 10. Despliegue y Configuración
 
-### 11.1 Configuración por Ambiente
+### 10.1 Configuración por Ambiente
 ```typescript
 // config/EnvironmentConfig.ts
 export class EnvironmentConfig {
@@ -1671,7 +1571,7 @@ export class EnvironmentConfig {
 }
 ```
 
-### 11.2 Inicialización del Sistema
+### 10.2 Inicialización del Sistema
 ```typescript
 // initialization/SystemInitializer.ts
 export class SystemInitializer {
@@ -1722,24 +1622,23 @@ export class SystemInitializer {
 }
 ```
 
-## 12. Conclusión y Próximos Pasos
+## 11. Conclusión y Próximos Pasos
 
-### 12.1 Beneficios de la Implementación
+### 11.1 Beneficios de la Implementación
 - **Robustez**: Control de iteraciones y manejo de errores
 - **Escalabilidad**: Arquitectura modular y paralelización
 - **Mantenibilidad**: Código limpio y bien estructurado  
 - **Observabilidad**: Métricas completas y alertas
 - **Flexibilidad**: Configuración por ambiente y feature flags
 
-### 12.2 Plan de Implementación Sugerido
+### 11.2 Plan de Implementación Sugerido
 1. **Fase 1**: Implementar estado y nodos básicos
 2. **Fase 2**: Desarrollar servicios especializados
-3. **Fase 3**: Agregar observabilidad y testing
+3. **Fase 3**: Agregar observabilidad
 4. **Fase 4**: Optimizaciones de rendimiento
 5. **Fase 5**: Sistema de alertas y monitorización
 
-### 12.3 Consideraciones Futuras
-- Implementar A/B testing para diferentes estrategias
+### 11.3 Consideraciones Futuras
 - Agregar support para multi-agente
 - Integrar con sistemas de analytics avanzados
 - Desarrollar dashboard de monitorización

@@ -4,16 +4,28 @@ import { InternalEventDispatcher } from '../../core/events/InternalEventDispatch
 import * as vscode from 'vscode';
 import { ToolValidator } from './ToolValidator';
 import { generateUniqueId } from '../../shared/utils/generateIds';
-import { EventType, ToolExecutionEventPayload } from '../../features/events/eventTypes';
+import { EventType } from '../../features/events/eventTypes';
 import { DynamicStructuredTool } from '@langchain/core/tools';
+import { PerformanceMonitor } from '../../core/monitoring/PerformanceMonitor';
+import { CacheManager } from '../../core/utils/CacheManager';
 
+/**
+ * Manages the registration, validation, and execution of all available tools.
+ * It also handles caching of tool results and emits events for observability.
+ */
 export class ToolRegistry {
   private tools = new Map<string, ToolDefinition<any, any>>();
 
-  constructor(private dispatcher: InternalEventDispatcher) {
+  constructor(
+    private dispatcher: InternalEventDispatcher,
+    private performanceMonitor: PerformanceMonitor,
+    private cacheManager: CacheManager
+  ) { }
 
-  }
-
+  /**
+   * Registers a list of tool definitions.
+   * @param toolsToRegister An array of tool definitions to add to the registry.
+   */
   public registerTools(toolsToRegister: ToolDefinition<any, any>[]): void {
     for (const tool of toolsToRegister) {
       if (this.tools.has(tool.name)) {
@@ -36,9 +48,14 @@ export class ToolRegistry {
     return Array.from(this.tools.values());
   }
 
-
-
-
+  /**
+   * Executes a tool by name with the given parameters.
+   * Handles caching, validation, execution, and event dispatching.
+   * @param name The name of the tool to execute.
+   * @param rawParams The raw parameters for the tool.
+   * @param executionCtxArgs Contextual arguments for the execution, like chatId.
+   * @returns A promise that resolves to the tool's result.
+   */
   async executeTool<T = any>(
     name: string,
     rawParams: any,
@@ -48,50 +65,43 @@ export class ToolRegistry {
     const startTime = Date.now();
     const tool = this.getTool(name);
 
-    // Obtener la descripción para UI desde la herramienta
-    const toolDescriptionForUI = tool && typeof tool.getUIDescription === 'function'
-      ? tool.getUIDescription(rawParams)
-      : tool?.description || `Ejecutando ${name}`;
+    // 1. Check cache
+    const cacheKey = `tool:${name}:${this.cacheManager.hashInput(rawParams)}`;
+    const cachedResult = this.cacheManager.get<ToolResult<T>>(cacheKey);
+    if (cachedResult) {
+      console.log(`[ToolRegistry] Cache hit for tool "${name}".`);
+      cachedResult.executionTime = Date.now() - startTime;
+      this.dispatchCompletionEvent(name, rawParams, operationId, executionCtxArgs.chatId, cachedResult, true);
+      return cachedResult;
+    }
+    console.log(`[ToolRegistry] Cache miss for tool "${name}". Executing...`);
 
-    const startPayload: ToolExecutionEventPayload = {
+    // 2. Dispatch start event
+    this.dispatcher.dispatch(EventType.TOOL_EXECUTION_STARTED, {
       toolName: name,
       parameters: rawParams,
-      toolDescription: toolDescriptionForUI,
+      toolDescription: tool?.description || `Executing ${name}`,
       chatId: executionCtxArgs.chatId,
       source: 'ToolRegistry',
       operationId,
-      timestamp: Date.now(),
-      duration: 0, // Valor inicial
-      isProcessingStep: false, // Valor inicial
-      toolSuccess: false // Valor inicial (se actualizará luego según el resultado)
-    };
+      timestamp: startTime,
+    });
 
-    this.dispatcher.dispatch(EventType.TOOL_EXECUTION_STARTED, startPayload);
-
+    // 3. Validate and execute
     if (!tool) {
-      const errorMsg = `Herramienta no encontrada: ${name}`;
-      const executionTime = Date.now() - startTime;
-
-      return {
-        success: false,
-        error: errorMsg,
-        executionTime,
-      };
+      const errorMsg = `Tool not found: ${name}`;
+      const result: ToolResult<T> = { success: false, error: errorMsg, executionTime: Date.now() - startTime };
+      this.dispatchCompletionEvent(name, rawParams, operationId, executionCtxArgs.chatId, result);
+      return result;
     }
-
 
     const validationResult = ToolValidator.validate(tool.parametersSchema, rawParams);
     if (!validationResult.success) {
-      const executionTime = Date.now() - startTime;
-      const errorMsg = `Error de validación: ${validationResult.error}`;
-
-      return {
-        success: false,
-        error: errorMsg,
-        executionTime,
-      };
+      const errorMsg = `Validation error: ${validationResult.error}`;
+      const result: ToolResult<T> = { success: false, error: errorMsg, executionTime: Date.now() - startTime };
+      this.dispatchCompletionEvent(name, rawParams, operationId, executionCtxArgs.chatId, result);
+      return result;
     }
-    const validatedParams = validationResult.data;
 
     const executionContext: ToolExecutionContext = {
       vscodeAPI: vscode,
@@ -100,37 +110,57 @@ export class ToolRegistry {
       ...executionCtxArgs
     };
 
+    let result: ToolResult<T>;
     try {
-      const toolExecuteOutcome = await tool.execute(validatedParams, executionContext);
-      const executionTime = Date.now() - startTime;
-
-      return {
-        ...toolExecuteOutcome,
-        executionTime,
-      };
+      const toolExecuteOutcome = await tool.execute(validationResult.data, executionContext);
+      result = { ...toolExecuteOutcome, executionTime: Date.now() - startTime };
     } catch (error: any) {
-      const executionTime = Date.now() - startTime;
-      const errorMsg = `Error inesperado al ejecutar la herramienta ${name}: ${error.message}`;
-
-      return {
-        success: false,
-        error: errorMsg,
-        executionTime,
-      };
+      const errorMsg = `Unexpected error executing tool ${name}: ${error.message}`;
+      result = { success: false, error: errorMsg, executionTime: Date.now() - startTime };
     }
+
+    // 4. Cache successful result
+    if (result.success) {
+      this.cacheManager.set(cacheKey, result);
+    }
+
+    // 5. Track performance and dispatch completion event
+    this.performanceMonitor.trackNodeExecution(`tool.${name}`, result.executionTime || 0, result.error);
+    this.dispatchCompletionEvent(name, rawParams, operationId, executionCtxArgs.chatId, result);
+
+    return result;
   }
 
-  public asDynamicTool(toolName: string, contextDefaults: Record<string, any> = {}): DynamicStructuredTool | undefined {
+  private dispatchCompletionEvent(name: string, params: any, operationId: string, chatId: string | undefined, result: ToolResult<any>, fromCache = false): void {
+    const eventType = result.success ? EventType.TOOL_EXECUTION_COMPLETED : EventType.TOOL_EXECUTION_ERROR;
+    this.dispatcher.dispatch(eventType, {
+      toolName: name,
+      parameters: params,
+      toolDescription: this.getTool(name)?.description || name,
+      chatId,
+      source: fromCache ? 'ToolRegistry.Cache' : 'ToolRegistry',
+      operationId,
+      timestamp: Date.now(),
+      duration: result.executionTime,
+      isProcessingStep: false,
+      toolSuccess: result.success,
+      error: result.error,
+      rawOutput: result.data
+    });
+  }
+
+  public asDynamicTool(toolName: string): DynamicStructuredTool | undefined {
     const toolDef = this.getTool(toolName);
     if (!toolDef) return undefined;
 
     const langChainFunc = async (input: any, runContext?: any) => {
-      const toolResult = await this.executeTool(toolName, input, runContext);
+      const toolResult = await this.executeTool(toolName, input, runContext?.config?.configurable);
       if (!toolResult.success) {
-        throw new Error(toolResult.error || 'Error desconocido');
+        // LangChain tools expect errors to be thrown to be handled correctly
+        throw new Error(toolResult.error || `Unknown error in tool: ${toolName}`);
       }
-      // Devolver los datos directamente, la UI se encargará del formateo
-      return JSON.stringify(toolResult.data) || "Success";
+      // Return a string representation of the result, as expected by many LangChain agents.
+      return JSON.stringify(toolResult.data) || "Tool executed successfully with no output.";
     };
     return new DynamicStructuredTool({
       name: toolDef.name,
@@ -140,9 +170,9 @@ export class ToolRegistry {
     });
   }
 
-  public asDynamicTools(contextDefaults: Record<string, any> = {}): DynamicStructuredTool[] {
+  public asDynamicTools(): DynamicStructuredTool[] {
     return this.getAllTools()
-      .map(toolDef => this.asDynamicTool(toolDef.name, contextDefaults))
-      .filter(tool => tool !== undefined) as DynamicStructuredTool[];
+      .map(toolDef => this.asDynamicTool(toolDef.name))
+      .filter((tool): tool is DynamicStructuredTool => tool !== undefined);
   }
 }
