@@ -3,12 +3,11 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { z } from 'zod';
 import { ToolDefinition, ToolResult } from '../../types';
-import { resolveFileFromInput } from '../../../../shared/utils/pathUtils';
-import { listFilesUtil } from '../../../../shared/utils/listFiles';
+import { resolveFileFromInput, searchFiles } from '../../../../shared/utils/pathUtils';
 
 // Esquema Zod para los parámetros
 export const getFileContentsParamsSchema = z.object({
-  path: z.string().min(1, { message: "File path cannot be empty." })
+  filePath: z.string().min(1, { message: "File path cannot be empty." })
 }).strict();
 
 export const getFileContents: ToolDefinition<
@@ -43,10 +42,9 @@ export const getFileContents: ToolDefinition<
     isBinary: boolean;
     lineCount: number;
   }>> {
-    const { path: requestedPath } = params;
+    const { filePath: requestedPath } = params;
 
     try {
-
       const resolution = await resolveFileFromInput(context.vscodeAPI, requestedPath);
 
       if (!resolution.success) {
@@ -57,17 +55,14 @@ export const getFileContents: ToolDefinition<
         };
       }
 
-
       const fileContentUint8Array = await context.vscodeAPI.workspace.fs.readFile(resolution.uri!);
       const content = new TextDecoder().decode(fileContentUint8Array);
-
 
       const stat = await context.vscodeAPI.workspace.fs.stat(resolution.uri!);
       const lines = content.split('\n').length;
 
-      const isBinary = content.length > 0 && !/^[ - ]*$/.test(content);
+      const isBinary = content.length > 0 && !/^[ -~]*$/.test(content);
       const mimeType = isBinary ? 'application/octet-stream' : 'text/plain';
-
 
       const similarFiles = await getSimilarFiles(context.vscodeAPI, resolution.uri!);
 
@@ -86,9 +81,6 @@ export const getFileContents: ToolDefinition<
         }
       };
     } catch (error: any) {
-
-      const fallbackResolution = await resolveFileFromInput(context.vscodeAPI, requestedPath);
-
       return {
         success: false,
         error: `Failed to get file contents for "${requestedPath}": ${error.message}`,
@@ -110,32 +102,33 @@ async function getSimilarFiles(vscodeAPI: typeof vscode, fileUri: vscode.Uri): P
     const dirName = path.dirname(relativePath);
     const fileName = path.basename(relativePath);
 
-    // Usar listFilesUtil para obtener archivos en el mismo directorio
-    const files = await listFilesUtil(vscodeAPI, `${dirName}/*`);
+    // Buscar archivos en el mismo directorio usando searchFiles
+    const allFiles = await searchFiles(vscodeAPI, undefined, 100);
 
-    // Filtrar archivos en el mismo directorio y ordenar por similitud con el nombre del archivo
-    return files
-      .map(file => file.path)
-      .filter(path => {
+    // Filtrar archivos en el mismo directorio
+    const filesInSameDir = allFiles
+      .filter(file => {
         // Excluir el archivo actual
-        if (path === relativePath) return false;
-        
+        if (file.relativePath === relativePath) return false;
+
         // Incluir archivos en el mismo directorio
-        const fileDir = path.split('/').slice(0, -1).join('/');
+        const fileDir = path.dirname(file.relativePath);
         return fileDir === dirName;
       })
+      .map(file => file.relativePath)
       .sort((a, b) => {
         // Ordenar por similitud con el nombre del archivo
         const aName = path.basename(a);
         const bName = path.basename(b);
-        
-        // Priorizar archivos con nombres similares
+
         const aScore = similarity(fileName, aName);
         const bScore = similarity(fileName, bName);
-        
+
         return bScore - aScore; // Orden descendente por puntuación de similitud
       })
       .slice(0, 5); // Limitar a 5 resultados
+
+    return filesInSameDir;
   } catch (error) {
     console.error('Error getting similar files:', error);
     return [];
@@ -148,18 +141,18 @@ async function getSimilarFiles(vscodeAPI: typeof vscode, fileUri: vscode.Uri): P
 function similarity(s1: string, s2: string): number {
   const longer = s1.length > s2.length ? s1 : s2;
   const shorter = s1.length > s2.length ? s2 : s1;
-  
+
   if (longer.length === 0) return 1.0;
-  
+
   // Si uno es prefijo del otro, dar mayor puntuación
   if (longer.startsWith(shorter)) return 0.9;
-  
+
   // Si comparten el mismo prefijo de 3 caracteres, dar puntuación media
   if (s1.substring(0, 3) === s2.substring(0, 3)) return 0.6;
-  
+
   // Si comparten el mismo sufijo, dar puntuación media-baja
   if (s1.endsWith(s2) || s2.endsWith(s1)) return 0.4;
-  
+
   // Si no hay coincidencias, puntuación baja
   return 0.1;
 }

@@ -1,6 +1,6 @@
 // src/core/ConversationManager.ts
 import { SimplifiedOptimizedGraphState } from './langgraph/state/GraphState';
-import { HistoryEntry } from '../features/chat/types';
+
 import { MemoryManager } from '../features/memory/MemoryManager';
 import { IConversationManager } from './interfaces/IConversationManager';
 import { generateUniqueId } from '../shared/utils/generateIds';

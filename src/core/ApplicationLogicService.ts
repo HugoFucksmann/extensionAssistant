@@ -20,6 +20,11 @@ export class ApplicationLogicService implements Disposable {
     private toolRegistry: ToolRegistry
   ) { }
 
+  /**
+   * Procesa el mensaje del usuario iniciando el flujo LangGraph de manera asíncrona (fire-and-forget).
+   * No espera el resultado del grafo ni retorna la respuesta generada por la IA.
+   * La UI debe actualizarse exclusivamente a través de los eventos emitidos por el backend (por ejemplo, RESPONSE_GENERATED).
+   */
   public async processUserMessage(
     chatId: string,
     userMessage: string,
@@ -36,29 +41,25 @@ export class ApplicationLogicService implements Disposable {
     }
 
     try {
-      // 2. Invocar el motor LangGraph. No esperamos el resultado aquí.
-      // La UI se actualizará a través de eventos.
-      const resultGraphState = await this.agentEngine.run(userMessage, chatId);
+      // 2. Invocar el motor LangGraph de manera asíncrona (fire-and-forget).
+      // No esperamos el resultado aquí. La UI se actualizará a través de eventos.
+      this.agentEngine.run(userMessage, chatId)
+        .catch((error: any) => {
+          // Manejo de errores asíncronos: actualizar el estado de la conversación y emitir eventos si corresponde.
+          convState.error = error.message || 'Unknown async error in LangGraphEngine.';
+          this.conversationManager.updateConversationState(chatId, convState);
+          // Aquí podría emitirse un evento de error global si el sistema lo requiere.
+        });
 
-      // 3. El procesamiento de la respuesta final es responsabilidad de los eventos generados por el grafo.
-      // Solo se actualiza el estado interno para consistencia.
-      convState.error = resultGraphState.error;
-      this.conversationManager.updateConversationState(chatId, convState);
-
-      // Retornamos solo el éxito o error; la UI debe escuchar los eventos para la respuesta.
+      // 3. Retornamos solo la aceptación/inicio del procesamiento; la UI debe escuchar los eventos para la respuesta.
       return {
-        success: !resultGraphState.error,
-        updatedState: convState,
-        error: resultGraphState.error,
+        success: true,
+        updatedState: convState
       };
-
-
     } catch (error: any) {
       const finalErrorState = this.conversationManager.getConversationState(chatId) || convState;
       finalErrorState.error = error.message || 'Unknown critical error in ApplicationLogicService.';
-this.conversationManager.updateConversationState(chatId, finalErrorState);
-
-      // Devolver el error para que el llamador sepa que el proceso falló.
+      this.conversationManager.updateConversationState(chatId, finalErrorState);
       return {
         success: false,
         error: finalErrorState.error,

@@ -141,29 +141,33 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
         this.postMessage('showHistory', {});
     }
 
-    public startNewChat(): void {
+    /**
+     * Flujo centralizado para crear un nuevo chat, actualizar contexto y notificar a la UI.
+     * Todas las rutas deben delegar aquí.
+     */
+    private startNewChatFlow(): string {
         try {
-            // Crear nuevo chat a través del conversationManager
             const newChatId = this.conversationManager.createNewChat();
-            
-            // Asegurarse de que el chat está marcado como activo
             const activeChatId = this.conversationManager.getActiveChatId();
-            
-            // Actualizar el contexto del mensaje
             this.messageContext.setCurrentChatId(newChatId);
-            
-            // Notificar a la UI
             this.postMessage('newChatStarted', {
                 chatId: newChatId,
                 activeChatId: activeChatId
             });
+            return newChatId;
         } catch (error) {
             this.errorManager.handleUnexpectedError(
                 error as Error,
-                'WebviewProvider.startNewChat',
+                'WebviewProvider.startNewChatFlow',
                 this.messageContext.currentChatId
             );
+            return '';
         }
+    }
+
+    // Nuevo método público para UI o handlers
+    public startNewChat(): void {
+        this.startNewChatFlow();
     }
 
     // State access methods

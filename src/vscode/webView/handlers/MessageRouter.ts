@@ -48,9 +48,15 @@ export class MessageRouter {
 
     private async handleUIReady(): Promise<void> {
         try {
+            // Centralizar la lógica de creación de chat y contexto
             let chatId = this.backend.getActiveChatId();
             if (!chatId) {
-                chatId = this.backend.createNewChat();
+                // Usar el flujo centralizado de WebviewProvider
+                if (typeof (this as any).webviewProvider?.startNewChatFlow === 'function') {
+                    chatId = (this as any).webviewProvider.startNewChatFlow();
+                } else {
+                    chatId = this.backend.createNewChat();
+                }
             }
 
             if (!chatId) {
@@ -125,20 +131,18 @@ export class MessageRouter {
 
     private handleNewChatRequest(): void {
         try {
-            // Crear nuevo chat a través del backend
-            const newChatId = this.backend.createNewChat();
-
-            // Obtener el chat activo después de crearlo
-            const activeChatId = this.backend.getActiveChatId();
-
-            // Actualizar el contexto local
-            this.context.setCurrentChatId(newChatId);
-
-            // Notificar a la UI
-            this.postMessage('newChatStarted', {
-                chatId: newChatId,
-                activeChatId: activeChatId
-            });
+            // Delegar en el flujo centralizado de WebviewProvider si está disponible
+            if (typeof (this as any).webviewProvider?.startNewChatFlow === 'function') {
+                (this as any).webviewProvider.startNewChatFlow();
+            } else {
+                const newChatId = this.backend.createNewChat();
+                const activeChatId = this.backend.getActiveChatId();
+                this.context.setCurrentChatId(newChatId);
+                this.postMessage('newChatStarted', {
+                    chatId: newChatId,
+                    activeChatId: activeChatId
+                });
+            }
         } catch (error: any) {
             this.errorManager.handleUnexpectedError(error, 'MessageRouter.handleNewChatRequest', this.context.currentChatId);
         }

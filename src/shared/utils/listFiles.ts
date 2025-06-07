@@ -1,13 +1,63 @@
 // src/shared/utils/listFiles.ts
 
 import * as vscode from 'vscode';
+import { searchFiles, type FileSearchResult } from './pathUtils';
 
-type ListedFile = { path: string; type: 'file' | 'directory' | 'symbolicLink' | 'unknown' };
+export type ListedFile = {
+  path: string;
+  type: 'file' | 'directory' | 'symbolicLink' | 'unknown';
+  name: string;
+  uri: vscode.Uri;
+};
 
 /**
- * Lista archivos del workspace con filtrado
+ * Lista archivos del workspace con filtrado eficiente
  */
 export async function listFilesUtil(
+  vscodeAPI: typeof vscode,
+  searchPattern?: string,
+  maxResults = 5000,
+  includeDirectories = false
+): Promise<ListedFile[]> {
+  const workspaceFolder = vscodeAPI.workspace.workspaceFolders?.[0];
+  if (!workspaceFolder) return [];
+
+  try {
+    if (process.env.NODE_ENV === 'development') {
+      console.debug('[listFilesUtil] Searching files in:', workspaceFolder.uri.fsPath);
+    }
+
+    // Use optimized search from pathUtils
+    const searchResults = await searchFiles(
+      vscodeAPI,
+      searchPattern,
+      maxResults,
+      includeDirectories
+    );
+
+    // Convert to ListedFile format
+    const listedFiles: ListedFile[] = searchResults.map(result => ({
+      path: result.relativePath,
+      type: result.type === 'directory' ? 'directory' : 'file',
+      name: result.name,
+      uri: result.uri
+    }));
+
+    if (process.env.NODE_ENV === 'development') {
+      console.debug('[listFilesUtil] Files found:', listedFiles.length);
+    }
+
+    return listedFiles;
+  } catch (error) {
+    console.error('[listFilesUtil] Error searching files:', error);
+    return [];
+  }
+}
+
+/**
+ * Lista archivos por patrón específico (backward compatibility)
+ */
+export async function listFilesByPattern(
   vscodeAPI: typeof vscode,
   pattern = '**/*',
   maxResults = 5000
@@ -16,31 +66,20 @@ export async function listFilesUtil(
   if (!workspaceFolder) return [];
 
   try {
-    // Logging para debug
-    if (process.env.NODE_ENV === 'development') {
-      console.debug('[listFilesUtil] Buscando archivos en:', workspaceFolder.uri.fsPath);
-    }
-
-    // Buscar archivos usando findFiles directamente
     const files = await vscodeAPI.workspace.findFiles(
       pattern,
-      '**/node_modules/**,**/.git/**',
+      '**/node_modules/**,**/.git/**,**/.next/**,**/out/**,**/build/**,**/dist/**',
       maxResults
     );
 
-    // Mapear a formato ListedFile
-    const listedFiles: ListedFile[] = files.map(uri => ({
-      path: vscode.workspace.asRelativePath(uri, false),
-      type: 'file'
+    return files.map(uri => ({
+      path: vscodeAPI.workspace.asRelativePath(uri, false),
+      type: 'file' as const,
+      name: uri.fsPath.split('/').pop() || '',
+      uri
     }));
-
-    // Logging para debug
-    if (process.env.NODE_ENV === 'development') {
-      console.debug('[listFilesUtil] Archivos encontrados:', listedFiles.length);
-    }
-    return listedFiles;
   } catch (error) {
-    console.error('[listFilesUtil] Error al buscar archivos:', error);
+    console.error('[listFilesByPattern] Error:', error);
     return [];
   }
 }

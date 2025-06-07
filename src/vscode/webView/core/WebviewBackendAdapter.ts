@@ -18,7 +18,7 @@ export interface IWebviewBackend {
     createNewChat(): string;
     getActiveChatId(): string | null;
     switchModel(modelType: 'gemini' | 'ollama'): Promise<void>;
-    getProjectFiles(): Promise<string[]>;
+    getProjectFiles(): Promise<any[]>;
 }
 
 export class WebviewBackendAdapter implements IWebviewBackend {
@@ -69,10 +69,10 @@ export class WebviewBackendAdapter implements IWebviewBackend {
         modelManager.setActiveProvider(modelType);
     }
 
-    public async getProjectFiles(): Promise<string[]> {
+    public async getProjectFiles(): Promise<any[]> {
         const { listFilesUtil } = await import('../../../shared/utils/listFiles');
-        // Se utiliza el 'vscode' importado en la parte superior del archivo
-        const files = await listFilesUtil(vscode, '**/*');
-        return files.map(f => f.path);
+        // Call without search pattern to get all files
+        const files = await listFilesUtil(vscode);
+        return files; // Return full file objects with name and path
     }
 }

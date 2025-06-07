@@ -1,22 +1,5 @@
 // src/features/chat/types.ts
-import { ToolExecution } from '../tools/types';
 import { SimplifiedOptimizedGraphState } from '../../core/langgraph/state/GraphState';
-
-// [MIGRACIÓN] El historial ahora refleja las fases reales del motor LangGraph.
-// Actualiza cualquier lógica de historial/visualización para consumir GraphPhase.
-import { GraphPhase } from '../../core/langgraph/state/GraphState';
-
-export interface HistoryEntry extends Omit<ChatMessage, 'id' | 'sender' | 'timestamp' | 'files'> {
-  phase: GraphPhase; // 'ANALYSIS' | 'EXECUTION' | 'VALIDATION' | 'RESPONSE' | 'COMPLETED' | 'ERROR'
-  iteration?: number;
-  content: string;
-  timestamp: number;
-  metadata: {
-    tool_executions?: ToolExecution[];
-    processingTime?: number;
-    [key: string]: any;
-  };
-}
 
 
 export interface ChatMessage {
