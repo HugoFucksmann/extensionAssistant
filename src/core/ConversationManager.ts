@@ -1,16 +1,18 @@
 // src/core/ConversationManager.ts
 import { SimplifiedOptimizedGraphState } from './langgraph/state/GraphState';
-
-import { MemoryManager } from '../features/memory/MemoryManager';
 import { IConversationManager } from './interfaces/IConversationManager';
 import { generateUniqueId } from '../shared/utils/generateIds';
 import { Disposable } from './interfaces/Disposable';
+// 1. Importaciones necesarias para el despachador de eventos
+import { InternalEventDispatcher } from './events/InternalEventDispatcher';
+import { EventType } from '../features/events/eventTypes';
 
 
 export class ConversationManager implements IConversationManager, Disposable {
   private activeConversations: Map<string, SimplifiedOptimizedGraphState> = new Map();
   private activeChatId: string | null = null;
 
+  constructor(private dispatcher: InternalEventDispatcher) { }
 
   public generateChatId(): string {
     return `chat_${generateUniqueId()}`;
@@ -99,16 +101,19 @@ export class ConversationManager implements IConversationManager, Disposable {
 
 
 
-  public clearConversation(chatId?: string, memoryManager?: MemoryManager): boolean {
+  public clearConversation(chatId?: string): boolean {
     const targetChatId = chatId || this.activeChatId;
     if (!targetChatId) return false;
 
     const wasDeleted = this.activeConversations.delete(targetChatId);
 
-    if (memoryManager && wasDeleted) {
-      memoryManager.clearRuntime(targetChatId);
+    // En lugar de llamar a memoryManager, despachamos un evento
+    if (wasDeleted) {
+      this.dispatcher.dispatch(EventType.CONVERSATION_ENDED, {
+        chatId: targetChatId,
+        finalStatus: 'cleared_by_user'
+      });
     }
-
 
     if (targetChatId === this.activeChatId) {
       this.activeChatId = null;

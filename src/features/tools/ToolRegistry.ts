@@ -8,11 +8,9 @@ import { EventType } from '../../features/events/eventTypes';
 import { DynamicStructuredTool } from '@langchain/core/tools';
 import { PerformanceMonitor } from '../../core/monitoring/PerformanceMonitor';
 import { CacheManager } from '../../core/utils/CacheManager';
+import { Disposable } from '../../core/interfaces/Disposable';
 
-/**
- * Manages the registration, validation, and execution of all available tools.
- * It also handles caching of tool results and emits events for observability.
- */
+
 export class ToolRegistry {
   private tools = new Map<string, ToolDefinition<any, any>>();
 
@@ -48,14 +46,6 @@ export class ToolRegistry {
     return Array.from(this.tools.values());
   }
 
-  /**
-   * Executes a tool by name with the given parameters.
-   * Handles caching, validation, execution, and event dispatching.
-   * @param name The name of the tool to execute.
-   * @param rawParams The raw parameters for the tool.
-   * @param executionCtxArgs Contextual arguments for the execution, like chatId.
-   * @returns A promise that resolves to the tool's result.
-   */
   async executeTool<T = any>(
     name: string,
     rawParams: any,
@@ -174,5 +164,10 @@ export class ToolRegistry {
     return this.getAllTools()
       .map(toolDef => this.asDynamicTool(toolDef.name))
       .filter((tool): tool is DynamicStructuredTool => tool !== undefined);
+  }
+
+  public dispose(): void {
+    this.tools.clear();
+    console.log('[ToolRegistry] Disposed and all tools cleared.');
   }
 }

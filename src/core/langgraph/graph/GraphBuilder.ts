@@ -1,10 +1,10 @@
 // src/core/langgraph/graph/GraphBuilder.ts
 import { StateGraph, START, END, CompiledStateGraph } from "@langchain/langgraph";
 import { DependencyContainer } from "../dependencies/DependencyContainer";
-import { AnalyzeNode } from "../nodes/AnalyzeNode";
-import { ExecuteNode } from "../nodes/ExecuteNode";
-import { RespondNode } from "../nodes/RespondNode";
-import { ValidateNode } from "../nodes/ValidateNode";
+import { AnalyzeNode } from "../nodes/analyzeNode";
+import { ExecuteNode } from "../nodes/executeNode";
+import { RespondNode } from "../nodes/respondNode";
+import { ValidateNode } from "../nodes/validateNode";
 import { GraphPhase, SimplifiedOptimizedGraphState } from "../state/GraphState";
 import { StateAnnotations } from "./StateAnnotations";
 import { TransitionLogic } from "./TransitionLogic";

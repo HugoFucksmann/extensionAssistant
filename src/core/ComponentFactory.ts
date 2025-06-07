@@ -15,10 +15,7 @@ import { ParallelExecutionService } from './utils/ParallelExecutionService';
 import { SystemInitializer } from './langgraph/initialization/SystemInitializer';
 import { Disposable } from './interfaces/Disposable';
 
-/**
- * A singleton factory for creating and managing core application components.
- * Ensures that components are initialized only once and in the correct order.
- */
+
 export class ComponentFactory {
   private static applicationLogicServiceInstance: ApplicationLogicService;
   private static internalEventDispatcherInstance: InternalEventDispatcher;
@@ -108,15 +105,15 @@ export class ComponentFactory {
 
   public static getConversationManager(): ConversationManager {
     if (!this.conversationManagerInstance) {
-      this.conversationManagerInstance = new ConversationManager();
+      this.conversationManagerInstance = new ConversationManager(this.getInternalEventDispatcher());
     }
     return this.conversationManagerInstance;
   }
 
-  /**
-   * Disposes of all managed singleton components in the reverse order of creation.
-   * This is crucial for a clean shutdown of the extension.
-   */
+
+  // src/core/ComponentFactory.ts
+
+  // ...
   public static async dispose(): Promise<void> {
     const disposeSafely = async (component: Disposable | undefined) => {
       if (component && typeof component.dispose === 'function') {
@@ -136,8 +133,12 @@ export class ComponentFactory {
     await disposeSafely(this.modelManagerInstance);
     this.modelManagerInstance = undefined as any;
 
-
+    // Ahora usamos disposeSafely para el toolRegistry
+    await disposeSafely(this.toolRegistryInstance);
     this.toolRegistryInstance = undefined as any;
+
+    // Nota: PerformanceMonitor también podría implementar Disposable, pero por ahora su 'reset' es suficiente.
+    // Si tuviera más lógica de limpieza, seguiría el mismo patrón.
     this.performanceMonitorInstance?.reset();
     this.performanceMonitorInstance = undefined as any;
 
@@ -152,4 +153,5 @@ export class ComponentFactory {
 
     console.log('[ComponentFactory] All components disposed.');
   }
+
 }

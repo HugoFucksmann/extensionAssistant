@@ -2,6 +2,7 @@
 import * as vscode from 'vscode';
 import { ApplicationLogicService } from '../../../core/ApplicationLogicService';
 import { IConversationManager } from '../../../core/interfaces/IConversationManager';
+import { searchFiles } from '../../../shared/utils/pathUtils';
 
 export interface ProcessMessageOptions {
     files?: string[];
@@ -70,9 +71,24 @@ export class WebviewBackendAdapter implements IWebviewBackend {
     }
 
     public async getProjectFiles(): Promise<any[]> {
-        const { listFilesUtil } = await import('../../../shared/utils/listFiles');
 
-        const files = await listFilesUtil(vscode);
+
+
+        const searchResults = await searchFiles(
+            vscode,
+            undefined,
+            5000,
+            false
+        );
+
+
+        const files = searchResults.map(result => ({
+            path: result.relativePath,
+            type: result.type,
+            name: result.name,
+            uri: result.uri
+        }));
+
         return files;
     }
 }

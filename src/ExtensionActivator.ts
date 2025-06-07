@@ -2,10 +2,13 @@ import * as vscode from 'vscode';
 import { WebviewProvider } from './vscode/webView/core/WebviewProvider';
 import { ComponentFactory } from './core/ComponentFactory';
 import { CommandManager } from './CommandManager';
+import { EventType } from './features/events/eventTypes';
+import { MemoryManager } from './features/memory/MemoryManager';
 
 export class ExtensionActivator {
   private webviewProvider?: WebviewProvider;
   private commandManager?: CommandManager;
+  private conversationEndedSubscription?: { unsubscribe: () => void };
 
   constructor(private readonly context: vscode.ExtensionContext) { }
 
@@ -13,6 +16,8 @@ export class ExtensionActivator {
     await this.initializeServices();
     this.registerWebview();
     this.registerCommands();
+
+    this.registerEventListeners();
   }
 
   private async initializeServices(): Promise<void> {
@@ -47,7 +52,23 @@ export class ExtensionActivator {
     });
   }
 
+  private registerEventListeners(): void {
+    const dispatcher = ComponentFactory.getInternalEventDispatcher();
+    const memoryManager = ComponentFactory.getMemoryManager(this.context);
+
+    this.conversationEndedSubscription = dispatcher.subscribe(
+      EventType.CONVERSATION_ENDED,
+      (event) => {
+        if (event.payload.chatId) {
+          console.log(`[ExtensionActivator] Conversation ${event.payload.chatId} ended. Clearing runtime memory.`);
+          memoryManager.clearRuntime(event.payload.chatId);
+        }
+      }
+    );
+  }
+
   public deactivate(): void {
+    this.conversationEndedSubscription?.unsubscribe();
     this.webviewProvider?.dispose();
     this.webviewProvider = undefined;
     this.commandManager?.dispose();
