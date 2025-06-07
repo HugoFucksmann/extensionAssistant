@@ -3,20 +3,22 @@ import { InternalEventDispatcher } from '../../../core/events/InternalEventDispa
 import { EventType, WindsurfEvent } from '../../../features/events/eventTypes';
 import { MessageFormatter } from '../formatters/MessageFormatter';
 import { ChatMessage } from '../../../features/chat/types';
+// CAMBIO: Se importa WebviewStateManager para acceder al estado centralizado.
+import { WebviewStateManager } from '../core/WebviewStateManager';
 
 export class EventSubscriber {
     private subscriptions: { unsubscribe: () => void }[] = [];
-    private currentChatId: string | null = null;
+    // CAMBIO: Se elimina el estado local `currentChatId`.
 
     constructor(
         private readonly internalEventDispatcher: InternalEventDispatcher,
         private readonly messageFormatter: MessageFormatter,
+        // CAMBIO: Se inyecta el stateManager.
+        private readonly stateManager: WebviewStateManager,
         private readonly postMessage: (type: string, payload: any) => void
     ) { }
 
-    public setCurrentChatId(chatId: string): void {
-        this.currentChatId = chatId;
-    }
+    // CAMBIO: Se elimina el método `setCurrentChatId`. El estado se leerá directamente.
 
     public subscribeToEvents(): void {
         this.unsubscribeAll();
@@ -43,10 +45,13 @@ export class EventSubscriber {
     }
 
     private handleEvent(event: WindsurfEvent): void {
+        // CAMBIO: Se obtiene el chatId actual desde el stateManager en el momento del evento.
+        const currentChatId = this.stateManager.getChatState().currentChatId;
+
         // Skip events for different chat sessions (except system errors)
         if (event.type !== EventType.SYSTEM_ERROR &&
             event.payload.chatId &&
-            event.payload.chatId !== this.currentChatId) {
+            event.payload.chatId !== currentChatId) {
             return;
         }
 
@@ -56,9 +61,11 @@ export class EventSubscriber {
         }
     }
 
+    // El resto de la clase (processEvent y los métodos handle*) no necesita cambios.
+    // ... (resto de los métodos sin cambios)
+    // ...
     private processEvent(event: WindsurfEvent): { messageType: string; chatMessage: ChatMessage } | null {
         const payload = event.payload as any;
-        // Pass operationId to ensure message ID is consistent for tool updates
         const baseMessage = this.messageFormatter.createBaseChatMessage(event.id, 'system', payload.operationId) as ChatMessage;
 
         switch (event.type) {
@@ -90,37 +97,22 @@ export class EventSubscriber {
             toolName: payload.toolName,
             toolInput: payload.parameters,
         };
-        // baseMessage.id and baseMessage.operationId are already set correctly by createBaseChatMessage
         return { messageType: 'agentActionUpdate', chatMessage: baseMessage };
     }
 
     private handleToolExecutionCompleted(event: WindsurfEvent, baseMessage: ChatMessage): { messageType: string; chatMessage: ChatMessage } {
         const payload = event.payload as any;
         const formatted = this.messageFormatter.formatToolExecutionCompleted(payload);
-
-        // Modify the baseMessage directly to ensure the ID (which is the operationId) is preserved for the update.
         baseMessage.content = formatted.content;
-        baseMessage.metadata = {
-            ...baseMessage.metadata,
-            ...formatted.metadata,
-            status: 'success' // Ensure status is success
-        };
-
+        baseMessage.metadata = { ...baseMessage.metadata, ...formatted.metadata, status: 'success' };
         return { messageType: 'agentActionUpdate', chatMessage: baseMessage };
     }
 
     private handleToolExecutionError(event: WindsurfEvent, baseMessage: ChatMessage): { messageType: string; chatMessage: ChatMessage } {
         const payload = event.payload as any;
         const formatted = this.messageFormatter.formatToolExecutionError(payload);
-
-        // Modify the baseMessage directly to ensure the ID (the operationId) is preserved for the update.
         baseMessage.content = formatted.content;
-        baseMessage.metadata = {
-            ...baseMessage.metadata,
-            ...formatted.metadata,
-            status: 'error' // Ensure status is error
-        };
-
+        baseMessage.metadata = { ...baseMessage.metadata, ...formatted.metadata, status: 'error' };
         return { messageType: 'agentActionUpdate', chatMessage: baseMessage };
     }
 
@@ -128,53 +120,28 @@ export class EventSubscriber {
         const payload = event.payload as any;
         baseMessage.sender = 'assistant';
         baseMessage.content = this.messageFormatter.formatResponseGenerated(payload);
-        baseMessage.metadata = {
-            ...baseMessage.metadata,
-            status: 'success',
-            processingTime: payload.duration,
-            ...(payload.metadata || {})
-        };
+        baseMessage.metadata = { ...baseMessage.metadata, status: 'success', processingTime: payload.duration, ...(payload.metadata || {}) };
         return { messageType: 'assistantResponse', chatMessage: baseMessage };
     }
 
     private handleAgentPhaseStarted(event: WindsurfEvent, baseMessage: ChatMessage): { messageType: string; chatMessage: ChatMessage } {
         const payload = event.payload as any;
         baseMessage.content = this.messageFormatter.formatAgentPhaseStarted(payload);
-        baseMessage.metadata = {
-            ...baseMessage.metadata,
-            status: 'phase_started',
-            phase: payload.phase,
-            iteration: payload.iteration,
-            source: payload.source
-        };
+        baseMessage.metadata = { ...baseMessage.metadata, status: 'phase_started', phase: payload.phase, iteration: payload.iteration, source: payload.source };
         return { messageType: 'agentPhaseUpdate', chatMessage: baseMessage };
     }
 
     private handleAgentPhaseCompleted(event: WindsurfEvent, baseMessage: ChatMessage): { messageType: string; chatMessage: ChatMessage } {
         const payload = event.payload as any;
         baseMessage.content = this.messageFormatter.formatAgentPhaseCompleted(payload);
-        baseMessage.metadata = {
-            ...baseMessage.metadata,
-            status: 'phase_completed',
-            phase: payload.phase,
-            iteration: payload.iteration,
-            source: payload.source,
-            phaseData: payload.data
-        };
+        baseMessage.metadata = { ...baseMessage.metadata, status: 'phase_completed', phase: payload.phase, iteration: payload.iteration, source: payload.source, phaseData: payload.data };
         return { messageType: 'agentPhaseUpdate', chatMessage: baseMessage };
     }
 
     private handleSystemError(event: WindsurfEvent, baseMessage: ChatMessage): { messageType: string; chatMessage: ChatMessage } {
         const payload = event.payload as any;
         baseMessage.content = this.messageFormatter.formatSystemError(payload);
-        baseMessage.metadata = {
-            ...baseMessage.metadata,
-            status: 'error',
-            details: payload.details,
-            errorObject: payload.errorObject,
-            source: payload.source,
-            level: payload.level || 'error'
-        };
+        baseMessage.metadata = { ...baseMessage.metadata, status: 'error', details: payload.details, errorObject: payload.errorObject, source: payload.source, level: payload.level || 'error' };
         return { messageType: 'systemError', chatMessage: baseMessage };
     }
 

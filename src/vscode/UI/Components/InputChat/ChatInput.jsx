@@ -557,16 +557,13 @@ const ChatInput = () => {
     },
   };
 
-  // Debug: log the structure of projectFiles
-  console.log('Project files:', projectFiles);
-  console.log('Search term:', mentionHooks.searchTerm);
 
   const filteredMentionFiles = projectFiles.filter(file => {
-    // Handle different possible file structures
+   
     const fileName = file.name || file.path?.split('/').pop() || '';
     const searchTerm = mentionHooks.searchTerm || '';
     
-    console.log('Filtering file:', fileName, 'with term:', searchTerm);
+    
     
     return !searchTerm || fileName.toLowerCase().includes(searchTerm.toLowerCase());
   });

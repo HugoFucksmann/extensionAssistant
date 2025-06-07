@@ -13,6 +13,8 @@ import { StateFactory } from "./state/StateFactory";
 import { IObservabilityManager } from "./services/interfaces/DependencyInterfaces";
 import { InternalEventDispatcher } from "@core/events/InternalEventDispatcher";
 import { PerformanceMonitor } from "@core/monitoring/PerformanceMonitor";
+import { CacheManager } from "@core/utils/CacheManager";
+import { ParallelExecutionService } from "@core/utils/ParallelExecutionService";
 import { ServiceRegistry } from "./dependencies/ServiceRegistry";
 
 export class LangGraphEngine {
@@ -21,18 +23,38 @@ export class LangGraphEngine {
     private config: EngineConfig;
     private observability: IObservabilityManager;
 
+    /**
+     * Crea una nueva instancia de LangGraphEngine
+     * @param modelManager Gestor de modelos de IA
+     * @param toolRegistry Registro de herramientas disponibles
+     * @param memoryManager Gestor de memoria
+     * @param dispatcher Dispatcher de eventos internos
+     * @param performanceMonitor Monitor de rendimiento
+     * @param cacheManager Gestor de caché (debe ser un singleton)
+     * @param parallelExecutionService Servicio de ejecución en paralelo (debe ser un singleton)
+     * @param config Configuración personalizada del motor
+     */
     constructor(
         modelManager: ModelManager,
         toolRegistry: ToolRegistry,
         memoryManager: MemoryManager,
         dispatcher: InternalEventDispatcher,
         performanceMonitor: PerformanceMonitor,
+        private readonly cacheManager: CacheManager,
+        private readonly parallelExecutionService: ParallelExecutionService,
         config: Partial<EngineConfig> = {}
     ) {
         this.config = { ...DEFAULT_ENGINE_CONFIG, ...config };
 
+        // Crear el contenedor de dependencias con todas las instancias necesarias
         this.dependencies = ServiceRegistry.createContainer(
-            modelManager, toolRegistry, memoryManager, dispatcher, performanceMonitor
+            modelManager,
+            toolRegistry,
+            memoryManager,
+            dispatcher,
+            performanceMonitor,
+            this.cacheManager,
+            this.parallelExecutionService
         );
 
         this.observability = this.dependencies.get<IObservabilityManager>('IObservabilityManager');

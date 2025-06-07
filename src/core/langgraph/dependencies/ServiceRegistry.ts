@@ -18,37 +18,48 @@ import { CacheManager } from "../../utils/CacheManager";
 import { ParallelExecutionService } from "../../utils/ParallelExecutionService";
 
 export class ServiceRegistry {
+    /**
+     * Crea un contenedor de dependencias con las instancias proporcionadas.
+     * @param modelManager Gestor de modelos de IA
+     * @param toolRegistry Registro de herramientas disponibles
+     * @param memoryManager Gestor de memoria
+     * @param dispatcher Dispatcher de eventos internos
+     * @param performanceMonitor Monitor de rendimiento
+     * @param cacheManager Instancia de CacheManager (debe ser un singleton)
+     * @param parallelExecutionService Instancia de ParallelExecutionService (debe ser un singleton)
+     */
     public static createContainer(
         modelManager: ModelManager,
         toolRegistry: ToolRegistry,
         memoryManager: MemoryManager,
-        dispatcher: InternalEventDispatcher, // Ya lo recibimos como parámetro
-        performanceMonitor: PerformanceMonitor
+        dispatcher: InternalEventDispatcher,
+        performanceMonitor: PerformanceMonitor,
+        cacheManager: CacheManager,
+        parallelExecutionService: ParallelExecutionService
     ): DependencyContainer {
         const container = new DependencyContainer();
 
-        // Registrar utilidades de optimización
-        const cacheManager = new CacheManager();
+        // Registrar dependencias singleton proporcionadas
         container.register<CacheManager>('CacheManager', cacheManager);
-        container.register<ParallelExecutionService>('ParallelExecutionService', new ParallelExecutionService());
+        container.register<ParallelExecutionService>('ParallelExecutionService', parallelExecutionService);
 
-        // Registrar componentes core
+        // Registrar dependencias principales
         container.register<IModelManager>('IModelManager', modelManager);
         container.register<IToolRegistry>('IToolRegistry', toolRegistry);
         container.register<IMemoryManager>('IMemoryManager', memoryManager);
 
-        // <<< AÑADIR ESTA LÍNEA
+        // Registrar dispatcher de eventos internos
         container.register<InternalEventDispatcher>('InternalEventDispatcher', dispatcher);
 
-        // Registrar proveedor de prompts
+
         const promptProvider = new PromptProvider();
         container.register<IPromptProvider>('IPromptProvider', promptProvider);
 
-        // Registrar componentes de observabilidad
+
         const observabilityManager = new ObservabilityManager(dispatcher, performanceMonitor);
         container.register<IObservabilityManager>('IObservabilityManager', observabilityManager);
 
-        // Registrar servicios de aplicación
+
         container.register<IMemoryService>('IMemoryService', new HybridMemoryService(memoryManager, modelManager));
         container.register<IAnalysisService>('IAnalysisService', new AnalysisService(modelManager, promptProvider));
         container.register<IReasoningService>('IReasoningService', new ReasoningService(modelManager, promptProvider, toolRegistry));

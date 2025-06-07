@@ -7,10 +7,9 @@ import { InternalEventDispatcher } from '../../../core/events/InternalEventDispa
 import { IConversationManager } from '../../../core/interfaces/IConversationManager';
 import * as crypto from 'crypto';
 
-// New architecture imports
 import { WebviewStateManager } from './WebviewStateManager';
 import { WebviewBackendAdapter } from './WebviewBackendAdapter';
-import { MessageRouter, MessageContext } from '../handlers/MessageRouter';
+import { MessageRouter } from '../handlers/MessageRouter';
 import { CommandProcessor } from '../handlers/CommandProcessor';
 import { ErrorManager } from '../handlers/ErrorManager';
 import { EventSubscriber } from '../handlers/EventSubscriber';
@@ -20,19 +19,15 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     private view?: vscode.WebviewView;
     private disposables: vscode.Disposable[] = [];
 
-    // Core components
     private stateManager!: WebviewStateManager;
     private backendAdapter!: WebviewBackendAdapter;
     private messageFormatter!: MessageFormatter;
-
-    // Handlers
     private messageRouter!: MessageRouter;
     private commandProcessor!: CommandProcessor;
     private errorManager!: ErrorManager;
     private eventSubscriber!: EventSubscriber;
 
-    // Context
-    private messageContext!: MessageContext;
+    // CAMBIO: Se elimina la propiedad `messageContext`.
 
     constructor(
         private readonly extensionUri: vscode.Uri,
@@ -44,46 +39,38 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     }
 
     private initializeComponents(): void {
-        // Initialize core components
         this.stateManager = new WebviewStateManager();
         this.backendAdapter = new WebviewBackendAdapter(this.appLogicService, this.conversationManager);
         this.messageFormatter = new MessageFormatter();
-
-        // Initialize handlers
         this.errorManager = new ErrorManager(this.internalEventDispatcher);
+
+        // CAMBIO: La inicialización de los manejadores es más limpia y directa.
         this.commandProcessor = new CommandProcessor(
             this.backendAdapter,
             this.errorManager,
+            this.stateManager, // Se inyecta el stateManager
             this.postMessage.bind(this)
         );
 
         this.eventSubscriber = new EventSubscriber(
             this.internalEventDispatcher,
             this.messageFormatter,
+            this.stateManager, // Se inyecta el stateManager
             this.postMessage.bind(this)
         );
 
-        // Initialize message context
-        this.messageContext = {
-            currentChatId: null,
-            setCurrentChatId: (chatId: string) => {
-                this.messageContext.currentChatId = chatId;
-                this.eventSubscriber.setCurrentChatId(chatId);
-                this.stateManager.setCurrentChatId(chatId);
-            }
-        };
+        // CAMBIO: Se elimina la inicialización de `messageContext`.
 
-        // Initialize message router
         this.messageRouter = new MessageRouter(
             this.backendAdapter,
             this.stateManager,
             this.commandProcessor,
             this.errorManager,
             this.postMessage.bind(this),
-            this.messageContext
+            // CAMBIO: Se pasa la función `startNewChat` directamente, evitando dependencias inversas.
+            this.startNewChat.bind(this)
         );
 
-        // Subscribe to state changes for debugging/logging
         this.stateManager.subscribeToStateChanges((state, changedFields) => {
             console.log('[WebviewProvider] State changed:', changedFields, state);
         });
@@ -94,12 +81,11 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
         this.setupWebview();
         this.setupMessageHandling();
         this.eventSubscriber.subscribeToEvents();
-
-        // Set initial connection state
         this.stateManager.setConnected(true);
     }
 
     private setupWebview(): void {
+        // ... (sin cambios)
         if (!this.view) return;
 
         this.view.webview.options = {
@@ -124,10 +110,12 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
                     await this.messageRouter.handleMessage(message);
                 } catch (error) {
                     console.error('[WebviewProvider] Error handling message:', error);
+                    // CAMBIO: Se obtiene el chatId del estado centralizado para el reporte de errores.
+                    const chatId = this.stateManager.getChatState().currentChatId;
                     this.errorManager.handleUnexpectedError(
                         error as Error,
                         'WebviewProvider.setupMessageHandling',
-                        this.messageContext.currentChatId
+                        chatId
                     );
                 }
             },
@@ -136,51 +124,61 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
         );
     }
 
-    // Public interface methods
-    public requestShowHistory(): void {
-        this.postMessage('showHistory', {});
-    }
-
     /**
-     * Flujo centralizado para crear un nuevo chat, actualizar contexto y notificar a la UI.
-     * Todas las rutas deben delegar aquí.
+     * CAMBIO: Este método ahora es la única fuente para crear un nuevo chat.
+     * Centraliza la lógica, actualiza el estado y notifica a la UI.
+     * @returns El ID del nuevo chat creado.
      */
-    private startNewChatFlow(): string {
+    public startNewChat(): string {
         try {
-            const newChatId = this.conversationManager.createNewChat();
-            const activeChatId = this.conversationManager.getActiveChatId();
-            this.messageContext.setCurrentChatId(newChatId);
+            const newChatId = this.backendAdapter.createNewChat();
+            const activeChatId = this.backendAdapter.getActiveChatId();
+
+            // Actualiza el estado centralizado
+            this.stateManager.updateChatState({
+                currentChatId: newChatId,
+                activeChatId: activeChatId
+            });
+
+            // Notifica a la UI
             this.postMessage('newChatStarted', {
                 chatId: newChatId,
                 activeChatId: activeChatId
             });
+
+            // También se puede enviar el estado inicial de la sesión aquí
+            this.postMessage('sessionReady', {
+                chatId: newChatId,
+                messages: [], // O cargar mensajes si existen
+            });
+
             return newChatId;
         } catch (error) {
+            const chatId = this.stateManager.getChatState().currentChatId;
             this.errorManager.handleUnexpectedError(
                 error as Error,
-                'WebviewProvider.startNewChatFlow',
-                this.messageContext.currentChatId
+                'WebviewProvider.startNewChat',
+                chatId
             );
             return '';
         }
     }
 
-    // Nuevo método público para UI o handlers
-    public startNewChat(): void {
-        this.startNewChatFlow();
+    public requestShowHistory(): void {
+        this.postMessage('showHistory', {});
     }
 
-    // State access methods
     public getState() {
         return this.stateManager.getState();
     }
 
     public getCurrentChatId(): string | null {
-        return this.messageContext.currentChatId;
+        // CAMBIO: Se obtiene el chatId directamente del estado centralizado.
+        return this.stateManager.getChatState().currentChatId;
     }
 
-    // Private helper methods
     private postMessage(type: string, payload: any): void {
+        // ... (sin cambios)
         if (this.view) {
             this.view.webview.postMessage({ type, payload });
         } else {
@@ -193,14 +191,10 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     }
 
     public dispose(): void {
-        // Set disconnected state
         this.stateManager.setConnected(false);
-
-        // Dispose all components
         this.disposables.forEach(d => d.dispose());
         this.eventSubscriber.dispose();
         this.stateManager.dispose();
-
         console.log('[WebviewProvider] Disposed successfully');
     }
 }

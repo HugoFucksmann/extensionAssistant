@@ -33,39 +33,39 @@ export class ConversationManager implements IConversationManager, Disposable {
     return false;
   }
 
+  /**
+   * Obtiene el estado de una conversación existente o crea uno nuevo si no existe.
+   * @param chatId ID de la conversación. Si no se proporciona, se crea una nueva conversación.
+   * @param userMessage Mensaje del usuario para inicializar el estado si es necesario.
+   * @param contextData Datos de contexto adicionales (no utilizado actualmente).
+   * @returns Un objeto con el estado de la conversación y un flag que indica si es nuevo.
+   */
   public getOrCreateConversationState(
     chatId?: string,
     userMessage: string = '',
     contextData: Record<string, any> = {},
   ): { state: SimplifiedOptimizedGraphState; isNew: boolean } {
-
+    // 1. Si no hay chatId, crear uno nuevo
     if (!chatId) {
       chatId = this.createNewChat();
-    } else if (!this.activeConversations.has(chatId)) {
-
-      this.activeChatId = chatId;
-    } else {
-
-      this.activeChatId = chatId;
     }
-    let state = this.activeConversations.get(chatId);
+    
+    // 2. Establecer este chat como activo
+    this.activeChatId = chatId;
+    
+    // 3. Verificar si ya existe un estado para este chatId
+    const existingState = this.activeConversations.get(chatId);
+    if (existingState) {
+      return { state: existingState, isNew: false };
+    }
+    
+    // 4. Si no existe, crear un nuevo estado
     const currentTime = Date.now();
-    let isNew = false;
-
-    if (state) {
-
-      this.activeConversations.set(chatId, state);
-      return { state, isNew };
-    }
-
-
-    isNew = true;
-
     const newState: SimplifiedOptimizedGraphState = {
       chatId: chatId,
       userInput: userMessage || '',
       messages: [],
-      currentPhase: undefined as any, // Debe ser GraphPhase, se debe inicializar según lógica de negocio.
+      currentPhase: undefined as any, // Se inicializará según la lógica de negocio
       currentPlan: [],
       toolsUsed: [],
       workingMemory: '',
@@ -85,9 +85,10 @@ export class ConversationManager implements IConversationManager, Disposable {
       maxNodeIterations: {},
       startTime: currentTime,
     };
-
+    
+    // 5. Guardar y retornar el nuevo estado
     this.activeConversations.set(chatId, newState);
-    return { state: newState, isNew };
+    return { state: newState, isNew: true };
   }
 
   public getConversationState(chatId: string): SimplifiedOptimizedGraphState | undefined {

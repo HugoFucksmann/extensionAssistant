@@ -11,6 +11,7 @@ import { MemoryManager } from '../features/memory/MemoryManager';
 import { LangGraphEngine } from './langgraph/LangGraphEngine';
 import { PerformanceMonitor } from './monitoring/PerformanceMonitor';
 import { CacheManager } from './utils/CacheManager';
+import { ParallelExecutionService } from './utils/ParallelExecutionService';
 import { SystemInitializer } from './langgraph/initialization/SystemInitializer';
 import { Disposable } from './interfaces/Disposable';
 
@@ -28,12 +29,20 @@ export class ComponentFactory {
   private static performanceMonitorInstance: PerformanceMonitor;
   private static langGraphEngineInstance: LangGraphEngine;
   private static cacheManagerInstance: CacheManager;
+  private static parallelExecutionServiceInstance: ParallelExecutionService;
 
   public static getCacheManager(): CacheManager {
     if (!this.cacheManagerInstance) {
       this.cacheManagerInstance = new CacheManager();
     }
     return this.cacheManagerInstance;
+  }
+
+  public static getParallelExecutionService(): ParallelExecutionService {
+    if (!this.parallelExecutionServiceInstance) {
+      this.parallelExecutionServiceInstance = new ParallelExecutionService();
+    }
+    return this.parallelExecutionServiceInstance;
   }
 
   public static getInternalEventDispatcher(): InternalEventDispatcher {

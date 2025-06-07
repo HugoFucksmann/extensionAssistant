@@ -4,10 +4,7 @@ import { ErrorManager } from './ErrorManager';
 import { IWebviewBackend } from '../core/WebviewBackendAdapter';
 import { WebviewStateManager } from '../core/WebviewStateManager';
 
-export interface MessageContext {
-    currentChatId: string | null;
-    setCurrentChatId: (chatId: string) => void;
-}
+// CAMBIO: Se elimina la interfaz MessageContext.
 
 export class MessageRouter {
     constructor(
@@ -16,10 +13,12 @@ export class MessageRouter {
         private readonly commandProcessor: CommandProcessor,
         private readonly errorManager: ErrorManager,
         private readonly postMessage: (type: string, payload: any) => void,
-        private readonly context: MessageContext
+        // CAMBIO: Se inyecta una función para iniciar un nuevo chat, eliminando la dependencia inversa.
+        private readonly startNewChat: () => string
     ) { }
 
     public async handleMessage(message: any): Promise<void> {
+        const chatId = this.stateManager.getChatState().currentChatId;
         try {
             switch (message.type) {
                 case 'uiReady':
@@ -32,130 +31,72 @@ export class MessageRouter {
                     await this.handleSwitchModel(message.payload);
                     break;
                 case 'newChatRequestedByUI':
-                    this.handleNewChatRequest();
+                    // CAMBIO: Se delega la creación del chat a la función inyectada.
+                    this.startNewChat();
                     break;
                 case 'command':
-                    await this.commandProcessor.processCommand(message.payload, this.context);
+                    // CAMBIO: El commandProcessor ya no necesita el contexto.
+                    await this.commandProcessor.processCommand(message.payload);
                     break;
                 default:
                     console.warn('[MessageRouter] Unknown message type:', message.type);
                     break;
             }
         } catch (error: any) {
-            this.errorManager.handleUnexpectedError(error, 'MessageRouter.handleMessage', this.context.currentChatId);
+            this.errorManager.handleUnexpectedError(error, 'MessageRouter.handleMessage', chatId);
         }
     }
 
     private async handleUIReady(): Promise<void> {
-        try {
-            // Centralizar la lógica de creación de chat y contexto
-            let chatId = this.backend.getActiveChatId();
-            if (!chatId) {
-                // Usar el flujo centralizado de WebviewProvider
-                if (typeof (this as any).webviewProvider?.startNewChatFlow === 'function') {
-                    chatId = (this as any).webviewProvider.startNewChatFlow();
-                } else {
-                    chatId = this.backend.createNewChat();
-                }
-            }
-
-            if (!chatId) {
-                this.errorManager.handleSystemError(
-                    'Failed to initialize chat session on UI ready.',
-                    'MessageRouter.handleUIReady',
-                    this.context.currentChatId
-                );
-                return;
-            }
-
-            this.context.setCurrentChatId(chatId);
-            this.postMessage('sessionReady', {
-                chatId: chatId,
-                messages: [],
-            });
-        } catch (error: any) {
-            this.errorManager.handleUnexpectedError(error, 'MessageRouter.handleUIReady', this.context.currentChatId);
+        // CAMBIO: Lógica simplificada. Si no hay chat, se crea uno usando el flujo centralizado.
+        let chatId = this.backend.getActiveChatId();
+        if (!chatId) {
+            chatId = this.startNewChat();
         }
+
+        if (!chatId) {
+            this.errorManager.handleSystemError(
+                'Failed to initialize chat session on UI ready.',
+                'MessageRouter.handleUIReady',
+                null
+            );
+        }
+        // La notificación a la UI ('sessionReady') ahora es responsabilidad del flujo `startNewChat`.
     }
 
     private async handleUserMessage(payload: { text: string; files?: string[] }): Promise<void> {
+        let chatId = this.stateManager.getChatState().currentChatId;
         try {
             if (!payload.text?.trim()) {
-                this.errorManager.handleSystemError(
-                    'Message cannot be empty.',
-                    'MessageRouter.handleUserMessage',
-                    this.context.currentChatId
-                );
+                this.errorManager.handleSystemError('Message cannot be empty.', 'MessageRouter.handleUserMessage', chatId);
                 return;
             }
 
-            let chatId = this.context.currentChatId;
-            console.log('[MessageRouter] Current chat ID:', chatId);
-
+            // CAMBIO: Si no hay chat, se crea uno de forma centralizada.
             if (!chatId) {
-                chatId = this.backend.createNewChat();
-                if (!chatId) {
-                    this.errorManager.handleSystemError(
-                        'Failed to create or retrieve chat session for user message.',
-                        'MessageRouter.handleUserMessage',
-                        null
-                    );
-                    return;
-                }
-                this.context.setCurrentChatId(chatId);
+                chatId = this.startNewChat();
             }
 
-            console.log('[MessageRouter] Calling backend.processMessage in the background...');
-            // Do not await. Let the process run and rely on events for feedback.
+            // La llamada al backend se mantiene asíncrona.
             this.backend.processMessage(chatId, payload.text, {
                 files: payload.files || []
             }).catch(error => {
-                // Catch any unexpected errors from the async process start itself
                 console.error('[MessageRouter] Backend processing failed to start:', error);
-                this.postMessage('systemError', {
-                    content: error instanceof Error ? error.message : 'Error inesperado al iniciar el procesamiento',
-                    metadata: { status: 'error' }
-                });
+                this.errorManager.handleUnexpectedError(error, 'MessageRouter.handleUserMessage', chatId);
             });
-
-            // The function now returns immediately. All feedback will be sent via EventSubscriber.
 
         } catch (error) {
-            console.error('[MessageRouter] Exception in handleUserMessage:', error);
-            this.postMessage('systemError', {
-                content: error instanceof Error ? error.message : 'Error inesperado',
-                metadata: { status: 'error' }
-            });
+            this.errorManager.handleUnexpectedError(error as Error, 'MessageRouter.handleUserMessage', chatId);
         }
     }
 
-    private handleNewChatRequest(): void {
-        try {
-            // Delegar en el flujo centralizado de WebviewProvider si está disponible
-            if (typeof (this as any).webviewProvider?.startNewChatFlow === 'function') {
-                (this as any).webviewProvider.startNewChatFlow();
-            } else {
-                const newChatId = this.backend.createNewChat();
-                const activeChatId = this.backend.getActiveChatId();
-                this.context.setCurrentChatId(newChatId);
-                this.postMessage('newChatStarted', {
-                    chatId: newChatId,
-                    activeChatId: activeChatId
-                });
-            }
-        } catch (error: any) {
-            this.errorManager.handleUnexpectedError(error, 'MessageRouter.handleNewChatRequest', this.context.currentChatId);
-        }
-    }
+    // CAMBIO: Se elimina handleNewChatRequest, ahora se maneja directamente en handleMessage.
 
     private async handleSwitchModel(payload: { modelType: string }): Promise<void> {
+        const chatId = this.stateManager.getChatState().currentChatId;
         try {
             if (!payload?.modelType) {
-                this.errorManager.handleSystemError(
-                    'No model type specified for switching.',
-                    'MessageRouter.handleSwitchModel',
-                    this.context.currentChatId
-                );
+                this.errorManager.handleSystemError('No model type specified.', 'MessageRouter.handleSwitchModel', chatId);
                 return;
             }
 
@@ -164,7 +105,7 @@ export class MessageRouter {
             this.postMessage('modelSwitched', { modelType: payload.modelType });
 
         } catch (error: any) {
-            this.errorManager.handleUnexpectedError(error, 'MessageRouter.handleSwitchModel', this.context.currentChatId);
+            this.errorManager.handleUnexpectedError(error, 'MessageRouter.handleSwitchModel', chatId);
         }
     }
 }

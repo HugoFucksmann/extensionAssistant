@@ -54,32 +54,3 @@ export async function listFilesUtil(
   }
 }
 
-/**
- * Lista archivos por patrón específico (backward compatibility)
- */
-export async function listFilesByPattern(
-  vscodeAPI: typeof vscode,
-  pattern = '**/*',
-  maxResults = 5000
-): Promise<ListedFile[]> {
-  const workspaceFolder = vscodeAPI.workspace.workspaceFolders?.[0];
-  if (!workspaceFolder) return [];
-
-  try {
-    const files = await vscodeAPI.workspace.findFiles(
-      pattern,
-      '**/node_modules/**,**/.git/**,**/.next/**,**/out/**,**/build/**,**/dist/**',
-      maxResults
-    );
-
-    return files.map(uri => ({
-      path: vscodeAPI.workspace.asRelativePath(uri, false),
-      type: 'file' as const,
-      name: uri.fsPath.split('/').pop() || '',
-      uri
-    }));
-  } catch (error) {
-    console.error('[listFilesByPattern] Error:', error);
-    return [];
-  }
-}

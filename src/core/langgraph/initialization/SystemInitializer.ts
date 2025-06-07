@@ -3,6 +3,7 @@ import * as vscode from 'vscode';
 import { ComponentFactory } from '../../ComponentFactory';
 import { LangGraphEngine } from '../LangGraphEngine';
 import { EnvironmentConfig } from '../config/EnvironmentConfig';
+import { ParallelExecutionService } from '../../utils/ParallelExecutionService';
 
 export class SystemInitializer {
     /**
@@ -26,6 +27,8 @@ export class SystemInitializer {
         const memoryManager = ComponentFactory.getMemoryManager(context);
         const dispatcher = ComponentFactory.getInternalEventDispatcher();
         const performanceMonitor = ComponentFactory.getPerformanceMonitor();
+        const cacheManager = ComponentFactory.getCacheManager();
+        const parallelExecutionService = ComponentFactory.getParallelExecutionService();
 
         // 3. Crear y configurar el motor
         const engine = new LangGraphEngine(
@@ -34,6 +37,8 @@ export class SystemInitializer {
             memoryManager,
             dispatcher,
             performanceMonitor,
+            cacheManager,
+            parallelExecutionService,
             engineConfig
         );
 

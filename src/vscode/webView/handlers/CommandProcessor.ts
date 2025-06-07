@@ -1,7 +1,8 @@
 // src/vscode/webView/handlers/CommandProcessor.ts
 import { IWebviewBackend } from '../core/WebviewBackendAdapter';
 import { ErrorManager } from './ErrorManager';
-import { MessageContext } from './MessageRouter';
+// CAMBIO: Se importa WebviewStateManager para obtener el estado.
+import { WebviewStateManager } from '../core/WebviewStateManager';
 
 export interface CommandPayload {
     command: string;
@@ -12,13 +13,15 @@ export class CommandProcessor {
     constructor(
         private readonly backend: IWebviewBackend,
         private readonly errorManager: ErrorManager,
+        // CAMBIO: Se inyecta el stateManager.
+        private readonly stateManager: WebviewStateManager,
         private readonly postMessage: (type: string, payload: any) => void
     ) { }
 
-    public async processCommand(payload: CommandPayload, context: MessageContext): Promise<void> {
+    public async processCommand(payload: CommandPayload): Promise<void> {
         switch (payload.command) {
             case 'getProjectFiles':
-                await this.handleGetProjectFiles(context);
+                await this.handleGetProjectFiles();
                 break;
             default:
                 console.warn('[CommandProcessor] Unknown command:', payload.command);
@@ -26,26 +29,24 @@ export class CommandProcessor {
         }
     }
 
-    private async handleGetProjectFiles(context: MessageContext): Promise<void> {
+    private async handleGetProjectFiles(): Promise<void> {
+        // CAMBIO: Se obtiene el chatId del estado central.
+        const chatId = this.stateManager.getChatState().currentChatId;
         try {
-            let chatId = context.currentChatId;
+            // CAMBIO: Se elimina la lógica de creación de chat. El comando asume que la sesión existe.
             if (!chatId) {
-                chatId = this.backend.createNewChat();
-                if (!chatId) {
-                    this.errorManager.handleSystemError(
-                        'Failed to create or retrieve chat session for getProjectFiles.',
-                        'CommandProcessor.handleGetProjectFiles',
-                        null
-                    );
-                    return;
-                }
-                context.setCurrentChatId(chatId);
+                this.errorManager.handleSystemError(
+                    'Cannot get project files without an active chat session.',
+                    'CommandProcessor.handleGetProjectFiles',
+                    null
+                );
+                return;
             }
 
             const filePaths = await this.backend.getProjectFiles();
             this.postMessage('projectFiles', { files: filePaths });
         } catch (error: any) {
-            this.errorManager.handleUnexpectedError(error, 'CommandProcessor.handleGetProjectFiles', context.currentChatId);
+            this.errorManager.handleUnexpectedError(error, 'CommandProcessor.handleGetProjectFiles', chatId);
         }
     }
 }

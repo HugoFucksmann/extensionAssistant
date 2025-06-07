@@ -26,8 +26,7 @@ export abstract class BaseNode {
     }
 
     async execute(state: SimplifiedOptimizedGraphState): Promise<Partial<SimplifiedOptimizedGraphState>> {
-        // <<< LOG MEJORADO
-        console.log(`[${this.nodeId}] ==> Phase Started. Chat: ${state.chatId}, Iteration: ${state.iteration}`);
+
         this.observability.logPhaseStart(this.nodeId, state);
 
         let result: Partial<SimplifiedOptimizedGraphState>;
@@ -45,8 +44,7 @@ export abstract class BaseNode {
             const context = await this.createExecutionContext(state);
             result = await this.executeCore(state, context);
 
-            // <<< LOG MEJORADO
-            console.log(`[${this.nodeId}] <== Phase Completed. Returning state updates:`, result);
+
 
         } catch (error: any) {
             result = this.handleError(error, state);
