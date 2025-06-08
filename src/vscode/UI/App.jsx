@@ -40,9 +40,7 @@ const App = () => {
 
   const chatInputContainerStyle = {
     position: 'relative',
-    padding: theme.spacing.medium,
-    borderRadius: theme.borderRadius.medium,
-    backgroundColor: theme.colors.secondary,
+    margin: theme.spacing.medium,
     flexShrink: 0, // Prevent input from shrinking
   };
 
@@ -81,22 +79,18 @@ const App = () => {
     <div style={appContainerStyle}>
       <main style={chatAreaStyle}>
         {!hasMessages ? (
-          // Centered layout when no messages
+      
           <div style={centeredContentStyle}>
             <RecentChats />
             <div style={{ width: '100%', maxWidth: '800px' }}>
               <div style={chatInputContainerStyle}>
-               {/*  {isLoading && (
-                  <div style={loadingIndicatorStyle}>
-                    <LoadingIndicator />
-                  </div>
-                )} */}
+             
                 <ChatInput />
               </div>
             </div>
           </div>
         ) : (
-          // Normal layout with messages
+         
           <>
             <div style={{ 
               flex: 1, 
@@ -107,11 +101,7 @@ const App = () => {
               <ChatMessages messages={messages} />
             </div>
             <div style={chatInputContainerStyle}>
-             {/*  {isLoading && (
-                <div style={loadingIndicatorStyle}>
-                  <LoadingIndicator />
-                </div>
-              )} */}
+            
               <ChatInput />
             </div>
           </>

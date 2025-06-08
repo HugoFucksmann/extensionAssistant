@@ -98,3 +98,96 @@ body {
 code {
   font-family: var(--vscode-font-family);
 }
+
+
+/* Scrollbar minimalista para VS Code Extension - Dark Theme */
+
+/* Webkit scrollbars (Chrome, Safari, Edge) */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(139, 148, 158, 0.3);
+  border-radius: 3px;
+  transition: all 0.2s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 148, 158, 0.5);
+  box-shadow: 0 0 4px rgba(139, 148, 158, 0.2);
+}
+
+::-webkit-scrollbar-thumb:active {
+  background: rgba(139, 148, 158, 0.7);
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Firefox scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(139, 148, 158, 0.3) transparent;
+}
+
+/* Scrollbar para contenedores específicos con mejor contraste */
+.chat-messages::-webkit-scrollbar,
+.file-dropdown-list::-webkit-scrollbar,
+.messages-container::-webkit-scrollbar {
+  width: 4px;
+}
+
+.chat-messages::-webkit-scrollbar-thumb,
+.file-dropdown-list::-webkit-scrollbar-thumb,
+.messages-container::-webkit-scrollbar-thumb {
+  background: rgba(72, 79, 88, 0.4);
+  border-radius: 2px;
+}
+
+.chat-messages::-webkit-scrollbar-thumb:hover,
+.file-dropdown-list::-webkit-scrollbar-thumb:hover,
+.messages-container::-webkit-scrollbar-thumb:hover {
+  background: rgba(72, 79, 88, 0.6);
+}
+
+/* Scrollbar para elementos con fondo claro */
+.light-background::-webkit-scrollbar-thumb {
+  background: rgba(48, 54, 61, 0.3);
+}
+
+.light-background::-webkit-scrollbar-thumb:hover {
+  background: rgba(48, 54, 61, 0.5);
+}
+
+/* Animación suave para la aparición del scrollbar */
+::-webkit-scrollbar-thumb {
+  opacity: 0;
+  transition: opacity 0.3s ease, background-color 0.2s ease;
+}
+
+*:hover::-webkit-scrollbar-thumb {
+  opacity: 1;
+}
+
+/* Scrollbar más visible en elementos interactivos */
+.interactive-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.interactive-scroll::-webkit-scrollbar-thumb {
+  background: rgba(56, 139, 253, 0.3);
+  border-radius: 4px;
+}
+
+.interactive-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(56, 139, 253, 0.5);
+  box-shadow: 0 0 6px rgba(56, 139, 253, 0.3);
+}
