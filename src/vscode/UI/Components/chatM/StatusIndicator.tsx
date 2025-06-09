@@ -7,21 +7,36 @@ interface StatusIndicatorProps {
   size?: "small" | "medium" | "large"
 }
 
-export const StatusIndicator: React.FC<StatusIndicatorProps> = ({ 
-  isVisible, 
-  loadingText, 
-  size = "medium" 
+const stateTexts = {
+  'analysis': 'Analizando...',
+  'initialAnalysis': 'Analizando...',
+  'ANALYSIS': 'Analizando...',
+  'reasoning': 'Razonando...',
+  'executing': 'Ejecutando...',
+  'EXECUTION': 'Ejecutando...',
+  'tool_executing': 'Ejecutando...',
+  'finalResponse': 'Generando respuesta...',
+  'finalResponseGeneration': 'Generando respuesta...',
+  'RESPONSE': 'Generando respuesta...'
+};
+
+export const StatusIndicator: React.FC<StatusIndicatorProps> = ({
+  isVisible,
+  loadingText,
+  size = "medium"
 }) => {
   if (!isVisible) {
-    return null
+    return null;
   }
+
+  const displayText = stateTexts[loadingText as keyof typeof stateTexts] || "thinking...";
 
   return (
     <div className={`status-indicator ${size}`}>
       <div className="status-content">
         <div className="status-dot processing" />
-        <span className="status-text">{loadingText}</span>
+        <span className="status-text">{displayText}</span>
       </div>
     </div>
-  )
-}
+  );
+};
