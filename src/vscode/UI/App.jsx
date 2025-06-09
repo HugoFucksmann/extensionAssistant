@@ -6,10 +6,10 @@ import ChatHistory from './Components/historical/ChatHistory';
 import { useApp } from './context/AppContext';
 import { ChatMessages } from './Components/chatM/ChatMessages';
 import RecentChats from './Components/historical/RecentChats';
+import { StatusIndicator } from './Components/chatM/StatusIndicator';
 
 const App = () => {
-  // CAMBIO: Ya no necesitamos `isLoading` aquí para la lógica de renderizado.
-  const { showHistory, theme, messages = [] } = useApp();
+  const { showHistory, theme, messages = [], isLoading, loadingText } = useApp();
  
   const appContainerStyle = {
     display: 'flex',
@@ -39,12 +39,10 @@ const App = () => {
   };
 
   const chatInputContainerStyle = {
-   
     position: 'relative',
     margin: theme.spacing.medium,
-    flexShrink: 0, // Prevent input from shrinking
+    flexShrink: 0,
   };
-
 
   if (showHistory) {
     return (
@@ -68,18 +66,20 @@ const App = () => {
     <div style={appContainerStyle}>
       <main style={chatAreaStyle}>
         {!hasMessages ? (
-      
           <div style={centeredContentStyle}>
             <RecentChats />
             <div style={{ width: '100%', maxWidth: '800px' }}>
               <div style={chatInputContainerStyle}>
-            
                 <ChatInput />
+                <StatusIndicator
+                  isVisible={isLoading}
+                  loadingText={loadingText}
+                  size="small"
+                />
               </div>
             </div>
           </div>
         ) : (
-         
           <>
             <div style={{ 
               flex: 1, 
@@ -90,8 +90,13 @@ const App = () => {
               <ChatMessages messages={messages} />
             </div>
             <div style={chatInputContainerStyle}>
-       
+            <StatusIndicator
+                isVisible={isLoading}
+                loadingText={loadingText}
+                size="small"
+              />
               <ChatInput />
+             
             </div>
           </>
         )}

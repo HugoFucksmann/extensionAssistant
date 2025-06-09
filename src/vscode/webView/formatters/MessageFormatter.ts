@@ -116,7 +116,7 @@ export class MessageFormatter {
     }
 
     public formatAgentPhaseStarted(payload: AgentPhaseEventPayload): string {
-        return this.phaseNames[payload.phase] || `Iniciando fase: ${payload.phase}`;
+        return this.phaseNames[payload.phase] || `${payload.phase}`;
     }
 
     public formatAgentPhaseCompleted(payload: AgentPhaseEventPayload): string {
