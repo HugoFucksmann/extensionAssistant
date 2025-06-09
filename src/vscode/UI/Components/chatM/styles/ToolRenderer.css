@@ -13,6 +13,7 @@
   box-shadow: var(--shadow-md);
 }
 
+/* CAMBIO: Simplificamos los bordes de estado */
 .tool-card.success {
   border-left: 3px solid var(--status-success);
 }
@@ -21,8 +22,7 @@
   border-left: 3px solid var(--status-error);
 }
 
-.tool-card.thinking,
-.tool-card.tool_executing {
+.tool-card.processing {
   border-left: 3px solid var(--status-warning);
 }
 
@@ -34,8 +34,7 @@
   border-color: var(--status-error);
 }
 
-.tool-card.expanded.thinking,
-.tool-card.expanded.tool_executing {
+.tool-card.expanded.processing {
   border-color: var(--status-warning);
 }
 
@@ -64,6 +63,7 @@
   min-width: 0;
 }
 
+/* --- INICIO: Estilos del Indicador de Estado Unificado --- */
 .status-square {
   width: 8px;
   height: 8px;
@@ -74,41 +74,18 @@
 }
 
 .status-square.processing {
-  animation: square-pulse 2s ease-in-out infinite;
-  box-shadow: 0 0 6px rgba(210, 153, 34, 0.3);
+  background-color: var(--status-warning);
+  animation: pulse 1.5s ease-in-out infinite;
 }
 
 .status-square.success {
-  box-shadow: 0 0 8px rgba(63, 185, 80, 0.4), 0 0 4px rgba(63, 185, 80, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.2);
-}
-
-.status-square.success::before {
-  content: "";
-  position: absolute;
-  top: -1px;
-  left: -1px;
-  right: -1px;
-  bottom: -1px;
-  background: radial-gradient(circle, rgba(63, 185, 80, 0.3) 0%, transparent 70%);
-  border-radius: 3px;
-  z-index: -1;
+  background-color: var(--status-success);
 }
 
 .status-square.error {
-  box-shadow: 0 0 8px rgba(248, 81, 73, 0.4), 0 0 4px rgba(248, 81, 73, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  background-color: var(--status-error);
 }
-
-.status-square.error::before {
-  content: "";
-  position: absolute;
-  top: -1px;
-  left: -1px;
-  right: -1px;
-  bottom: -1px;
-  background: radial-gradient(circle, rgba(248, 81, 73, 0.3) 0%, transparent 70%);
-  border-radius: 3px;
-  z-index: -1;
-}
+/* --- FIN: Estilos del Indicador de Estado Unificado --- */
 
 .tool-action-text {
   font-size: 13px;
@@ -169,6 +146,8 @@
 .tool-details-expanded {
   animation: slideDown 0.3s ease-out;
 }
+
+/* ... (resto del archivo CSS sin cambios) ... */
 
 .tool-message {
   padding: var(--spacing-sm);
@@ -407,17 +386,16 @@
   font-size: 12px;
 }
 
-@keyframes square-pulse {
+/* CAMBIO: Animación de pulso para el estado de procesamiento */
+@keyframes pulse {
   0%,
   100% {
     opacity: 1;
     transform: scale(1);
-    box-shadow: 0 0 0 0 rgba(210, 153, 34, 0.4), 0 0 4px rgba(210, 153, 34, 0.4);
   }
   50% {
-    opacity: 0.7;
+    opacity: 0.6;
     transform: scale(1.1);
-    box-shadow: 0 0 0 2px rgba(210, 153, 34, 0.2), 0 0 8px rgba(210, 153, 34, 0.6);
   }
 }
 

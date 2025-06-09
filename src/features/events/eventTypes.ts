@@ -1,9 +1,5 @@
 // src/features/events/eventTypes.ts
-import { ActionOutput } from '@features/ai/prompts/optimized/actionPrompt';
 
-/**
- * All supported event types in the system
- */
 export enum EventType {
   // Conversation lifecycle
   CONVERSATION_STARTED = 'conversation:started',
@@ -34,7 +30,10 @@ export enum EventType {
 
   // UI Interaction events
   USER_INTERACTION_REQUIRED = 'ui:interaction:required',
-  USER_INPUT_RECEIVED = 'ui:input:received'
+  USER_INPUT_RECEIVED = 'ui:input:received',
+  
+  // Conversation Turn Events
+  CONVERSATION_TURN_COMPLETED = 'conversation:turn_completed'
 }
 
 
@@ -55,6 +54,12 @@ export interface ConversationEventPayload extends BaseEventPayload {
 export interface ConversationEndedPayload extends BaseEventPayload {
   finalStatus: 'completed' | 'cleared_by_user' | 'error' | 'max_iterations_reached' | 'failed' | 'cancelled'; // Added 'failed', 'cancelled' and changed 'reason' to 'finalStatus'
   duration?: number;
+}
+
+export interface ConversationTurnCompletedPayload extends BaseEventPayload {
+  status: 'success' | 'failure';
+  duration: number;
+  error?: string;
 }
 
 
@@ -155,6 +160,7 @@ export type EventPayload =
   | BaseEventPayload
   | ConversationEventPayload
   | ConversationEndedPayload
+  | ConversationTurnCompletedPayload
   | LlmRequestStartedPayload
   | LlmRequestCompletedPayload
   | AgentPhaseEventPayload

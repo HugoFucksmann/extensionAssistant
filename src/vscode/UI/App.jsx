@@ -6,10 +6,10 @@ import ChatHistory from './Components/historical/ChatHistory';
 import { useApp } from './context/AppContext';
 import { ChatMessages } from './Components/chatM/ChatMessages';
 import RecentChats from './Components/historical/RecentChats';
-import LoadingIndicator from './Components/LoadingIndicator/LoadingIndicator';
 
 const App = () => {
-  const { showHistory, theme, messages = [], isLoading } = useApp();
+  // CAMBIO: Ya no necesitamos `isLoading` aquí para la lógica de renderizado.
+  const { showHistory, theme, messages = [] } = useApp();
  
   const appContainerStyle = {
     display: 'flex',
@@ -39,22 +39,12 @@ const App = () => {
   };
 
   const chatInputContainerStyle = {
+   
     position: 'relative',
     margin: theme.spacing.medium,
     flexShrink: 0, // Prevent input from shrinking
   };
 
-  const loadingIndicatorStyle = {
-    position: 'absolute',
-    bottom: '100%', // Position right above the input
-    left: 0,
-    right: 0,
-    zIndex: 1000,
-    backgroundColor: theme.colors.background,
-    borderTop: `1px solid ${theme.colors.border}`,
-    backdropFilter: 'blur(10px)',
-    boxShadow: '0 -2px 8px rgba(0, 0, 0, 0.1)',
-  };
 
   if (showHistory) {
     return (
@@ -64,7 +54,6 @@ const App = () => {
     );
   }
 
-  // Check if we have any displayable messages
   const displayableMessages = messages.filter(msg => {
     const phase = msg.metadata?.phase;
     if (phase && (msg.metadata?.status === 'phase_started' || msg.metadata?.status === 'phase_completed')) {
@@ -84,7 +73,7 @@ const App = () => {
             <RecentChats />
             <div style={{ width: '100%', maxWidth: '800px' }}>
               <div style={chatInputContainerStyle}>
-             
+            
                 <ChatInput />
               </div>
             </div>
@@ -101,7 +90,7 @@ const App = () => {
               <ChatMessages messages={messages} />
             </div>
             <div style={chatInputContainerStyle}>
-            
+       
               <ChatInput />
             </div>
           </>

@@ -1,16 +1,9 @@
 // src/core/langgraph/services/ValidationService.ts
-import { z } from "zod";
 import { createAutoCorrectStep } from "../../../shared/utils/aiResponseParser";
 import { DeepValidationResult, IModelManager, IPromptProvider, IValidationService } from "./interfaces/DependencyInterfaces";
 import { SimplifiedOptimizedGraphState } from "../state/GraphState";
-
-// Esquema para la salida del LLM de validación
-const validationOutputSchema = z.object({
-    isValid: z.boolean().describe("¿El resultado de la herramienta parece correcto y útil para el siguiente paso?"),
-    reasoning: z.string().describe("Breve explicación de por qué el resultado es válido o no."),
-    correctionSuggestion: z.string().optional().describe("Si no es válido, una sugerencia de cómo corregir el plan o la siguiente acción."),
-    updatedPlan: z.array(z.string()).optional().describe("Un nuevo plan si el original necesita ser modificado drásticamente.")
-});
+import { validationOutputSchema } from "../../../features/ai/prompts/optimized/validationPrompt";
+import { StringOutputParser } from "@langchain/core/output_parsers";
 
 export class ValidationService implements IValidationService {
     constructor(
@@ -33,7 +26,7 @@ export class ValidationService implements IValidationService {
         const model = this.modelManager.getActiveModel();
         const prompt = this.promptProvider.getValidationPrompt();
         const parseStep = createAutoCorrectStep(validationOutputSchema, model, { maxAttempts: 2 });
-        const chain = prompt.pipe(model).pipe(parseStep);
+        const chain = prompt.pipe(model).pipe(new StringOutputParser()).pipe(parseStep);
 
         try {
             const validation = await chain.invoke({

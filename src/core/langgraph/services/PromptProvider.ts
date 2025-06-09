@@ -4,14 +4,7 @@ import { IPromptProvider } from "./interfaces/DependencyInterfaces";
 import { analysisPromptLC } from "../../../features/ai/prompts/optimized/analysisPrompt";
 import { reasoningPromptLC } from "../../../features/ai/prompts/optimized/reasoningPrompt";
 import { responsePromptLC } from "../../../features/ai/prompts/optimized/responsePrompt";
-
-// Placeholder para el prompt de validación
-const VALIDATION_PROMPT_TEMPLATE = `
-An automated process encountered errors. Based on the context, suggest corrections.
-Errors: {errors}
-Context: {context}
-Respond ONLY with a JSON object: { "stateUpdates": { "currentPlan": ["...", "..."], "error": "optional new error message" }, "error": "summary of unrecoverable issue" }
-`;
+import { validationPromptLC } from "../../../features/ai/prompts/optimized/validationPrompt";
 
 export class PromptProvider implements IPromptProvider {
     public getAnalysisPrompt(): ChatPromptTemplate {
@@ -23,7 +16,7 @@ export class PromptProvider implements IPromptProvider {
     }
 
     public getValidationPrompt(): ChatPromptTemplate {
-        return ChatPromptTemplate.fromTemplate(VALIDATION_PROMPT_TEMPLATE);
+        return validationPromptLC;
     }
 
     public getResponsePrompt(): ChatPromptTemplate {

@@ -4,11 +4,9 @@ import { IResponseService } from "../services/interfaces/DependencyInterfaces";
 import { GraphPhase, SimplifiedOptimizedGraphState } from "../state/GraphState";
 import { BaseNode, NodeExecutionContext } from "./BaseNode";
 import { EventType } from "../../../features/events/eventTypes"; // <<< AÑADIDO
-import { InternalEventDispatcher } from "../../events/InternalEventDispatcher"; // <<< AÑADIDO
 
 export class RespondNode extends BaseNode {
     private responseService: IResponseService;
-    private dispatcher: InternalEventDispatcher; // <<< AÑADIDO
 
     constructor(dependencies: any, observability: any) {
         super(GraphPhase.RESPONSE, dependencies, observability);
@@ -19,13 +17,12 @@ export class RespondNode extends BaseNode {
 
     protected async executeCore(
         state: SimplifiedOptimizedGraphState,
-        context: NodeExecutionContext
     ): Promise<Partial<SimplifiedOptimizedGraphState>> {
 
         const response = await this.responseService.generateResponse(state);
         const executionTime = Date.now() - state.startTime;
 
-        // <<< AÑADIDO: Disparar el evento para que la UI reciba la respuesta final
+
         this.dispatcher.dispatch(EventType.RESPONSE_GENERATED, {
             chatId: state.chatId,
             responseContent: response.response,

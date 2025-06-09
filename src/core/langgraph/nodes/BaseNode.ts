@@ -1,6 +1,8 @@
 // src/core/langgraph/nodes/BaseNode.ts
 import { GraphPhase, SimplifiedOptimizedGraphState } from "../state/GraphState";
 import { IObservabilityManager } from "../services/interfaces/DependencyInterfaces";
+import { InternalEventDispatcher } from "../../events/InternalEventDispatcher";
+import { EventType } from "../../../features/events/eventTypes";
 type DependencyContainer = any;
 
 export interface NodeExecutionContext {
@@ -14,6 +16,8 @@ export abstract class BaseNode {
     protected nodeId: GraphPhase;
     protected dependencies: DependencyContainer;
     protected observability: IObservabilityManager;
+    // CAMBIO: Añadir el dispatcher para poder emitir eventos de error
+    protected dispatcher: InternalEventDispatcher;
 
     constructor(
         nodeId: GraphPhase,
@@ -23,8 +27,11 @@ export abstract class BaseNode {
         this.nodeId = nodeId;
         this.dependencies = dependencies;
         this.observability = observability;
+        // CAMBIO: Obtener el dispatcher desde el contenedor de dependencias
+        this.dispatcher = dependencies.get('InternalEventDispatcher');
     }
 
+    // ... (método execute sin cambios)
     async execute(state: SimplifiedOptimizedGraphState): Promise<Partial<SimplifiedOptimizedGraphState>> {
 
         this.observability.logPhaseStart(this.nodeId, state);
@@ -77,14 +84,23 @@ export abstract class BaseNode {
     }
 
     protected handleError(error: Error, state: SimplifiedOptimizedGraphState): Partial<SimplifiedOptimizedGraphState> {
-        // <<< LOG MEJORADO
         console.error(`[ERROR in ${this.nodeId}] Chat: ${state.chatId}`, error);
         this.observability.trackError(this.nodeId, error, state);
 
+        // CAMBIO: Despachar un evento SYSTEM_ERROR para notificar del error
+        this.dispatcher.dispatch(EventType.SYSTEM_ERROR, {
+            chatId: state.chatId,
+            message: `Error en la fase ${this.nodeId}: ${error.message}`,
+            source: `LangGraphEngine.${this.nodeId}`,
+            errorObject: error,
+        });
+
+        // CAMBIO CLAVE: En lugar de terminar el flujo, lo redirigimos al nodo de manejo de errores.
+        // El grafo ya no termina aquí. El ErrorNode se encargará de generar una respuesta final.
         return {
-            currentPhase: GraphPhase.ERROR,
+            currentPhase: GraphPhase.ERROR_HANDLER,
             error: error.message,
-            isCompleted: true
+            isCompleted: false // El flujo no ha terminado, solo ha cambiado de ruta.
         };
     }
 }

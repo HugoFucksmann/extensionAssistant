@@ -16,6 +16,7 @@ import { PerformanceMonitor } from "@core/monitoring/PerformanceMonitor";
 import { CacheManager } from "@core/utils/CacheManager";
 import { ParallelExecutionService } from "@core/utils/ParallelExecutionService";
 import { ServiceRegistry } from "./dependencies/ServiceRegistry";
+import { EventType } from "@features/events/eventTypes";
 
 export class LangGraphEngine {
     private dependencies: DependencyContainer;
@@ -80,6 +81,8 @@ export class LangGraphEngine {
             finalState = await this.compiledGraph.invoke(initialState, {
                 configurable: { thread_id: chatId }
             });
+            // Notify that the turn has completed successfully
+            this.dispatchTurnCompletedEvent(chatId, finalState.startTime, finalState.error);
         } catch (error: any) {
             finalState = {
                 ...initialState,
@@ -88,6 +91,8 @@ export class LangGraphEngine {
                 currentPhase: GraphPhase.ERROR
             };
             this.observability.trackError('LangGraphEngine.run', error, finalState);
+            // Notify that the turn has completed with an error
+            this.dispatchTurnCompletedEvent(chatId, finalState.startTime, finalState.error);
         }
 
         this.observability.logEngineEnd(chatId, finalState);
@@ -99,6 +104,16 @@ export class LangGraphEngine {
         // ...
     ): AsyncGenerator<SimplifiedOptimizedGraphState> {
         // ...
+    }
+
+    private dispatchTurnCompletedEvent(chatId: string, startTime: number, error?: string): void {
+        const dispatcher = this.dependencies.get<InternalEventDispatcher>('InternalEventDispatcher');
+        dispatcher.dispatch(EventType.CONVERSATION_TURN_COMPLETED, {
+            chatId,
+            status: error ? 'failure' : 'success',
+            duration: Date.now() - startTime,
+            error: error
+        });
     }
 
     public dispose(): void {

@@ -1,10 +1,13 @@
 .loading-indicator-fixed {
+  /* CAMBIO: Se ajusta el posicionamiento para que aparezca encima del contenedor del input. */
   position: absolute;
-  bottom: 0;
+  bottom: 100%; /* Coloca el indicador justo encima del borde superior de su contenedor padre relativo. */
   left: 0;
   right: 0;
   z-index: 1000;
   padding: var(--spacing-sm) var(--spacing-md);
+  /* CAMBIO: Añadimos un puntero de eventos para no bloquear el input si hay algún solapamiento accidental. */
+  pointer-events: none;
 }
 
 .loading-indicator {
@@ -17,6 +20,8 @@
   padding: var(--spacing-sm) var(--spacing-md);
   max-width: 300px;
   margin: 0 auto;
+  /* CAMBIO: Restauramos los eventos de puntero para el contenido del indicador si es necesario. */
+  pointer-events: auto;
 }
 
 .loading-square {

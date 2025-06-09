@@ -31,6 +31,7 @@ export class EventSubscriber {
             EventType.RESPONSE_GENERATED,
             EventType.AGENT_PHASE_STARTED,
             EventType.AGENT_PHASE_COMPLETED,
+            EventType.CONVERSATION_TURN_COMPLETED, // Added for turn completion events
         ];
 
         eventTypesToWatch.forEach(eventType => {
@@ -81,6 +82,9 @@ export class EventSubscriber {
                 return this.handleAgentPhaseCompleted(event, baseMessage);
             case EventType.SYSTEM_ERROR:
                 return this.handleSystemError(event, baseMessage);
+            case EventType.CONVERSATION_TURN_COMPLETED:
+                this.handleTurnCompleted(event);
+                return null; // This event only updates state, doesn't generate a chat message
             default:
                 return null;
         }
@@ -141,6 +145,13 @@ export class EventSubscriber {
         baseMessage.content = this.messageFormatter.formatSystemError(payload);
         baseMessage.metadata = { ...baseMessage.metadata, status: 'error', details: payload.details, errorObject: payload.errorObject, source: payload.source, level: payload.level || 'error' };
         return { messageType: 'systemError', chatMessage: baseMessage };
+    }
+
+    private handleTurnCompleted(event: WindsurfEvent): void {
+        // The most important action: stop the loading indicator in the UI
+        this.stateManager.setLoading(false);
+        // Optionally, send a message to the UI if additional logic is needed there
+        this.postMessage('turnCompleted', {});
     }
 
     public unsubscribeAll(): void {

@@ -21,7 +21,6 @@ export function createMessageHandler(
                 break;
 
             case 'assistantResponse':
-
                 const responsePayload = {
                     id: payload.id || `asst_${Date.now()}`,
                     content: payload.content || '',
@@ -30,7 +29,6 @@ export function createMessageHandler(
                     metadata: payload.metadata || { status: 'completed' },
                     operationId: payload.operationId,
                 };
-
 
                 if (responsePayload.content || !responsePayload.operationId) {
                     dispatch({ type: 'ADD_MESSAGE', payload: responsePayload });
@@ -45,13 +43,11 @@ export function createMessageHandler(
                 break;
 
             case 'agentActionUpdate':
-
                 const hasOperationId = payload.operationId;
                 const existingMessageIndex = hasOperationId ?
                     state.messages.findIndex(m => m.operationId === payload.operationId) : -1;
 
                 if (hasOperationId && existingMessageIndex !== -1) {
-
                     dispatch({
                         type: 'UPDATE_MESSAGE',
                         payload: {
@@ -63,36 +59,24 @@ export function createMessageHandler(
                         }
                     });
                 } else {
-
                     dispatch({ type: 'ADD_MESSAGE', payload });
                 }
 
                 if (payload.metadata?.status === 'tool_executing') {
+                    dispatch({ type: 'SET_LOADING', payload: { loading: true, text: payload.content || `Ejecutando ${payload.metadata.toolName}...` } });
                     dispatch({ type: 'SET_ACTIVE_FEEDBACK_OPERATION_ID', payload: payload.operationId || payload.id });
-                    dispatch({ type: 'SET_LOADING_TEXT', payload: payload.content || `Ejecutando ${payload.metadata.toolName}...` });
-                    dispatch({ type: 'SET_LOADING', payload: { loading: true } });
                 } else if (payload.metadata?.status === 'success' || payload.metadata?.status === 'error') {
-                    dispatch({ type: 'SET_LOADING', payload: { loading: false } });
+                    dispatch({ type: 'SET_LOADING', payload: { loading: true, text: 'Procesando resultado...' } });
                     dispatch({ type: 'SET_ACTIVE_FEEDBACK_OPERATION_ID', payload: null });
-                    if (state.isLoading) {
-                        dispatch({ type: 'SET_LOADING_TEXT', payload: DEFAULT_LOADING_TEXT });
-                    }
                 }
                 break;
 
             case 'agentPhaseUpdate':
                 const phaseContent = payload.content || DEFAULT_LOADING_TEXT;
                 const isPhaseStarted = payload.metadata?.status === 'phase_started';
-                const isPhaseCompleted = payload.metadata?.status === 'phase_completed';
 
                 if (isPhaseStarted) {
                     dispatch({ type: 'SET_LOADING', payload: { loading: true, text: phaseContent } });
-                } else if (isPhaseCompleted) {
-                    dispatch({ type: 'SET_LOADING', payload: { loading: false } });
-                } else {
-                    if (state.isLoading) {
-                        dispatch({ type: 'SET_LOADING_TEXT', payload: phaseContent });
-                    }
                 }
                 break;
 

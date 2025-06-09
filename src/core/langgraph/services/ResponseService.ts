@@ -4,6 +4,7 @@ import { createAutoCorrectStep } from "../../../shared/utils/aiResponseParser";
 import type { ResponseOutput } from "../../../features/ai/prompts/optimized/responsePrompt";
 import { IModelManager, IPromptProvider, IResponseService } from "./interfaces/DependencyInterfaces";
 import { SimplifiedOptimizedGraphState } from "../state/GraphState";
+import { StringOutputParser } from "@langchain/core/output_parsers";
 
 export class ResponseService implements IResponseService {
     constructor(
@@ -16,7 +17,7 @@ export class ResponseService implements IResponseService {
         const prompt = this.promptProvider.getResponsePrompt();
 
         const parseStep = createAutoCorrectStep(responseOutputSchema, model, { maxAttempts: 2 });
-        const chain = prompt.pipe(model).pipe(parseStep);
+        const chain = prompt.pipe(model).pipe(new StringOutputParser()).pipe(parseStep);
 
         const toolResults = state.toolsUsed.map(t => ({ tool: t.toolName, result: t.output }));
 

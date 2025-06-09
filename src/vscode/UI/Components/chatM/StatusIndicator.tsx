@@ -1,4 +1,4 @@
-import type React from "react"
+/* import type React from "react"
 import "./styles/StatusIndicator.css"
 
 interface StatusIndicatorProps {
@@ -8,47 +8,29 @@ interface StatusIndicatorProps {
 }
 
 export const StatusIndicator: React.FC<StatusIndicatorProps> = ({ status, size = "medium", showLabel = false }) => {
+  // CAMBIO: Simplificamos la lógica para mapear múltiples estados a tres clases CSS principales.
   const getStatusClass = (): string => {
-    switch (status) {
-      case "thinking":
-      case "tool_executing":
-        return "processing"
-      case "success":
-      case "completed":
-        return "success"
-      case "error":
-      case "failed":
-        return "error"
-      case "user_input_pending":
-      case "pending":
-        return "pending"
-      case "skipped":
-        return "skipped"
-      default:
-        return "info"
+    if (status === "success" || status === "completed") {
+      return "success"
     }
+    if (status === "error" || status === "failed") {
+      return "error"
+    }
+    // Todos los demás estados (thinking, tool_executing, pending, etc.) se consideran "processing".
+    return "processing"
   }
 
+  // CAMBIO: Simplificamos las etiquetas para que coincidan con los tres estados.
   const getStatusLabel = (): string => {
-    switch (status) {
-      case "thinking":
-        return "Pensando..."
-      case "tool_executing":
-        return "Ejecutando..."
+    const statusClass = getStatusClass()
+    switch (statusClass) {
       case "success":
-        return "Completado"
-      case "completed":
         return "Completado"
       case "error":
         return "Error"
-      case "failed":
-        return "Falló"
-      case "pending":
-        return "Pendiente"
-      case "skipped":
-        return "Omitido"
+      case "processing":
       default:
-        return "Info"
+        return "Procesando..."
     }
   }
 
@@ -58,4 +40,4 @@ export const StatusIndicator: React.FC<StatusIndicatorProps> = ({ status, size =
       {showLabel && <span className="status-label">{getStatusLabel()}</span>}
     </div>
   )
-}
+} */

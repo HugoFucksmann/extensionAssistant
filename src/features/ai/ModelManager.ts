@@ -65,7 +65,7 @@ export class ModelManager implements Disposable {
       },
       ollama: {
         provider: 'ollama',
-        modelName: vsCodeConfig.get<string>('ollama.model', 'gemma3:4b'),
+        modelName: vsCodeConfig.get<string>('ollama.model', 'qwen2.5-coder:7b'),
         temperature: vsCodeConfig.get<number>('ollama.temperature', 0.2),
         baseUrl: vsCodeConfig.get<string>('ollama.baseUrl', 'http://localhost:11434'),
         maxTokens: 4096,

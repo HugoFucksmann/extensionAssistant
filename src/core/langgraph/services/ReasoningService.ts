@@ -5,6 +5,7 @@ import { createAutoCorrectStep } from "../../../shared/utils/aiResponseParser";
 import type { ReasoningOutput } from "../../../features/ai/prompts/optimized/reasoningPrompt";
 import { IModelManager, IPromptProvider, IReasoningService, IToolRegistry } from "./interfaces/DependencyInterfaces";
 import { SimplifiedOptimizedGraphState } from "../state/GraphState";
+import { StringOutputParser } from "@langchain/core/output_parsers";
 
 function formatToolsDescription(toolRegistry: IToolRegistry): string {
     // Esta función se puede mover a una utilidad si se reutiliza.
@@ -24,7 +25,7 @@ export class ReasoningService implements IReasoningService {
         const prompt = this.promptProvider.getReasoningPrompt();
 
         const parseStep = createAutoCorrectStep(reasoningOutputSchema, model, { maxAttempts: 2 });
-        const chain = prompt.pipe(model).pipe(parseStep);
+        const chain = prompt.pipe(model).pipe(new StringOutputParser()).pipe(parseStep);
 
         const previousToolResults = state.messages
             .filter((m): m is ToolMessage => m._getType() === 'tool')

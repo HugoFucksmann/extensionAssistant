@@ -1,6 +1,4 @@
-"use client"
-
-import React, { ReactElement, useState } from "react"
+import React, {  useState } from "react"
 import { getToolDefinition } from "../data/toolOutputs"
 import "../styles/ToolRenderer.css"
 
@@ -28,35 +26,48 @@ const formatTimestamp = (ts?: number): string => {
   return time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
 }
 
-const getActionText = (toolName: string, toolInput?: Record<string, any>, status?: string): string => {
+// CAMBIO: La función ahora genera textos para diferentes estados (ejecutando, éxito, error)
+const getActionText = (
+  toolName: string,
+  toolInput: Record<string, any> | undefined,
+  status: string,
+  isSuccess: boolean
+): string => {
   const definition = getToolDefinition(toolName)
   const baseAction = definition?.displayName || toolName
+  const isProcessing = status === "thinking" || status === "tool_executing"
 
-  // Crear texto descriptivo basado en la herramienta y su input
+  // Textos base para cada estado
+  const stateText = isProcessing ? "Ejecutando" : isSuccess ? "Éxito" : "Error";
+  const stateTextVerb = isProcessing ? "Obteniendo" : isSuccess ? "obtenido" : "falló";
+  const stateTextVerbPast = isProcessing ? "Examinando" : isSuccess ? "examinado" : "falló al examinar";
+
   switch (toolName) {
     case "search":
-      return `Buscando: ${toolInput?.query || "..."}`
+      const query = toolInput?.query || "..."
+      return isProcessing ? `Buscando: ${query}` : `Búsqueda para "${query}" finalizada`
     case "file_examine":
     case "file_read":
     case "getFileContents":
       const fileName = toolInput?.filePath?.split("/").pop() || toolInput?.filePath || "archivo"
-      return `Examinando archivo: ${fileName}`
+      return isProcessing ? `Examinando: ${fileName}` : `Archivo ${fileName} ${stateTextVerbPast}`
     case "file_edit":
     case "file_write":
       const editFileName = toolInput?.filePath?.split("/").pop() || toolInput?.filePath || "archivo"
-      return `Editando archivo: ${editFileName}`
+      return isProcessing ? `Editando: ${editFileName}` : `Archivo ${editFileName} editado`
     case "project_search":
-      return `Buscando en proyecto: ${toolInput?.query || "..."}`
+      const projectQuery = toolInput?.query || "..."
+      return isProcessing ? `Buscando en proyecto: ${projectQuery}` : `Búsqueda en proyecto finalizada`
     case "console_command":
     case "terminal":
       const command = toolInput?.command?.split(" ")[0] || "comando"
-      return `Ejecutando: ${command}`
+      return `${stateText}: ${command}`
     case "getGitStatus":
-      return "Obteniendo estado de Git"
+      return isProcessing ? "Obteniendo estado de Git" : `Estado de Git ${stateTextVerb}`
     case "getProjectSummary":
-      return "Generando resumen del proyecto"
+      return isProcessing ? "Generando resumen del proyecto" : `Resumen del proyecto ${stateTextVerb}`
     default:
-      return baseAction
+      return `${baseAction}: ${stateText.toLowerCase()}`
   }
 }
 
@@ -71,27 +82,13 @@ export const ToolRendererBase: React.FC<ToolRendererBaseProps> = ({
   children,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false)
-  const definition = getToolDefinition(toolName)
   const isSuccess = success !== undefined ? success : status === "success" || toolOutput?.success
   const isError = status === "error" || success === false
   const isProcessing = status === "thinking" || status === "tool_executing"
   const hasDetails = React.Children.count(children) > 0
 
-  const getStatusColor = () => {
-    if (isError) return "var(--status-error)"
-    if (isSuccess) return "var(--status-success)"
-    if (isProcessing) return "var(--status-warning)"
-    return "var(--text-muted)"
-  }
-
-  const renderStatusIndicator = () => {
-    return (
-      <div
-        className={`status-square ${isProcessing ? "processing" : isError ? "error" : "success"}`}
-        style={{ backgroundColor: getStatusColor() }}
-      />
-    )
-  }
+  // CAMBIO: El texto de acción ahora es dinámico según el estado
+  const actionText = getActionText(toolName, toolInput, status, isSuccess)
 
   const handleToggleExpand = () => {
     if (hasDetails && !isProcessing) {
@@ -99,18 +96,17 @@ export const ToolRendererBase: React.FC<ToolRendererBaseProps> = ({
     }
   }
 
-  const actionText = getActionText(toolName, toolInput, status)
-
   return (
     <div
-      className={`tool-card ${status} ${isSuccess ? "success" : ""} ${isError ? "error" : ""} ${isExpanded ? "expanded" : ""}`}
+      className={`tool-card ${isProcessing ? "processing" : isError ? "error" : "success"} ${isExpanded ? "expanded" : ""}`}
     >
       <div
         className={`tool-card-header ${hasDetails && !isProcessing ? "clickable" : ""}`}
         onClick={handleToggleExpand}
       >
         <div className="tool-main-info">
-          {renderStatusIndicator()}
+          {/* CAMBIO: Indicador de estado simplificado. La lógica de estilo está en CSS. */}
+          <div className={`status-square ${isProcessing ? "processing" : isError ? "error" : "success"}`} />
           <span className="tool-action-text">{actionText}</span>
         </div>
 

@@ -27,6 +27,7 @@ export class ComponentFactory {
   private static langGraphEngineInstance: LangGraphEngine;
   private static cacheManagerInstance: CacheManager;
   private static parallelExecutionServiceInstance: ParallelExecutionService;
+  private static appLogicService: ApplicationLogicService;
 
   public static getCacheManager(): CacheManager {
     if (!this.cacheManagerInstance) {
@@ -89,18 +90,22 @@ export class ComponentFactory {
     return this.langGraphEngineInstance;
   }
 
-  public static async getApplicationLogicService(extensionContext: vscode.ExtensionContext): Promise<ApplicationLogicService> {
-    if (!this.applicationLogicServiceInstance) {
-      const engine = await this.getLangGraphEngine(extensionContext);
+  public static async getApplicationLogicService(context: vscode.ExtensionContext): Promise<ApplicationLogicService> {
+    if (!this.appLogicService) {
+      const agentEngine = await this.getLangGraphEngine(context);
       const conversationManager = this.getConversationManager();
       const toolRegistry = this.getToolRegistry();
-      this.applicationLogicServiceInstance = new ApplicationLogicService(
-        engine,
+      // CAMBIO: Obtener el despachador y pasarlo al constructor.
+      const dispatcher = this.getInternalEventDispatcher();
+
+      this.appLogicService = new ApplicationLogicService(
+        agentEngine,
         conversationManager,
-        toolRegistry
+        toolRegistry,
+        dispatcher // Añadir esta línea
       );
     }
-    return this.applicationLogicServiceInstance;
+    return this.appLogicService;
   }
 
   public static getConversationManager(): ConversationManager {

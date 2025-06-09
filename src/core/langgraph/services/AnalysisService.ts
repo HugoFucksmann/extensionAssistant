@@ -2,6 +2,7 @@
 import { createAutoCorrectStep } from "../../../shared/utils/aiResponseParser";
 import { analysisOutputSchema } from "../../../features/ai/prompts/optimized/analysisPrompt";
 import type { AnalysisOutput } from "../../../features/ai/prompts/optimized/analysisPrompt";
+import { StringOutputParser } from "@langchain/core/output_parsers";
 import { IAnalysisService, IModelManager, IPromptProvider, StructuredMemoryContext } from "./interfaces/DependencyInterfaces";
 
 export class AnalysisService implements IAnalysisService {
@@ -19,7 +20,7 @@ export class AnalysisService implements IAnalysisService {
             verbose: process.env.NODE_ENV === 'development',
         });
 
-        const chain = prompt.pipe(model).pipe(parseStep);
+        const chain = prompt.pipe(model).pipe(new StringOutputParser()).pipe(parseStep);
 
         const analysisResult = await chain.invoke({
             userQuery: query,
