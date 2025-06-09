@@ -398,6 +398,10 @@
   overflow: hidden;
 }
 
+.margin-icon-right {
+  margin-right: 6px;
+}
+
 .file-dropdown {
   display: flex;
   flex-direction: column;
@@ -455,7 +459,7 @@
 }
 
 .file-item-icon {
-  margin-right: 10px;
+  
   color: rgba(139, 148, 158, 0.8);
 }
 
