@@ -17,7 +17,7 @@ export class MessageFormatter {
 
 
     public formatToolExecutionStarted(payload: any): string {
-        return `🔧 Ejecutando ${payload.toolName || 'herramienta'}...`;
+        return `Ejecutando ${payload.toolName || 'herramienta'}...`;
     }
 
     public formatToolExecutionCompleted(payload: any): { content: string; metadata: any } {
@@ -36,7 +36,7 @@ export class MessageFormatter {
         const toolName = payload.toolName || 'herramienta';
         const error = payload.error || 'Error desconocido';
         return {
-            content: `❌ ${toolName} falló: ${error}`,
+            content: `${toolName} falló: ${error}`,
             metadata: {
                 status: 'error',
                 toolName: payload.toolName,
@@ -52,12 +52,12 @@ export class MessageFormatter {
     }
 
     public formatAgentPhaseCompleted(payload: any): string {
-        return `✅ Fase completada: ${payload.phase}`;
+        return `ase completada: ${payload.phase}`;
     }
 
     public formatSystemError(payload: any): string {
         const errorMessage = payload.message || payload.errorMessage || 'Error inesperado del sistema.';
-        return `⚠️ Error del sistema: ${errorMessage}`;
+        return `Error del sistema: ${errorMessage}`;
     }
 
     public formatResponseGenerated(payload: any): string {
