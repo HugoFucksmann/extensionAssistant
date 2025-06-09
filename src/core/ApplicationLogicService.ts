@@ -4,25 +4,24 @@ import { ConversationManager } from './ConversationManager';
 import { Disposable } from './interfaces/Disposable';
 import { LangGraphEngine } from './langgraph/LangGraphEngine';
 import { ToolRegistry } from '../features/tools/ToolRegistry';
-// CAMBIO: Importaciones necesarias
 import { InternalEventDispatcher } from './events/InternalEventDispatcher';
 import { EventType } from '../features/events/eventTypes';
-import { AIMessage } from '@langchain/core/messages';
+import { HumanMessage } from '@langchain/core/messages';
+import { GraphPhase } from './langgraph/state/GraphState';
 
 export interface ProcessUserMessageResult {
   success: boolean;
-  finalResponse?: string; // Mantenemos string para la API externa, pero internamente manejaremos el tipo correcto
+  finalResponse?: string;
   updatedState?: SimplifiedOptimizedGraphState;
   error?: string;
 }
 
 export class ApplicationLogicService implements Disposable {
-  // CAMBIO: Añadir el dispatcher al constructor
   constructor(
     private agentEngine: LangGraphEngine,
     private conversationManager: ConversationManager,
     private toolRegistry: ToolRegistry,
-    private dispatcher: InternalEventDispatcher // Añadido
+    private dispatcher: InternalEventDispatcher
   ) { }
 
   public async processUserMessage(
@@ -30,28 +29,56 @@ export class ApplicationLogicService implements Disposable {
     userMessage: string,
     contextData: Record<string, any> = {}
   ): Promise<ProcessUserMessageResult> {
-    const { state: convState, isNew } = this.conversationManager.getOrCreateConversationState(
+    const { state: existingState, isNew } = this.conversationManager.getOrCreateConversationState(
       chatId,
       userMessage,
       contextData
     );
+
     if (isNew) {
       this.conversationManager.setActiveChatId(chatId);
     }
 
-    // CAMBIO: Eliminamos el `try...catch` que envolvía la llamada al motor.
-    // El motor ahora se ejecuta en segundo plano y el `catch` aquí no capturaría errores asíncronos.
-    // La función principal ahora solo inicia el proceso.
+    // CAMBIO: Obtener la configuración actual del motor.
+    const engineConfig = this.agentEngine.getConfig();
 
-    // Ejecutamos el motor en segundo plano y no esperamos (fire-and-forget).
-    // El motor es responsable de emitir eventos, incluyendo el de finalización o error.
-    this.agentEngine.run(userMessage, chatId)
+    const stateForNewTurn: SimplifiedOptimizedGraphState = {
+      ...existingState,
+      userInput: userMessage,
+      messages: [...existingState.messages, new HumanMessage(userMessage)],
+      error: undefined,
+      isCompleted: false,
+      requiresValidation: false,
+      lastToolOutput: undefined,
+      currentPlan: [],
+      currentTask: undefined,
+      toolsUsed: [],
+      iteration: 0,
+      nodeIterations: {
+        ANALYSIS: 0,
+        EXECUTION: 0,
+        VALIDATION: 0,
+        RESPONSE: 0,
+        COMPLETED: 0,
+        ERROR: 0,
+        ERROR_HANDLER: 0,
+      },
+      startTime: Date.now(),
+      currentPhase: GraphPhase.ANALYSIS,
+      // CAMBIO: Aplicar la configuración del motor al estado del turno.
+      maxGraphIterations: engineConfig.maxGraphIterations,
+      maxNodeIterations: engineConfig.maxNodeIterations,
+    };
+
+    this.conversationManager.updateConversationState(chatId, stateForNewTurn);
+
+    this.agentEngine.run(stateForNewTurn)
+      .then(finalState => {
+        this.conversationManager.updateConversationState(chatId, finalState);
+      })
       .catch((error: any) => {
-        // Este catch es un último recurso si la promesa de `run` es rechazada,
-        // lo cual no debería ocurrir si el motor maneja sus propios errores internos.
         console.error(`[ApplicationLogicService] Critical unhandled error from agentEngine.run for chat ${chatId}:`, error);
 
-        // Despachamos un evento de error del sistema para que la UI reaccione.
         this.dispatcher.dispatch(EventType.SYSTEM_ERROR, {
           chatId: chatId,
           message: `Error crítico en el motor del agente: ${error.message}`,
@@ -59,17 +86,15 @@ export class ApplicationLogicService implements Disposable {
           errorObject: error,
         });
 
-        // Actualizamos el estado de la conversación con el error.
-        const finalErrorState = this.conversationManager.getConversationState(chatId) || convState;
+        const finalErrorState = this.conversationManager.getConversationState(chatId) || stateForNewTurn;
         finalErrorState.error = error.message || 'Unknown async error in LangGraphEngine.';
+        finalErrorState.isCompleted = true;
         this.conversationManager.updateConversationState(chatId, finalErrorState);
       });
 
-    // Retornamos inmediatamente para que la UI no se quede bloqueada.
-    // La UI ahora dependerá 100% de los eventos para las actualizaciones.
     return {
       success: true,
-      updatedState: convState
+      updatedState: stateForNewTurn
     };
   }
 

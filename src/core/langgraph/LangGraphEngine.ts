@@ -3,12 +3,11 @@ import { CompiledStateGraph, MemorySaver } from "@langchain/langgraph";
 import { ModelManager } from "../../features/ai/ModelManager";
 import { MemoryManager } from "../../features/memory/MemoryManager";
 import { ToolRegistry } from "../../features/tools/ToolRegistry";
-import { DEFAULT_ENGINE_CONFIG, EngineConfig } from "./config/EngineConfig";
+import { DEFAULT_ENGINE_CONFIG, EngineConfig } from "./config/EngineConfig"; // <-- Asegúrate que EngineConfig esté exportado
 import { DependencyContainer } from "./dependencies/DependencyContainer";
 
 import { GraphBuilder } from "./graph/GraphBuilder";
 import { GraphPhase, SimplifiedOptimizedGraphState } from "./state/GraphState";
-import { StateFactory } from "./state/StateFactory";
 
 import { IObservabilityManager } from "./services/interfaces/DependencyInterfaces";
 import { InternalEventDispatcher } from "@core/events/InternalEventDispatcher";
@@ -24,17 +23,6 @@ export class LangGraphEngine {
     private config: EngineConfig;
     private observability: IObservabilityManager;
 
-    /**
-     * Crea una nueva instancia de LangGraphEngine
-     * @param modelManager Gestor de modelos de IA
-     * @param toolRegistry Registro de herramientas disponibles
-     * @param memoryManager Gestor de memoria
-     * @param dispatcher Dispatcher de eventos internos
-     * @param performanceMonitor Monitor de rendimiento
-     * @param cacheManager Gestor de caché (debe ser un singleton)
-     * @param parallelExecutionService Servicio de ejecución en paralelo (debe ser un singleton)
-     * @param config Configuración personalizada del motor
-     */
     constructor(
         modelManager: ModelManager,
         toolRegistry: ToolRegistry,
@@ -46,7 +34,6 @@ export class LangGraphEngine {
         config: Partial<EngineConfig> = {}
     ) {
         this.config = { ...DEFAULT_ENGINE_CONFIG, ...config };
-
 
         this.dependencies = ServiceRegistry.createContainer(
             modelManager,
@@ -68,37 +55,37 @@ export class LangGraphEngine {
         });
     }
 
+    // CAMBIO: Añadir este getter público
+    public getConfig(): EngineConfig {
+        return this.config;
+    }
 
     public async run(
-        userInput: string,
-        chatId: string
+        initialStateForTurn: SimplifiedOptimizedGraphState
     ): Promise<SimplifiedOptimizedGraphState> {
+        const chatId = initialStateForTurn.chatId;
         this.observability.logEngineStart(chatId);
-        const initialState = StateFactory.createInitialState(userInput, chatId, this.config);
 
         let finalState: SimplifiedOptimizedGraphState;
         try {
-            finalState = await this.compiledGraph.invoke(initialState, {
+            finalState = await this.compiledGraph.invoke(initialStateForTurn, {
                 configurable: { thread_id: chatId }
             });
-            // Notify that the turn has completed successfully
             this.dispatchTurnCompletedEvent(chatId, finalState.startTime, finalState.error);
         } catch (error: any) {
             finalState = {
-                ...initialState,
+                ...initialStateForTurn,
                 error: `Engine execution failed: ${error.message}`,
                 isCompleted: true,
                 currentPhase: GraphPhase.ERROR
             };
             this.observability.trackError('LangGraphEngine.run', error, finalState);
-            // Notify that the turn has completed with an error
             this.dispatchTurnCompletedEvent(chatId, finalState.startTime, finalState.error);
         }
 
         this.observability.logEngineEnd(chatId, finalState);
         return finalState;
     }
-
 
     public async *stream(
         // ...
@@ -117,7 +104,6 @@ export class LangGraphEngine {
     }
 
     public dispose(): void {
-
         console.log("[LangGraphEngine] Disposed.");
     }
 }

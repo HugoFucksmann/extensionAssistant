@@ -30,7 +30,6 @@ export class ExecuteNode extends BaseNode {
 
         if (reasoningResult.nextAction === 'use_tool' && reasoningResult.tool) {
             const toolUpdates = await this.executeTool(reasoningResult.tool, reasoningResult.parameters, state);
-            // Fusionar los mensajes y otros campos del estado
             updates.messages = [...(updates.messages || []), ...(toolUpdates.messages || [])];
             delete toolUpdates.messages;
             updates = { ...updates, ...toolUpdates };
@@ -40,8 +39,6 @@ export class ExecuteNode extends BaseNode {
                 updates.messages = [...(updates.messages || []), new AIMessage(reasoningResult.response)];
             }
         }
-
-        // Si en el futuro se requiere actualización de memoria, agregar aquí.
 
         return updates;
     }
@@ -76,10 +73,9 @@ export class ExecuteNode extends BaseNode {
             toolsUsed: [toolExecution],
             lastToolOutput: toolResult.data,
             messages: [toolMessage],
-            // Si la herramienta falla, activa el nodo de validación para intentar recuperarse.
             requiresValidation: !toolResult.success,
-            // Propaga el error al estado para que el nodo de validación pueda usarlo.
-            error: toolResult.error
+            // CAMBIO: Limpiar el error si la herramienta tuvo éxito, o establecerlo si falló.
+            error: toolResult.success ? undefined : toolResult.error
         };
     }
 }

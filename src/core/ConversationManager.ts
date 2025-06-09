@@ -3,9 +3,10 @@ import { SimplifiedOptimizedGraphState } from './langgraph/state/GraphState';
 import { IConversationManager } from './interfaces/IConversationManager';
 import { generateUniqueId } from '../shared/utils/generateIds';
 import { Disposable } from './interfaces/Disposable';
-// 1. Importaciones necesarias para el despachador de eventos
 import { InternalEventDispatcher } from './events/InternalEventDispatcher';
 import { EventType } from '../features/events/eventTypes';
+// CAMBIO: Importar la configuración por defecto
+import { DEFAULT_ENGINE_CONFIG } from './langgraph/config/EngineConfig';
 
 
 export class ConversationManager implements IConversationManager, Disposable {
@@ -61,7 +62,7 @@ export class ConversationManager implements IConversationManager, Disposable {
       chatId: chatId,
       userInput: userMessage || '',
       messages: [],
-      currentPhase: undefined as any, // Se inicializará según la lógica de negocio
+      currentPhase: undefined as any,
       currentPlan: [],
       toolsUsed: [],
       workingMemory: '',
@@ -76,9 +77,11 @@ export class ConversationManager implements IConversationManager, Disposable {
         RESPONSE: 0,
         COMPLETED: 0,
         ERROR: 0,
+        ERROR_HANDLER: 0,
       },
-      maxGraphIterations: 0,
-      maxNodeIterations: {},
+      // CAMBIO: Usar valores por defecto seguros.
+      maxGraphIterations: DEFAULT_ENGINE_CONFIG.maxGraphIterations,
+      maxNodeIterations: DEFAULT_ENGINE_CONFIG.maxNodeIterations,
       startTime: currentTime,
     };
 
@@ -92,14 +95,8 @@ export class ConversationManager implements IConversationManager, Disposable {
   }
 
   public updateConversationState(chatId: string, state: SimplifiedOptimizedGraphState): void {
-
-
     this.activeConversations.set(chatId, state);
-
   }
-
-
-
 
   public clearConversation(chatId?: string): boolean {
     const targetChatId = chatId || this.activeChatId;
@@ -107,7 +104,6 @@ export class ConversationManager implements IConversationManager, Disposable {
 
     const wasDeleted = this.activeConversations.delete(targetChatId);
 
-    // En lugar de llamar a memoryManager, despachamos un evento
     if (wasDeleted) {
       this.dispatcher.dispatch(EventType.CONVERSATION_ENDED, {
         chatId: targetChatId,
@@ -129,7 +125,6 @@ export class ConversationManager implements IConversationManager, Disposable {
 
 
   public dispose(): void {
-
     this.activeConversations.clear();
     this.activeChatId = null;
   }
