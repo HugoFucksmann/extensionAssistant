@@ -1,3 +1,0 @@
-ALL_
-BACK_52600 - sin utils 46200
-FRONT_
