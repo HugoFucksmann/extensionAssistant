@@ -1,11 +1,5 @@
-// src/vscode/webView/formatters/MessageFormatter.ts
+// src/vscode/webView/formatters/MessageFormatter.ts - Simplified Version
 import { ChatMessage } from '../../../features/chat/types';
-import {
-    ToolExecutionEventPayload,
-    AgentPhaseEventPayload,
-    SystemEventPayload,
-    ResponseEventPayload
-} from '../../../features/events/eventTypes';
 
 export interface FormattedMessage {
     title: string;
@@ -38,11 +32,11 @@ export class MessageFormatter {
         'finalResponseGeneration': '✅ Respuesta lista'
     };
 
-    public formatToolExecutionStarted(payload: ToolExecutionEventPayload): string {
+    public formatToolExecutionStarted(payload: any): string {
         return `🔧 ${payload.toolDescription || `Ejecutando ${payload.toolName || 'herramienta'}`}...`;
     }
 
-    public formatToolExecutionCompleted(payload: ToolExecutionEventPayload): { content: string; metadata: any } {
+    public formatToolExecutionCompleted(payload: any): { content: string; metadata: any } {
         const toolDisplayName = payload.toolDescription || payload.toolName || 'La herramienta';
         const formattedOutput = this.formatToolOutput(payload.toolName || 'UnknownTool', payload.rawOutput);
 
@@ -74,12 +68,12 @@ export class MessageFormatter {
                 },
                 modelAnalysis: payload.modelAnalysis,
                 toolSuccess: true,
-                warnings: (payload.rawOutput as any)?.warnings
+                warnings: payload.rawOutput?.warnings
             }
         };
     }
 
-    public formatToolExecutionError(payload: ToolExecutionEventPayload): { content: string; metadata: any } {
+    public formatToolExecutionError(payload: any): { content: string; metadata: any } {
         const toolDisplayName = payload.toolDescription || payload.toolName || 'La herramienta';
         const errorMessage = payload.error || 'Error desconocido al ejecutar la herramienta.';
         const formattedOutput = this.formatToolOutput(payload.toolName || 'UnknownTool', { error: errorMessage }, true);
@@ -110,16 +104,16 @@ export class MessageFormatter {
                 rawOutput: payload.rawOutput,
                 modelAnalysis: payload.modelAnalysis,
                 toolSuccess: false,
-                warnings: (payload.rawOutput as any)?.warnings
+                warnings: payload.rawOutput?.warnings
             }
         };
     }
 
-    public formatAgentPhaseStarted(payload: AgentPhaseEventPayload): string {
+    public formatAgentPhaseStarted(payload: any): string {
         return this.phaseNames[payload.phase] || `${payload.phase}`;
     }
 
-    public formatAgentPhaseCompleted(payload: AgentPhaseEventPayload): string {
+    public formatAgentPhaseCompleted(payload: any): string {
         let content = this.phaseCompletedNames[payload.phase] || `Fase completada: ${payload.phase}`;
 
         if (payload.data) {
@@ -137,19 +131,12 @@ export class MessageFormatter {
         return content;
     }
 
-    public formatSystemError(payload: SystemEventPayload): string {
-        let errorMessageText = 'Error inesperado del sistema.';
-
-        if ('message' in payload && typeof payload.message === 'string') {
-            errorMessageText = payload.message;
-        } else if ('errorMessage' in payload && typeof payload.errorMessage === 'string') {
-            errorMessageText = payload.errorMessage;
-        }
-
-        return `⚠️ Error del sistema: ${errorMessageText}`;
+    public formatSystemError(payload: any): string {
+        const errorMessage = payload.message || payload.errorMessage || 'Error inesperado del sistema.';
+        return `⚠️ Error del sistema: ${errorMessage}`;
     }
 
-    public formatResponseGenerated(payload: ResponseEventPayload): string {
+    public formatResponseGenerated(payload: any): string {
         return payload.responseContent;
     }
 
