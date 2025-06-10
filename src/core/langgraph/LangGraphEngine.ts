@@ -10,10 +10,10 @@ import { GraphBuilder } from "./graph/GraphBuilder";
 import { GraphPhase, SimplifiedOptimizedGraphState } from "./state/GraphState";
 
 import { IObservabilityManager } from "./services/interfaces/DependencyInterfaces";
-import { InternalEventDispatcher } from "@core/events/InternalEventDispatcher";
-import { PerformanceMonitor } from "@core/monitoring/PerformanceMonitor";
-import { CacheManager } from "@core/utils/CacheManager";
-import { ParallelExecutionService } from "@core/utils/ParallelExecutionService";
+import { InternalEventDispatcher } from "src/core/events/InternalEventDispatcher";
+import { PerformanceMonitor } from "src/core/monitoring/PerformanceMonitor";
+import { CacheManager } from "src/core/utils/CacheManager";
+import { ParallelExecutionService } from "src/core/utils/ParallelExecutionService";
 import { ServiceRegistry } from "./dependencies/ServiceRegistry";
 import { EventType } from "@features/events/eventTypes";
 

@@ -1,4 +1,4 @@
-// src/vscode/react/context/appActions.ts
+// src/vscode/react/context/appActions.ts - Enhanced with Execution Mode Support
 
 import { ChatMessage } from '../../../features/chat/types';
 import { DEFAULT_LOADING_TEXT } from './constants';
@@ -11,7 +11,7 @@ export function createAppActions(
     dispatch: ActionDispatcher
 ) {
     return {
-        sendMessage: (text: string, files: string[] = []) => {
+        sendMessage: (text: string, files: string[] = [], mode?: 'simple' | 'planner' | 'supervised') => {
             const userMessage: ChatMessage = {
                 id: `user_${Date.now()}`,
                 content: text,
@@ -23,7 +23,13 @@ export function createAppActions(
             console.log('[AppActions] Sending user message:', userMessage);
             dispatch({ type: 'ADD_MESSAGE', payload: userMessage });
             dispatch({ type: 'SET_LOADING', payload: { loading: true, text: DEFAULT_LOADING_TEXT } });
-            postMessage('userMessageSent', { text, files });
+
+            // Include execution mode in the message if specified
+            postMessage('userMessageSent', {
+                text,
+                files,
+                ...(mode && { mode })
+            });
         },
 
         newChat: () => {

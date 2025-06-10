@@ -1,4 +1,4 @@
-// src/vscode/react/context/messageHandlers.ts
+// src/vscode/react/context/messageHandlers.ts - Enhanced with Execution Mode Support
 
 import { AppState, AppAction } from './types';
 import { DEFAULT_LOADING_TEXT } from './constants';
@@ -126,6 +126,34 @@ export function createMessageHandler(
                 if (state.chatList.length === 0) {
                     postMessage('command', { command: 'getChatHistory' });
                 }
+                break;
+
+            // New execution mode message handlers
+            case 'modesUpdated':
+                dispatch({ type: 'SET_AVAILABLE_EXECUTION_MODES', payload: payload.availableModes });
+                if (payload.currentMode) {
+                    dispatch({ type: 'SET_EXECUTION_MODE', payload: payload.currentMode });
+                }
+                break;
+
+            case 'executionModeChanged':
+                dispatch({
+                    type: 'EXECUTION_MODE_CHANGED',
+                    payload: {
+                        mode: payload.mode,
+                        modeName: payload.modeName
+                    }
+                });
+                break;
+
+            case 'requestUserInteraction':
+                // Handle user interaction requests from backend
+                console.log('[MessageHandler] User interaction requested:', payload);
+                // This could trigger a modal or other UI element
+                break;
+
+            case 'turnCompleted':
+                dispatch({ type: 'SET_LOADING', payload: { loading: false } });
                 break;
 
             case 'responseReceived':

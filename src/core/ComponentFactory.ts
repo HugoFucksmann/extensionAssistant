@@ -1,4 +1,3 @@
-// src/core/ComponentFactory.ts
 import * as vscode from 'vscode';
 
 import { ModelManager } from '../features/ai/ModelManager';
@@ -8,15 +7,20 @@ import { ConversationManager } from './ConversationManager';
 import { ApplicationLogicService } from './ApplicationLogicService';
 import { InternalEventDispatcher } from './events/InternalEventDispatcher';
 import { MemoryManager } from '../features/memory/MemoryManager';
-import { LangGraphEngine } from './langgraph/LangGraphEngine';
 import { PerformanceMonitor } from './monitoring/PerformanceMonitor';
 import { CacheManager } from './utils/CacheManager';
 import { ParallelExecutionService } from './utils/ParallelExecutionService';
-import { SystemInitializer } from './langgraph/initialization/SystemInitializer';
 import { Disposable } from './interfaces/Disposable';
 
+// CAMBIO CLAVE: Importar el nuevo motor de ejecución y sus dependencias.
+// El LangGraphEngine y SystemInitializer ya no son necesarios.
+import { ExecutionEngine } from './execution/ExecutionEngine';
+import { ConcreteExecutionEngine } from './execution/ConcreteExecutionEngine';
+// ExecutionStateManager y CheckpointManager son gestionados internamente por ConcreteExecutionEngine,
+// por lo que no necesitamos importarlos aquí directamente.
 
 export class ComponentFactory {
+  // CAMBIO CLAVE: Renombrado para mayor claridad, pero la instancia sigue siendo la misma.
   private static applicationLogicServiceInstance: ApplicationLogicService;
   private static internalEventDispatcherInstance: InternalEventDispatcher;
   private static toolRegistryInstance: ToolRegistry;
@@ -24,10 +28,15 @@ export class ComponentFactory {
   private static conversationManagerInstance: ConversationManager;
   private static memoryManagerInstance: MemoryManager;
   private static performanceMonitorInstance: PerformanceMonitor;
-  private static langGraphEngineInstance: LangGraphEngine;
   private static cacheManagerInstance: CacheManager;
   private static parallelExecutionServiceInstance: ParallelExecutionService;
-  private static appLogicService: ApplicationLogicService;
+
+  // CAMBIO CLAVE: La instancia del nuevo motor de ejecución.
+  private static executionEngineInstance: ExecutionEngine;
+
+  // CAMBIO CLAVE: Las instancias de LangGraphEngine y sus dependencias directas se eliminan.
+  // private static langGraphEngineInstance: LangGraphEngine;
+  // private static appLogicService: ApplicationLogicService; // Redundante
 
   public static getCacheManager(): CacheManager {
     if (!this.cacheManagerInstance) {
@@ -83,29 +92,33 @@ export class ComponentFactory {
     return this.performanceMonitorInstance;
   }
 
+  // CAMBIO CLAVE: El método getLangGraphEngine se elimina por completo. Es obsoleto.
+  /*
   public static async getLangGraphEngine(extensionContext: vscode.ExtensionContext): Promise<LangGraphEngine> {
-    if (!this.langGraphEngineInstance) {
-      this.langGraphEngineInstance = await SystemInitializer.initialize(extensionContext);
-    }
-    return this.langGraphEngineInstance;
+    // ...código eliminado...
   }
+  */
 
+  // CAMBIO CLAVE: Este es el método principal que se modifica para usar el nuevo motor.
   public static async getApplicationLogicService(context: vscode.ExtensionContext): Promise<ApplicationLogicService> {
-    if (!this.appLogicService) {
-      const agentEngine = await this.getLangGraphEngine(context);
+    if (!this.applicationLogicServiceInstance) {
+      // 1. Obtener el nuevo motor de ejecución en lugar del antiguo.
+      const executionEngine = this.getExecutionEngine(context);
+
+      // 2. Obtener las demás dependencias como antes.
       const conversationManager = this.getConversationManager();
       const toolRegistry = this.getToolRegistry();
-      // CAMBIO: Obtener el despachador y pasarlo al constructor.
       const dispatcher = this.getInternalEventDispatcher();
 
-      this.appLogicService = new ApplicationLogicService(
-        agentEngine,
+      // 3. Instanciar ApplicationLogicService con el nuevo motor.
+      this.applicationLogicServiceInstance = new ApplicationLogicService(
+        executionEngine, // <-- Se pasa el nuevo motor
         conversationManager,
         toolRegistry,
-        dispatcher // Añadir esta línea
+        dispatcher
       );
     }
-    return this.appLogicService;
+    return this.applicationLogicServiceInstance;
   }
 
   public static getConversationManager(): ConversationManager {
@@ -115,10 +128,34 @@ export class ComponentFactory {
     return this.conversationManagerInstance;
   }
 
+  // --- NUEVOS MÉTODOS DEL MOTOR DE EJECUCIÓN (ETAPA 1 COMPLETADA) ---
 
-  // src/core/ComponentFactory.ts
+  /**
+   * CAMBIO CLAVE: Implementación completa del getter para el nuevo motor de ejecución.
+   * Crea y devuelve una instancia singleton de ConcreteExecutionEngine.
+   * Este es el corazón de la nueva arquitectura.
+   */
+  public static getExecutionEngine(extensionContext: vscode.ExtensionContext): ExecutionEngine {
+    if (!this.executionEngineInstance) {
+      console.log('[ComponentFactory] Creating new ConcreteExecutionEngine instance...');
+      const memoryManager = this.getMemoryManager(extensionContext);
+      // ConcreteExecutionEngine se encarga de crear su propio StateManager y CheckpointManager.
+      this.executionEngineInstance = new ConcreteExecutionEngine(memoryManager);
+    }
+    return this.executionEngineInstance;
+  }
 
-  // ...
+  /**
+   * CAMBIO CLAVE: El nuevo sistema ya está disponible.
+   */
+  public static isExecutionEngineAvailable(): boolean {
+    return true; // ¡El nuevo motor está vivo!
+  }
+
+  // CAMBIO CLAVE: Los getters para ExecutionStateManager y CheckpointManager se eliminan
+  // porque son detalles de implementación interna del ConcreteExecutionEngine.
+  // Esto simplifica la API de la fábrica.
+
   public static async dispose(): Promise<void> {
     const disposeSafely = async (component: Disposable | undefined) => {
       if (component && typeof component.dispose === 'function') {
@@ -126,11 +163,17 @@ export class ComponentFactory {
       }
     };
 
+    // CAMBIO CLAVE: Asegurarse de que el nuevo motor se deseche correctamente.
+    await disposeSafely(this.executionEngineInstance);
+    this.executionEngineInstance = undefined as any;
+
+    // Lógica de desecho existente
     await disposeSafely(this.applicationLogicServiceInstance);
     this.applicationLogicServiceInstance = undefined as any;
 
-    await disposeSafely(this.langGraphEngineInstance);
-    this.langGraphEngineInstance = undefined as any;
+    // El langGraphEngineInstance ya no existe, por lo que se elimina de aquí.
+    // await disposeSafely(this.langGraphEngineInstance);
+    // this.langGraphEngineInstance = undefined as any;
 
     await disposeSafely(this.memoryManagerInstance);
     this.memoryManagerInstance = undefined as any;
@@ -138,12 +181,9 @@ export class ComponentFactory {
     await disposeSafely(this.modelManagerInstance);
     this.modelManagerInstance = undefined as any;
 
-    // Ahora usamos disposeSafely para el toolRegistry
     await disposeSafely(this.toolRegistryInstance);
     this.toolRegistryInstance = undefined as any;
 
-    // Nota: PerformanceMonitor también podría implementar Disposable, pero por ahora su 'reset' es suficiente.
-    // Si tuviera más lógica de limpieza, seguiría el mismo patrón.
     this.performanceMonitorInstance?.reset();
     this.performanceMonitorInstance = undefined as any;
 
@@ -158,5 +198,4 @@ export class ComponentFactory {
 
     console.log('[ComponentFactory] All components disposed.');
   }
-
 }

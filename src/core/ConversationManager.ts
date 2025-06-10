@@ -1,16 +1,24 @@
 // src/core/ConversationManager.ts
-import { SimplifiedOptimizedGraphState } from './langgraph/state/GraphState';
+import { ExecutionState } from './execution/ExecutionState';
 import { IConversationManager } from './interfaces/IConversationManager';
 import { generateUniqueId } from '../shared/utils/generateIds';
 import { Disposable } from './interfaces/Disposable';
 import { InternalEventDispatcher } from './events/InternalEventDispatcher';
 import { EventType } from '../features/events/eventTypes';
-// CAMBIO: Importar la configuración por defecto
-import { DEFAULT_ENGINE_CONFIG } from './langgraph/config/EngineConfig';
 
+interface ConversationState {
+  chatId: string;
+  userInput: string;
+  isCompleted: boolean;
+  error?: string;
+  finalResponse?: string;
+  executionState?: ExecutionState;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 export class ConversationManager implements IConversationManager, Disposable {
-  private activeConversations: Map<string, SimplifiedOptimizedGraphState> = new Map();
+  private activeConversations: Map<string, ConversationState> = new Map();
   private activeChatId: string | null = null;
 
   constructor(private dispatcher: InternalEventDispatcher) { }
@@ -36,66 +44,57 @@ export class ConversationManager implements IConversationManager, Disposable {
     return false;
   }
 
-
   public getOrCreateConversationState(
     chatId?: string,
     userMessage: string = '',
     contextData: Record<string, any> = {},
-  ): { state: SimplifiedOptimizedGraphState; isNew: boolean } {
+  ): { state: ConversationState; isNew: boolean } {
 
     if (!chatId) {
       chatId = this.createNewChat();
     }
 
-
     this.activeChatId = chatId;
-
 
     const existingState = this.activeConversations.get(chatId);
     if (existingState) {
       return { state: existingState, isNew: false };
     }
 
-
-    const currentTime = Date.now();
-    const newState: SimplifiedOptimizedGraphState = {
+    const currentTime = new Date();
+    const newState: ConversationState = {
       chatId: chatId,
       userInput: userMessage || '',
-      messages: [],
-      currentPhase: undefined as any,
-      currentPlan: [],
-      toolsUsed: [],
-      workingMemory: '',
-      retrievedMemory: '',
-      requiresValidation: false,
       isCompleted: false,
-      iteration: 0,
-      nodeIterations: {
-        ANALYSIS: 0,
-        EXECUTION: 0,
-        VALIDATION: 0,
-        RESPONSE: 0,
-        COMPLETED: 0,
-        ERROR: 0,
-        ERROR_HANDLER: 0,
-      },
-      // CAMBIO: Usar valores por defecto seguros.
-      maxGraphIterations: DEFAULT_ENGINE_CONFIG.maxGraphIterations,
-      maxNodeIterations: DEFAULT_ENGINE_CONFIG.maxNodeIterations,
-      startTime: currentTime,
+      createdAt: currentTime,
+      updatedAt: currentTime,
+      executionState: {
+        sessionId: chatId,
+        mode: 'simple',
+        step: 0,
+        lastResult: null,
+        errorCount: 0,
+        createdAt: currentTime,
+        updatedAt: currentTime,
+        progress: 0,
+        executionStatus: 'planning'
+      }
     };
-
 
     this.activeConversations.set(chatId, newState);
     return { state: newState, isNew: true };
   }
 
-  public getConversationState(chatId: string): SimplifiedOptimizedGraphState | undefined {
+  public getConversationState(chatId: string): ConversationState | undefined {
     return this.activeConversations.get(chatId);
   }
 
-  public updateConversationState(chatId: string, state: SimplifiedOptimizedGraphState): void {
-    this.activeConversations.set(chatId, state);
+  public updateConversationState(chatId: string, state: ConversationState): void {
+    const updatedState = {
+      ...state,
+      updatedAt: new Date()
+    };
+    this.activeConversations.set(chatId, updatedState);
   }
 
   public clearConversation(chatId?: string): boolean {
@@ -118,11 +117,9 @@ export class ConversationManager implements IConversationManager, Disposable {
     return wasDeleted;
   }
 
-
   public getActiveConversationIds(): string[] {
     return Array.from(this.activeConversations.keys());
   }
-
 
   public dispose(): void {
     this.activeConversations.clear();

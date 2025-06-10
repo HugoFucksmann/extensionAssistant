@@ -1,4 +1,4 @@
-// src/vscode/react/context/appReducer.ts
+// src/vscode/react/context/appReducer.ts - Enhanced with Execution Mode Support
 
 import { AppState, AppAction } from './types';
 import { DEFAULT_LOADING_TEXT } from './constants';
@@ -16,6 +16,9 @@ export function appReducer(state: AppState, action: AppAction): AppState {
                 testModeEnabled: action.payload.testMode !== undefined ? action.payload.testMode : state.testModeEnabled,
                 loadingText: DEFAULT_LOADING_TEXT,
                 activeFeedbackOperationId: null,
+                // Update execution mode state from session
+                availableExecutionModes: action.payload.availableModes || state.availableExecutionModes,
+                currentExecutionMode: action.payload.currentMode || state.currentExecutionMode,
             };
 
         case 'SET_MESSAGES':
@@ -86,6 +89,19 @@ export function appReducer(state: AppState, action: AppAction): AppState {
 
         case 'SET_TEST_MODE':
             return { ...state, testModeEnabled: action.payload };
+
+        // New execution mode cases
+        case 'SET_EXECUTION_MODE':
+            return { ...state, currentExecutionMode: action.payload };
+
+        case 'SET_AVAILABLE_EXECUTION_MODES':
+            return { ...state, availableExecutionModes: action.payload };
+
+        case 'EXECUTION_MODE_CHANGED':
+            return {
+                ...state,
+                currentExecutionMode: action.payload.mode
+            };
 
         case 'ADD_MESSAGE': {
             const msg = action.payload;

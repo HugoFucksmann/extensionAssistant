@@ -1,4 +1,4 @@
-// src/vscode/react/context/AppContext.tsx
+// src/vscode/react/context/AppContext.tsx - Enhanced with Execution Mode Support
 
 import '../../webView/types/VSCodeContext';
 import React, { createContext, useContext, useReducer } from 'react';
@@ -25,6 +25,28 @@ const initialState: AppState = {
   testModeEnabled: false,
   activeFeedbackOperationId: null,
   loadingText: DEFAULT_LOADING_TEXT,
+  // New execution mode properties
+  currentExecutionMode: 'simple',
+  availableExecutionModes: [
+    {
+      id: 'simple',
+      name: 'Simple',
+      description: 'Ejecución directa paso a paso - rápida y eficiente',
+      enabled: true
+    },
+    {
+      id: 'planner',
+      name: 'Planificador',
+      description: 'Planificación detallada con replanificación automática',
+      enabled: true
+    },
+    {
+      id: 'supervised',
+      name: 'No Supervisado',
+      description: 'Ejecución autónoma con plan validado',
+      enabled: true
+    }
+  ]
 };
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -56,6 +78,24 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
     actions.setShowHistory(show, state.chatList.length);
   }, [actions, state.chatList.length]);
 
+  // New execution mode action
+  const switchExecutionMode = React.useCallback((mode: 'simple' | 'planner' | 'supervised') => {
+    const modeConfig = state.availableExecutionModes.find(m => m.id === mode);
+    
+    if (!modeConfig) {
+      console.error(`Unknown execution mode: ${mode}`);
+      return;
+    }
+    
+    if (!modeConfig.enabled) {
+      console.warn(`Execution mode '${mode}' is not yet available`);
+      return;
+    }
+
+    dispatch({ type: 'SET_EXECUTION_MODE', payload: mode });
+    postMessageToBackend('switchExecutionMode', { mode });
+  }, [state.availableExecutionModes, postMessageToBackend]);
+
   return (
     <AppContext.Provider value={{
       ...state,
@@ -66,6 +106,7 @@ export const AppProvider = ({ children }: { children: React.ReactNode }) => {
       loadChat: actions.loadChat,
       switchModel: actions.switchModel,
       toggleDarkMode: actions.toggleDarkMode,
+      switchExecutionMode,
     }}>
       {children}
     </AppContext.Provider>

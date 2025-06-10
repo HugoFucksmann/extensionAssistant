@@ -3,6 +3,7 @@ import { useApp } from "../../context/AppContext";
 import { useProjectFiles } from "./useProjectFiles";
 import { useMentionMode } from "./useMentionMode";
 import { DropdownArrowIcon, EnterIcon, FileIcon } from "./Iconst";
+import ExecutionModeSelector from "./ExecutionModeSelector";
 import './styles/ChatInput.css';
 
 const MODEL_OPTIONS = [
@@ -152,7 +153,16 @@ const useDropdowns = (containerRef, mentionHooks) => {
 };
 
 const ChatInput = () => {
-  const { sendMessage, isLoading, currentModel, messages, postMessage } = useApp();
+  const {
+    sendMessage,
+    isLoading,
+    currentModel,
+    messages,
+    postMessage,
+    currentExecutionMode,
+    availableExecutionModes,
+    switchExecutionMode
+  } = useApp();
   
   const [inputText, setInputText] = useState('');
   const [selectedFiles, setSelectedFiles] = useState([]);
@@ -201,8 +211,9 @@ const ChatInput = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
     if ((!inputText.trim() && selectedFiles.length === 0) || isLoading) return;
-    
-    sendMessage(inputText.trim(), selectedFiles);
+
+    // Pass execution mode explicitly
+    sendMessage(inputText.trim(), selectedFiles, currentExecutionMode);
     setInputText('');
     setSelectedFiles([]);
     mentionHooks.closeDropdown();
@@ -300,13 +311,18 @@ const ChatInput = () => {
         </div>
 
         <div className="controls-row">
-          <div className="left-controls">
+          <div className="left-controls" style={{ gap: 8 }}>
             <div className="model-selector" ref={modelSelectorRef} onClick={handleModelClick}>
               <span className="model-name">{currentModel}</span>
               <DropdownArrowIcon className="dropdown-arrow" />
             </div>
+            <ExecutionModeSelector
+              currentMode={currentExecutionMode}
+              availableModes={availableExecutionModes}
+              onModeChange={switchExecutionMode}
+              isDisabled={isLoading}
+            />
           </div>
-          
           <div className="right-controls">
             <button onClick={mentionHooks.startMentionByButton} className="file-button" title="Add file">
               <FileIcon className="file-button-icon" />

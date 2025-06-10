@@ -1,19 +1,19 @@
-// src/vscode/webView/WebviewProvider.ts - Simplified Version
+// src/vscode/webView/WebviewProvider.ts - Enhanced with Mode Selection
 import * as vscode from 'vscode';
 import * as crypto from 'crypto';
 import { getReactHtmlContent } from './htmlTemplate';
 import { MessageFormatter } from '../formatters/MessageFormatter';
-import { ApplicationLogicService } from '@core/ApplicationLogicService';
-import { InternalEventDispatcher } from '@core/events/InternalEventDispatcher';
-import { IConversationManager } from '@core/interfaces/IConversationManager';
+import { ApplicationLogicService } from 'src/core/ApplicationLogicService';
+import { InternalEventDispatcher } from 'src/core/events/InternalEventDispatcher';
+import { IConversationManager } from 'src/core/interfaces/IConversationManager';
 import { EventType, WindsurfEvent } from '@features/events/eventTypes';
 import { searchFiles } from '@shared/utils/pathUtils';
-import { ComponentFactory } from '@core/ComponentFactory';
-
+import { ComponentFactory } from 'src/core/ComponentFactory';
 
 // Types and interfaces
 export interface ProcessMessageOptions {
     files?: string[];
+    mode?: 'simple' | 'planner' | 'supervised';
 }
 
 export interface ProcessMessageResult {
@@ -28,8 +28,32 @@ interface WebviewState {
     isConnected: boolean;
     isLoading: boolean;
     currentModel: string | null;
+    currentMode: 'simple' | 'planner' | 'supervised';
+    availableModes: Array<{ id: string; name: string; description: string; enabled: boolean }>;
     lastError: string | null;
 }
+
+// Mode definitions for UI
+const EXECUTION_MODES = [
+    {
+        id: 'simple',
+        name: 'Simple',
+        description: 'Ejecución directa paso a paso - rápida y eficiente',
+        enabled: true
+    },
+    {
+        id: 'planner',
+        name: 'Planificador',
+        description: 'Planificación detallada con replanificación automática',
+        enabled: true // Enabled for Stage 4
+    },
+    {
+        id: 'supervised',
+        name: 'No Supervisado',
+        description: 'Ejecución autónoma con plan validado',
+        enabled: true // Will be enabled in a future Stage
+    }
+];
 
 export class WebviewProvider implements vscode.WebviewViewProvider {
     private view?: vscode.WebviewView;
@@ -37,13 +61,15 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     private messageFormatter = new MessageFormatter();
     private eventSubscriptions: { unsubscribe: () => void }[] = [];
 
-    // Consolidated state management
+    // Enhanced state management with mode support
     private state: WebviewState = {
         currentChatId: null,
         activeChatId: null,
         isConnected: false,
         isLoading: false,
         currentModel: null,
+        currentMode: 'simple', // Default to simple mode
+        availableModes: EXECUTION_MODES,
         lastError: null
     };
 
@@ -103,8 +129,14 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
             case 'userMessageSent':
                 await this.handleUserMessage(message.payload);
                 break;
+            case 'userInputReceived': // Handle response from UI interaction
+                this.handleUserInputReceived(message.payload);
+                break;
             case 'switchModel':
                 await this.handleSwitchModel(message.payload);
+                break;
+            case 'switchExecutionMode':
+                await this.handleSwitchExecutionMode(message.payload);
                 break;
             case 'newChatRequestedByUI':
                 this.startNewChat();
@@ -118,6 +150,15 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
         }
     }
 
+    private handleUserInputReceived(payload: any): void {
+        // Forward the user's response back into the system as an event
+        this.internalEventDispatcher.dispatch(EventType.USER_INPUT_RECEIVED, {
+            ...payload,
+            timestamp: Date.now(),
+            source: 'WebviewProvider'
+        });
+    }
+
     private async handleUIReady(): Promise<void> {
         let chatId = this.getActiveChatId();
         if (!chatId) {
@@ -126,10 +167,21 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
 
         if (!chatId) {
             this.handleSystemError('Failed to initialize chat session on UI ready.');
+            return;
         }
+
+        // Send available modes and current state to UI
+        this.postMessage('modesUpdated', {
+            availableModes: this.state.availableModes,
+            currentMode: this.state.currentMode
+        });
     }
 
-    private async handleUserMessage(payload: { text: string; files?: string[] }): Promise<void> {
+    private async handleUserMessage(payload: {
+        text: string;
+        files?: string[];
+        mode?: 'simple' | 'planner' | 'supervised';
+    }): Promise<void> {
         if (!payload.text?.trim()) {
             this.handleSystemError('Message cannot be empty.');
             return;
@@ -140,10 +192,26 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
             chatId = this.startNewChat();
         }
 
+        const executionMode = payload.mode || this.state.currentMode;
+
+        const modeConfig = this.state.availableModes.find(m => m.id === executionMode);
+        if (!modeConfig || !modeConfig.enabled) {
+            this.handleSystemError(`Execution mode '${executionMode}' is not available.`);
+            return;
+        }
+
         try {
             this.state.isLoading = true;
+            this.state.currentMode = executionMode;
+
+            this.postMessage('executionModeChanged', {
+                mode: executionMode,
+                modeName: modeConfig.name
+            });
+
             const result = await this.processMessage(chatId, payload.text, {
-                files: payload.files || []
+                files: payload.files || [],
+                mode: executionMode
             });
 
             if (!result.success) {
@@ -151,6 +219,36 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
             }
         } catch (error) {
             this.handleError(error as Error, 'handleUserMessage');
+        }
+    }
+
+    private async handleSwitchExecutionMode(payload: { mode: 'simple' | 'planner' | 'supervised' }): Promise<void> {
+        if (!payload?.mode) {
+            this.handleSystemError('No execution mode specified.');
+            return;
+        }
+
+        const modeConfig = this.state.availableModes.find(m => m.id === payload.mode);
+        if (!modeConfig) {
+            this.handleSystemError(`Unknown execution mode: ${payload.mode}`);
+            return;
+        }
+
+        if (!modeConfig.enabled) {
+            this.handleSystemError(`Execution mode '${payload.mode}' is not yet available.`);
+            return;
+        }
+
+        try {
+            this.state.currentMode = payload.mode;
+            await this.appLogicService.setExecutionMode(payload.mode);
+            this.postMessage('executionModeChanged', {
+                mode: payload.mode,
+                modeName: modeConfig.name
+            });
+            console.log(`[WebviewProvider] Execution mode changed to: ${payload.mode}`);
+        } catch (error) {
+            this.handleError(error as Error, 'handleSwitchExecutionMode');
         }
     }
 
@@ -174,6 +272,12 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
             case 'getProjectFiles':
                 await this.handleGetProjectFiles();
                 break;
+            case 'getExecutionModes':
+                this.postMessage('modesUpdated', {
+                    availableModes: this.state.availableModes,
+                    currentMode: this.state.currentMode
+                });
+                break;
             default:
                 console.warn('[WebviewProvider] Unknown command:', payload.command);
                 break;
@@ -194,7 +298,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
         }
     }
 
-    // Backend operations (consolidated from WebviewBackendAdapter)
+    // Backend operations (enhanced with mode support)
     private async processMessage(
         chatId: string,
         text: string,
@@ -204,7 +308,10 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
             const result = await this.appLogicService.processUserMessage(
                 chatId,
                 text,
-                { files: options.files || [] }
+                {
+                    files: options.files || [],
+                    executionMode: options.mode || this.state.currentMode
+                }
             );
 
             return {
@@ -272,6 +379,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
             EventType.AGENT_PHASE_STARTED,
             EventType.AGENT_PHASE_COMPLETED,
             EventType.CONVERSATION_TURN_COMPLETED,
+            EventType.USER_INTERACTION_REQUIRED, // Subscribe to interaction requests
         ];
 
         eventTypes.forEach(eventType => {
@@ -284,7 +392,6 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
     }
 
     private handleEvent(event: WindsurfEvent): void {
-        // Filter events by current chat ID
         if (event.type !== EventType.SYSTEM_ERROR &&
             event.payload.chatId &&
             event.payload.chatId !== this.state.currentChatId) {
@@ -306,6 +413,30 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
         );
 
         switch (event.type) {
+            // ... (other cases unchanged)
+            case EventType.USER_INTERACTION_REQUIRED:
+                return this.handleUserInteractionRequired(event);
+            case EventType.CONVERSATION_TURN_COMPLETED:
+                this.state.isLoading = false;
+                this.postMessage('turnCompleted', {});
+                return null;
+            default:
+                // Fallback for existing event handlers
+                const otherEvent = this.processOtherEvents(event, baseMessage);
+                if (otherEvent) return otherEvent;
+                return null;
+        }
+    }
+
+    private handleUserInteractionRequired(event: WindsurfEvent) {
+        // This event doesn't create a chat message, it triggers a UI element.
+        // We post a specific message type that the webview front-end will listen for.
+        this.postMessage('requestUserInteraction', event.payload);
+        return null; // No chat message to display for this event
+    }
+
+    private processOtherEvents(event: WindsurfEvent, baseMessage: any): { messageType: string; chatMessage: any } | null {
+        switch (event.type) {
             case EventType.TOOL_EXECUTION_STARTED:
                 return this.handleToolExecutionStarted(event, baseMessage);
             case EventType.TOOL_EXECUTION_COMPLETED:
@@ -320,10 +451,6 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
                 return this.handleAgentPhaseCompleted(event, baseMessage);
             case EventType.SYSTEM_ERROR:
                 return this.handleSystemErrorEvent(event, baseMessage);
-            case EventType.CONVERSATION_TURN_COMPLETED:
-                this.state.isLoading = false;
-                this.postMessage('turnCompleted', {});
-                return null;
             default:
                 return null;
         }
@@ -337,6 +464,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
             status: 'tool_executing',
             toolName: payload.toolName,
             toolInput: payload.parameters,
+            executionMode: this.state.currentMode,
         };
         return { messageType: 'agentActionUpdate', chatMessage: baseMessage };
     }
@@ -345,7 +473,12 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
         const payload = event.payload as any;
         const formatted = this.messageFormatter.formatToolExecutionCompleted(payload);
         baseMessage.content = formatted.content;
-        baseMessage.metadata = { ...baseMessage.metadata, ...formatted.metadata, status: 'success' };
+        baseMessage.metadata = {
+            ...baseMessage.metadata,
+            ...formatted.metadata,
+            status: 'success',
+            executionMode: this.state.currentMode,
+        };
         return { messageType: 'agentActionUpdate', chatMessage: baseMessage };
     }
 
@@ -353,7 +486,12 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
         const payload = event.payload as any;
         const formatted = this.messageFormatter.formatToolExecutionError(payload);
         baseMessage.content = formatted.content;
-        baseMessage.metadata = { ...baseMessage.metadata, ...formatted.metadata, status: 'error' };
+        baseMessage.metadata = {
+            ...baseMessage.metadata,
+            ...formatted.metadata,
+            status: 'error',
+            executionMode: this.state.currentMode,
+        };
         return { messageType: 'agentActionUpdate', chatMessage: baseMessage };
     }
 
@@ -365,6 +503,7 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
             ...baseMessage.metadata,
             status: 'success',
             processingTime: payload.duration,
+            executionMode: this.state.currentMode,
             ...(payload.metadata || {})
         };
         return { messageType: 'assistantResponse', chatMessage: baseMessage };
@@ -378,7 +517,8 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
             status: 'phase_started',
             phase: payload.phase,
             iteration: payload.iteration,
-            source: payload.source
+            source: payload.source,
+            executionMode: this.state.currentMode,
         };
         return { messageType: 'agentPhaseUpdate', chatMessage: baseMessage };
     }
@@ -392,7 +532,8 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
             phase: payload.phase,
             iteration: payload.iteration,
             source: payload.source,
-            phaseData: payload.data
+            phaseData: payload.data,
+            executionMode: this.state.currentMode,
         };
         return { messageType: 'agentPhaseUpdate', chatMessage: baseMessage };
     }
@@ -406,7 +547,8 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
             details: payload.details,
             errorObject: payload.errorObject,
             source: payload.source,
-            level: payload.level || 'error'
+            level: payload.level || 'error',
+            executionMode: this.state.currentMode,
         };
         return { messageType: 'systemError', chatMessage: baseMessage };
     }
@@ -428,6 +570,8 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
             this.postMessage('sessionReady', {
                 chatId: newChatId,
                 messages: [],
+                availableModes: this.state.availableModes,
+                currentMode: this.state.currentMode
             });
 
             return newChatId;
@@ -447,6 +591,26 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
 
     public getCurrentChatId(): string | null {
         return this.state.currentChatId;
+    }
+
+    public getCurrentExecutionMode(): 'simple' | 'planner' | 'supervised' {
+        return this.state.currentMode;
+    }
+
+    public getAvailableModes(): Array<{ id: string; name: string; description: string; enabled: boolean }> {
+        return [...this.state.availableModes];
+    }
+
+    // Future method for enabling additional modes in later stages
+    public enableExecutionMode(mode: 'planner' | 'supervised'): void {
+        const modeIndex = this.state.availableModes.findIndex(m => m.id === mode);
+        if (modeIndex !== -1) {
+            this.state.availableModes[modeIndex].enabled = true;
+            this.postMessage('modesUpdated', {
+                availableModes: this.state.availableModes,
+                currentMode: this.state.currentMode
+            });
+        }
     }
 
     // Error handling (consolidated from ErrorManager)

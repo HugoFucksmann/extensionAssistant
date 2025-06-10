@@ -1,71 +1,144 @@
 // src/features/events/eventTypes.ts
 
+/**
+ * Enum for all possible event types in the system.
+ * Follows a 'domain:action:status' naming convention where applicable.
+ */
 export enum EventType {
-  // Conversation lifecycle
+  // == CONVERSATION LIFECYCLE ==
   CONVERSATION_STARTED = 'conversation:started',
   CONVERSATION_ENDED = 'conversation:ended',
 
-  // LLM Interaction Events
-  LLM_REQUEST_STARTED = 'llm:request:started',
-  LLM_REQUEST_COMPLETED = 'llm:request:completed',
+  // == CONVERSATION TURN (User Query -> Final Response) ==
+  CONVERSATION_TURN_STARTED = 'conversation:turn:started',
+  CONVERSATION_TURN_COMPLETED = 'conversation:turn:completed',
 
-  // Agent/ReAct Cycle Events
+  // == TASK EXECUTION (Core logic processing) ==
+  TASK_EXECUTION_STARTED = 'task:execution:started',
+  EXECUTION_MODE_CHANGED = 'task:execution:mode_changed',
+
+  // == AGENT/PLANNER PHASES (For complex modes) ==
   AGENT_PHASE_STARTED = 'agent:phase:started',
   AGENT_PHASE_COMPLETED = 'agent:phase:completed',
 
-  // Tool execution
+  // == TOOL EXECUTION ==
   TOOL_EXECUTION_STARTED = 'tool:execution:started',
   TOOL_EXECUTION_COMPLETED = 'tool:execution:completed',
   TOOL_EXECUTION_ERROR = 'tool:execution:error',
 
+  // == LLM INTERACTION ==
+  LLM_REQUEST_STARTED = 'llm:request:started',
+  LLM_REQUEST_COMPLETED = 'llm:request:completed',
 
-  // Response handling
+  // == RESPONSE HANDLING ==
   RESPONSE_GENERATED = 'response:generated',
-  RESPONSE_DELIVERED = 'response:delivered',
 
-  // System events
+  // == SYSTEM & UI ==
   SYSTEM_INFO = 'system:info',
   SYSTEM_WARNING = 'system:warning',
   SYSTEM_ERROR = 'system:error',
-
-  // UI Interaction events
   USER_INTERACTION_REQUIRED = 'ui:interaction:required',
   USER_INPUT_RECEIVED = 'ui:input:received',
-  
-  // Conversation Turn Events
-  CONVERSATION_TURN_COMPLETED = 'conversation:turn_completed'
 }
 
 
+// =================================================================
+// BASE PAYLOADS
+// =================================================================
+
 export interface BaseEventPayload {
-  timestamp?: number;
+  timestamp: number;
   chatId?: string;
   source?: string;
-
   operationId?: string;
 }
 
+// =================================================================
+// PAYLOAD DEFINITIONS
+// =================================================================
 
-export interface ConversationEventPayload extends BaseEventPayload {
-  userMessage?: string;
-  finalStatus?: 'completed' | 'failed' | 'cancelled';
+// -- Conversation Payloads --
+
+export interface ConversationStartedPayload extends BaseEventPayload {
+  chatId: string;
+  userMessage: string;
+}
+
+export interface ConversationEndedPayload extends BaseEventPayload {
+  chatId: string;
+  finalStatus: 'completed' | 'cleared_by_user' | 'error' | 'max_iterations_reached' | 'failed' | 'cancelled';
   duration?: number;
 }
-export interface ConversationEndedPayload extends BaseEventPayload {
-  finalStatus: 'completed' | 'cleared_by_user' | 'error' | 'max_iterations_reached' | 'failed' | 'cancelled'; // Added 'failed', 'cancelled' and changed 'reason' to 'finalStatus'
-  duration?: number;
+
+export interface ConversationTurnStartedPayload extends BaseEventPayload {
+  chatId: string;
+  userMessage: string;
+  executionMode: string;
 }
 
 export interface ConversationTurnCompletedPayload extends BaseEventPayload {
-  status: 'success' | 'failure';
+  chatId: string;
+  success: boolean;
+  executionTime: number;
+  mode: string;
+  error?: string;
+}
+
+// -- Task & Execution Payloads --
+
+export interface TaskExecutionStartedPayload extends BaseEventPayload {
+  chatId: string;
+  query: string;
+  mode: string;
+}
+
+export interface ExecutionModeChangedPayload extends BaseEventPayload {
+  mode: string;
+}
+
+// -- Agent/Planner Payloads --
+
+export interface AgentPhaseStartedPayload extends BaseEventPayload {
+  phase: string; // e.g., 'planning', 'reasoning', 'reflection'
+  iteration?: number;
+  data?: any;
+}
+
+export interface AgentPhaseCompletedPayload extends AgentPhaseStartedPayload {
   duration: number;
   error?: string;
 }
 
+// -- Tool Payloads --
 
-/**
-* LLM Request Payloads
-*/
+export interface ToolExecutionStartedPayload extends BaseEventPayload {
+  toolName: string;
+  parameters: any;
+  toolDescription: string;
+  chatId?: string;
+  operationId: string;
+}
+
+export interface ToolExecutionCompletedPayload extends BaseEventPayload {
+  toolName: string;
+  parameters: any;
+  operationId: string;
+  duration: number;
+  toolSuccess: true;
+  rawOutput: any;
+}
+
+export interface ToolExecutionErrorPayload extends BaseEventPayload {
+  toolName: string;
+  parameters: any;
+  operationId: string;
+  duration: number;
+  toolSuccess: false;
+  error: string;
+}
+
+// -- LLM Payloads --
+
 export interface LlmRequestStartedPayload extends BaseEventPayload {
   llmRequestType: 'reasoning' | 'responseGeneration' | string;
   promptLength?: number;
@@ -78,102 +151,72 @@ export interface LlmRequestCompletedPayload extends LlmRequestStartedPayload {
   duration: number;
   success: boolean;
   error?: string;
-
   rawResponse?: string;
   tokenUsage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number };
 }
 
+// -- Response Payloads --
 
-export interface AgentPhaseEventPayload extends BaseEventPayload {
-  phase: 'reasoning' | 'action' | 'finalResponseGeneration' | 'reflection' | 'correction' | 'toolOutputAnalysis' | 'initialAnalysis' | 'toolExecution' | string; // Added toolOutputAnalysis, initialAnalysis, toolExecution
-  iteration?: number;
-  data?: any;
-  duration?: number;
-  error?: string;
-}
-
-
-
-export interface ToolExecutionEventPayload {
-  toolName: string;
-  parameters: any;
-  toolDescription: string;
-  chatId?: string;
-  source: string;
-  operationId: string;
-  timestamp: number;
-  duration: number;
-  isProcessingStep: boolean;
-  toolSuccess: boolean;
-  error?: string;
-  warnings?: string[];
-  rawOutput?: any;
-  modelAnalysis?: any;
-}
-
-export interface ToolExecutionCompletedPayload extends BaseEventPayload {
-  toolName: string;
-  success: boolean;
-  data?: any;
-  error?: string;
-  executionTime?: number;
-  operationId: string;
-}
-
-
-export interface ResponseEventPayload extends BaseEventPayload {
-  responseContent: string;
-  isFinal?: boolean;
+export interface ResponseGeneratedPayload extends BaseEventPayload {
+  chatId: string;
+  response: string;
+  executionTime: number;
+  mode: string;
   metadata?: Record<string, any>;
-  duration?: number;
 }
 
+// -- System & UI Payloads --
 
 export interface SystemEventPayload extends BaseEventPayload {
   message: string;
   level: 'info' | 'warning' | 'error';
   details?: Record<string, any>;
-  errorObject?: { name?: string; message: string; stack?: string };
+  error?: string; // Simplified from errorObject
+  errorObject?: Error;
 }
+
 export interface UserInteractionRequiredPayload extends BaseEventPayload {
   interactionType: 'requestInput' | 'confirmation' | 'choiceSelection';
-
   promptMessage: string;
-  inputType?: 'text' | 'password' | 'number';
-  placeholder?: string;
-  defaultValue?: string;
   options?: Array<{ label: string; value: any }>;
-  confirmButtonText?: string;
-  cancelButtonText?: string;
   title?: string;
 }
+
 export interface UserInputReceivedPayload extends BaseEventPayload {
   value?: any;
   wasCancelled?: boolean;
 }
 
 
+// =================================================================
+// TYPE UNIONS
+// =================================================================
+
 /**
-* Union type for all event payloads
-*/
+ * Union type for all possible event payloads.
+ */
 export type EventPayload =
-  | BaseEventPayload
-  | ConversationEventPayload
+  | ConversationStartedPayload
   | ConversationEndedPayload
+  | ConversationTurnStartedPayload
   | ConversationTurnCompletedPayload
+  | TaskExecutionStartedPayload
+  | ExecutionModeChangedPayload
+  | AgentPhaseStartedPayload
+  | AgentPhaseCompletedPayload
+  | ToolExecutionStartedPayload
+  | ToolExecutionCompletedPayload
+  | ToolExecutionErrorPayload
   | LlmRequestStartedPayload
   | LlmRequestCompletedPayload
-  | AgentPhaseEventPayload
-  | ToolExecutionEventPayload
-  | ToolExecutionCompletedPayload
-  | ResponseEventPayload
+  | ResponseGeneratedPayload
   | SystemEventPayload
   | UserInteractionRequiredPayload
   | UserInputReceivedPayload;
 
 /**
-* Complete event structure
-*/
+ * The complete, structured event object that is dispatched and subscribed to.
+ */
 export interface WindsurfEvent {
   type: EventType;
   payload: EventPayload;
@@ -182,8 +225,8 @@ export interface WindsurfEvent {
 }
 
 /**
-* Event filter interface
-*/
+ * Interface for filtering events from the event history or subscriptions.
+ */
 export interface EventFilter {
   types?: EventType[];
   chatId?: string;

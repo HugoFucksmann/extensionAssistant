@@ -1,24 +1,29 @@
 // src/core/ApplicationLogicService.ts
-import { SimplifiedOptimizedGraphState } from './langgraph/state/GraphState';
+import { ExecutionState } from './execution/ExecutionState';
 import { ConversationManager } from './ConversationManager';
 import { Disposable } from './interfaces/Disposable';
-import { LangGraphEngine } from './langgraph/LangGraphEngine';
+import { ExecutionEngine, ExecutionResult, ExecutionMode } from './execution/ExecutionEngine';
 import { ToolRegistry } from '../features/tools/ToolRegistry';
 import { InternalEventDispatcher } from './events/InternalEventDispatcher';
 import { EventType } from '../features/events/eventTypes';
-import { HumanMessage } from '@langchain/core/messages';
-import { GraphPhase } from './langgraph/state/GraphState';
+
+export interface ProcessUserMessageOptions {
+  files?: string[];
+  executionMode?: ExecutionMode;
+  activeFile?: string;
+  workspaceFiles?: string[];
+}
 
 export interface ProcessUserMessageResult {
   success: boolean;
   finalResponse?: string;
-  updatedState?: SimplifiedOptimizedGraphState;
+  updatedState?: ExecutionState;
   error?: string;
 }
 
 export class ApplicationLogicService implements Disposable {
   constructor(
-    private agentEngine: LangGraphEngine,
+    private executionEngine: ExecutionEngine,
     private conversationManager: ConversationManager,
     private toolRegistry: ToolRegistry,
     private dispatcher: InternalEventDispatcher
@@ -27,82 +32,209 @@ export class ApplicationLogicService implements Disposable {
   public async processUserMessage(
     chatId: string,
     userMessage: string,
-    contextData: Record<string, any> = {}
+    options: ProcessUserMessageOptions = {}
   ): Promise<ProcessUserMessageResult> {
     const { state: existingState, isNew } = this.conversationManager.getOrCreateConversationState(
       chatId,
       userMessage,
-      contextData
+      options
     );
 
     if (isNew) {
       this.conversationManager.setActiveChatId(chatId);
     }
 
-    // CAMBIO: Obtener la configuración actual del motor.
-    const engineConfig = this.agentEngine.getConfig();
+    // Set execution mode if provided
+    if (options.executionMode) {
+      this.executionEngine.setMode(options.executionMode);
+    }
 
-    const stateForNewTurn: SimplifiedOptimizedGraphState = {
-      ...existingState,
-      userInput: userMessage,
-      messages: [...existingState.messages, new HumanMessage(userMessage)],
-      error: undefined,
-      isCompleted: false,
-      requiresValidation: false,
-      lastToolOutput: undefined,
-      currentPlan: [],
-      currentTask: undefined,
-      toolsUsed: [],
-      iteration: 0,
-      nodeIterations: {
-        ANALYSIS: 0,
-        EXECUTION: 0,
-        VALIDATION: 0,
-        RESPONSE: 0,
-        COMPLETED: 0,
-        ERROR: 0,
-        ERROR_HANDLER: 0,
-      },
-      startTime: Date.now(),
-      currentPhase: GraphPhase.ANALYSIS,
-      // CAMBIO: Aplicar la configuración del motor al estado del turno.
-      maxGraphIterations: engineConfig.maxGraphIterations,
-      maxNodeIterations: engineConfig.maxNodeIterations,
+    // Create execution context
+    const executionState: ExecutionState = {
+      ...existingState.executionState,
+      sessionId: chatId,
+      mode: options.executionMode || this.executionEngine.currentMode,
+      currentQuery: userMessage,
+      workspaceFiles: options.workspaceFiles || this.getWorkspaceFiles(options),
+      activeFile: options.activeFile,
+      userContext: options,
+      step: 0,
+      errorCount: 0,
+      lastResult: existingState.executionState?.lastResult ?? null, // <--- AGREGAR ESTO
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      executionStatus: 'planning'
     };
 
-    this.conversationManager.updateConversationState(chatId, stateForNewTurn);
+    // Update conversation state with execution state
+    this.conversationManager.updateConversationState(chatId, {
+      ...existingState,
+      executionState,
+      userInput: userMessage,
+      isCompleted: false,
+      error: undefined
+    });
 
-    this.agentEngine.run(stateForNewTurn)
-      .then(finalState => {
-        this.conversationManager.updateConversationState(chatId, finalState);
-      })
-      .catch((error: any) => {
-        console.error(`[ApplicationLogicService] Critical unhandled error from agentEngine.run for chat ${chatId}:`, error);
+    // Dispatch execution started event
+    this.dispatcher.dispatch(EventType.CONVERSATION_TURN_STARTED, {
+      chatId,
+      userMessage,
+      executionMode: executionState.mode,
+      timestamp: Date.now()
+    });
 
-        this.dispatcher.dispatch(EventType.SYSTEM_ERROR, {
-          chatId: chatId,
-          message: `Error crítico en el motor del agente: ${error.message}`,
-          source: 'ApplicationLogicService.processUserMessage.catch',
-          errorObject: error,
-        });
-
-        const finalErrorState = this.conversationManager.getConversationState(chatId) || stateForNewTurn;
-        finalErrorState.error = error.message || 'Unknown async error in LangGraphEngine.';
-        finalErrorState.isCompleted = true;
-        this.conversationManager.updateConversationState(chatId, finalErrorState);
-      });
+    // Execute task asynchronously
+    this.executeTaskAsync(chatId, userMessage, executionState);
 
     return {
       success: true,
-      updatedState: stateForNewTurn
+      updatedState: executionState
     };
+  }
+
+  private async executeTaskAsync(
+    chatId: string,
+    userMessage: string,
+    executionState: ExecutionState
+  ): Promise<void> {
+    try {
+      const startTime = Date.now();
+
+      // Dispatch task execution started
+      this.dispatcher.dispatch(EventType.TASK_EXECUTION_STARTED, {
+        chatId,
+        query: userMessage,
+        mode: executionState.mode,
+        timestamp: startTime
+      });
+
+      const result: ExecutionResult = await this.executionEngine.executeTask(userMessage);
+      const executionTime = Date.now() - startTime;
+
+      // Update conversation with results
+      const conversationState = this.conversationManager.getConversationState(chatId);
+      if (conversationState) {
+        this.conversationManager.updateConversationState(chatId, {
+          ...conversationState,
+          executionState: this.executionEngine.state,
+          isCompleted: true,
+          error: result.success ? undefined : result.error,
+          finalResponse: this.formatFinalResponse(result)
+        });
+      }
+
+      // Dispatch completion events
+      if (result.success) {
+        this.dispatcher.dispatch(EventType.RESPONSE_GENERATED, {
+          chatId,
+          response: this.formatFinalResponse(result),
+          executionTime,
+          mode: executionState.mode,
+          metadata: result.data,
+          timestamp: Date.now()
+        });
+      }
+
+      this.dispatcher.dispatch(EventType.CONVERSATION_TURN_COMPLETED, {
+        chatId,
+        success: result.success,
+        executionTime,
+        mode: executionState.mode,
+        timestamp: Date.now()
+      });
+
+    } catch (error: any) {
+      console.error(`[ApplicationLogicService] Error executing task for chat ${chatId}:`, error);
+
+      // Update conversation with error
+      const conversationState = this.conversationManager.getConversationState(chatId);
+      if (conversationState) {
+        this.conversationManager.updateConversationState(chatId, {
+          ...conversationState,
+          executionState: this.executionEngine.state,
+          isCompleted: true,
+          error: error.message || 'Unknown execution error'
+        });
+      }
+
+      // Dispatch error event
+      this.dispatcher.dispatch(EventType.SYSTEM_ERROR, {
+        chatId: chatId,
+        message: `Error in execution engine: ${error.message}`,
+        source: 'ApplicationLogicService.executeTaskAsync',
+        errorObject: error,
+        level: 'error',
+        timestamp: Date.now()
+      });
+    }
+  }
+
+  private formatFinalResponse(result: ExecutionResult): string {
+    if (result.success) {
+      if (result.data && result.data.response) {
+        return result.data.response;
+      }
+      return 'Task completed successfully.';
+    } else {
+      return `Task failed: ${result.error || 'Unknown error'}`;
+    }
+  }
+
+  private getWorkspaceFiles(options: ProcessUserMessageOptions): string[] {
+    return options.workspaceFiles || options.files || [];
   }
 
   public async clearConversation(chatId?: string): Promise<boolean> {
     return this.conversationManager.clearConversation(chatId);
   }
 
+  public async setExecutionMode(mode: ExecutionMode): Promise<void> {
+    this.executionEngine.setMode(mode);
+
+    // Dispatch mode change event
+    this.dispatcher.dispatch(EventType.EXECUTION_MODE_CHANGED, {
+      mode,
+      timestamp: Date.now()
+    });
+  }
+
+  public getCurrentExecutionMode(): ExecutionMode {
+    return this.executionEngine.currentMode;
+  }
+
+  public getAvailableExecutionModes(): ExecutionMode[] {
+    // Supervised mode is now available
+    return ['simple', 'planner', 'supervised'];
+  }
+
+  public getExecutionProgress(): number {
+    return this.executionEngine.getProgress();
+  }
+
+  public async createCheckpoint(): Promise<void> {
+    await this.executionEngine.createCheckpoint();
+  }
+
+  public async pauseExecution(): Promise<void> {
+    await this.executionEngine.pause();
+  }
+
+  public async resumeExecution(): Promise<void> {
+    await this.executionEngine.resume();
+  }
+
+  public async stopExecution(): Promise<void> {
+    await this.executionEngine.stop();
+  }
+
+  public getExecutionState(): ExecutionState {
+    return this.executionEngine.state;
+  }
+
   public dispose(): void {
+    if (this.executionEngine && typeof this.executionEngine.dispose === 'function') {
+      this.executionEngine.dispose();
+    }
     console.log('[ApplicationLogicService] Disposed.');
   }
 }

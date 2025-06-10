@@ -1,5 +1,5 @@
 // src/features/tools/types.ts
-import { InternalEventDispatcher } from '@core/events/InternalEventDispatcher';
+import { InternalEventDispatcher } from 'src/core/events/InternalEventDispatcher';
 import * as vscode from 'vscode';
 import { z, ZodObject, ZodEffects, ZodTypeAny } from 'zod';
 

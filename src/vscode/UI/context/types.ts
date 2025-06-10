@@ -1,8 +1,15 @@
-// src/vscode/react/context/types.ts
+// src/vscode/react/context/types.ts - Enhanced with Execution Mode Support
 
 import { ChatMessage, Chat } from '../../../features/chat/types';
 
 export type ThemeType = any;
+
+export interface ExecutionMode {
+    id: 'simple' | 'planner' | 'supervised';
+    name: string;
+    description: string;
+    enabled: boolean;
+}
 
 export interface AppState {
     messages: ChatMessage[];
@@ -16,6 +23,9 @@ export interface AppState {
     testModeEnabled: boolean;
     activeFeedbackOperationId: string | null;
     loadingText: string;
+    // New execution mode properties
+    currentExecutionMode: 'simple' | 'planner' | 'supervised';
+    availableExecutionModes: ExecutionMode[];
 }
 
 export type AppAction =
@@ -32,9 +42,13 @@ export type AppAction =
     | { type: 'TOGGLE_DARK_MODE' }
     | { type: 'SET_THEME'; payload: ThemeType }
     | { type: 'SET_TEST_MODE'; payload: boolean }
-    | { type: 'SESSION_READY'; payload: { chatId: string; messages: ChatMessage[]; model?: string; history?: Chat[]; testMode?: boolean } }
+    | { type: 'SESSION_READY'; payload: { chatId: string; messages: ChatMessage[]; model?: string; history?: Chat[]; testMode?: boolean; availableModes?: ExecutionMode[]; currentMode?: 'simple' | 'planner' | 'supervised' } }
     | { type: 'SET_LOADING_TEXT'; payload: string }
-    | { type: 'SET_ACTIVE_FEEDBACK_OPERATION_ID'; payload: string | null };
+    | { type: 'SET_ACTIVE_FEEDBACK_OPERATION_ID'; payload: string | null }
+    // New execution mode actions
+    | { type: 'SET_EXECUTION_MODE'; payload: 'simple' | 'planner' | 'supervised' }
+    | { type: 'SET_AVAILABLE_EXECUTION_MODES'; payload: ExecutionMode[] }
+    | { type: 'EXECUTION_MODE_CHANGED'; payload: { mode: 'simple' | 'planner' | 'supervised'; modeName: string } };
 
 export interface AppContextType extends AppState {
     postMessage: (type: string, payload?: any) => void;
@@ -44,4 +58,6 @@ export interface AppContextType extends AppState {
     loadChat: (chatId: string) => void;
     switchModel: (modelType: string) => void;
     toggleDarkMode: () => void;
+    // New execution mode method
+    switchExecutionMode: (mode: 'simple' | 'planner' | 'supervised') => void;
 }

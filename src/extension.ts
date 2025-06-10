@@ -5,11 +5,11 @@ import { ComponentFactory } from './core/ComponentFactory';
 let activator: ExtensionActivator | undefined;
 
 export async function activate(context: vscode.ExtensionContext) {
- 
+
   try {
     activator = new ExtensionActivator(context);
     await activator.activate();
-  
+
   } catch (error) {
     console.error('Error activating extension:', error);
     vscode.window.showErrorMessage(
@@ -22,5 +22,5 @@ export function deactivate() {
 
   activator?.deactivate();
   ComponentFactory.dispose();
- 
+
 }
