@@ -8,7 +8,7 @@ export enum GraphPhase {
     RESPONSE = 'RESPONSE',
     ERROR_HANDLER = 'ERROR_HANDLER',
     COMPLETED = 'COMPLETED',
-    ERROR = 'ERROR' // Mantenido por si se usa en el estado, pero no como nodo
+    ERROR = 'ERROR'
 }
 
 export interface ToolExecution {

@@ -90,6 +90,6 @@ export class ObservabilityManager implements Disposable {
 
     public dispose(): void {
         this.timers.clear();
-        // El dispatcher y el monitor se gestionan externamente, no se disponen aquí.
+
     }
 }

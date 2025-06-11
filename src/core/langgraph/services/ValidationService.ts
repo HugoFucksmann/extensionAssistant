@@ -12,7 +12,7 @@ export class ValidationService implements IValidationService {
     ) { }
 
     async performDeepValidation(state: SimplifiedOptimizedGraphState): Promise<DeepValidationResult> {
-        // La validación profunda se activa cuando hay un error o se solicita explícitamente.
+
         const lastToolExecution = state.toolsUsed[state.toolsUsed.length - 1];
         const contextForValidation = `
             User Query: ${state.userInput}
@@ -38,13 +38,13 @@ export class ValidationService implements IValidationService {
                 return { passed: true, stateUpdates: {} };
             }
 
-            // Si no es válido, preparamos las actualizaciones sugeridas
+
             const stateUpdates: Partial<SimplifiedOptimizedGraphState> = {};
             if (validation.updatedPlan) {
                 stateUpdates.currentPlan = validation.updatedPlan;
-                stateUpdates.currentTask = validation.updatedPlan[0]; // Reiniciar la tarea al inicio del nuevo plan
+                stateUpdates.currentTask = validation.updatedPlan[0];
             }
-            // El `reasoning` del siguiente paso tomará la `correctionSuggestion` como input.
+
             stateUpdates.workingMemory = `${state.workingMemory}\n\nValidation Feedback: ${validation.correctionSuggestion}`;
 
             return {

@@ -3,11 +3,12 @@ import { SimplifiedOptimizedGraphState } from './langgraph/state/GraphState';
 import { ConversationManager } from './ConversationManager';
 import { Disposable } from './interfaces/Disposable';
 import { LangGraphEngine } from './langgraph/LangGraphEngine';
-import { ToolRegistry } from '../features/tools/ToolRegistry';
 import { InternalEventDispatcher } from './events/InternalEventDispatcher';
 import { EventType } from '../features/events/eventTypes';
 import { HumanMessage } from '@langchain/core/messages';
 import { GraphPhase } from './langgraph/state/GraphState';
+// AÑADIDO: Importamos la fábrica.
+import { StateFactory } from './langgraph/state/StateFactory';
 
 export interface ProcessUserMessageResult {
   success: boolean;
@@ -20,61 +21,42 @@ export class ApplicationLogicService implements Disposable {
   constructor(
     private agentEngine: LangGraphEngine,
     private conversationManager: ConversationManager,
-    private toolRegistry: ToolRegistry,
     private dispatcher: InternalEventDispatcher
   ) { }
 
   public async processUserMessage(
     chatId: string,
     userMessage: string,
-    contextData: Record<string, any> = {}
+    context?: { files?: string[] }
   ): Promise<ProcessUserMessageResult> {
-    const { state: existingState, isNew } = this.conversationManager.getOrCreateConversationState(
+    const { state: previousTurnFinalState, isNew } = this.conversationManager.getOrCreateConversationState(
       chatId,
-      userMessage,
-      contextData
     );
 
     if (isNew) {
       this.conversationManager.setActiveChatId(chatId);
     }
 
-    // CAMBIO: Obtener la configuración actual del motor.
     const engineConfig = this.agentEngine.getConfig();
 
-    const stateForNewTurn: SimplifiedOptimizedGraphState = {
-      ...existingState,
-      userInput: userMessage,
-      messages: [...existingState.messages, new HumanMessage(userMessage)],
-      error: undefined,
-      isCompleted: false,
-      requiresValidation: false,
-      lastToolOutput: undefined,
-      currentPlan: [],
-      currentTask: undefined,
-      toolsUsed: [],
-      iteration: 0,
-      nodeIterations: {
-        ANALYSIS: 0,
-        EXECUTION: 0,
-        VALIDATION: 0,
-        RESPONSE: 0,
-        COMPLETED: 0,
-        ERROR: 0,
-        ERROR_HANDLER: 0,
-      },
-      startTime: Date.now(),
-      currentPhase: GraphPhase.ANALYSIS,
-      // CAMBIO: Aplicar la configuración del motor al estado del turno.
-      maxGraphIterations: engineConfig.maxGraphIterations,
-      maxNodeIterations: engineConfig.maxNodeIterations,
-    };
+    let fullInput = userMessage;
+    if (context?.files && context.files.length > 0) {
+      const fileList = context.files.map(f => `- ${f}`).join('\n');
+      fullInput += `\n\nContexto de archivos proporcionado:\n${fileList}`;
+    }
+
+    // CAMBIO: Usamos StateFactory para crear el estado base.
+    const stateForNewTurn = StateFactory.createInitialState(fullInput, chatId, engineConfig);
+
+    // AÑADIDO: Ahora, poblamos el estado con la información del turno anterior.
+    stateForNewTurn.messages = [...previousTurnFinalState.messages, new HumanMessage(fullInput)];
+    stateForNewTurn.workingMemory = previousTurnFinalState.error ? '' : (previousTurnFinalState.workingMemory || '');
 
     this.conversationManager.updateConversationState(chatId, stateForNewTurn);
 
     this.agentEngine.run(stateForNewTurn)
-      .then(finalState => {
-        this.conversationManager.updateConversationState(chatId, finalState);
+      .then(finalStateFromRun => {
+        this.conversationManager.updateConversationState(chatId, finalStateFromRun);
       })
       .catch((error: any) => {
         console.error(`[ApplicationLogicService] Critical unhandled error from agentEngine.run for chat ${chatId}:`, error);
@@ -89,6 +71,7 @@ export class ApplicationLogicService implements Disposable {
         const finalErrorState = this.conversationManager.getConversationState(chatId) || stateForNewTurn;
         finalErrorState.error = error.message || 'Unknown async error in LangGraphEngine.';
         finalErrorState.isCompleted = true;
+        finalErrorState.currentPhase = GraphPhase.ERROR;
         this.conversationManager.updateConversationState(chatId, finalErrorState);
       });
 

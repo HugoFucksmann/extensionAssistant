@@ -10,7 +10,6 @@ import { PerformanceMonitor } from '../../core/monitoring/PerformanceMonitor';
 import { CacheManager } from '../../core/utils/CacheManager';
 import { Disposable } from '../../core/interfaces/Disposable';
 
-
 export class ToolRegistry {
   private tools = new Map<string, ToolDefinition<any, any>>();
 
@@ -46,14 +45,16 @@ export class ToolRegistry {
     return Array.from(this.tools.values());
   }
 
+  // CHANGE: Add throwOnError parameter for centralized error handling
   async executeTool<T = any>(
     name: string,
     rawParams: any,
-    executionCtxArgs: { chatId?: string; operationId?: string;[key: string]: any } = {}
+    executionCtxArgs: { chatId?: string; operationId?: string; throwOnError?: boolean;[key: string]: any } = {}
   ): Promise<ToolResult<T>> {
     const operationId = executionCtxArgs.operationId || generateUniqueId();
     const startTime = Date.now();
     const tool = this.getTool(name);
+    const throwOnError = executionCtxArgs.throwOnError ?? false;
 
     // 1. Check cache
     const cacheKey = `tool:${name}:${this.cacheManager.hashInput(rawParams)}`;
@@ -62,6 +63,12 @@ export class ToolRegistry {
       console.log(`[ToolRegistry] Cache hit for tool "${name}".`);
       cachedResult.executionTime = Date.now() - startTime;
       this.dispatchCompletionEvent(name, rawParams, operationId, executionCtxArgs.chatId, cachedResult, true);
+
+      // CHANGE: Throw if cached result was an error and throwOnError is true
+      if (throwOnError && !cachedResult.success) {
+        throw new Error(cachedResult.error || `Tool '${name}' failed`);
+      }
+
       return cachedResult;
     }
     console.log(`[ToolRegistry] Cache miss for tool "${name}". Executing...`);
@@ -82,6 +89,12 @@ export class ToolRegistry {
       const errorMsg = `Tool not found: ${name}`;
       const result: ToolResult<T> = { success: false, error: errorMsg, executionTime: Date.now() - startTime };
       this.dispatchCompletionEvent(name, rawParams, operationId, executionCtxArgs.chatId, result);
+
+      // CHANGE: Throw instead of returning error result
+      if (throwOnError) {
+        throw new Error(errorMsg);
+      }
+
       return result;
     }
 
@@ -90,6 +103,12 @@ export class ToolRegistry {
       const errorMsg = `Validation error: ${validationResult.error}`;
       const result: ToolResult<T> = { success: false, error: errorMsg, executionTime: Date.now() - startTime };
       this.dispatchCompletionEvent(name, rawParams, operationId, executionCtxArgs.chatId, result);
+
+      // CHANGE: Throw instead of returning error result
+      if (throwOnError) {
+        throw new Error(errorMsg);
+      }
+
       return result;
     }
 
@@ -118,6 +137,11 @@ export class ToolRegistry {
     this.performanceMonitor.trackNodeExecution(`tool.${name}`, result.executionTime || 0, result.error);
     this.dispatchCompletionEvent(name, rawParams, operationId, executionCtxArgs.chatId, result);
 
+    // CHANGE: Throw if execution failed and throwOnError is true
+    if (throwOnError && !result.success) {
+      throw new Error(result.error || `Tool '${name}' failed`);
+    }
+
     return result;
   }
 
@@ -144,14 +168,16 @@ export class ToolRegistry {
     if (!toolDef) return undefined;
 
     const langChainFunc = async (input: any, runContext?: any) => {
-      const toolResult = await this.executeTool(toolName, input, runContext?.config?.configurable);
-      if (!toolResult.success) {
-        // LangChain tools expect errors to be thrown to be handled correctly
-        throw new Error(toolResult.error || `Unknown error in tool: ${toolName}`);
-      }
-      // Return a string representation of the result, as expected by many LangChain agents.
+      // CHANGE: Use throwOnError=true for LangChain compatibility
+      const toolResult = await this.executeTool(toolName, input, {
+        ...runContext?.config?.configurable,
+        throwOnError: true
+      });
+
+      // This line is never reached if tool fails (exception thrown above)
       return JSON.stringify(toolResult.data) || "Tool executed successfully with no output.";
     };
+
     return new DynamicStructuredTool({
       name: toolDef.name,
       description: toolDef.description,

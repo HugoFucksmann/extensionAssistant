@@ -2,8 +2,8 @@
 import { AIMessage } from "@langchain/core/messages";
 import { IResponseService } from "../services/interfaces/DependencyInterfaces";
 import { GraphPhase, SimplifiedOptimizedGraphState } from "../state/GraphState";
-import { BaseNode, NodeExecutionContext } from "./BaseNode";
-import { EventType } from "../../../features/events/eventTypes"; // <<< AÑADIDO
+import { BaseNode, } from "./BaseNode";
+import { EventType } from "../../../features/events/eventTypes";
 
 export class RespondNode extends BaseNode {
     private responseService: IResponseService;

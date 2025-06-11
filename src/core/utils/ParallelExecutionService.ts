@@ -1,5 +1,8 @@
 // src/core/utils/ParallelExecutionService.ts
 
+import { Disposable } from "@core/interfaces/Disposable";
+
+
 class Semaphore {
     private permits: number;
     private waitingQueue: Array<() => void> = [];
@@ -37,7 +40,7 @@ export interface ParallelOptions {
     failFast?: boolean;
 }
 
-export class ParallelExecutionService {
+export class ParallelExecutionService implements Disposable {
     public async execute<T>(
         tasks: Array<() => Promise<T>>,
         options: ParallelOptions = {}
@@ -72,5 +75,10 @@ export class ParallelExecutionService {
             console.warn(`[ParallelExecutionService] Task ${index} failed:`, result.reason);
             return null;
         });
+    }
+
+
+    public dispose(): void {
+        console.log('[ParallelExecutionService] Disposed.');
     }
 }

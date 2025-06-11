@@ -18,16 +18,7 @@ import { CacheManager } from "../../utils/CacheManager";
 import { ParallelExecutionService } from "../../utils/ParallelExecutionService";
 
 export class ServiceRegistry {
-    /**
-     * Crea un contenedor de dependencias con las instancias proporcionadas.
-     * @param modelManager Gestor de modelos de IA
-     * @param toolRegistry Registro de herramientas disponibles
-     * @param memoryManager Gestor de memoria
-     * @param dispatcher Dispatcher de eventos internos
-     * @param performanceMonitor Monitor de rendimiento
-     * @param cacheManager Instancia de CacheManager (debe ser un singleton)
-     * @param parallelExecutionService Instancia de ParallelExecutionService (debe ser un singleton)
-     */
+
     public static createContainer(
         modelManager: ModelManager,
         toolRegistry: ToolRegistry,
@@ -39,26 +30,20 @@ export class ServiceRegistry {
     ): DependencyContainer {
         const container = new DependencyContainer();
 
-        // Registrar dependencias singleton proporcionadas
         container.register<CacheManager>('CacheManager', cacheManager);
         container.register<ParallelExecutionService>('ParallelExecutionService', parallelExecutionService);
 
-        // Registrar dependencias principales
         container.register<IModelManager>('IModelManager', modelManager);
         container.register<IToolRegistry>('IToolRegistry', toolRegistry);
         container.register<IMemoryManager>('IMemoryManager', memoryManager);
 
-        // Registrar dispatcher de eventos internos
         container.register<InternalEventDispatcher>('InternalEventDispatcher', dispatcher);
-
 
         const promptProvider = new PromptProvider();
         container.register<IPromptProvider>('IPromptProvider', promptProvider);
 
-
         const observabilityManager = new ObservabilityManager(dispatcher, performanceMonitor);
         container.register<IObservabilityManager>('IObservabilityManager', observabilityManager);
-
 
         container.register<IMemoryService>('IMemoryService', new HybridMemoryService(memoryManager, modelManager));
         container.register<IAnalysisService>('IAnalysisService', new AnalysisService(modelManager, promptProvider));

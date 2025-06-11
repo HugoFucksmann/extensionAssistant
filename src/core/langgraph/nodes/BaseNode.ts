@@ -16,7 +16,7 @@ export abstract class BaseNode {
     protected nodeId: GraphPhase;
     protected dependencies: DependencyContainer;
     protected observability: IObservabilityManager;
-    // CAMBIO: Añadir el dispatcher para poder emitir eventos de error
+
     protected dispatcher: InternalEventDispatcher;
 
     constructor(
@@ -27,11 +27,11 @@ export abstract class BaseNode {
         this.nodeId = nodeId;
         this.dependencies = dependencies;
         this.observability = observability;
-        // CAMBIO: Obtener el dispatcher desde el contenedor de dependencias
+
         this.dispatcher = dependencies.get('InternalEventDispatcher');
     }
 
-    // ... (método execute sin cambios)
+
     async execute(state: SimplifiedOptimizedGraphState): Promise<Partial<SimplifiedOptimizedGraphState>> {
 
         this.observability.logPhaseStart(this.nodeId, state);
@@ -39,7 +39,7 @@ export abstract class BaseNode {
         let result: Partial<SimplifiedOptimizedGraphState>;
 
         try {
-            // Validar límites globales y de nodo
+
             if (state.iteration >= state.maxGraphIterations) {
                 throw new Error(`Max graph iterations (${state.maxGraphIterations}) exceeded`);
             }
@@ -87,7 +87,7 @@ export abstract class BaseNode {
         console.error(`[ERROR in ${this.nodeId}] Chat: ${state.chatId}`, error);
         this.observability.trackError(this.nodeId, error, state);
 
-        // CAMBIO: Despachar un evento SYSTEM_ERROR para notificar del error
+
         this.dispatcher.dispatch(EventType.SYSTEM_ERROR, {
             chatId: state.chatId,
             message: `Error en la fase ${this.nodeId}: ${error.message}`,
@@ -95,12 +95,11 @@ export abstract class BaseNode {
             errorObject: error,
         });
 
-        // CAMBIO CLAVE: En lugar de terminar el flujo, lo redirigimos al nodo de manejo de errores.
-        // El grafo ya no termina aquí. El ErrorNode se encargará de generar una respuesta final.
+
         return {
             currentPhase: GraphPhase.ERROR_HANDLER,
             error: error.message,
-            isCompleted: false // El flujo no ha terminado, solo ha cambiado de ruta.
+            isCompleted: false
         };
     }
 }

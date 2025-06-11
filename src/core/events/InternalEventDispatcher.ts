@@ -15,12 +15,7 @@ export class InternalEventDispatcher implements Disposable {
 
   }
 
-  /**
-   * Despacha un evento tipado.
-   * @param type El tipo de evento desde EventType enum.
-   * @param payload El payload del evento, conforme a la interfaz correspondiente.
-   * @returns El objeto WindsurfEvent completo que fue emitido.
-   */
+
   public dispatch(type: EventType, payload: EventPayload, forcedId?: string): WindsurfEvent {
     const event: WindsurfEvent = {
       type,
@@ -46,12 +41,6 @@ export class InternalEventDispatcher implements Disposable {
     return event;
   }
 
-  /**
-   * Se suscribe a uno o más tipos de eventos, o a todos con '*'.
-   * @param type El tipo de evento, un array de tipos, o '*' para todos.
-   * @param listener La función callback que se ejecutará cuando el evento ocurra.
-   * @returns Un objeto con una función `unsubscribe` para remover el listener.
-   */
   public subscribe(
     type: EventType | EventType[] | '*',
     listener: (event: WindsurfEvent) => void

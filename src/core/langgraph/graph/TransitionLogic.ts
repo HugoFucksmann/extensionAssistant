@@ -3,7 +3,7 @@ import { GraphPhase, SimplifiedOptimizedGraphState } from "../state/GraphState";
 
 export class TransitionLogic {
     public static determineNextNode(state: SimplifiedOptimizedGraphState): GraphPhase {
-        // CAMBIO: Añadir el caso para el nuevo nodo de error.
+
         switch (state.currentPhase) {
             case GraphPhase.ANALYSIS:
                 return this.routeFromAnalysis(state);
@@ -13,15 +13,15 @@ export class TransitionLogic {
                 return this.routeFromValidation(state);
             case GraphPhase.RESPONSE:
                 return this.routeFromResponse(state);
-            case GraphPhase.ERROR_HANDLER: // <<< AÑADIDO
-                return GraphPhase.COMPLETED; // El ErrorNode es terminal
+            case GraphPhase.ERROR_HANDLER:
+                return GraphPhase.COMPLETED;
             default:
                 return GraphPhase.COMPLETED;
         }
     }
 
     private static routeFromAnalysis(state: SimplifiedOptimizedGraphState): GraphPhase {
-        if (state.error) return GraphPhase.ERROR_HANDLER; // <<< CAMBIADO
+        if (state.error) return GraphPhase.ERROR_HANDLER;
         return GraphPhase.EXECUTION;
     }
 
@@ -31,7 +31,7 @@ export class TransitionLogic {
         }
 
         if (state.error) {
-            return GraphPhase.ERROR_HANDLER; // <<< CAMBIADO
+            return GraphPhase.ERROR_HANDLER;
         }
 
         if (state.isCompleted) {
@@ -51,7 +51,7 @@ export class TransitionLogic {
 
     private static routeFromValidation(state: SimplifiedOptimizedGraphState): GraphPhase {
         if (state.error) {
-            return GraphPhase.ERROR_HANDLER; // <<< CAMBIADO
+            return GraphPhase.ERROR_HANDLER;
         }
 
         if (state.isCompleted) {

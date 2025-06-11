@@ -27,7 +27,6 @@ export class ComponentFactory {
   private static langGraphEngineInstance: LangGraphEngine;
   private static cacheManagerInstance: CacheManager;
   private static parallelExecutionServiceInstance: ParallelExecutionService;
-  private static appLogicService: ApplicationLogicService;
 
   public static getCacheManager(): CacheManager {
     if (!this.cacheManagerInstance) {
@@ -90,22 +89,21 @@ export class ComponentFactory {
     return this.langGraphEngineInstance;
   }
 
+
   public static async getApplicationLogicService(context: vscode.ExtensionContext): Promise<ApplicationLogicService> {
-    if (!this.appLogicService) {
+    if (!this.applicationLogicServiceInstance) {
       const agentEngine = await this.getLangGraphEngine(context);
       const conversationManager = this.getConversationManager();
       const toolRegistry = this.getToolRegistry();
-      // CAMBIO: Obtener el despachador y pasarlo al constructor.
       const dispatcher = this.getInternalEventDispatcher();
 
-      this.appLogicService = new ApplicationLogicService(
+      this.applicationLogicServiceInstance = new ApplicationLogicService(
         agentEngine,
         conversationManager,
-        toolRegistry,
-        dispatcher // Añadir esta línea
+        dispatcher
       );
     }
-    return this.appLogicService;
+    return this.applicationLogicServiceInstance;
   }
 
   public static getConversationManager(): ConversationManager {
@@ -115,16 +113,13 @@ export class ComponentFactory {
     return this.conversationManagerInstance;
   }
 
-
-  // src/core/ComponentFactory.ts
-
-  // ...
   public static async dispose(): Promise<void> {
     const disposeSafely = async (component: Disposable | undefined) => {
       if (component && typeof component.dispose === 'function') {
         await Promise.resolve(component.dispose());
       }
     };
+
 
     await disposeSafely(this.applicationLogicServiceInstance);
     this.applicationLogicServiceInstance = undefined as any;
@@ -138,12 +133,9 @@ export class ComponentFactory {
     await disposeSafely(this.modelManagerInstance);
     this.modelManagerInstance = undefined as any;
 
-    // Ahora usamos disposeSafely para el toolRegistry
     await disposeSafely(this.toolRegistryInstance);
     this.toolRegistryInstance = undefined as any;
 
-    // Nota: PerformanceMonitor también podría implementar Disposable, pero por ahora su 'reset' es suficiente.
-    // Si tuviera más lógica de limpieza, seguiría el mismo patrón.
     this.performanceMonitorInstance?.reset();
     this.performanceMonitorInstance = undefined as any;
 
@@ -156,7 +148,9 @@ export class ComponentFactory {
     await disposeSafely(this.cacheManagerInstance);
     this.cacheManagerInstance = undefined as any;
 
+    await disposeSafely(this.parallelExecutionServiceInstance);
+    this.parallelExecutionServiceInstance = undefined as any;
+
     console.log('[ComponentFactory] All components disposed.');
   }
-
 }

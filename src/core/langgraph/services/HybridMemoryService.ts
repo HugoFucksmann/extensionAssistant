@@ -62,7 +62,7 @@ export class HybridMemoryService implements IMemoryService {
     ): Promise<void> {
         const existingMemory = this.memoryManager.getRuntime<string>(chatId, 'working_memory') || '';
 
-        // Usar un LLM para integrar la información de forma inteligente
+
         try {
             const model = this.modelManager.getActiveModel();
             const prompt = ChatPromptTemplate.fromTemplate(MEMORY_INTEGRATION_PROMPT);
@@ -77,7 +77,7 @@ export class HybridMemoryService implements IMemoryService {
             this.memoryManager.setRuntime(chatId, 'working_memory', updatedMemory.trim());
         } catch (error) {
             console.error("[HybridMemoryService] Failed to update working memory with LLM. Falling back to concatenation.", error);
-            // Fallback a la concatenación simple si la llamada al LLM falla
+
             const fallbackMemory = `${existingMemory}\n- ${new Date().toISOString()}: ${newInfo}`.trim();
             this.memoryManager.setRuntime(chatId, 'working_memory', fallbackMemory);
         }

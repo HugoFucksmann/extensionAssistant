@@ -8,8 +8,7 @@ import { SimplifiedOptimizedGraphState } from "../state/GraphState";
 import { StringOutputParser } from "@langchain/core/output_parsers";
 
 function formatToolsDescription(toolRegistry: IToolRegistry): string {
-    // Esta función se puede mover a una utilidad si se reutiliza.
-    // Implementación simplificada.
+
     return toolRegistry.getToolNames().join(', ');
 }
 
@@ -39,7 +38,7 @@ export class ReasoningService implements IReasoningService {
             memoryContext: state.retrievedMemory
         });
 
-        // Adaptar la salida del prompt al tipo ReasoningOutput inferido por Zod
+
         return {
             reasoning: reasoningResult.reasoning,
             nextAction: reasoningResult.nextAction,

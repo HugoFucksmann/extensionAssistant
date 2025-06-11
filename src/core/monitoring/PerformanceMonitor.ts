@@ -38,7 +38,7 @@ export class PerformanceMonitor {
             metrics.lastError = error;
         }
 
-        // Mantener solo las últimas N muestras de duración para evitar consumo excesivo de memoria
+
         if (metrics.durations.length > this.MAX_DURATION_SAMPLES) {
             metrics.durations.shift();
         }
@@ -68,7 +68,7 @@ export class PerformanceMonitor {
             });
         }
 
-        // Ordenar por número de llamadas o duración promedio para identificar cuellos de botella
+
         return performances.sort((a, b) => b.averageDuration - a.averageDuration);
     }
 

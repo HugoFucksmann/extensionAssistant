@@ -5,7 +5,7 @@ import { AnalyzeNode } from "../nodes/analyzeNode";
 import { ExecuteNode } from "../nodes/executeNode";
 import { RespondNode } from "../nodes/respondNode";
 import { ValidateNode } from "../nodes/validateNode";
-import { ErrorNode } from "../nodes/ErrorNode"; // <<< AÑADIDO
+import { ErrorNode } from "../nodes/ErrorNode";
 import { GraphPhase, SimplifiedOptimizedGraphState } from "../state/GraphState";
 import { StateAnnotations } from "./StateAnnotations";
 import { TransitionLogic } from "./TransitionLogic";
@@ -26,33 +26,33 @@ export class GraphBuilder {
         const executeNode = new ExecuteNode(this.dependencies, this.observability);
         const validateNode = new ValidateNode(this.dependencies, this.observability);
         const respondNode = new RespondNode(this.dependencies, this.observability);
-        const errorNode = new ErrorNode(this.dependencies, this.observability); // <<< AÑADIDO
+        const errorNode = new ErrorNode(this.dependencies, this.observability);
 
-        workflow.addNode(GraphPhase.ANALYSIS, analyzeNode.execute.bind(analyzeNode));
-        workflow.addNode(GraphPhase.EXECUTION, executeNode.execute.bind(executeNode));
-        workflow.addNode(GraphPhase.VALIDATION, validateNode.execute.bind(validateNode));
-        workflow.addNode(GraphPhase.RESPONSE, respondNode.execute.bind(respondNode));
-        workflow.addNode(GraphPhase.ERROR_HANDLER, errorNode.execute.bind(errorNode)); // <<< AÑADIDO
+        workflow.addNode(GraphPhase.ANALYSIS, analyzeNode.execute.bind(analyzeNode) as any);
+        workflow.addNode(GraphPhase.EXECUTION, executeNode.execute.bind(executeNode) as any);
+        workflow.addNode(GraphPhase.VALIDATION, validateNode.execute.bind(validateNode) as any);
+        workflow.addNode(GraphPhase.RESPONSE, respondNode.execute.bind(respondNode) as any);
+        workflow.addNode(GraphPhase.ERROR_HANDLER, errorNode.execute.bind(errorNode) as any);
 
         workflow.addEdge(START, GraphPhase.ANALYSIS as any);
 
-        // CAMBIO: Las transiciones de error ahora apuntan a ERROR_HANDLER en lugar de a END.
-        workflow.addConditionalEdges(GraphPhase.ANALYSIS as any, TransitionLogic.determineNextNode.bind(TransitionLogic), {
+
+        workflow.addConditionalEdges(GraphPhase.ANALYSIS as any, TransitionLogic.determineNextNode.bind(TransitionLogic) as any, {
             [GraphPhase.EXECUTION]: GraphPhase.EXECUTION as any,
-            [GraphPhase.ERROR_HANDLER]: GraphPhase.ERROR_HANDLER as any, // <<< CAMBIADO
+            [GraphPhase.ERROR_HANDLER]: GraphPhase.ERROR_HANDLER as any,
         });
-        workflow.addConditionalEdges(GraphPhase.EXECUTION as any, TransitionLogic.determineNextNode.bind(TransitionLogic), {
+        workflow.addConditionalEdges(GraphPhase.EXECUTION as any, TransitionLogic.determineNextNode.bind(TransitionLogic) as any, {
             [GraphPhase.EXECUTION]: GraphPhase.EXECUTION as any,
             [GraphPhase.VALIDATION]: GraphPhase.VALIDATION as any,
             [GraphPhase.RESPONSE]: GraphPhase.RESPONSE as any,
-            [GraphPhase.ERROR_HANDLER]: GraphPhase.ERROR_HANDLER as any, // <<< CAMBIADO
+            [GraphPhase.ERROR_HANDLER]: GraphPhase.ERROR_HANDLER as any,
         });
-        workflow.addConditionalEdges(GraphPhase.VALIDATION as any, TransitionLogic.determineNextNode.bind(TransitionLogic), {
+        workflow.addConditionalEdges(GraphPhase.VALIDATION as any, TransitionLogic.determineNextNode.bind(TransitionLogic) as any, {
             [GraphPhase.EXECUTION]: GraphPhase.EXECUTION as any,
             [GraphPhase.RESPONSE]: GraphPhase.RESPONSE as any,
-            [GraphPhase.ERROR_HANDLER]: GraphPhase.ERROR_HANDLER as any, // <<< CAMBIADO
+            [GraphPhase.ERROR_HANDLER]: GraphPhase.ERROR_HANDLER as any,
         });
-        workflow.addConditionalEdges(GraphPhase.RESPONSE as any, TransitionLogic.determineNextNode.bind(TransitionLogic), {
+        workflow.addConditionalEdges(GraphPhase.RESPONSE as any, TransitionLogic.determineNextNode.bind(TransitionLogic) as any, {
             [GraphPhase.COMPLETED]: END,
         });
 

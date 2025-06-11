@@ -25,7 +25,7 @@ export class AnalysisService implements IAnalysisService {
         const analysisResult = await chain.invoke({
             userQuery: query,
             availableTools: availableTools.join(', '),
-            codeContext: "", // Placeholder
+            codeContext: "",
             memoryContext: `${context.workingMemorySnapshot}\n${context.retrievedKnowledgeChunks.join('\n')}`.trim()
         });
 

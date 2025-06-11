@@ -1,9 +1,7 @@
 // src/core/langgraph/state/StateFactory.ts
 import { HumanMessage } from "@langchain/core/messages";
-// Se eliminó la dependencia de 'config2.ts'
 import { GraphPhase, SimplifiedOptimizedGraphState } from "./GraphState";
 
-// La configuración del motor se pasa directamente, eliminando la necesidad de importar archivos de config.
 interface EngineConfig {
     maxGraphIterations: number;
     maxNodeIterations: Partial<Record<GraphPhase, number>>;
@@ -13,16 +11,19 @@ export class StateFactory {
     static createInitialState(
         userInput: string,
         chatId: string,
-        config: EngineConfig // La configuración del motor se pasará aquí
+        config: EngineConfig
     ): SimplifiedOptimizedGraphState {
         return {
-            messages: [new HumanMessage(userInput)],
+            // CAMBIO: Inicializamos los mensajes como un array vacío.
+            // El ApplicationLogicService se encargará de poblarlo con el historial + el nuevo mensaje.
+            messages: [],
             userInput,
             chatId,
             currentPhase: GraphPhase.ANALYSIS,
             currentPlan: [],
             toolsUsed: [],
-            workingMemory: `User wants to: ${userInput.substring(0, 100)}`,
+            // CAMBIO: El working memory se inicializará en el servicio, que tiene el contexto previo.
+            workingMemory: '',
             retrievedMemory: '',
             requiresValidation: false,
             isCompleted: false,
@@ -32,6 +33,7 @@ export class StateFactory {
                 [GraphPhase.EXECUTION]: 0,
                 [GraphPhase.VALIDATION]: 0,
                 [GraphPhase.RESPONSE]: 0,
+                [GraphPhase.ERROR_HANDLER]: 0,
                 [GraphPhase.COMPLETED]: 0,
                 [GraphPhase.ERROR]: 0
             },
