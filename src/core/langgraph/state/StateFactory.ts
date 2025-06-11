@@ -8,21 +8,19 @@ interface EngineConfig {
 }
 
 export class StateFactory {
+
     static createInitialState(
         userInput: string,
         chatId: string,
         config: EngineConfig
     ): SimplifiedOptimizedGraphState {
         return {
-            // CAMBIO: Inicializamos los mensajes como un array vacío.
-            // El ApplicationLogicService se encargará de poblarlo con el historial + el nuevo mensaje.
-            messages: [],
+            messages: [new HumanMessage(userInput)],
             userInput,
             chatId,
             currentPhase: GraphPhase.ANALYSIS,
             currentPlan: [],
             toolsUsed: [],
-            // CAMBIO: El working memory se inicializará en el servicio, que tiene el contexto previo.
             workingMemory: '',
             retrievedMemory: '',
             requiresValidation: false,
@@ -40,6 +38,47 @@ export class StateFactory {
             maxGraphIterations: config.maxGraphIterations,
             maxNodeIterations: config.maxNodeIterations,
             startTime: Date.now()
+        };
+    }
+
+
+    static prepareStateForNewTurn(
+        previousState: SimplifiedOptimizedGraphState,
+        newUserInput: string,
+        config: EngineConfig
+    ): SimplifiedOptimizedGraphState {
+        return {
+
+            chatId: previousState.chatId,
+            messages: [...previousState.messages, new HumanMessage(newUserInput)],
+            workingMemory: previousState.error ? '' : (previousState.workingMemory || ''),
+
+
+            maxGraphIterations: config.maxGraphIterations,
+            maxNodeIterations: config.maxNodeIterations,
+
+            userInput: newUserInput,
+            currentPhase: GraphPhase.ANALYSIS,
+            currentPlan: [],
+            currentTask: undefined,
+            toolsUsed: [],
+            retrievedMemory: '',
+            requiresValidation: false,
+            isCompleted: false,
+            lastToolOutput: undefined,
+            iteration: 0,
+            nodeIterations: {
+                [GraphPhase.ANALYSIS]: 0,
+                [GraphPhase.EXECUTION]: 0,
+                [GraphPhase.VALIDATION]: 0,
+                [GraphPhase.RESPONSE]: 0,
+                [GraphPhase.ERROR_HANDLER]: 0,
+                [GraphPhase.COMPLETED]: 0,
+                [GraphPhase.ERROR]: 0
+            },
+            startTime: Date.now(),
+            error: undefined,
+            debugInfo: {},
         };
     }
 }

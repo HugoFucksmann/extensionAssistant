@@ -5,9 +5,8 @@ import { Disposable } from './interfaces/Disposable';
 import { LangGraphEngine } from './langgraph/LangGraphEngine';
 import { InternalEventDispatcher } from './events/InternalEventDispatcher';
 import { EventType } from '../features/events/eventTypes';
-import { HumanMessage } from '@langchain/core/messages';
 import { GraphPhase } from './langgraph/state/GraphState';
-// AÑADIDO: Importamos la fábrica.
+
 import { StateFactory } from './langgraph/state/StateFactory';
 
 export interface ProcessUserMessageResult {
@@ -45,12 +44,12 @@ export class ApplicationLogicService implements Disposable {
       fullInput += `\n\nContexto de archivos proporcionado:\n${fileList}`;
     }
 
-    // CAMBIO: Usamos StateFactory para crear el estado base.
-    const stateForNewTurn = StateFactory.createInitialState(fullInput, chatId, engineConfig);
 
-    // AÑADIDO: Ahora, poblamos el estado con la información del turno anterior.
-    stateForNewTurn.messages = [...previousTurnFinalState.messages, new HumanMessage(fullInput)];
-    stateForNewTurn.workingMemory = previousTurnFinalState.error ? '' : (previousTurnFinalState.workingMemory || '');
+    const stateForNewTurn = StateFactory.prepareStateForNewTurn(
+      previousTurnFinalState,
+      fullInput,
+      engineConfig
+    );
 
     this.conversationManager.updateConversationState(chatId, stateForNewTurn);
 
