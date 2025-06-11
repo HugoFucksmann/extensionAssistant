@@ -4,7 +4,12 @@ import { InternalEventDispatcher } from '../../core/events/InternalEventDispatch
 import * as vscode from 'vscode';
 import { ToolValidator } from './ToolValidator';
 import { generateUniqueId } from '../../shared/utils/generateIds';
-import { EventType } from '../../features/events/eventTypes';
+import { 
+  EventType, 
+  ToolExecutionStartedPayload,
+  ToolExecutionCompletedPayload,
+  ToolExecutionErrorPayload 
+} from '../../features/events/eventTypes';
 import { DynamicStructuredTool } from '@langchain/core/tools';
 import { PerformanceMonitor } from '../../core/monitoring/PerformanceMonitor';
 import { CacheManager } from '../../core/utils/CacheManager';
@@ -67,15 +72,15 @@ export class ToolRegistry {
     console.log(`[ToolRegistry] Cache miss for tool "${name}". Executing...`);
 
     // 2. Dispatch start event
-    this.dispatcher.dispatch(EventType.TOOL_EXECUTION_STARTED, {
+    const toolStartedPayload: Omit<ToolExecutionStartedPayload, 'timestamp'> = {
       toolName: name,
       parameters: rawParams,
       toolDescription: tool?.description || `Executing ${name}`,
-      chatId: executionCtxArgs.chatId,
+      chatId: executionCtxArgs.chatId || '',
       source: 'ToolRegistry',
-      operationId,
-      timestamp: startTime,
-    });
+      operationId
+    };
+    this.dispatcher.dispatch(EventType.TOOL_EXECUTION_STARTED, toolStartedPayload);
 
     // 3. Validate and execute
     if (!tool) {
@@ -123,20 +128,33 @@ export class ToolRegistry {
 
   private dispatchCompletionEvent(name: string, params: any, operationId: string, chatId: string | undefined, result: ToolResult<any>, fromCache = false): void {
     const eventType = result.success ? EventType.TOOL_EXECUTION_COMPLETED : EventType.TOOL_EXECUTION_ERROR;
-    this.dispatcher.dispatch(eventType, {
-      toolName: name,
-      parameters: params,
-      toolDescription: this.getTool(name)?.description || name,
-      chatId,
-      source: fromCache ? 'ToolRegistry.Cache' : 'ToolRegistry',
-      operationId,
-      timestamp: Date.now(),
-      duration: result.executionTime,
-      isProcessingStep: false,
-      toolSuccess: result.success,
-      error: result.error,
-      rawOutput: result.data
-    });
+  
+    // Usar el tipo correcto según el evento
+    if (result.success) {
+      const completedPayload: Omit<ToolExecutionCompletedPayload, 'timestamp'> = {
+        toolName: name,
+        parameters: params,
+        chatId: chatId || '',  // Asegurar que no sea undefined
+        source: fromCache ? 'ToolRegistry.Cache' : 'ToolRegistry',
+        operationId,
+        duration: result.executionTime || 0,  // Asegurar que no sea undefined
+        toolSuccess: true,
+        rawOutput: result.data
+      };
+      this.dispatcher.dispatch(EventType.TOOL_EXECUTION_COMPLETED, completedPayload);
+    } else {
+      const errorPayload: Omit<ToolExecutionErrorPayload, 'timestamp'> = {
+        toolName: name,
+        parameters: params,
+        chatId: chatId || '',  // Asegurar que no sea undefined
+        source: fromCache ? 'ToolRegistry.Cache' : 'ToolRegistry',
+        operationId,
+        duration: result.executionTime || 0,  // Asegurar que no sea undefined
+        toolSuccess: false,
+        error: result.error?.toString() || 'Unknown error'
+      };
+      this.dispatcher.dispatch(EventType.TOOL_EXECUTION_ERROR, errorPayload);
+    }
   }
 
   public asDynamicTool(toolName: string): DynamicStructuredTool | undefined {

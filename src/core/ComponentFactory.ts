@@ -12,15 +12,12 @@ import { CacheManager } from './utils/CacheManager';
 import { ParallelExecutionService } from './utils/ParallelExecutionService';
 import { Disposable } from './interfaces/Disposable';
 
-// CAMBIO CLAVE: Importar el nuevo motor de ejecución y sus dependencias.
-// El LangGraphEngine y SystemInitializer ya no son necesarios.
 import { ExecutionEngine } from './execution/ExecutionEngine';
 import { ConcreteExecutionEngine } from './execution/ConcreteExecutionEngine';
-// ExecutionStateManager y CheckpointManager son gestionados internamente por ConcreteExecutionEngine,
-// por lo que no necesitamos importarlos aquí directamente.
+
 
 export class ComponentFactory {
-  // CAMBIO CLAVE: Renombrado para mayor claridad, pero la instancia sigue siendo la misma.
+
   private static applicationLogicServiceInstance: ApplicationLogicService;
   private static internalEventDispatcherInstance: InternalEventDispatcher;
   private static toolRegistryInstance: ToolRegistry;
@@ -31,12 +28,9 @@ export class ComponentFactory {
   private static cacheManagerInstance: CacheManager;
   private static parallelExecutionServiceInstance: ParallelExecutionService;
 
-  // CAMBIO CLAVE: La instancia del nuevo motor de ejecución.
+
   private static executionEngineInstance: ExecutionEngine;
 
-  // CAMBIO CLAVE: Las instancias de LangGraphEngine y sus dependencias directas se eliminan.
-  // private static langGraphEngineInstance: LangGraphEngine;
-  // private static appLogicService: ApplicationLogicService; // Redundante
 
   public static getCacheManager(): CacheManager {
     if (!this.cacheManagerInstance) {
@@ -92,14 +86,7 @@ export class ComponentFactory {
     return this.performanceMonitorInstance;
   }
 
-  // CAMBIO CLAVE: El método getLangGraphEngine se elimina por completo. Es obsoleto.
-  /*
-  public static async getLangGraphEngine(extensionContext: vscode.ExtensionContext): Promise<LangGraphEngine> {
-    // ...código eliminado...
-  }
-  */
 
-  // CAMBIO CLAVE: Este es el método principal que se modifica para usar el nuevo motor.
   public static async getApplicationLogicService(context: vscode.ExtensionContext): Promise<ApplicationLogicService> {
     if (!this.applicationLogicServiceInstance) {
       // 1. Obtener el nuevo motor de ejecución en lugar del antiguo.
@@ -112,7 +99,7 @@ export class ComponentFactory {
 
       // 3. Instanciar ApplicationLogicService con el nuevo motor.
       this.applicationLogicServiceInstance = new ApplicationLogicService(
-        executionEngine, // <-- Se pasa el nuevo motor
+        executionEngine,
         conversationManager,
         toolRegistry,
         dispatcher
@@ -128,33 +115,25 @@ export class ComponentFactory {
     return this.conversationManagerInstance;
   }
 
-  // --- NUEVOS MÉTODOS DEL MOTOR DE EJECUCIÓN (ETAPA 1 COMPLETADA) ---
 
-  /**
-   * CAMBIO CLAVE: Implementación completa del getter para el nuevo motor de ejecución.
-   * Crea y devuelve una instancia singleton de ConcreteExecutionEngine.
-   * Este es el corazón de la nueva arquitectura.
-   */
   public static getExecutionEngine(extensionContext: vscode.ExtensionContext): ExecutionEngine {
     if (!this.executionEngineInstance) {
       console.log('[ComponentFactory] Creating new ConcreteExecutionEngine instance...');
       const memoryManager = this.getMemoryManager(extensionContext);
-      // ConcreteExecutionEngine se encarga de crear su propio StateManager y CheckpointManager.
-      this.executionEngineInstance = new ConcreteExecutionEngine(memoryManager);
+
+      const toolRegistry = this.getToolRegistry();
+
+      this.executionEngineInstance = new ConcreteExecutionEngine(memoryManager, toolRegistry);
     }
     return this.executionEngineInstance;
   }
 
-  /**
-   * CAMBIO CLAVE: El nuevo sistema ya está disponible.
-   */
+
   public static isExecutionEngineAvailable(): boolean {
-    return true; // ¡El nuevo motor está vivo!
+    return true;
   }
 
-  // CAMBIO CLAVE: Los getters para ExecutionStateManager y CheckpointManager se eliminan
-  // porque son detalles de implementación interna del ConcreteExecutionEngine.
-  // Esto simplifica la API de la fábrica.
+
 
   public static async dispose(): Promise<void> {
     const disposeSafely = async (component: Disposable | undefined) => {
@@ -163,17 +142,15 @@ export class ComponentFactory {
       }
     };
 
-    // CAMBIO CLAVE: Asegurarse de que el nuevo motor se deseche correctamente.
+
     await disposeSafely(this.executionEngineInstance);
     this.executionEngineInstance = undefined as any;
 
-    // Lógica de desecho existente
+
     await disposeSafely(this.applicationLogicServiceInstance);
     this.applicationLogicServiceInstance = undefined as any;
 
-    // El langGraphEngineInstance ya no existe, por lo que se elimina de aquí.
-    // await disposeSafely(this.langGraphEngineInstance);
-    // this.langGraphEngineInstance = undefined as any;
+
 
     await disposeSafely(this.memoryManagerInstance);
     this.memoryManagerInstance = undefined as any;

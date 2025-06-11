@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { WebviewProvider } from './vscode/webView/core/WebviewProvider';
-import { ComponentFactory } from './core/ComponentFactory';
+import { ComponentFactory } from '@core/ComponentFactory';
 import { CommandManager } from './CommandManager';
 import { EventType } from './features/events/eventTypes';
 import { MemoryManager } from './features/memory/MemoryManager';

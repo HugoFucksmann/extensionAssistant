@@ -141,10 +141,28 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, isLast = fals
         </div>
         <div className="attachments-grid">
           {files.map((file, index) => {
-            // Simular información del archivo
-            const fileName = typeof file === "string" ? file : file.name || "archivo"
-            const fileSize =
-              typeof file === "object" && file.size ? file.size : Math.floor(Math.random() * 1000000) + 1000
+            // Manejar el archivo según su tipo
+            let fileName: string;
+            let fileSize: number;
+            
+            // Si es un string, usamos el string como nombre de archivo
+            if (typeof file === "string") {
+              fileName = file;
+              // Tamaño simulado para archivos que solo tienen nombre
+              fileSize = Math.floor(Math.random() * 1000000) + 1000;
+            } 
+            // Si es un objeto con propiedades name y size
+            else if (file && typeof file === "object") {
+              // Usamos type assertion para indicar a TypeScript que confiamos en que estas propiedades existen
+              const fileObj = file as { name?: string; size?: number };
+              fileName = fileObj.name || "archivo";
+              fileSize = typeof fileObj.size === "number" ? fileObj.size : Math.floor(Math.random() * 1000000) + 1000;
+            }
+            // Fallback para cualquier otro caso
+            else {
+              fileName = "archivo";
+              fileSize = Math.floor(Math.random() * 1000000) + 1000;
+            }
 
             return (
               <div key={index} className="attachment">

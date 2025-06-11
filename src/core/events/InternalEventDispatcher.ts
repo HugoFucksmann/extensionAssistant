@@ -1,5 +1,5 @@
 // src/core/events/InternalEventDispatcher.ts
-import { EventType, EventPayload, WindsurfEvent, EventFilter } from '../../features/events/eventTypes'; // Reutiliza tus tipos de eventos existentes
+import { EventType, EventPayload, WindsurfEvent, EventFilter, SystemEventPayload } from '../../features/events/eventTypes'; // Reutiliza tus tipos de eventos existentes
 import { generateUniqueId } from '../../shared/utils/generateIds';
 import EventEmitter from 'eventemitter3';
 
@@ -12,36 +12,40 @@ export class InternalEventDispatcher implements Disposable {
 
   constructor() {
     this.emitter = new EventEmitter();
-
   }
 
   /**
    * Despacha un evento tipado.
    * @param type El tipo de evento desde EventType enum.
    * @param payload El payload del evento, conforme a la interfaz correspondiente.
+   * @param forcedId Un ID opcional para forzar, útil para correlacionar eventos.
    * @returns El objeto WindsurfEvent completo que fue emitido.
    */
-  public dispatch(type: EventType, payload: EventPayload, forcedId?: string): WindsurfEvent {
+  public dispatch<T extends EventType>(
+    type: T,
+    // CAMBIO CLAVE: Usar un tipo genérico para que TypeScript valide el payload contra el tipo de evento.
+    // Omitimos 'timestamp' porque el dispatcher lo gestionará de forma centralizada.
+    payload: Omit<Extract<EventPayload, { __eventType?: T } | (EventPayload & { chatId?: string })>, 'timestamp'>,
+    forcedId?: string
+  ): WindsurfEvent {
     const event: WindsurfEvent = {
       type,
+      // CAMBIO CLAVE: Aseguramos que el timestamp se establezca aquí, evitando duplicados o ausencias.
+      // El payload se une con un timestamp gestionado centralmente.
       payload: {
         ...payload,
-        timestamp: payload.timestamp || Date.now(),
-      },
+        timestamp: Date.now(),
+      } as EventPayload, // Hacemos un cast aquí después de añadir el timestamp
       timestamp: Date.now(),
       id: forcedId || generateUniqueId(),
     };
-
 
     this.eventHistory.push(event);
     if (this.eventHistory.length > this.maxHistorySize) {
       this.eventHistory.shift();
     }
 
-
     this.emitter.emit(type, event);
-
-
 
     return event;
   }
@@ -83,8 +87,6 @@ export class InternalEventDispatcher implements Disposable {
     }
   }
 
-
-
   public getEventHistory(filter?: EventFilter): WindsurfEvent[] {
     if (!filter) {
       return [...this.eventHistory];
@@ -93,13 +95,10 @@ export class InternalEventDispatcher implements Disposable {
   }
 
   private passesFilter(event: WindsurfEvent, filter: EventFilter): boolean {
-
     if (filter.types && !filter.types.includes(event.type)) return false;
     if (filter.chatId && event.payload.chatId !== filter.chatId) return false;
-
     return true;
   }
-
 
   public dispose(): void {
     this.emitter.removeAllListeners();
@@ -107,22 +106,27 @@ export class InternalEventDispatcher implements Disposable {
     console.log('[InternalEventDispatcher] Disposed and all listeners removed.');
   }
 
-
-  public systemInfo(message: string, details?: Record<string, any>, source?: string): void {
-    this.dispatch(EventType.SYSTEM_INFO, { message, details, source, level: 'info' });
+  // CAMBIO CLAVE: Hacer los métodos de ayuda más seguros y consistentes.
+  public systemInfo(message: string, details?: Record<string, any>, source?: string, chatId?: string): void {
+    const payload: Omit<SystemEventPayload, 'timestamp'> = { message, details, source, chatId, level: 'info' };
+    this.dispatch(EventType.SYSTEM_INFO, payload);
   }
 
-  public systemWarning(message: string, details?: Record<string, any>, source?: string): void {
-    this.dispatch(EventType.SYSTEM_WARNING, { message, details, source, level: 'warning' });
+  public systemWarning(message: string, details?: Record<string, any>, source?: string, chatId?: string): void {
+    const payload: Omit<SystemEventPayload, 'timestamp'> = { message, details, source, chatId, level: 'warning' };
+    this.dispatch(EventType.SYSTEM_WARNING, payload);
   }
 
-  public systemError(message: string, error?: Error, details?: Record<string, any>, source?: string): void {
-    this.dispatch(EventType.SYSTEM_ERROR, {
+  public systemError(message: string, error?: Error, details?: Record<string, any>, source?: string, chatId?: string): void {
+    const payload: Omit<SystemEventPayload, 'timestamp'> = {
       message,
       error: error?.message,
       details,
       source,
+      chatId,
+      errorObject: error,
       level: 'error'
-    });
+    };
+    this.dispatch(EventType.SYSTEM_ERROR, payload);
   }
 }

@@ -20,9 +20,10 @@ export interface CheckpointMetadata {
     toolsUsed: string[];
     dataSize: number;
     isAutomatic: boolean;
-    parentCheckpointId?: string; // Added to match implementation
-    createdAt: Date; // Added to match implementation
-    tags?: string[]; // Added to match implementation
+    // --- CORRECCIÓN: Añadidas las propiedades que faltaban para coincidir con la implementación ---
+    parentCheckpointId?: string;
+    createdAt: Date;
+    tags?: string[];
 }
 
 export interface CheckpointFilter {
@@ -34,7 +35,7 @@ export interface CheckpointFilter {
     };
     canRollback?: boolean;
     limit?: number;
-    tags?: string[]; // Added for advanced filtering
+    tags?: string[];
 }
 
 export interface CheckpointStats {
@@ -45,7 +46,8 @@ export interface CheckpointStats {
     totalSize: number;
     oldestTimestamp: Date;
     newestTimestamp: Date;
-    averageSize?: number; // Added for more detailed stats
-    byMode?: Record<string, number>; // Added for more detailed stats
-    rollbackFrequency?: number; // Added for more detailed stats
+    // --- NOTA: Estas propiedades opcionales pueden ser implementadas en el futuro ---
+    averageSize?: number;
+    byMode?: Record<string, number>;
+    rollbackFrequency?: number;
 }

@@ -5,6 +5,7 @@ import { generateUniqueId } from '../shared/utils/generateIds';
 import { Disposable } from './interfaces/Disposable';
 import { InternalEventDispatcher } from './events/InternalEventDispatcher';
 import { EventType } from '../features/events/eventTypes';
+import { ExecutionMode } from './execution/ExecutionEngine';
 
 interface ConversationState {
   chatId: string;
@@ -12,7 +13,7 @@ interface ConversationState {
   isCompleted: boolean;
   error?: string;
   finalResponse?: string;
-  executionState?: ExecutionState;
+  executionState: ExecutionState;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -61,26 +62,7 @@ export class ConversationManager implements IConversationManager, Disposable {
       return { state: existingState, isNew: false };
     }
 
-    const currentTime = new Date();
-    const newState: ConversationState = {
-      chatId: chatId,
-      userInput: userMessage || '',
-      isCompleted: false,
-      createdAt: currentTime,
-      updatedAt: currentTime,
-      executionState: {
-        sessionId: chatId,
-        mode: 'simple',
-        step: 0,
-        lastResult: null,
-        errorCount: 0,
-        createdAt: currentTime,
-        updatedAt: currentTime,
-        progress: 0,
-        executionStatus: 'planning'
-      }
-    };
-
+    const newState = this.createInitialConversationState(chatId, userMessage, contextData);
     this.activeConversations.set(chatId, newState);
     return { state: newState, isNew: true };
   }
@@ -89,12 +71,36 @@ export class ConversationManager implements IConversationManager, Disposable {
     return this.activeConversations.get(chatId);
   }
 
-  public updateConversationState(chatId: string, state: ConversationState): void {
-    const updatedState = {
-      ...state,
+  public updateConversationState(chatId: string, updates: Partial<ConversationState>): void {
+    const existingState = this.activeConversations.get(chatId);
+    if (!existingState) {
+      throw new Error(`No conversation state found for chatId: ${chatId}`);
+    }
+
+    const updatedState: ConversationState = {
+      ...existingState,
+      ...updates,
       updatedAt: new Date()
     };
+
     this.activeConversations.set(chatId, updatedState);
+  }
+
+  public updateExecutionState(chatId: string, executionUpdates: Partial<ExecutionState>): void {
+    const conversationState = this.activeConversations.get(chatId);
+    if (!conversationState) {
+      throw new Error(`No conversation state found for chatId: ${chatId}`);
+    }
+
+    const updatedExecutionState: ExecutionState = {
+      ...conversationState.executionState,
+      ...executionUpdates,
+      updatedAt: new Date()
+    };
+
+    this.updateConversationState(chatId, {
+      executionState: updatedExecutionState
+    });
   }
 
   public clearConversation(chatId?: string): boolean {
@@ -104,10 +110,11 @@ export class ConversationManager implements IConversationManager, Disposable {
     const wasDeleted = this.activeConversations.delete(targetChatId);
 
     if (wasDeleted) {
-      this.dispatcher.dispatch(EventType.CONVERSATION_ENDED, {
+      const endedPayload: Omit<import('../features/events/eventTypes').ConversationEndedPayload, 'timestamp'> = {
         chatId: targetChatId,
         finalStatus: 'cleared_by_user'
-      });
+      };
+      this.dispatcher.dispatch(EventType.CONVERSATION_ENDED, endedPayload);
     }
 
     if (targetChatId === this.activeChatId) {
@@ -119,6 +126,48 @@ export class ConversationManager implements IConversationManager, Disposable {
 
   public getActiveConversationIds(): string[] {
     return Array.from(this.activeConversations.keys());
+  }
+
+  private createInitialConversationState(
+    chatId: string,
+    userMessage: string,
+    contextData: Record<string, any>
+  ): ConversationState {
+    const currentTime = new Date();
+
+    return {
+      chatId,
+      userInput: userMessage,
+      isCompleted: false,
+      createdAt: currentTime,
+      updatedAt: currentTime,
+      executionState: this.createInitialExecutionState(chatId, contextData)
+    };
+  }
+
+  private createInitialExecutionState(
+    sessionId: string,
+    contextData: Record<string, any>
+  ): ExecutionState {
+    const currentTime = new Date();
+
+    return {
+      sessionId,
+      mode: (contextData.executionMode as ExecutionMode) || 'simple',
+      step: 0,
+      lastResult: null,
+      errorCount: 0,
+      createdAt: currentTime,
+      updatedAt: currentTime,
+      executionStatus: 'planning',
+      progress: 0,
+      currentQuery: contextData.userMessage || '',
+      workspaceFiles: contextData.workspaceFiles || contextData.files || [],
+      activeFile: contextData.activeFile,
+      userContext: contextData,
+      recoveryAttempts: 0,
+      maxRecoveryAttempts: 3
+    };
   }
 
   public dispose(): void {

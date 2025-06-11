@@ -52,5 +52,5 @@ ESQUEMA JSON ESPERADO:
 ]);
 
 
-// OutputParser basado en Zod y LangChain
+
 export const analysisOutputParser = new JsonMarkdownStructuredOutputParser(analysisOutputSchema);

@@ -1,6 +1,5 @@
 // src/features/chat/types.ts
-import { SimplifiedOptimizedGraphState } from '../../core/langgraph/state/GraphState';
-
+import { ExecutionState } from '../../core/execution/ExecutionState';
 
 export interface ChatMessage {
   id: string;
@@ -39,7 +38,7 @@ export interface Chat {
   createdAt: number;
   updatedAt: number;
   metadata?: {
-    graphState?: SimplifiedOptimizedGraphState;
+    executionState?: ExecutionState;
     [key: string]: any;
   };
 }

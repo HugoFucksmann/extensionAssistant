@@ -1,7 +1,7 @@
 // src/core/execution/ExecutionStateManager.ts
 import { ExecutionMode } from './ExecutionEngine';
 import { ExecutionState, ExecutionStateManager, ExecutionStateSnapshot } from './ExecutionState';
-import { generateUniqueId } from '@shared/utils/generateIds';
+import { generateUniqueId } from '../../shared/utils/generateIds';
 
 export class DefaultExecutionStateManager implements ExecutionStateManager {
     private currentState: ExecutionState;
@@ -58,7 +58,7 @@ export class DefaultExecutionStateManager implements ExecutionStateManager {
     validateState(): boolean {
         const state = this.currentState;
 
-        // Basic validation
+
         if (!state.sessionId || !state.mode) return false;
         if (state.step < 0 || state.errorCount < 0) return false;
         if (state.progress !== undefined && (state.progress < 0 || state.progress > 1)) return false;
@@ -88,10 +88,10 @@ export class DefaultExecutionStateManager implements ExecutionStateManager {
     private canSafelyRestore(): boolean {
         const state = this.currentState;
 
-        // Don't allow restore if too many errors
+
         if (state.errorCount > 5) return false;
 
-        // Don't allow restore if in critical execution phase
+
         if (state.executionStatus === 'executing' && state.step > 10) return false;
 
         return true;

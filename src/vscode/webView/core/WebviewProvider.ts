@@ -8,7 +8,7 @@ import { InternalEventDispatcher } from 'src/core/events/InternalEventDispatcher
 import { IConversationManager } from 'src/core/interfaces/IConversationManager';
 import { EventType, WindsurfEvent } from '@features/events/eventTypes';
 import { searchFiles } from '@shared/utils/pathUtils';
-import { ComponentFactory } from 'src/core/ComponentFactory';
+import { ComponentFactory } from '@core/ComponentFactory';
 
 // Types and interfaces
 export interface ProcessMessageOptions {
@@ -298,6 +298,26 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
         }
     }
 
+    // Método para obtener archivos del proyecto
+    private async getProjectFiles(): Promise<string[]> {
+        try {
+            // Buscar archivos en el workspace actual
+            const workspaceFolders = vscode.workspace.workspaceFolders;
+            if (!workspaceFolders || workspaceFolders.length === 0) {
+                throw new Error('No workspace folder is open');
+            }
+
+            // Usar la utilidad searchFiles para buscar archivos en el workspace
+            const fileResults = await searchFiles(vscode, undefined, 500, false);
+            
+            // Convertir los resultados a un array de strings (paths relativos)
+            return fileResults.map(file => file.relativePath);
+        } catch (error) {
+            console.error('[WebviewProvider] Error getting project files:', error);
+            throw error;
+        }
+    }
+
     // Backend operations (enhanced with mode support)
     private async processMessage(
         chatId: string,
@@ -346,24 +366,39 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
         }
 
         try {
-            const modelManager = ComponentFactory.getModelManager();
-            await modelManager.setActiveProvider(modelType);
-            this.state.currentModel = modelType;
-            this.postMessage('modelSwitched', { modelType });
-        } catch (error) {
-            console.error(`Failed to switch to model ${modelType}:`, error);
-            throw new Error(`Failed to switch model: ${error instanceof Error ? error.message : String(error)}`);
-        }
-    }
+            // Usamos try-catch para manejar el caso donde ComponentFactory no está completamente inicializado
+            try {
+                // Solo intentamos acceder a ModelManager si realmente necesitamos cambiar el modelo
+                if (this.state.currentModel !== modelType) {
+                    const modelManager = ComponentFactory.getModelManager();
+                    await modelManager.setActiveProvider(modelType);
+                    this.state.currentModel = modelType;
+                }
+                
+                this.postMessage('modelSwitched', {
+                    model: modelType,
+                    success: true
+                });
 
-    private async getProjectFiles(): Promise<any[]> {
-        const searchResults = await searchFiles(vscode, undefined, 5000, false);
-        return searchResults.map(result => ({
-            path: result.relativePath,
-            type: result.type,
-            name: result.name,
-            uri: result.uri
-        }));
+                console.log(`[WebviewProvider] Model switched to ${modelType}`);
+            } catch (factoryError) {
+                console.warn('[WebviewProvider] ModelManager not available yet, deferring model switch');
+                // Actualizamos el estado pero no intentamos cambiar el modelo realmente
+                this.state.currentModel = modelType;
+                this.postMessage('modelSwitched', {
+                    model: modelType,
+                    success: true,
+                    deferred: true
+                });
+            }
+        } catch (error) {
+            console.error('[WebviewProvider] Error switching model:', error);
+            this.handleError(error as Error, 'switchModel');
+            this.postMessage('modelSwitched', {
+                success: false,
+                error: (error as Error).message
+            });
+        }
     }
 
     // Event handling (consolidated from EventSubscriber)
@@ -613,21 +648,14 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
         }
     }
 
-    // Error handling (consolidated from ErrorManager)
-    private handleSystemError(message: string, source?: string): void {
-        this.state.lastError = message;
-        this.internalEventDispatcher.dispatch(EventType.SYSTEM_ERROR, {
-            message,
-            level: 'error',
-            chatId: this.state.currentChatId || undefined,
-            source: `WebviewProvider.${source || 'unknown'}`,
-            timestamp: Date.now(),
-        });
+    // Error handling methods
+    private handleError(error: Error, context?: string): void {
+        console.error(`[WebviewProvider] Error${context ? ' in ' + context : ''}:`, error);
+        this.handleSystemError(error.message);
     }
 
-    private handleError(error: Error, source: string): void {
-        console.error(`[WebviewProvider] Error in ${source}:`, error);
-        this.handleSystemError(error.message || 'An unexpected error occurred.', source);
+    private handleSystemError(message: string): void {
+        this.postMessage('systemError', { message });
     }
 
     // Utility methods

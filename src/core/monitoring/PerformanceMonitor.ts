@@ -10,7 +10,7 @@ export interface NodePerformance {
     maxDuration: number;
 }
 
-// CAMBIO: Añadido un tipo para el reporte agrupado.
+
 export type GroupedPerformanceReport = Record<string, NodePerformance[]>;
 
 export class PerformanceMonitor {
@@ -23,13 +23,7 @@ export class PerformanceMonitor {
 
     private readonly MAX_DURATION_SAMPLES = 100;
 
-    /**
-     * Registra la ejecución de un nodo o proceso.
-     * @param nodeName - El nombre del nodo. Se recomienda usar un prefijo para el modo,
-     *                   ej: 'simple:tool_execution', 'planner:analysis'.
-     * @param duration - La duración de la ejecución en milisegundos.
-     * @param error - Un mensaje de error si la ejecución falló.
-     */
+
     public trackNodeExecution(nodeName: string, duration: number, error?: string): void {
         if (!this.nodeMetrics.has(nodeName)) {
             this.nodeMetrics.set(nodeName, {
@@ -53,10 +47,7 @@ export class PerformanceMonitor {
         }
     }
 
-    /**
-     * Genera un reporte de rendimiento plano de todos los nodos monitoreados.
-     * @returns Un array de objetos NodePerformance.
-     */
+
     public getReport(): NodePerformance[] {
         const performances: NodePerformance[] = [];
 
@@ -70,11 +61,7 @@ export class PerformanceMonitor {
         return performances.sort((a, b) => b.averageDuration - a.averageDuration);
     }
 
-    /**
-     * CAMBIO: Nuevo método para obtener un reporte agrupado por un prefijo (ej. el modo).
-     * @param-groupByPrefix El caracter usado para separar el prefijo (ej: ':').
-     * @returns Un objeto donde las claves son los prefijos y los valores son los reportes de rendimiento.
-     */
+
     public getGroupedReport(groupByPrefix: string = ':'): GroupedPerformanceReport {
         const groupedReport: GroupedPerformanceReport = {};
         const allNodesReport = this.getReport();
@@ -87,8 +74,7 @@ export class PerformanceMonitor {
                 groupedReport[groupName] = [];
             }
 
-            // Opcional: limpiar el nombre del nodo del prefijo para el reporte
-            // nodePerformance.nodeName = parts.length > 1 ? parts.slice(1).join(groupByPrefix) : nodePerformance.nodeName;
+
             groupedReport[groupName].push(nodePerformance);
         }
 

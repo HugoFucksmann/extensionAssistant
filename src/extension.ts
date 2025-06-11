@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { ExtensionActivator } from './ExtensionActivator';
-import { ComponentFactory } from './core/ComponentFactory';
+import { ComponentFactory } from '@core/ComponentFactory';
 
 let activator: ExtensionActivator | undefined;
 

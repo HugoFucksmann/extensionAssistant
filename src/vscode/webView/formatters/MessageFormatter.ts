@@ -61,7 +61,8 @@ export class MessageFormatter {
     }
 
     public formatResponseGenerated(payload: any): string {
-        return payload.responseContent;
+        // Soportar tanto response (nuevo formato) como responseContent (formato antiguo)
+        return payload.response || payload.responseContent || '';
     }
 
 

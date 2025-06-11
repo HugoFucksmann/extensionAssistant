@@ -4,10 +4,6 @@ import { z } from 'zod';
 import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { JsonMarkdownStructuredOutputParser } from "langchain/output_parsers";
 
-// Updated PromptProvider.ts should import this:
-// import { validationPromptLC } from "../../../features/ai/prompts/optimized/validationPrompt";
-
-// Esquema para validar la salida del modelo
 export const validationOutputSchema = z.object({
     isValid: z.boolean().describe("¿El resultado de la herramienta parece correcto y útil para el siguiente paso?"),
     reasoning: z.string().describe("Breve explicación de por qué el resultado es válido o no."),

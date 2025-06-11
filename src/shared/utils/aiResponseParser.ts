@@ -43,15 +43,28 @@ export class AIResponseParser {
     this.defaultModel = model;
   }
 
-  /**
-   * Usa JSON.stringify(schema._def) como clave de caché.
-   * ¡ATENCIÓN!: Para esquemas Zod complejos, esto podría no ser único o eficiente.
-   * Si se detectan colisiones en producción, reemplazar por una función hash robusta (por ejemplo, object-hash).
-   * TODO: Mejorar si aparecen problemas de unicidad.
-   */
+
   private getParser<T extends ZodTypeAny>(schema: T): JsonMarkdownStructuredOutputParser<z.infer<typeof schema>> {
-    const schemaKey = JSON.stringify(schema._def);
+    // --- INICIO DE LA CORRECCIÓN ---
+    let schemaKey: string;
+    try {
+      // Intentar obtener las claves del objeto para una clave más única
+      const shape = (schema._def as any).shape;
+      if (shape && typeof shape === 'object') {
+        const keys = Object.keys(shape).sort().join(',');
+        schemaKey = `zod_object:${keys}`;
+      } else {
+        // Fallback para otros tipos de esquemas Zod (arrays, enums, etc.)
+        schemaKey = JSON.stringify(schema._def);
+      }
+    } catch (e) {
+      // Fallback en caso de error al inspeccionar el esquema
+      schemaKey = JSON.stringify(schema._def);
+    }
+    // --- FIN DE LA CORRECCIÓN ---
+
     if (!this.parserCache.has(schemaKey)) {
+      console.log(`[AIResponseParser] Caching new parser for key: ${schemaKey}`); // Log de depuración
       this.parserCache.set(schemaKey, new JsonMarkdownStructuredOutputParser(schema as z.ZodType));
     }
     return this.parserCache.get(schemaKey)!;

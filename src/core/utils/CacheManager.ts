@@ -6,19 +6,19 @@ interface CacheEntry {
     value: any;
     createdAt: number;
     lastAccessed: number;
-    ttl: number; // Time-to-live in milliseconds
+    ttl: number;
 }
 
 export interface CacheConfig {
-    defaultTTL: number; // Default TTL in ms
-    maxSize: number; // Max number of items in cache
-    cleanupInterval: number; // How often to check for expired items in ms
+    defaultTTL: number;
+    maxSize: number;
+    cleanupInterval: number;
 }
 
 export const DEFAULT_CACHE_CONFIG: CacheConfig = {
-    defaultTTL: 5 * 60 * 1000, // 5 minutes
+    defaultTTL: 5 * 60 * 1000,
     maxSize: 100,
-    cleanupInterval: 60 * 1000, // 1 minute
+    cleanupInterval: 60 * 1000,
 };
 
 export class CacheManager implements Disposable {
@@ -56,7 +56,7 @@ export class CacheManager implements Disposable {
 
     public hashInput(input: any): string {
         if (input === null || input === undefined) return 'null';
-        // Sort object keys for consistent hashing
+
         const sortedInput = JSON.stringify(this.sortObjectKeys(input));
         return createHash('md5').update(sortedInput).digest('hex');
     }
@@ -74,7 +74,7 @@ export class CacheManager implements Disposable {
     }
 
     private enforceMaxSize(): void {
-        // Simple LRU (Least Recently Used) eviction strategy
+
         if (this.cache.size < this.config.maxSize) return;
 
         const oldestEntry = [...this.cache.entries()].sort(
