@@ -211,7 +211,6 @@ export type ToolOutputMap = {
 
   // Edit
   getActiveEditorInfo: ActiveEditorInfoToolOutput;
-  getDocumentDiagnostics: DocumentDiagnosticsToolOutput;
 
   // Terminal
   terminal: RunInTerminalToolOutput;

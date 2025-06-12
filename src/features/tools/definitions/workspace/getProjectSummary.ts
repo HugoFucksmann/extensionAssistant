@@ -5,7 +5,7 @@ import { ToolDefinition, ToolResult, } from '../../types';
 import * as path from 'path';
 
 
-export const getProjectSummaryParamsSchema = z.object({}).strict();
+export const getProjectSummaryParamsSchema = z.object({}).passthrough();
 
 
 type TopLevelEntry = {

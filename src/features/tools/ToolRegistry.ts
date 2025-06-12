@@ -8,7 +8,7 @@ import { EventType } from '../../features/events/eventTypes';
 import { DynamicStructuredTool } from '@langchain/core/tools';
 import { PerformanceMonitor } from '../../core/monitoring/PerformanceMonitor';
 import { CacheManager } from '../../core/utils/CacheManager';
-import { Disposable } from '../../core/interfaces/Disposable';
+
 
 export class ToolRegistry {
   private tools = new Map<string, ToolDefinition<any, any>>();
@@ -19,10 +19,7 @@ export class ToolRegistry {
     private cacheManager: CacheManager
   ) { }
 
-  /**
-   * Registers a list of tool definitions.
-   * @param toolsToRegister An array of tool definitions to add to the registry.
-   */
+
   public registerTools(toolsToRegister: ToolDefinition<any, any>[]): void {
     for (const tool of toolsToRegister) {
       if (this.tools.has(tool.name)) {
@@ -45,7 +42,7 @@ export class ToolRegistry {
     return Array.from(this.tools.values());
   }
 
-  // CHANGE: Add throwOnError parameter for centralized error handling
+
   async executeTool<T = any>(
     name: string,
     rawParams: any,
@@ -56,7 +53,7 @@ export class ToolRegistry {
     const tool = this.getTool(name);
     const throwOnError = executionCtxArgs.throwOnError ?? false;
 
-    // 1. Check cache
+
     const cacheKey = `tool:${name}:${this.cacheManager.hashInput(rawParams)}`;
     const cachedResult = this.cacheManager.get<ToolResult<T>>(cacheKey);
     if (cachedResult) {
@@ -64,7 +61,7 @@ export class ToolRegistry {
       cachedResult.executionTime = Date.now() - startTime;
       this.dispatchCompletionEvent(name, rawParams, operationId, executionCtxArgs.chatId, cachedResult, true);
 
-      // CHANGE: Throw if cached result was an error and throwOnError is true
+
       if (throwOnError && !cachedResult.success) {
         throw new Error(cachedResult.error || `Tool '${name}' failed`);
       }
@@ -73,7 +70,7 @@ export class ToolRegistry {
     }
     console.log(`[ToolRegistry] Cache miss for tool "${name}". Executing...`);
 
-    // 2. Dispatch start event
+
     this.dispatcher.dispatch(EventType.TOOL_EXECUTION_STARTED, {
       toolName: name,
       parameters: rawParams,
@@ -84,13 +81,13 @@ export class ToolRegistry {
       timestamp: startTime,
     });
 
-    // 3. Validate and execute
+
     if (!tool) {
       const errorMsg = `Tool not found: ${name}`;
       const result: ToolResult<T> = { success: false, error: errorMsg, executionTime: Date.now() - startTime };
       this.dispatchCompletionEvent(name, rawParams, operationId, executionCtxArgs.chatId, result);
 
-      // CHANGE: Throw instead of returning error result
+
       if (throwOnError) {
         throw new Error(errorMsg);
       }
@@ -104,7 +101,7 @@ export class ToolRegistry {
       const result: ToolResult<T> = { success: false, error: errorMsg, executionTime: Date.now() - startTime };
       this.dispatchCompletionEvent(name, rawParams, operationId, executionCtxArgs.chatId, result);
 
-      // CHANGE: Throw instead of returning error result
+
       if (throwOnError) {
         throw new Error(errorMsg);
       }
@@ -128,16 +125,16 @@ export class ToolRegistry {
       result = { success: false, error: errorMsg, executionTime: Date.now() - startTime };
     }
 
-    // 4. Cache successful result
+
     if (result.success) {
       this.cacheManager.set(cacheKey, result);
     }
 
-    // 5. Track performance and dispatch completion event
+
     this.performanceMonitor.trackNodeExecution(`tool.${name}`, result.executionTime || 0, result.error);
     this.dispatchCompletionEvent(name, rawParams, operationId, executionCtxArgs.chatId, result);
 
-    // CHANGE: Throw if execution failed and throwOnError is true
+
     if (throwOnError && !result.success) {
       throw new Error(result.error || `Tool '${name}' failed`);
     }
@@ -168,13 +165,13 @@ export class ToolRegistry {
     if (!toolDef) return undefined;
 
     const langChainFunc = async (input: any, runContext?: any) => {
-      // CHANGE: Use throwOnError=true for LangChain compatibility
+
       const toolResult = await this.executeTool(toolName, input, {
         ...runContext?.config?.configurable,
         throwOnError: true
       });
 
-      // This line is never reached if tool fails (exception thrown above)
+
       return JSON.stringify(toolResult.data) || "Tool executed successfully with no output.";
     };
 
