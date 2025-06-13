@@ -4,9 +4,22 @@ import { z } from 'zod';
 import { ToolDefinition, ToolResult, } from '../../types';
 import { buildWorkspaceUri } from '@shared/utils/pathUtils';
 
-
-
-export const createFileOrDirectoryParamsSchema = z.object({
+export const createFileOrDirectoryParamsSchema = z.preprocess((input) => {
+  if (typeof input === 'object' && input !== null) {
+    const rawInput = input as any;
+    // Corregimos 'filePaths' a 'path'
+    if ('filePaths' in rawInput && !('path' in rawInput)) {
+      const filePaths = rawInput.filePaths;
+      if (Array.isArray(filePaths) && filePaths.length > 0) {
+        const correctedInput = { ...rawInput };
+        correctedInput.path = filePaths[0];
+        delete correctedInput.filePaths;
+        return correctedInput;
+      }
+    }
+  }
+  return input;
+}, z.object({
   path: z.string().min(1, { message: "Path cannot be empty." }),
   type: z.enum(['file', 'directory']).describe("Specify 'file' to create a file (optionally with content) or 'directory' to create a directory."),
   content: z.string().optional().describe("Content for the file. Only used if type is 'file'. If type is 'file' and content is omitted, an empty file is created.")
@@ -19,8 +32,7 @@ export const createFileOrDirectoryParamsSchema = z.object({
   }, {
     message: "Content should not be provided when creating a directory. For files, content is optional.",
     path: ['content']
-  });
-
+  }));
 
 type CreateResultType = {
   path: string;
@@ -32,17 +44,17 @@ type CreateResultType = {
   mimeType?: string;
   lastModified: string;
   parentDirectory: string;
-  children?: string[]; // Para directorios
+  children?: string[];
 };
 
 export const createFileOrDirectory: ToolDefinition<typeof createFileOrDirectoryParamsSchema, CreateResultType> = {
   getUIDescription: (params) => `Crear ${params?.type || 'ítem'}: ${params?.path?.split(/[\\/]/).pop() || 'archivo'}`,
   uiFeedback: true,
   name: 'createFileOrDirectory',
-  description: 'Creates a new file or a new directory with detailed metadata. Paths must be relative to the workspace root. Creates parent directories if they do not exist. Overwrites existing files if type is "file".',
+  description: 'Creates a new file or a new directory with detailed metadata. The path must be provided in the "path" parameter. If multiple paths are sent, only the first one is processed. Creates parent directories if they do not exist. Overwrites existing files if type is "file".',
   parametersSchema: createFileOrDirectoryParamsSchema,
   async execute(
-    params, // Tipado por Zod
+    params,
     context
   ): Promise<ToolResult<CreateResultType>> {
     const { path, type, content } = params;
@@ -63,7 +75,6 @@ export const createFileOrDirectory: ToolDefinition<typeof createFileOrDirectoryP
         existingStat = await context.vscodeAPI.workspace.fs.stat(targetUri);
       } catch (e) { /* No existe, se creará */ }
 
-
       const targetPath = targetUri.fsPath;
       const relativePath = context.vscodeAPI.workspace.asRelativePath(targetUri, false);
       const parentRelativePath = context.vscodeAPI.workspace.asRelativePath(parentDirUri, false);
@@ -76,16 +87,9 @@ export const createFileOrDirectory: ToolDefinition<typeof createFileOrDirectoryP
             return {
               success: true,
               data: {
-                path: relativePath,
-                type: 'directory',
-                operation,
-                absolutePath: targetPath,
-                size: 0,
-                encoding: 'utf-8',
-                mimeType: 'inode/directory',
-                lastModified: new Date(existingStat.mtime).toISOString(),
-                parentDirectory: parentRelativePath,
-                children: children.map(([name, _]) => name)
+                path: relativePath, type: 'directory', operation, absolutePath: targetPath, size: 0,
+                encoding: 'utf-8', mimeType: 'inode/directory', lastModified: new Date(existingStat.mtime).toISOString(),
+                parentDirectory: parentRelativePath, children: children.map(([name, _]) => name)
               }
             };
           } else {
@@ -97,16 +101,9 @@ export const createFileOrDirectory: ToolDefinition<typeof createFileOrDirectoryP
         return {
           success: true,
           data: {
-            path: relativePath,
-            type: 'directory',
-            operation,
-            absolutePath: targetPath,
-            size: 0,
-            encoding: 'utf-8',
-            mimeType: 'inode/directory',
-            lastModified: new Date(stat.mtime).toISOString(),
-            parentDirectory: parentRelativePath,
-            children: []
+            path: relativePath, type: 'directory', operation, absolutePath: targetPath, size: 0,
+            encoding: 'utf-8', mimeType: 'inode/directory', lastModified: new Date(stat.mtime).toISOString(),
+            parentDirectory: parentRelativePath, children: []
           }
         };
       } else {
@@ -121,14 +118,8 @@ export const createFileOrDirectory: ToolDefinition<typeof createFileOrDirectoryP
         return {
           success: true,
           data: {
-            path: relativePath,
-            type: 'file',
-            operation,
-            absolutePath: targetPath,
-            size: fileStat.size,
-            encoding: 'utf-8',
-            mimeType: 'text/plain',
-            lastModified: new Date(fileStat.mtime).toISOString(),
+            path: relativePath, type: 'file', operation, absolutePath: targetPath, size: fileStat.size,
+            encoding: 'utf-8', mimeType: 'text/plain', lastModified: new Date(fileStat.mtime).toISOString(),
             parentDirectory: parentRelativePath
           }
         };

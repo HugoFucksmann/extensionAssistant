@@ -4,12 +4,24 @@ import { z } from 'zod';
 import { ToolDefinition, ToolResult, } from '../../types';
 import { buildWorkspaceUri } from '@shared/utils/pathUtils';
 
-
-// Esquema Zod para los parámetros
-export const deletePathParamsSchema = z.object({
+export const deletePathParamsSchema = z.preprocess((input) => {
+  if (typeof input === 'object' && input !== null) {
+    const rawInput = input as any;
+    // Corregimos 'filePaths' a 'path'
+    if ('filePaths' in rawInput && !('path' in rawInput)) {
+      const filePaths = rawInput.filePaths;
+      if (Array.isArray(filePaths) && filePaths.length > 0) {
+        const correctedInput = { ...rawInput };
+        correctedInput.path = filePaths[0];
+        delete correctedInput.filePaths;
+        return correctedInput;
+      }
+    }
+  }
+  return input;
+}, z.object({
   path: z.string().min(1, { message: "Path to delete cannot be empty." })
-
-}).strict();
+}).strict());
 
 export type DeletePathResultData = {
   path: string;
@@ -20,10 +32,10 @@ export const deletePath: ToolDefinition<typeof deletePathParamsSchema, DeletePat
   getUIDescription: (params) => `Eliminar: ${params?.path?.split(/[\\/]/).pop() || 'ítem'}`,
   uiFeedback: true,
   name: 'deletePath',
-  description: 'Deletes a file or directory recursively. The path must be relative to the workspace root. Uses trash by default if available on the system.',
+  description: 'Deletes a file or directory recursively. The path must be provided in the "path" parameter. If multiple paths are sent, only the first one is processed. Uses trash by default if available on the system.',
   parametersSchema: deletePathParamsSchema,
   async execute(
-    params, // Tipado como: { path: string }
+    params,
     context
   ): Promise<ToolResult<{ path: string; deleted: boolean }>> {
     const { path } = params;
@@ -40,7 +52,6 @@ export const deletePath: ToolDefinition<typeof deletePathParamsSchema, DeletePat
       } catch (e) {
         return { success: false, error: `Path not found: ${context.vscodeAPI.workspace.asRelativePath(targetUri, false)}`, data: undefined };
       }
-
 
       await context.vscodeAPI.workspace.fs.delete(targetUri, { recursive: true, useTrash: true });
       return { success: true, data: { path: context.vscodeAPI.workspace.asRelativePath(targetUri, false), deleted: true } };

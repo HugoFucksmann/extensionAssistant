@@ -5,10 +5,30 @@ import { z } from 'zod';
 import { ToolDefinition, ToolResult } from '../../types';
 import { resolveFileFromInput, searchFiles } from '../../../../shared/utils/pathUtils';
 
-// Esquema Zod para los parámetros
-export const getFileContentsParamsSchema = z.object({
+// Esquema Zod con autocorrección MEJORADO
+export const getFileContentsParamsSchema = z.preprocess((input) => {
+  if (typeof input === 'object' && input !== null) {
+    const rawInput = input as any;
+    // Si el LLM envía 'filePaths' en lugar de 'filePath', lo corregimos.
+    if ('filePaths' in rawInput && !('filePath' in rawInput)) {
+      const filePaths = rawInput.filePaths;
+      if (Array.isArray(filePaths) && filePaths.length > 0) {
+        // 1. Creamos una copia del input para no mutar el original.
+        const correctedInput = { ...rawInput };
+        // 2. Añadimos la clave correcta ('filePath') con el primer valor del array.
+        correctedInput.filePath = filePaths[0];
+        // 3. ELIMINAMOS la clave incorrecta ('filePaths') del objeto.
+        delete correctedInput.filePaths;
+        // 4. Devolvemos el objeto corregido y limpio.
+        return correctedInput;
+      }
+    }
+  }
+  // Si no hay nada que corregir, devolvemos el input original.
+  return input;
+}, z.object({
   filePath: z.string().min(1, { message: "File path cannot be empty." })
-}).strict();
+}).strict()); // .strict() ahora recibirá un objeto limpio.
 
 export const getFileContents: ToolDefinition<
   typeof getFileContentsParamsSchema,
@@ -26,7 +46,7 @@ export const getFileContents: ToolDefinition<
 > = {
   uiFeedback: true,
   name: 'getFileContents',
-  description: 'Gets the content of a specified file with detailed metadata. The path can be absolute, relative to the workspace root, or just a filename. The tool will automatically resolve the correct path.',
+  description: 'Gets the content of a single, specified file. The path must be provided in the "filePath" parameter. If multiple paths are sent, only the first one is processed. The path can be absolute, relative to the workspace root, or just a filename.',
   parametersSchema: getFileContentsParamsSchema,
   async execute(
     params,
@@ -90,44 +110,27 @@ export const getFileContents: ToolDefinition<
   }
 };
 
-/**
- * Obtiene archivos similares o relacionados al archivo actual
- * @param vscodeAPI API de VS Code
- * @param fileUri URI del archivo actual
- * @returns Lista de rutas relativas de archivos similares
- */
 async function getSimilarFiles(vscodeAPI: typeof vscode, fileUri: vscode.Uri): Promise<string[]> {
   try {
     const relativePath = vscodeAPI.workspace.asRelativePath(fileUri, false);
     const dirName = path.dirname(relativePath);
     const fileName = path.basename(relativePath);
-
-    // Buscar archivos en el mismo directorio usando searchFiles
     const allFiles = await searchFiles(vscodeAPI, undefined, 100);
-
-    // Filtrar archivos en el mismo directorio
     const filesInSameDir = allFiles
       .filter(file => {
-        // Excluir el archivo actual
         if (file.relativePath === relativePath) return false;
-
-        // Incluir archivos en el mismo directorio
         const fileDir = path.dirname(file.relativePath);
         return fileDir === dirName;
       })
       .map(file => file.relativePath)
       .sort((a, b) => {
-        // Ordenar por similitud con el nombre del archivo
         const aName = path.basename(a);
         const bName = path.basename(b);
-
         const aScore = similarity(fileName, aName);
         const bScore = similarity(fileName, bName);
-
-        return bScore - aScore; // Orden descendente por puntuación de similitud
+        return bScore - aScore;
       })
-      .slice(0, 5); // Limitar a 5 resultados
-
+      .slice(0, 5);
     return filesInSameDir;
   } catch (error) {
     console.error('Error getting similar files:', error);
@@ -135,24 +138,12 @@ async function getSimilarFiles(vscodeAPI: typeof vscode, fileUri: vscode.Uri): P
   }
 }
 
-/**
- * Calcula la similitud entre dos cadenas usando la distancia de Levenshtein
- */
 function similarity(s1: string, s2: string): number {
   const longer = s1.length > s2.length ? s1 : s2;
   const shorter = s1.length > s2.length ? s2 : s1;
-
   if (longer.length === 0) return 1.0;
-
-  // Si uno es prefijo del otro, dar mayor puntuación
   if (longer.startsWith(shorter)) return 0.9;
-
-  // Si comparten el mismo prefijo de 3 caracteres, dar puntuación media
   if (s1.substring(0, 3) === s2.substring(0, 3)) return 0.6;
-
-  // Si comparten el mismo sufijo, dar puntuación media-baja
   if (s1.endsWith(s2) || s2.endsWith(s1)) return 0.4;
-
-  // Si no hay coincidencias, puntuación baja
   return 0.1;
 }

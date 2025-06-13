@@ -1,77 +1,72 @@
-import React, {  useState } from "react"
-import { getToolDefinition } from "../data/toolOutputs"
-import "../styles/ToolRenderer.css"
+// ToolRendererBase.tsx
+
+import React, { useState } from "react";
+import "../styles/ToolRenderer.css";
+import { ToolDefinition } from "@features/tools/types";
 
 interface ToolChildProps {
   toolInput?: Record<string, any>;
   toolOutput?: any;
   status?: string;
   isSuccess?: boolean;
-  [key: string]: any; // Allow any additional props
+  [key: string]: any;
 }
 
+// --- CAMBIOS APLICADOS ---
 interface ToolRendererBaseProps {
-  toolName: string
-  toolInput?: Record<string, any>
-  toolOutput?: any
-  status?: string
-  success?: boolean
-  message?: string
-  timestamp?: number
-  children?: React.ReactNode
+  // La definición ahora es opcional para manejar casos de error donde no se encuentra.
+  toolDefinition?: ToolDefinition<any, any>;
+  // El nombre de la herramienta es ahora requerido para usarlo como fallback.
+  toolName: string;
+  toolInput?: Record<string, any>;
+  toolOutput?: any;
+  status?: string;
+  success?: boolean;
+  message?: string;
+  timestamp?: number;
+  children?: React.ReactNode;
 }
 
 const formatTimestamp = (ts?: number): string => {
-  const time = ts && !isNaN(ts) ? new Date(ts) : new Date()
-  return time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-}
+  const time = ts && !isNaN(ts) ? new Date(ts) : new Date();
+  return time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+};
 
-// CAMBIO: La función ahora genera textos para diferentes estados (ejecutando, éxito, error)
+// --- CAMBIOS APLICADOS ---
+// La función ahora es más robusta y maneja una definición opcional.
 const getActionText = (
+  definition: ToolDefinition<any, any> | undefined,
   toolName: string,
   toolInput: Record<string, any> | undefined,
   status: string,
   isSuccess: boolean
 ): string => {
-  const definition = getToolDefinition(toolName)
-  const baseAction = definition?.displayName || toolName
-  const isProcessing = status === "thinking" || status === "tool_executing"
+  const isProcessing = status === "thinking" || status === "tool_executing";
 
-  // Textos base para cada estado
-  const stateText = isProcessing ? "Ejecutando" : isSuccess ? "Éxito" : "Error";
-  const stateTextVerb = isProcessing ? "Obteniendo" : isSuccess ? "obtenido" : "falló";
-  const stateTextVerbPast = isProcessing ? "Examinando" : isSuccess ? "examinado" : "falló al examinar";
-
-  switch (toolName) {
-    case "search":
-      const query = toolInput?.query || "..."
-      return isProcessing ? `Buscando: ${query}` : `Búsqueda para "${query}" finalizada`
-    case "file_examine":
-    case "file_read":
-    case "getFileContents":
-      const fileName = toolInput?.filePath?.split("/").pop() || toolInput?.filePath || "archivo"
-      return isProcessing ? `Examinando: ${fileName}` : `Archivo ${fileName} ${stateTextVerbPast}`
-    case "file_edit":
-    case "file_write":
-      const editFileName = toolInput?.filePath?.split("/").pop() || toolInput?.filePath || "archivo"
-      return isProcessing ? `Editando: ${editFileName}` : `Archivo ${editFileName} editado`
-    case "project_search":
-      const projectQuery = toolInput?.query || "..."
-      return isProcessing ? `Buscando en proyecto: ${projectQuery}` : `Búsqueda en proyecto finalizada`
-    case "console_command":
-    case "terminal":
-      const command = toolInput?.command?.split(" ")[0] || "comando"
-      return `${stateText}: ${command}`
-    case "getGitStatus":
-      return isProcessing ? "Obteniendo estado de Git" : `Estado de Git ${stateTextVerb}`
-    case "getProjectSummary":
-      return isProcessing ? "Generando resumen del proyecto" : `Resumen del proyecto ${stateTextVerb}`
-    default:
-      return `${baseAction}: ${stateText.toLowerCase()}`
+  // Primero, intenta usar la descripción de UI si la definición existe.
+  if (definition?.getUIDescription) {
+    try {
+      return definition.getUIDescription(toolInput);
+    } catch (e) {
+      // Si getUIDescription falla (ej. por un input inesperado), no crashear.
+      console.error("Error in getUIDescription:", e);
+    }
   }
-}
+
+  // Fallback si no hay definición o getUIDescription.
+  const baseAction = definition?.name || toolName;
+  if (isProcessing) {
+    return `Ejecutando: ${baseAction}...`;
+  }
+  if (isSuccess) {
+    return `Éxito: ${baseAction}`;
+  }
+  // Para errores, es útil mostrar el nombre de la herramienta que falló.
+  return `Error en herramienta: ${baseAction}`;
+};
 
 export const ToolRendererBase: React.FC<ToolRendererBaseProps> = ({
+  toolDefinition,
   toolName,
   toolInput = {},
   toolOutput,
@@ -81,20 +76,21 @@ export const ToolRendererBase: React.FC<ToolRendererBaseProps> = ({
   timestamp,
   children,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false)
-  const isSuccess = success !== undefined ? success : status === "success" || toolOutput?.success
-  const isError = status === "error" || success === false
-  const isProcessing = status === "thinking" || status === "tool_executing"
-  const hasDetails = React.Children.count(children) > 0
+  const [isExpanded, setIsExpanded] = useState(false);
+  const isSuccess = success !== undefined ? success : status === "success" || toolOutput?.success;
+  const isError = status === "error" || success === false;
+  const isProcessing = status === "thinking" || status === "tool_executing";
+  const hasDetails = React.Children.count(children) > 0;
 
-  // CAMBIO: El texto de acción ahora es dinámico según el estado
-  const actionText = getActionText(toolName, toolInput, status, isSuccess)
+  // --- CAMBIOS APLICADOS ---
+  // El texto de acción ahora se genera con la nueva función robusta.
+  const actionText = getActionText(toolDefinition, toolName, toolInput, status, isSuccess);
 
   const handleToggleExpand = () => {
     if (hasDetails && !isProcessing) {
-      setIsExpanded(!isExpanded)
+      setIsExpanded(!isExpanded);
     }
-  }
+  };
 
   return (
     <div
@@ -105,14 +101,12 @@ export const ToolRendererBase: React.FC<ToolRendererBaseProps> = ({
         onClick={handleToggleExpand}
       >
         <div className="tool-main-info">
-          {/* CAMBIO: Indicador de estado simplificado. La lógica de estilo está en CSS. */}
           <div className={`status-square ${isProcessing ? "processing" : isError ? "error" : "success"}`} />
           <span className="tool-action-text">{actionText}</span>
         </div>
 
         <div className="tool-controls">
           <span className="tool-timestamp">{formatTimestamp(timestamp)}</span>
-
           {hasDetails && !isProcessing && (
             <button
               className={`expand-button ${isExpanded ? "expanded" : ""}`}
@@ -148,5 +142,5 @@ export const ToolRendererBase: React.FC<ToolRendererBaseProps> = ({
         </div>
       )}
     </div>
-  )
-}
+  );
+};
