@@ -8,45 +8,37 @@ import { ToolRegistry } from "../../../../features/tools/ToolRegistry";
 import { MemoryManager } from "../../../../features/memory/MemoryManager";
 import { ObservabilityManager } from "../../observability/ObservabilityManager";
 
+// --- SALIDAS DE PROMPTS (Arquitectura Planner/Executor) ---
+import { Plan } from '../../../../features/ai/prompts/plannerPrompt';
+import { ExecutorOutput } from '../../../../features/ai/prompts/executorPrompt';
+import { FinalResponse } from '../../../../features/ai/prompts/finalResponsePrompt';
 
-import type { AnalysisOutput } from '../../../../features/ai/prompts/optimized/analysisPrompt';
-import type { ReasoningOutput } from '../../../../features/ai/prompts/optimized/reasoningPrompt';
-import type { ResponseOutput } from '../../../../features/ai/prompts/optimized/responsePrompt';
+// --- SERVICIOS (Arquitectura Planner/Executor) ---
+export interface IPlannerService {
+    updatePlan(userQuery: string, chatHistory: string, currentPlan: string[], executionHistory: string): Promise<Plan>;
+}
+export interface IExecutorService {
+    generateToolCall(task: string, userQuery: string, availableTools: string): Promise<ExecutorOutput>;
+}
+export interface IFinalResponseService {
+    generateResponse(userQuery: string, chatHistory: string): Promise<FinalResponse>;
+}
 
-export interface DeepValidationResult { passed: boolean; stateUpdates: Partial<SimplifiedOptimizedGraphState>; error?: string; }
+// --- PROVEEDOR DE PROMPTS (Simplificado) ---
+export interface IPromptProvider {
+    getPlannerPrompt(): ChatPromptTemplate;
+    getExecutorPrompt(): ChatPromptTemplate;
+    getFinalResponsePrompt(): ChatPromptTemplate;
+}
 
+// --- SERVICIOS COMUNES (Se mantienen) ---
 export interface StructuredMemoryContext { workingMemorySnapshot: string; retrievedKnowledgeChunks: string[]; }
-
-
 export interface IMemoryService {
     getStructuredContext(chatId: string, query: string, objective?: string): Promise<StructuredMemoryContext>;
     updateWorkingMemory(chatId: string, newInfo: string, currentMessages: BaseMessage[], objective?: string): Promise<void>;
 }
 
-export interface IAnalysisService {
-    analyzeQuery(query: string, context: StructuredMemoryContext, availableTools: string[]): Promise<AnalysisOutput>;
-}
-
-export interface IReasoningService {
-    generateReasoningAndAction(state: SimplifiedOptimizedGraphState): Promise<ReasoningOutput>;
-}
-
-export interface IValidationService {
-    performDeepValidation(state: SimplifiedOptimizedGraphState): Promise<DeepValidationResult>;
-}
-
-export interface IResponseService {
-    generateResponse(state: SimplifiedOptimizedGraphState): Promise<ResponseOutput>;
-}
-
-export interface IPromptProvider {
-    getAnalysisPrompt(): ChatPromptTemplate;
-    getReasoningPrompt(): ChatPromptTemplate;
-    getValidationPrompt(): ChatPromptTemplate;
-    getResponsePrompt(): ChatPromptTemplate;
-}
-
-
+// --- DEPENDENCIAS PRINCIPALES (Se mantienen) ---
 export type IModelManager = ModelManager;
 export type IToolRegistry = ToolRegistry;
 export type IMemoryManager = MemoryManager;

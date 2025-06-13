@@ -75,7 +75,7 @@ export const getProjectSummary: ToolDefinition<typeof getProjectSummaryParamsSch
             break;
         }
         return { name, type: typeValue };
-      }).slice(0, 25);
+      }).slice(0, 35);
 
       // 3. Primary Language (Heuristic)
       let primaryLanguage = 'unknown';

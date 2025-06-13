@@ -2,15 +2,23 @@
 import { ModelManager } from "../../../features/ai/ModelManager";
 import { MemoryManager } from "../../../features/memory/MemoryManager";
 import { ToolRegistry } from "../../../features/tools/ToolRegistry";
-import { AnalysisService } from "../services/AnalysisService";
 import { HybridMemoryService } from "../services/HybridMemoryService";
-import { IAnalysisService, IMemoryService, IModelManager, IReasoningService, IResponseService, IToolRegistry, IValidationService, IPromptProvider, IMemoryManager } from "../services/interfaces/DependencyInterfaces";
+import {
+    IPlannerService,
+    IExecutorService,
+    IFinalResponseService,
+    IMemoryService,
+    IModelManager,
+    IToolRegistry,
+    IMemoryManager,
+    IPromptProvider,
+    IObservabilityManager
+} from "../services/interfaces/DependencyInterfaces";
 import { PromptProvider } from "../services/PromptProvider";
-import { ReasoningService } from "../services/ReasoningService";
-import { ResponseService } from "../services/ResponseService";
-import { ValidationService } from "../services/ValidationService";
+import { PlannerService } from "../services/PlannerService";
+import { ExecutorService } from "../services/ExecutorService";
+import { FinalResponseService } from "../services/FinalResponseService";
 import { DependencyContainer } from "./DependencyContainer";
-import { IObservabilityManager } from "../services/interfaces/DependencyInterfaces";
 import { ObservabilityManager } from "../observability/ObservabilityManager";
 import { InternalEventDispatcher } from "../../events/InternalEventDispatcher";
 import { PerformanceMonitor } from "../../monitoring/PerformanceMonitor";
@@ -30,13 +38,12 @@ export class ServiceRegistry {
     ): DependencyContainer {
         const container = new DependencyContainer();
 
+        // Dependencias base
         container.register<CacheManager>('CacheManager', cacheManager);
         container.register<ParallelExecutionService>('ParallelExecutionService', parallelExecutionService);
-
         container.register<IModelManager>('IModelManager', modelManager);
         container.register<IToolRegistry>('IToolRegistry', toolRegistry);
         container.register<IMemoryManager>('IMemoryManager', memoryManager);
-
         container.register<InternalEventDispatcher>('InternalEventDispatcher', dispatcher);
 
         const promptProvider = new PromptProvider();
@@ -46,10 +53,11 @@ export class ServiceRegistry {
         container.register<IObservabilityManager>('IObservabilityManager', observabilityManager);
 
         container.register<IMemoryService>('IMemoryService', new HybridMemoryService(memoryManager, modelManager));
-        container.register<IAnalysisService>('IAnalysisService', new AnalysisService(modelManager, promptProvider));
-        container.register<IReasoningService>('IReasoningService', new ReasoningService(modelManager, promptProvider, toolRegistry));
-        container.register<IValidationService>('IValidationService', new ValidationService(modelManager, promptProvider));
-        container.register<IResponseService>('IResponseService', new ResponseService(modelManager, promptProvider));
+
+        // Servicios de la arquitectura Planner/Executor
+        container.register<IPlannerService>('IPlannerService', new PlannerService(modelManager, promptProvider));
+        container.register<IExecutorService>('IExecutorService', new ExecutorService(modelManager, promptProvider));
+        container.register<IFinalResponseService>('IFinalResponseService', new FinalResponseService(modelManager, promptProvider));
 
         return container;
     }

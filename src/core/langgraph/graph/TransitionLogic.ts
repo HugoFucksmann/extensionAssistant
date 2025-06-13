@@ -2,66 +2,24 @@
 import { GraphPhase, SimplifiedOptimizedGraphState } from "../state/GraphState";
 
 export class TransitionLogic {
-    public static determineNextNode(state: SimplifiedOptimizedGraphState): GraphPhase {
+    public static afterPlanner(state: SimplifiedOptimizedGraphState): string {
+        console.log(`[TransitionLogic] Routing from phase: ${state.currentPhase}`);
 
-        switch (state.currentPhase) {
-            case GraphPhase.ANALYSIS:
-                return this.routeFromAnalysis(state);
-            case GraphPhase.EXECUTION:
-                return this.routeFromExecution(state);
-            case GraphPhase.VALIDATION:
-                return this.routeFromValidation(state);
-            case GraphPhase.RESPONSE:
-                return this.routeFromResponse(state);
-            case GraphPhase.ERROR_HANDLER:
-                return GraphPhase.COMPLETED;
-            default:
-                return GraphPhase.COMPLETED;
-        }
-    }
-
-    private static routeFromAnalysis(state: SimplifiedOptimizedGraphState): GraphPhase {
-        if (state.error) return GraphPhase.ERROR_HANDLER;
-        return GraphPhase.EXECUTION;
-    }
-
-    private static routeFromExecution(state: SimplifiedOptimizedGraphState): GraphPhase {
-        if (state.requiresValidation) {
-            return GraphPhase.VALIDATION;
-        }
-
+        // Prioridad 1: Si hay un error, ir al manejador de errores.
         if (state.error) {
+            console.log(`[TransitionLogic] Error detected. Routing to ${GraphPhase.ERROR_HANDLER}.`);
             return GraphPhase.ERROR_HANDLER;
         }
 
+        // Prioridad 2: Si el planificador marcó el plan como completo, ir a responder.
         if (state.isCompleted) {
+            console.log(`[TransitionLogic] Plan is complete. Routing to ${GraphPhase.RESPONSE}.`);
             return GraphPhase.RESPONSE;
         }
 
-        const hasMoreTasks = state.currentTask || (state.currentPlan && state.currentPlan.length > 0);
-        const nodeIterationLimit = state.maxNodeIterations[GraphPhase.EXECUTION] || 5;
-        const withinIterationLimit = (state.nodeIterations[GraphPhase.EXECUTION] || 0) < nodeIterationLimit;
-
-        if (hasMoreTasks && withinIterationLimit) {
-            return GraphPhase.EXECUTION;
-        }
-
-        return GraphPhase.RESPONSE;
-    }
-
-    private static routeFromValidation(state: SimplifiedOptimizedGraphState): GraphPhase {
-        if (state.error) {
-            return GraphPhase.ERROR_HANDLER;
-        }
-
-        if (state.isCompleted) {
-            return GraphPhase.RESPONSE;
-        }
-
-        return GraphPhase.EXECUTION;
-    }
-
-    private static routeFromResponse(state: SimplifiedOptimizedGraphState): GraphPhase {
-        return GraphPhase.COMPLETED;
+        // Si no hay errores y el plan no está completo, significa que hay una nueva tarea.
+        // Por lo tanto, vamos al ejecutor.
+        console.log(`[TransitionLogic] Plan has next step. Routing to ${GraphPhase.EXECUTOR}.`);
+        return GraphPhase.EXECUTOR;
     }
 }

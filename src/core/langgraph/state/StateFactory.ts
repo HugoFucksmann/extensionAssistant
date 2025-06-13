@@ -24,6 +24,7 @@ export class StateFactory {
             workingMemory: '',
             retrievedMemory: '',
             requiresValidation: false,
+            currentTaskRetryCount: 0,
             isCompleted: false,
             iteration: 0,
             nodeIterations: {
@@ -53,7 +54,7 @@ export class StateFactory {
             messages: [...previousState.messages, new HumanMessage(newUserInput)],
             workingMemory: previousState.error ? '' : (previousState.workingMemory || ''),
 
-
+            currentTaskRetryCount: 0,
             maxGraphIterations: config.maxGraphIterations,
             maxNodeIterations: config.maxNodeIterations,
 

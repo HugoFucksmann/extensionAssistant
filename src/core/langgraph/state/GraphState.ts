@@ -2,13 +2,21 @@
 import { BaseMessage } from "@langchain/core/messages";
 
 export enum GraphPhase {
-    ANALYSIS = 'ANALYSIS',
-    EXECUTION = 'EXECUTION',
-    VALIDATION = 'VALIDATION',
+    // Fases del ciclo Planner/Executor
+    PLANNER = 'PLANNER',
+    EXECUTOR = 'EXECUTOR',
+    TOOL_RUNNER = 'TOOL_RUNNER',
+
+    // Fases Comunes
     RESPONSE = 'RESPONSE',
     ERROR_HANDLER = 'ERROR_HANDLER',
     COMPLETED = 'COMPLETED',
-    ERROR = 'ERROR'
+    ERROR = 'ERROR',
+
+    // Fases Antiguas (pueden ser eliminadas si no se usan en ningún otro sitio)
+    ANALYSIS = 'ANALYSIS',
+    EXECUTION = 'EXECUTION',
+    VALIDATION = 'VALIDATION',
 }
 
 export interface ToolExecution {
@@ -29,19 +37,20 @@ export interface SimplifiedOptimizedGraphState {
 
     // Execution & Context
     currentPlan: string[];
-    currentTask?: string;
+    currentTask?: string | null;
+    currentTaskRetryCount: number;
     toolsUsed: ToolExecution[];
-    workingMemory: string;
+    workingMemory: string; // Se puede mantener o eliminar si el plan es suficiente
     retrievedMemory: string;
 
     // Control Flags
-    requiresValidation: boolean;
+    requiresValidation: boolean; // Probablemente ya no se use, pero se puede dejar por ahora
     isCompleted: boolean;
     lastToolOutput?: any;
 
     // Iteration Control
     iteration: number;
-    nodeIterations: Record<GraphPhase, number>;
+    nodeIterations: Record<string, number>; // Cambiado a string para flexibilidad
     maxGraphIterations: number;
     maxNodeIterations: Partial<Record<GraphPhase, number>>;
 

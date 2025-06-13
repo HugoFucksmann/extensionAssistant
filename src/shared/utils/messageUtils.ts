@@ -10,7 +10,8 @@ export function deduplicateMessages(messages: BaseMessage[]): BaseMessage[] {
     const result: BaseMessage[] = [];
     for (let i = messages.length - 1; i >= 0; i--) {
         const msg = messages[i];
-        const type = msg._getType ? msg._getType() : 'unknown';
+        // CORRECCIÓN: Usar el nuevo método getType()
+        const type = msg.getType();
         const name = (msg as any).name || (msg as any).tool_call_id || '';
         const hash = `${type}|${msg.content}|${name}`;
         if (!seen.has(hash)) {
