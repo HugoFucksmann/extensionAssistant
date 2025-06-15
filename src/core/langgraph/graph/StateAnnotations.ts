@@ -59,10 +59,7 @@ export class StateAnnotations {
             },
 
 
-            requiresValidation: {
-                reducer: (current: boolean, update?: boolean) => update ?? current,
-                default: () => false,
-            },
+
             isCompleted: {
                 reducer: (current: boolean, update?: boolean) => update ?? current,
                 default: () => false,

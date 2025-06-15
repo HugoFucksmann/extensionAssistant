@@ -13,8 +13,7 @@ export interface BaseToolOutput<T = any> {
   };
 }
 
-
-
+// Tipos específicos para cada herramienta
 export interface ProjectSummaryToolOutput extends BaseToolOutput<{
   projectName: string;
   rootPath: string;
@@ -26,84 +25,28 @@ export interface ProjectSummaryToolOutput extends BaseToolOutput<{
   detectedPrimaryLanguage: string;
 }> { }
 
+export interface RunInTerminalToolOutput extends BaseToolOutput<{
+  terminalName: string;
+  commandSent: boolean;
+}> { }
 
-export interface GitFileStatus {
+export interface CreateFileOrDirectoryToolOutput extends BaseToolOutput<{
   path: string;
-  indexStatus: string;
-  workTreeStatus: string;
-  description: string;
-}
-
-export interface GitStatusToolOutput extends BaseToolOutput<{
-  currentBranch: string | null;
-  remoteTracking: {
-    ahead: number;
-    behind: number;
-  };
-  changedFilesCount: number;
-  stagedFilesCount: number;
-  unstagedFilesCount: number;
-  untrackedFilesCount: number;
-  conflictedFilesCount: number;
-  files: GitFileStatus[];
+  type: 'file' | 'directory';
+  operation: 'created' | 'overwritten' | 'exists';
+  absolutePath: string;
+  size?: number;
+  encoding: string;
+  mimeType?: string;
+  lastModified: string;
+  parentDirectory: string;
+  children?: string[];
 }> { }
 
-export interface FileCommitSummary {
-  file: string;
-  insertions: number;
-  deletions: number;
-}
-
-export interface GitCommitToolOutput extends BaseToolOutput<{
-  success: boolean;
-  stdout: string;
-  stderr?: string;
-  committedFiles?: string[];
-  commitHash?: string;
-  commitSummary?: string;
-  commitDate?: string;
-  author?: string;
-  filesChangedSummary?: FileCommitSummary[];
+export interface DeletePathToolOutput extends BaseToolOutput<{
+  path: string;
+  deleted: boolean;
 }> { }
-
-export interface GitPushToolOutput extends BaseToolOutput<{
-  success: boolean;
-  stdout: string;
-  stderr?: string;
-  pushedTo?: string;
-  remoteUrl?: string;
-  branch?: string;
-  commitHash?: string;
-  pushedCommits?: number;
-}> { }
-
-export interface GitPullToolOutput extends BaseToolOutput<{
-  success: boolean;
-  stdout: string;
-  stderr?: string;
-  pulledFrom?: string;
-  remoteUrl?: string;
-  branch?: string;
-  commitHash?: string;
-  commitsPulled?: number;
-}> { }
-
-export interface FileDiffSummary {
-  file: string;
-  insertions: number;
-  deletions: number;
-}
-
-export interface GitDiffToolOutput extends BaseToolOutput<{
-  success: boolean;
-  stdout: string;
-  stderr?: string;
-  diffSummary?: string;
-  filesChanged?: FileDiffSummary[];
-  isStaged: boolean;
-}> { }
-
-
 
 export interface FileContentsToolOutput extends BaseToolOutput<{
   filePath: string;
@@ -117,116 +60,34 @@ export interface FileContentsToolOutput extends BaseToolOutput<{
   lineCount: number;
 }> { }
 
-export interface CreateFileOrDirectoryToolOutput extends BaseToolOutput<{
-  path: string;
-  type: 'file' | 'directory';
-  created: boolean;
-  alreadyExists: boolean;
-}> { }
-
-export interface DeletePathToolOutput extends BaseToolOutput<{
-  path: string;
-  deleted: boolean;
-  error?: string;
-}> { }
-
-export interface WriteToFileToolOutput extends BaseToolOutput<{
-  filePath: string;
-  success: boolean;
-  bytesWritten: number;
-  error?: string;
-}> { }
-
-
-
 export interface ActiveEditorInfoToolOutput extends BaseToolOutput<{
-  filePath: string;
+  filePath: string | undefined;
+  content: string;
   languageId: string;
   lineCount: number;
-  selection?: {
+  selection: {
+    text: string;
     startLine: number;
-    startCharacter: number;
+    startChar: number;
     endLine: number;
-    endCharacter: number;
-  };
-  cursorPosition?: {
-    line: number;
-    character: number;
-  };
-  visibleRanges?: Array<{
-    startLine: number;
-    endLine: number;
-  }>;
+    endChar: number;
+    isEmpty: boolean;
+  } | null;
 }> { }
 
-export interface DocumentDiagnosticsToolOutput extends BaseToolOutput<{
-  filePath: string;
-  diagnostics: Array<{
-    severity: 'error' | 'warning' | 'info' | 'hint';
-    message: string;
-    range: {
-      startLine: number;
-      startCharacter: number;
-      endLine: number;
-      endCharacter: number;
-    };
-    source?: string;
-    code?: string | number;
-  }>;
-  hasErrors: boolean;
-  hasWarnings: boolean;
-}> { }
-
-
-export interface RunInTerminalToolOutput extends BaseToolOutput<{
-  command: string;
-  cwd: string;
-  exitCode: number;
-  output: string;
-  errorOutput: string;
-  executionTime: number;
-  pid?: number;
-  shellProcessId?: string;
-}> { }
-
-
+// Mapeo de herramientas a sus tipos de salida
 export type ToolOutputMap = {
-  // Workspace
   getProjectSummary: ProjectSummaryToolOutput;
-
-  // Git
-  getGitStatus: GitStatusToolOutput;
-  gitCommit: GitCommitToolOutput;
-  gitPush: GitPushToolOutput;
-  gitPull: GitPullToolOutput;
-  gitDiff: GitDiffToolOutput;
-
-  // Filesystem
-  getFileContents: FileContentsToolOutput;
-  file_examine: FileContentsToolOutput;
-  file_read: FileContentsToolOutput;
+  runInTerminal: RunInTerminalToolOutput;
   createFileOrDirectory: CreateFileOrDirectoryToolOutput;
   deletePath: DeletePathToolOutput;
-  writeToFile: WriteToFileToolOutput;
-
-  // Edit
+  getFileContents: FileContentsToolOutput;
   getActiveEditorInfo: ActiveEditorInfoToolOutput;
-
-  // Terminal
-  terminal: RunInTerminalToolOutput;
-  runInTerminal: RunInTerminalToolOutput;
-  console_command: RunInTerminalToolOutput;
 };
 
-
 export type ToolName = keyof ToolOutputMap;
-
-
 export type ToolOutputType<T extends ToolName> = ToolOutputMap[T];
-
-
 export type AnyToolOutput = ToolOutputMap[ToolName];
-
 
 export function createToolOutput<T extends ToolName>(
   toolName: T,

@@ -1,7 +1,9 @@
-import { IModelManager, IPromptProvider } from "./interfaces/DependencyInterfaces";
-import { Plan, planSchema, plannerPromptLC } from "../../../features/ai/prompts/plannerPrompt";
+// src/core/langgraph/services/PlannerService.ts
+import { IModelManager, IPromptProvider, } from "./interfaces/DependencyInterfaces"; // <-- MODIFICAR: Importar PlannerContext
+import { Plan, planSchema } from "../../../features/ai/prompts/plannerPrompt";
 import { createAutoCorrectStep } from "../../../shared/utils/aiResponseParser";
 import { StringOutputParser } from "@langchain/core/output_parsers";
+import { PlannerContext } from "./ContextBuilderService";
 
 export class PlannerService {
     constructor(
@@ -9,17 +11,21 @@ export class PlannerService {
         private promptProvider: IPromptProvider
     ) { }
 
-    async updatePlan(userQuery: string, chatHistory: string, currentPlan: string[], executionHistory: string): Promise<Plan> {
+    // MODIFICAR: La firma del método ahora es más limpia y usa el tipo PlannerContext.
+    async updatePlan(context: PlannerContext): Promise<Plan> {
         const model = this.modelManager.getActiveModel();
         const prompt = this.promptProvider.getPlannerPrompt();
-        const chain = prompt.pipe(model).pipe(new StringOutputParser()).pipe(createAutoCorrectStep(planSchema, model, { throwOnError: true }));
+        const chain = prompt
+            .pipe(model)
+            .pipe(new StringOutputParser())
+            .pipe(createAutoCorrectStep(planSchema, model, { throwOnError: true }));
 
+        // MODIFICAR: Usamos las propiedades del objeto de contexto directamente.
         return await chain.invoke({
-            userQuery,
-            // AÑADIR chatHistory al invoke
-            chatHistory,
-            currentPlan: currentPlan.join('\n') || 'N/A',
-            executionHistory: executionHistory || 'N/A',
+            userQuery: context.userQuery,
+            chatHistory: context.chatHistory,
+            currentPlan: context.currentPlan.join('\n') || 'N/A',
+            executionHistory: context.executionHistory,
         });
     }
 }

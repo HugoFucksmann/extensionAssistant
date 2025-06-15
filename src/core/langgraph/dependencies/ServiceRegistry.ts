@@ -4,15 +4,9 @@ import { MemoryManager } from "../../../features/memory/MemoryManager";
 import { ToolRegistry } from "../../../features/tools/ToolRegistry";
 import { HybridMemoryService } from "../services/HybridMemoryService";
 import {
-    IPlannerService,
-    IExecutorService,
-    IFinalResponseService,
-    IMemoryService,
-    IModelManager,
-    IToolRegistry,
-    IMemoryManager,
-    IPromptProvider,
-    IObservabilityManager
+    IPlannerService, IExecutorService, IFinalResponseService, IMemoryService,
+    IModelManager, IToolRegistry, IMemoryManager, IPromptProvider, IObservabilityManager,
+    IErrorCorrectionService, IContextBuilderService // <-- AÑADIR
 } from "../services/interfaces/DependencyInterfaces";
 import { PromptProvider } from "../services/PromptProvider";
 import { PlannerService } from "../services/PlannerService";
@@ -24,6 +18,8 @@ import { InternalEventDispatcher } from "../../events/InternalEventDispatcher";
 import { PerformanceMonitor } from "../../monitoring/PerformanceMonitor";
 import { CacheManager } from "../../utils/CacheManager";
 import { ParallelExecutionService } from "../../utils/ParallelExecutionService";
+import { ErrorCorrectionService } from "../services/ErrorCorrectionService"; // <-- AÑADIR
+import { ContextBuilderService } from "../services/ContextBuilderService"; // <-- AÑADIR
 
 export class ServiceRegistry {
 
@@ -53,6 +49,11 @@ export class ServiceRegistry {
         container.register<IObservabilityManager>('IObservabilityManager', observabilityManager);
 
         container.register<IMemoryService>('IMemoryService', new HybridMemoryService(memoryManager, modelManager));
+
+        // --- AÑADIR NUEVOS SERVICIOS ---
+        container.register<IContextBuilderService>('IContextBuilderService', new ContextBuilderService(toolRegistry));
+        container.register<IErrorCorrectionService>('IErrorCorrectionService', new ErrorCorrectionService(modelManager, promptProvider));
+        // ---------------------------------
 
         // Servicios de la arquitectura Planner/Executor
         container.register<IPlannerService>('IPlannerService', new PlannerService(modelManager, promptProvider));

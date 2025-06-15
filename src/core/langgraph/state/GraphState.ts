@@ -38,19 +38,23 @@ export interface SimplifiedOptimizedGraphState {
     // Execution & Context
     currentPlan: string[];
     currentTask?: string | null;
+    // MODIFICACIÓN: Este campo es gestionado por el PlannerNode. Sigue siendo útil para
+    // que el Planner evite reintentar la misma tarea indefinidamente si el ErrorNode
+    // decide 'retry'. Lo mantenemos.
     currentTaskRetryCount: number;
-    toolsUsed: ToolExecution[];
-    workingMemory: string; // Se puede mantener o eliminar si el plan es suficiente
-    retrievedMemory: string;
+    toolsUsed: ToolExecution[]; // Este campo no parece ser usado activamente, pero puede ser útil para depuración. Lo mantenemos por ahora.
+    workingMemory: string; // Gestionado por HybridMemoryService, pero no integrado en el flujo. Lo dejamos por si se integra en el futuro.
+    retrievedMemory: string; // Ídem.
 
     // Control Flags
-    requiresValidation: boolean; // Probablemente ya no se use, pero se puede dejar por ahora
+    // MODIFICACIÓN: Este campo no se usa en la nueva arquitectura. Lo eliminamos.
+    // requiresValidation: boolean; 
     isCompleted: boolean;
     lastToolOutput?: any;
 
     // Iteration Control
     iteration: number;
-    nodeIterations: Record<string, number>; // Cambiado a string para flexibilidad
+    nodeIterations: Record<string, number>;
     maxGraphIterations: number;
     maxNodeIterations: Partial<Record<GraphPhase, number>>;
 

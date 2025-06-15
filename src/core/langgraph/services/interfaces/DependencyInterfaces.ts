@@ -8,37 +8,52 @@ import { ToolRegistry } from "../../../../features/tools/ToolRegistry";
 import { MemoryManager } from "../../../../features/memory/MemoryManager";
 import { ObservabilityManager } from "../../observability/ObservabilityManager";
 
-// --- SALIDAS DE PROMPTS (Arquitectura Planner/Executor) ---
+// --- SALIDAS DE PROMPTS ---
 import { Plan } from '../../../../features/ai/prompts/plannerPrompt';
 import { ExecutorOutput } from '../../../../features/ai/prompts/executorPrompt';
 import { FinalResponse } from '../../../../features/ai/prompts/finalResponsePrompt';
+import { ErrorCorrectionDecision } from "../../../../features/ai/prompts/errorCorrectionPrompt";
 
-// --- SERVICIOS (Arquitectura Planner/Executor) ---
+// --- CONTEXTOS DE SERVICIO ---
+import { ErrorContext } from "../ErrorCorrectionService"; // <-- AÑADIR
+import { PlannerContext, ExecutorContext, ResponderContext, ErrorHandlerContext } from "../ContextBuilderService"; // <-- AÑADIR
+
+// --- SERVICIOS ---
 export interface IPlannerService {
-    updatePlan(userQuery: string, chatHistory: string, currentPlan: string[], executionHistory: string): Promise<Plan>;
+    updatePlan(context: PlannerContext): Promise<Plan>; // <-- MODIFICAR
 }
 export interface IExecutorService {
-    generateToolCall(task: string, userQuery: string, availableTools: string): Promise<ExecutorOutput>;
+    generateToolCall(context: ExecutorContext): Promise<ExecutorOutput>; // <-- MODIFICAR
 }
 export interface IFinalResponseService {
-    generateResponse(userQuery: string, chatHistory: string): Promise<FinalResponse>;
+    generateResponse(context: ResponderContext): Promise<FinalResponse>; // <-- MODIFICAR
+}
+export interface IErrorCorrectionService { // <-- AÑADIR
+    analyzeError(context: ErrorContext): Promise<ErrorCorrectionDecision>;
 }
 
-// --- PROVEEDOR DE PROMPTS (Simplificado) ---
+// --- PROVEEDOR DE PROMPTS ---
 export interface IPromptProvider {
     getPlannerPrompt(): ChatPromptTemplate;
     getExecutorPrompt(): ChatPromptTemplate;
     getFinalResponsePrompt(): ChatPromptTemplate;
+    getErrorCorrectionPrompt(): ChatPromptTemplate; // <-- AÑADIR
 }
 
-// --- SERVICIOS COMUNES (Se mantienen) ---
+// --- SERVICIOS DE INFRAESTRUCTURA ---
 export interface StructuredMemoryContext { workingMemorySnapshot: string; retrievedKnowledgeChunks: string[]; }
 export interface IMemoryService {
     getStructuredContext(chatId: string, query: string, objective?: string): Promise<StructuredMemoryContext>;
     updateWorkingMemory(chatId: string, newInfo: string, currentMessages: BaseMessage[], objective?: string): Promise<void>;
 }
+export interface IContextBuilderService { // <-- AÑADIR
+    forPlanner(state: SimplifiedOptimizedGraphState): PlannerContext;
+    forExecutor(state: SimplifiedOptimizedGraphState): ExecutorContext;
+    forResponder(state: SimplifiedOptimizedGraphState): ResponderContext;
+    forError(state: SimplifiedOptimizedGraphState): ErrorHandlerContext;
+}
 
-// --- DEPENDENCIAS PRINCIPALES (Se mantienen) ---
+// --- DEPENDENCIAS PRINCIPALES ---
 export type IModelManager = ModelManager;
 export type IToolRegistry = ToolRegistry;
 export type IMemoryManager = MemoryManager;
