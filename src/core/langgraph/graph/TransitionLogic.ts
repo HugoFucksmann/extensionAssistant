@@ -5,7 +5,7 @@ export class TransitionLogic {
     public static afterPlanner(state: SimplifiedOptimizedGraphState): string {
         console.log(`[TransitionLogic] Routing from phase: ${state.currentPhase}`);
 
-        // MODIFICAR: Esta es ahora la condición de máxima prioridad.
+        // <-- MODIFICAR: Esta es ahora la condición de máxima prioridad.
         // Si cualquier nodo anterior (incluido el propio Planner) ha establecido un error,
         // se debe ir al manejador de errores inmediatamente.
         if (state.error) {

@@ -17,21 +17,32 @@ export class ExecutorNode extends BaseNode {
     }
 
     protected async executeCore(state: SimplifiedOptimizedGraphState): Promise<Partial<SimplifiedOptimizedGraphState>> {
+        console.log('--- [ExecutorNode] INICIO ---');
+        console.log('Estado recibido:', JSON.stringify(state, null, 2));
         if (!state.currentTask) {
             throw new Error("ExecutorNode no recibió ninguna tarea para ejecutar.");
         }
 
         // MODIFICAR: Creamos el contexto y llamamos al servicio.
         const executorContext = this.contextBuilder.forExecutor(state);
+        console.log('[ExecutorNode] Contexto construido para executor:', JSON.stringify(executorContext, null, 2));
         const executorResult = await this.executorService.generateToolCall(executorContext);
+        console.log('[ExecutorNode] Resultado de executorService:', JSON.stringify(executorResult, null, 2));
 
         const thoughtMessage = new AIMessage({ content: `Executor Thought: ${executorResult.thought}` });
 
         const toolCallInfo = {
+            // Log explícito del nombre de la tool y parámetros
+            toolLog: executorResult.tool,
+            paramsLog: executorResult.parameters,
             tool: executorResult.tool,
             parameters: executorResult.parameters,
         };
 
+        console.log('[ExecutorNode] Estado resultante:', {
+            pendingToolCall: toolCallInfo,
+            currentTask: undefined
+        });
         return {
             messages: [...state.messages, thoughtMessage],
             debugInfo: { ...state.debugInfo, pendingToolCall: toolCallInfo },

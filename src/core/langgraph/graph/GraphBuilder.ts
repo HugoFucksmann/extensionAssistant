@@ -61,7 +61,7 @@ export class GraphBuilder {
         workflow.addEdge(GraphPhase.EXECUTOR, GraphPhase.TOOL_RUNNER);
         workflow.addEdge(GraphPhase.TOOL_RUNNER, GraphPhase.PLANNER);
 
-        // MODIFICACIÓN CLAVE:
+        // <-- MODIFICACIÓN CLAVE:
         // ELIMINAR la vieja conexión a END.
         // workflow.addEdge(GraphPhase.ERROR_HANDLER, END);
 

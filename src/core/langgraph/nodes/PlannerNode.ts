@@ -17,6 +17,8 @@ export class PlannerNode extends BaseNode {
     }
 
     protected async executeCore(state: SimplifiedOptimizedGraphState): Promise<Partial<SimplifiedOptimizedGraphState>> {
+        console.log('--- [PlannerNode] INICIO ---');
+        console.log('Estado recibido:', JSON.stringify(state, null, 2));
         const lastMessage = state.messages[state.messages.length - 1];
         const lastToolFailed = lastMessage && isToolMessage(lastMessage) && lastMessage.content.toString().startsWith('Error:');
 
@@ -40,6 +42,15 @@ export class PlannerNode extends BaseNode {
 
         // MODIFICAR: Delegamos la creación del contexto al nuevo servicio.
         const plannerContext = this.contextBuilder.forPlanner(state);
+        console.log('[PlannerNode] Contexto construido para planner:', JSON.stringify(plannerContext, null, 2));
+
+        // Log extra: detectar si el contenido de getFileContents ya está presente
+        if (plannerContext.executionHistory.includes('getFileContents')) {
+            console.warn('[PlannerNode][ADVERTENCIA] El historial ya contiene una llamada a getFileContents.');
+        }
+        console.log('--- [PlannerNode] executionHistory for LLM ---');
+        console.log(plannerContext.executionHistory);
+        console.log('---------------------------------------------');
         const planResult = await this.plannerService.updatePlan(plannerContext);
 
         console.log('--- [PlannerNode] OUTPUT ---');
@@ -48,6 +59,19 @@ export class PlannerNode extends BaseNode {
         console.log('Is Complete:', planResult.isPlanComplete);
         console.log('Next Task:', planResult.nextTask);
         console.log('----------------------------');
+        console.log('[PlannerNode] Estado resultante:', {
+            currentPlan: planResult.plan,
+            currentTask: planResult.nextTask,
+            isCompleted: planResult.isPlanComplete
+        });
+
+        // Detectar loops: si el plan nuevo es igual al anterior o la tarea es igual
+        if (JSON.stringify(planResult.plan) === JSON.stringify(state.currentPlan)) {
+            console.warn('[PlannerNode][LOOP WARNING] El plan generado es igual al plan anterior.');
+        }
+        if (planResult.nextTask === state.currentTask) {
+            console.warn('[PlannerNode][LOOP WARNING] La tarea generada es igual a la anterior.');
+        }
 
         const thoughtMessage = new AIMessage({ content: `Planner Thought: ${planResult.thought}` });
 
@@ -55,18 +79,18 @@ export class PlannerNode extends BaseNode {
             return {
                 messages: [...state.messages, thoughtMessage],
                 currentPlan: [],
+                currentTask: undefined,
                 isCompleted: true,
                 currentTaskRetryCount: 0,
             };
         }
 
-        const nextRetryCount = planResult.nextTask === state.currentTask ? retryCount : 0;
-
+        // Solo sugerir la próxima tarea (nextTask)
         return {
             messages: [...state.messages, thoughtMessage],
             currentPlan: planResult.plan,
-            currentTask: planResult.nextTask,
-            currentTaskRetryCount: nextRetryCount,
+            currentTask: planResult.nextTask ?? undefined,
+            currentTaskRetryCount: 0,
         };
     }
 

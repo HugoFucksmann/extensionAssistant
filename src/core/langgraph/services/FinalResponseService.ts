@@ -24,6 +24,8 @@ export class FinalResponseService {
         return await chain.invoke({
             userQuery: context.userQuery,
             chatHistory: context.chatHistory,
+            executionHistory: context.executionHistory,
+            workingMemorySnapshot: context.workingMemorySnapshot,
         });
     }
 }
