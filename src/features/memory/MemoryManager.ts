@@ -113,12 +113,12 @@ export class MemoryManager implements Disposable {
                         results.push({
                             id: key,
                             content: data,
-                            relevance: 1,
+                            relevance: 1, // Basic relevance score
                             timestamp: Date.now()
                         });
                     }
                 } catch {
-
+                    // Ignore errors reading individual files during search
                 }
             }
 

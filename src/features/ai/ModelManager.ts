@@ -122,8 +122,9 @@ export class ModelManager implements Disposable {
       vscode.window.showWarningMessage(`Preferred model '${preferredProvider}' is not available. Falling back to '${fallbackProvider}'.`);
       console.warn(`[ModelManager] Preferred provider '${preferredProvider}' not available. Using fallback: '${fallbackProvider}'.`);
     } else {
-      this.activeProvider = 'ollama'; // Default to prevent crash
-      vscode.window.showErrorMessage('No AI models available. Please configure Google API Key or ensure Ollama is running.');
+
+      this.activeProvider = undefined as any;
+      vscode.window.showErrorMessage('No AI models available. Please configure a Google API Key or ensure Ollama is running.');
       console.error('[ModelManager] No models available. Please ensure Ollama is running or configure a Google API key.');
     }
   }
@@ -133,14 +134,17 @@ export class ModelManager implements Disposable {
   }
 
   public getActiveModel(): BaseChatModel {
+
+    if (!this.activeProvider || !this.models.has(this.activeProvider)) {
+      this.ensureActiveProviderIsValid();
+      if (!this.activeProvider || !this.models.has(this.activeProvider)) {
+        throw new Error(`Critical: No AI model is available. Please check your configuration.`);
+      }
+    }
     const model = this.models.get(this.activeProvider);
     if (!model) {
-      this.ensureActiveProviderIsValid(); // Attempt to recover
-      const recoveredModel = this.models.get(this.activeProvider);
-      if (!recoveredModel) {
-        throw new Error(`Critical: No AI model available for active provider '${this.activeProvider}'.`);
-      }
-      return recoveredModel;
+
+      throw new Error(`Critical: Could not retrieve model for active provider '${this.activeProvider}'.`);
     }
     return model;
   }

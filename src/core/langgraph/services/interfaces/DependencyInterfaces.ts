@@ -6,7 +6,7 @@ import { SimplifiedOptimizedGraphState } from "../../state/GraphState";
 import { ModelManager } from "../../../../features/ai/ModelManager";
 import { ToolRegistry } from "../../../../features/tools/ToolRegistry";
 import { MemoryManager } from "../../../../features/memory/MemoryManager";
-import { ObservabilityManager } from "../../observability/ObservabilityManager";
+import { GraphPhaseObserver } from "../../observability/GraphPhaseObserver";
 
 // --- SALIDAS DE PROMPTS ---
 import { Plan } from '../../../../features/ai/prompts/plannerPrompt';
@@ -15,20 +15,20 @@ import { FinalResponse } from '../../../../features/ai/prompts/finalResponseProm
 import { ErrorCorrectionDecision } from "../../../../features/ai/prompts/errorCorrectionPrompt";
 
 // --- CONTEXTOS DE SERVICIO ---
-import { ErrorContext } from "../ErrorCorrectionService"; // <-- AÑADIR
-import { PlannerContext, ExecutorContext, ResponderContext, ErrorHandlerContext } from "../ContextBuilderService"; // <-- AÑADIR
+import { ErrorContext } from "../ErrorCorrectionService";
+import { PlannerContext, ExecutorContext, ResponderContext, ErrorHandlerContext } from "../ContextBuilderService";
 
 // --- SERVICIOS ---
 export interface IPlannerService {
-    updatePlan(context: PlannerContext): Promise<Plan>; // <-- MODIFICAR
+    updatePlan(context: PlannerContext): Promise<Plan>;
 }
 export interface IExecutorService {
-    generateToolCall(context: ExecutorContext): Promise<ExecutorOutput>; // <-- MODIFICAR
+    generateToolCall(context: ExecutorContext): Promise<ExecutorOutput>;
 }
 export interface IFinalResponseService {
-    generateResponse(context: ResponderContext): Promise<FinalResponse>; // <-- MODIFICAR
+    generateResponse(context: ResponderContext): Promise<FinalResponse>;
 }
-export interface IErrorCorrectionService { // <-- AÑADIR
+export interface IErrorCorrectionService {
     analyzeError(context: ErrorContext): Promise<ErrorCorrectionDecision>;
 }
 
@@ -37,7 +37,7 @@ export interface IPromptProvider {
     getPlannerPrompt(): ChatPromptTemplate;
     getExecutorPrompt(): ChatPromptTemplate;
     getFinalResponsePrompt(): ChatPromptTemplate;
-    getErrorCorrectionPrompt(): ChatPromptTemplate; // <-- AÑADIR
+    getErrorCorrectionPrompt(): ChatPromptTemplate;
 }
 
 // --- SERVICIOS DE INFRAESTRUCTURA ---
@@ -46,7 +46,7 @@ export interface IMemoryService {
     getStructuredContext(chatId: string, query: string, objective?: string): Promise<StructuredMemoryContext>;
     updateWorkingMemory(chatId: string, newInfo: string, currentMessages: BaseMessage[], objective?: string): Promise<void>;
 }
-export interface IContextBuilderService { // <-- AÑADIR
+export interface IContextBuilderService {
     forPlanner(state: SimplifiedOptimizedGraphState): PlannerContext;
     forExecutor(state: SimplifiedOptimizedGraphState): ExecutorContext;
     forResponder(state: SimplifiedOptimizedGraphState): ResponderContext;
@@ -57,4 +57,4 @@ export interface IContextBuilderService { // <-- AÑADIR
 export type IModelManager = ModelManager;
 export type IToolRegistry = ToolRegistry;
 export type IMemoryManager = MemoryManager;
-export type IObservabilityManager = ObservabilityManager;
+export type IGraphPhaseObserver = GraphPhaseObserver;

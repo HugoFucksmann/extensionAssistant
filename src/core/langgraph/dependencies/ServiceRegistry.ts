@@ -5,21 +5,21 @@ import { ToolRegistry } from "../../../features/tools/ToolRegistry";
 import { HybridMemoryService } from "../services/HybridMemoryService";
 import {
     IPlannerService, IExecutorService, IFinalResponseService, IMemoryService,
-    IModelManager, IToolRegistry, IMemoryManager, IPromptProvider, IObservabilityManager,
-    IErrorCorrectionService, IContextBuilderService // <-- AÑADIR
+    IModelManager, IToolRegistry, IMemoryManager, IPromptProvider, IGraphPhaseObserver,
+    IErrorCorrectionService, IContextBuilderService
 } from "../services/interfaces/DependencyInterfaces";
 import { PromptProvider } from "../services/PromptProvider";
 import { PlannerService } from "../services/PlannerService";
 import { ExecutorService } from "../services/ExecutorService";
 import { FinalResponseService } from "../services/FinalResponseService";
 import { DependencyContainer } from "./DependencyContainer";
-import { ObservabilityManager } from "../observability/ObservabilityManager";
+import { GraphPhaseObserver } from "../observability/GraphPhaseObserver";
 import { InternalEventDispatcher } from "../../events/InternalEventDispatcher";
 import { PerformanceMonitor } from "../../monitoring/PerformanceMonitor";
 import { CacheManager } from "../../utils/CacheManager";
 import { ParallelExecutionService } from "../../utils/ParallelExecutionService";
-import { ErrorCorrectionService } from "../services/ErrorCorrectionService"; // <-- AÑADIR
-import { ContextBuilderService } from "../services/ContextBuilderService"; // <-- AÑADIR
+import { ErrorCorrectionService } from "../services/ErrorCorrectionService";
+import { ContextBuilderService } from "../services/ContextBuilderService";
 
 export class ServiceRegistry {
 
@@ -45,8 +45,8 @@ export class ServiceRegistry {
         const promptProvider = new PromptProvider();
         container.register<IPromptProvider>('IPromptProvider', promptProvider);
 
-        const observabilityManager = new ObservabilityManager(dispatcher, performanceMonitor);
-        container.register<IObservabilityManager>('IObservabilityManager', observabilityManager);
+        const graphPhaseObserver = new GraphPhaseObserver(dispatcher, performanceMonitor);
+        container.register<IGraphPhaseObserver>('IGraphPhaseObserver', graphPhaseObserver);
 
         container.register<IMemoryService>('IMemoryService', new HybridMemoryService(memoryManager, modelManager));
 

@@ -1,5 +1,5 @@
 // src/core/langgraph/services/PlannerService.ts
-import { IModelManager, IPromptProvider, } from "./interfaces/DependencyInterfaces"; // <-- MODIFICAR: Importar PlannerContext
+import { IModelManager, IPromptProvider, } from "./interfaces/DependencyInterfaces";
 import { Plan, planSchema } from "../../../features/ai/prompts/plannerPrompt";
 import { createAutoCorrectStep } from "../../../shared/utils/aiResponseParser";
 import { StringOutputParser } from "@langchain/core/output_parsers";
@@ -11,7 +11,6 @@ export class PlannerService {
         private promptProvider: IPromptProvider
     ) { }
 
-    // MODIFICAR: La firma del método ahora es más limpia y usa el tipo PlannerContext.
     async updatePlan(context: PlannerContext): Promise<Plan> {
         const model = this.modelManager.getActiveModel();
         const prompt = this.promptProvider.getPlannerPrompt();
@@ -20,7 +19,6 @@ export class PlannerService {
             .pipe(new StringOutputParser())
             .pipe(createAutoCorrectStep(planSchema, model, { throwOnError: true }));
 
-        // MODIFICAR: Usamos las propiedades del objeto de contexto directamente.
         return await chain.invoke({
             userQuery: context.userQuery,
             chatHistory: context.chatHistory,

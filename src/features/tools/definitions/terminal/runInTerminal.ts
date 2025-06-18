@@ -1,23 +1,24 @@
-import { ToolDefinition } from '@features/tools/types';
+// src/features/tools/definitions/terminal/runInTerminal.ts
+import { ToolDefinition, ToolResult } from '@features/tools/types';
 import { z } from 'zod';
+import { RunInTerminalToolOutput } from '@features/tools/toolOutputTypes';
 
-// No importes 'child_process' o 'util' en el nivel superior.
-// Los cargaremos dinámicamente dentro de la función.
+// --- CAMBIO CLAVE: Se añade un esquema de parámetros explícito ---
+export const runInTerminalParamsSchema = z.object({
+  command: z.string().describe('The command to execute in the terminal (e.g., "npm install", "ls -l").'),
+});
 
-export const runInTerminal: ToolDefinition<any, any> = {
+// --- CAMBIO CLAVE: Se usan los tipos correctos en la definición ---
+export const runInTerminal: ToolDefinition<typeof runInTerminalParamsSchema, RunInTerminalToolOutput['items'][0]> = {
   name: 'runInTerminal',
-  description: 'Executes a shell command in the workspace root and returns its output. Use for installations (npm, pip), running scripts, git commands, etc.',
-  parametersSchema: z.object({
-    command: z.string().describe('The command to execute (e.g., "npm install", "ls -l").'),
-  }),
-  execute: async (params, context) => {
-    // --- Carga dinámica de módulos de Node.js ---
-    const cp = await import('node:child_process');
-    const util = await import('node:util');
-    const execPromise = util.promisify(cp.exec);
-    // ---------------------------------------------
-
+  description: 'Executes a shell command in a new, visible VS Code terminal named "Extension Assistant". Use for installations (npm, pip), running scripts, git commands, etc. This command does not return the output, it only confirms execution.',
+  parametersSchema: runInTerminalParamsSchema,
+  getUIDescription: (params) => `Ejecutar en terminal: ${params.command}`,
+  uiFeedback: true,
+  execute: async (params, context): Promise<ToolResult<RunInTerminalToolOutput['items'][0]>> => {
+    const { command } = params;
     const workspaceFolder = context.vscodeAPI.workspace.workspaceFolders?.[0];
+
     if (!workspaceFolder) {
       return {
         success: false,
@@ -26,39 +27,34 @@ export const runInTerminal: ToolDefinition<any, any> = {
     }
 
     try {
-      context.dispatcher.systemInfo(`Executing command in terminal: ${params.command}`, { command: params.command }, 'runInTerminal');
+      // --- CAMBIO CLAVE: Lógica de ejecución en terminal de VS Code ---
+      context.dispatcher.systemInfo(`Executing command in VS Code terminal: ${command}`, { command }, 'runInTerminal');
 
-      const { stdout, stderr } = await execPromise(params.command, {
-        cwd: workspaceFolder.uri.fsPath, // Ejecutar en la raíz del workspace
-      });
-
-      if (stderr && !stdout) { // A veces hay warnings en stderr pero el comando funciona
-        console.warn(`[runInTerminal] Command "${params.command}" produced an error output:`, stderr);
-        return {
-          success: true, // La herramienta funcionó, pero el comando puede haber fallado
-          data: {
-            message: "Command executed, but produced errors or warnings.",
-            output: stderr.trim(),
-          }
-        };
+      // Busca una terminal existente o crea una nueva.
+      let terminal = context.vscodeAPI.window.terminals.find(t => t.name === 'Extension Assistant');
+      if (!terminal) {
+        terminal = context.vscodeAPI.window.createTerminal({
+          name: 'Extension Assistant',
+          cwd: workspaceFolder.uri,
+        });
       }
 
-      const output = stdout.trim();
-      const truncatedOutput = output.length > 2000 ? output.substring(0, 2000) + "\n... (output truncated)" : output;
+      // Muestra la terminal y envía el comando.
+      terminal.show();
+      terminal.sendText(command, true); // El segundo argumento 'true' ejecuta el comando.
 
       return {
         success: true,
         data: {
-          message: "Command executed successfully.",
-          // Si hay stderr (warnings) y stdout, los combinamos
-          output: (stderr ? `Warnings:\n${stderr.trim()}\n\nOutput:\n` : '') + (truncatedOutput || "Command executed with no output."),
-        }
+          terminalName: 'Extension Assistant',
+          commandSent: true,
+        },
       };
+      // --- FIN DEL CAMBIO CLAVE ---
 
     } catch (error: any) {
-      console.error(`[runInTerminal] Failed to execute command "${params.command}":`, error);
-      // El error de exec a menudo incluye stdout/stderr, que es información valiosa
-      const errorMessage = `Failed to execute command. Reason: ${error.message}\n\nSTDOUT:\n${error.stdout}\n\nSTDERR:\n${error.stderr}`;
+      console.error(`[runInTerminal] Failed to execute command "${command}":`, error);
+      const errorMessage = `Failed to send command to terminal. Reason: ${error.message}`;
       return {
         success: false,
         error: errorMessage,

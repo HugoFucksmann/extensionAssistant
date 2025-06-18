@@ -3,22 +3,9 @@ import * as vscode from 'vscode';
 import { z } from 'zod';
 import { ToolDefinition, ToolResult, } from '../../types';
 import { buildWorkspaceUri } from '@shared/utils/pathUtils';
+import { correctFilePathsToSinglePath } from '@shared/utils/zodUtils';
 
-export const writeToFileParamsSchema = z.preprocess((input) => {
-  if (typeof input === 'object' && input !== null) {
-    const rawInput = input as any;
-    if ('filePaths' in rawInput && !('path' in rawInput)) {
-      const filePaths = rawInput.filePaths;
-      if (Array.isArray(filePaths) && filePaths.length > 0) {
-        const correctedInput = { ...rawInput };
-        correctedInput.path = filePaths[0];
-        delete correctedInput.filePaths;
-        return correctedInput;
-      }
-    }
-  }
-  return input;
-}, z.object({
+export const writeToFileParamsSchema = z.preprocess(correctFilePathsToSinglePath('path'), z.object({
   path: z.string().min(1, { message: "File path cannot be empty." }),
   content: z.string()
 }).strict());

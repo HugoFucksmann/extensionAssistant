@@ -7,9 +7,9 @@ export interface EngineConfig {
 }
 
 export const DEFAULT_ENGINE_CONFIG: EngineConfig = {
-    maxGraphIterations: 20,
+    maxGraphIterations: 40,
     maxNodeIterations: {
-        [GraphPhase.EXECUTION]: 8,
-        [GraphPhase.VALIDATION]: 3,
+        [GraphPhase.EXECUTOR]: 15,
+        [GraphPhase.TOOL_RUNNER]: 5,
     }
 };

@@ -3,13 +3,13 @@ import { CompiledStateGraph, MemorySaver } from "@langchain/langgraph";
 import { ModelManager } from "../../features/ai/ModelManager";
 import { MemoryManager } from "../../features/memory/MemoryManager";
 import { ToolRegistry } from "../../features/tools/ToolRegistry";
-import { DEFAULT_ENGINE_CONFIG, EngineConfig } from "./config/EngineConfig"; // <-- Asegúrate que EngineConfig esté exportado
+import { EngineConfig, DEFAULT_ENGINE_CONFIG } from "./config/EngineConfig";
 import { DependencyContainer } from "./dependencies/DependencyContainer";
 
 import { GraphBuilder } from "./graph/GraphBuilder";
 import { GraphPhase, SimplifiedOptimizedGraphState } from "./state/GraphState";
 
-import { IObservabilityManager } from "./services/interfaces/DependencyInterfaces";
+import { IGraphPhaseObserver } from "./services/interfaces/DependencyInterfaces";
 import { InternalEventDispatcher } from "@core/events/InternalEventDispatcher";
 import { PerformanceMonitor } from "@core/monitoring/PerformanceMonitor";
 import { CacheManager } from "@core/utils/CacheManager";
@@ -21,7 +21,7 @@ export class LangGraphEngine {
     private dependencies: DependencyContainer;
     private compiledGraph: CompiledStateGraph<SimplifiedOptimizedGraphState, Partial<SimplifiedOptimizedGraphState>>;
     private config: EngineConfig;
-    private observability: IObservabilityManager;
+    private observer: IGraphPhaseObserver;
 
     constructor(
         modelManager: ModelManager,
@@ -45,9 +45,9 @@ export class LangGraphEngine {
             this.parallelExecutionService
         );
 
-        this.observability = this.dependencies.get<IObservabilityManager>('IObservabilityManager');
+        this.observer = this.dependencies.get<IGraphPhaseObserver>('IGraphPhaseObserver');
 
-        const graphBuilder = new GraphBuilder(this.dependencies, this.observability);
+        const graphBuilder = new GraphBuilder(this.dependencies, this.observer);
         const workflow = graphBuilder.buildGraph();
 
         this.compiledGraph = workflow.compile({
@@ -55,7 +55,6 @@ export class LangGraphEngine {
         });
     }
 
-    // CAMBIO: Añadir este getter público
     public getConfig(): EngineConfig {
         return this.config;
     }
@@ -64,13 +63,17 @@ export class LangGraphEngine {
         initialStateForTurn: SimplifiedOptimizedGraphState
     ): Promise<SimplifiedOptimizedGraphState> {
         const chatId = initialStateForTurn.chatId;
-        this.observability.logEngineStart(chatId);
+        this.observer.logEngineStart(chatId);
 
         let finalState: SimplifiedOptimizedGraphState;
         try {
-            finalState = await this.compiledGraph.invoke(initialStateForTurn, {
+            const result = await this.compiledGraph.invoke(initialStateForTurn, {
                 configurable: { thread_id: chatId }
             });
+            finalState = {
+                ...initialStateForTurn,
+                ...result
+            };
             this.dispatchTurnCompletedEvent(chatId, finalState.startTime, finalState.error);
         } catch (error: any) {
             finalState = {
@@ -79,11 +82,11 @@ export class LangGraphEngine {
                 isCompleted: true,
                 currentPhase: GraphPhase.ERROR
             };
-            this.observability.trackError('LangGraphEngine.run', error, finalState);
+            this.observer.trackError('LangGraphEngine.run', error, finalState);
             this.dispatchTurnCompletedEvent(chatId, finalState.startTime, finalState.error);
         }
 
-        this.observability.logEngineEnd(chatId, finalState);
+        this.observer.logEngineEnd(chatId, finalState);
         return finalState;
     }
 

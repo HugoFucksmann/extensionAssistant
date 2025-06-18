@@ -3,7 +3,7 @@ import { BaseMessage, isAIMessage, isHumanMessage, isToolMessage } from "@langch
 import { SimplifiedOptimizedGraphState } from "../state/GraphState";
 import { IToolRegistry } from "./interfaces/DependencyInterfaces";
 
-// Tipos para los contextos de salida, para mayor claridad.
+
 export type PlannerContext = { userQuery: string; currentPlan: string[]; chatHistory: string; executionHistory: string; };
 export type ExecutorContext = { userQuery: string; task: string; availableTools: string; };
 export type ResponderContext = {
@@ -17,9 +17,7 @@ export type ErrorHandlerContext = { userQuery: string; currentPlan: string[]; fa
 export class ContextBuilderService {
     constructor(private toolRegistry: IToolRegistry) { }
 
-    /**
-     * Permite pasar previousSummary, maxMessages y maxToolResults para ventanas dinámicas.
-     */
+
     public forPlanner(
         state: SimplifiedOptimizedGraphState,
         previousSummary?: string,
@@ -41,9 +39,7 @@ export class ContextBuilderService {
         };
     }
 
-    /**
-     * Permite pasar previousSummary, maxMessages y maxToolResults para ventanas dinámicas.
-     */
+
     public forExecutor(
         state: SimplifiedOptimizedGraphState,
         previousSummary?: string,
@@ -53,12 +49,11 @@ export class ContextBuilderService {
         if (!state.currentTask) {
             throw new Error("ContextBuilder: No currentTask found in state for Executor.");
         }
-        // Proporcionamos una descripción más rica de las herramientas.
         const availableTools = this.toolRegistry.getAllTools().map(tool =>
             `Tool: ${tool.name}\nDescription: ${tool.description}\nParameters (Zod Schema): ${JSON.stringify(tool.parametersSchema.description || tool.parametersSchema._def, null, 2)}`
         ).join('\n\n---\n\n');
 
-        // Solo para consistencia, aunque normalmente el executor no usa chatHistory.
+
         this.formatMessagesForHistory(state.messages, false, maxMessages, maxToolResults, previousSummary);
 
         return {
@@ -68,9 +63,6 @@ export class ContextBuilderService {
         };
     }
 
-    /**
-     * Permite pasar previousSummary, maxMessages y maxToolResults para ventanas dinámicas.
-     */
     public forResponder(
         state: SimplifiedOptimizedGraphState,
         previousSummary?: string,
@@ -103,16 +95,7 @@ export class ContextBuilderService {
         };
     }
 
-    /**
-     * Formatea el historial de mensajes para los prompts, separando la conversación
-     * de los resultados de las herramientas y truncando salidas largas.
-     */
-    /**
-     * Formatea el historial de mensajes para los prompts, separando la conversación
-     * de los resultados de las herramientas y truncando salidas largas.
-     * Permite limitar la cantidad de mensajes y herramientas recientes enviados (últimos N),
-     * y anteponer un resumen previo si se proporciona.
-     */
+
     private formatMessagesForHistory(
         messages: BaseMessage[],
         includeSystemThoughts = false,
@@ -123,7 +106,6 @@ export class ContextBuilderService {
         const chatHistory: string[] = [];
         const executionHistory: string[] = [];
 
-        // Filtra solo los últimos N mensajes
         const recentMessages = messages.slice(-maxMessages);
 
         for (const msg of recentMessages) {
@@ -147,13 +129,10 @@ export class ContextBuilderService {
                         // Si no es JSON, dejar como está
                     }
                 }
-                // Ya no truncar salidas de herramientas para getFileContents
-                // Para otras tools, puedes dejar el truncamiento si lo deseas
                 executionHistory.push(`Tool: ${msg.name}\nResult: ${contentStr}`);
             }
         }
 
-        // Limita solo los últimos N resultados de tools
         const limitedExecutionHistory = executionHistory.slice(-maxToolResults);
 
         return {

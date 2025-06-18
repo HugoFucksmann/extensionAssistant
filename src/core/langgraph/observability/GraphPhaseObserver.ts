@@ -1,11 +1,11 @@
-// src/core/langgraph/observability/ObservabilityManager.ts
+// src/core/langgraph/observability/GraphPhaseObserver.ts
 import { InternalEventDispatcher } from "../../events/InternalEventDispatcher";
 import { PerformanceMonitor } from "../../monitoring/PerformanceMonitor";
 import { GraphPhase, SimplifiedOptimizedGraphState } from "../state/GraphState";
 import { EventType, AgentPhaseEventPayload, SystemEventPayload } from "../../../features/events/eventTypes";
 import { Disposable } from "../../interfaces/Disposable";
 
-export class ObservabilityManager implements Disposable {
+export class GraphPhaseObserver implements Disposable {
     private timers = new Map<string, number>();
 
     constructor(
@@ -25,7 +25,7 @@ export class ObservabilityManager implements Disposable {
             source: `LangGraphEngine.${phase}Node`,
         };
         this.dispatcher.dispatch(EventType.AGENT_PHASE_STARTED, payload);
-        console.log(`[OBSERVABILITY][${phase}] Phase started for chat ${state.chatId}.`);
+        console.log(`[GraphPhaseObserver][${phase}] Phase started for chat ${state.chatId}.`);
     }
 
     public logPhaseComplete(
@@ -51,11 +51,10 @@ export class ObservabilityManager implements Disposable {
             source: `LangGraphEngine.${phase}Node`,
             data: {
                 isCompleted: result.isCompleted,
-                requiresValidation: result.requiresValidation,
             },
         };
         this.dispatcher.dispatch(EventType.AGENT_PHASE_COMPLETED, payload);
-        console.log(`[OBSERVABILITY][${phase}] Phase completed in ${duration}ms for chat ${state.chatId}.`);
+        console.log(`[GraphPhaseObserver][${phase}] Phase completed in ${duration}ms for chat ${state.chatId}.`);
     }
 
     public trackError(source: string, error: Error, state: SimplifiedOptimizedGraphState): void {
@@ -71,7 +70,7 @@ export class ObservabilityManager implements Disposable {
             },
         };
         this.dispatcher.dispatch(EventType.SYSTEM_ERROR, payload);
-        console.error(`[OBSERVABILITY][ERROR] Source: ${source}, Message: ${error.message}`);
+        console.error(`[GraphPhaseObserver][ERROR] Source: ${source}, Message: ${error.message}`);
     }
 
     public logEngineStart(chatId: string): void {
@@ -90,6 +89,5 @@ export class ObservabilityManager implements Disposable {
 
     public dispose(): void {
         this.timers.clear();
-
     }
 }

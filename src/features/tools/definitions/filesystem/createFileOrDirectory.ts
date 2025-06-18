@@ -3,23 +3,9 @@ import * as vscode from 'vscode';
 import { z } from 'zod';
 import { ToolDefinition, ToolResult, } from '../../types';
 import { buildWorkspaceUri } from '@shared/utils/pathUtils';
+import { correctFilePathsToSinglePath } from '@shared/utils/zodUtils';
 
-export const createFileOrDirectoryParamsSchema = z.preprocess((input) => {
-  if (typeof input === 'object' && input !== null) {
-    const rawInput = input as any;
-    // Corregimos 'filePaths' a 'path'
-    if ('filePaths' in rawInput && !('path' in rawInput)) {
-      const filePaths = rawInput.filePaths;
-      if (Array.isArray(filePaths) && filePaths.length > 0) {
-        const correctedInput = { ...rawInput };
-        correctedInput.path = filePaths[0];
-        delete correctedInput.filePaths;
-        return correctedInput;
-      }
-    }
-  }
-  return input;
-}, z.object({
+export const createFileOrDirectoryParamsSchema = z.preprocess(correctFilePathsToSinglePath('path'), z.object({
   path: z.string().min(1, { message: "Path cannot be empty." }),
   type: z.enum(['file', 'directory']).describe("Specify 'file' to create a file (optionally with content) or 'directory' to create a directory."),
   content: z.string().optional().describe("Content for the file. Only used if type is 'file'. If type is 'file' and content is omitted, an empty file is created.")

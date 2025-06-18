@@ -44,11 +44,7 @@ export class AIResponseParser {
     this.defaultModel = model;
   }
 
-  /**
-   * Usa JSON.stringify(schema._def) como clave de caché.
-   * ¡ATENCIÓN!: Para esquemas Zod complejos, esto podría no ser único o eficiente.
-   * Si se detectan colisiones en producción, reemplazar por una función hash robusta (por ejemplo, object-hash).
-   */
+
   private getParser<T extends ZodTypeAny>(schema: T): JsonMarkdownStructuredOutputParser<z.infer<typeof schema>> {
     const schemaKey = JSON.stringify(schema._def);
     if (!this.parserCache.has(schemaKey)) {
@@ -159,15 +155,12 @@ export class AIResponseParser {
     });
 
     const correctedText = response.content?.toString() || '';
-    // La respuesta corregida también se limpia
     return this.cleanJsonResponse(correctedText);
   }
 
   private getSchemaDescription(schema: z.ZodSchema): string {
     try {
-      // Intenta obtener una descripción más útil si está disponible
       if (schema.description) return schema.description;
-      // Fallback a la estructura interna de Zod
       return 'shape' in schema._def && schema._def.shape
         ? JSON.stringify(schema._def.shape, null, 2)
         : 'Expected schema structure (see validation error for details)';
@@ -177,21 +170,14 @@ export class AIResponseParser {
     }
   }
 
-  /**
-   * Extrae el primer bloque JSON y corrige errores comunes como `undefined`.
-   */
   private cleanJsonResponse(response: string): string {
-    // 1. Limpiar los bloques de código markdown
     let cleaned = response
       .replace(/```json\s*/g, '')
       .replace(/```\s*/g, '')
       .trim();
 
-    // 2. Reemplazar el error común de `undefined` por `null`
-    // Busca `: undefined` y lo cambia por `: null`. Es más seguro que un reemplazo global.
     cleaned = cleaned.replace(/:\s*undefined/g, ': null');
 
-    // 3. Extraer el objeto JSON principal
     const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
     return jsonMatch ? jsonMatch[0] : cleaned;
   }
@@ -199,7 +185,6 @@ export class AIResponseParser {
   createAutoCorrectStep<T>(schema: z.ZodSchema<T>, options: AutoCorrectOptions = {}) {
     return async (input: string | object): Promise<T> => {
       const result = await this.parseWithAutoCorrect(input, schema, { ...options, throwOnError: true });
-      // El ! es seguro aquí porque throwOnError: true asegura que no llegará a este punto si hay un error.
       return result.data!;
     };
   }
@@ -225,7 +210,7 @@ export async function parseWithAutoCorrect<T>(
   options: Omit<AutoCorrectOptions, 'correctionModel'> = {}
 ): Promise<ParseResult<T>> {
   const parser = new AIResponseParser();
-  parser.setDefaultModel(model); // Asegurarse de que el modelo por defecto esté establecido
+  parser.setDefaultModel(model);
   return parser.parseWithAutoCorrect(response, schema, { ...options, correctionModel: model });
 }
 
@@ -235,7 +220,7 @@ export function createAutoCorrectStep<T>(
   options: Omit<AutoCorrectOptions, 'correctionModel'> = {}
 ) {
   const parser = new AIResponseParser();
-  parser.setDefaultModel(model); // Asegurarse de que el modelo por defecto esté establecido
+  parser.setDefaultModel(model);
   return parser.createAutoCorrectStep(schema, { ...options, correctionModel: model });
 }
 

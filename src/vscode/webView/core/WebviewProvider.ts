@@ -90,13 +90,6 @@ export class WebviewProvider implements vscode.WebviewViewProvider {
         }
     }
 
-    // Methods that were missing from original WebviewProvider
-    public async loadFiles(): Promise<void> {
-        const result = await this.backendAdapter.executeCommand('getProjectFiles', {});
-        if (result.success) {
-            this.postMessage('projectFiles', result.data);
-        }
-    }
 
     public requestShowHistory(): void {
         this.postMessage('showHistory', {});

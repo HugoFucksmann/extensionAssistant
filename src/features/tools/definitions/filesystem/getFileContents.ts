@@ -4,31 +4,11 @@ import * as path from 'path';
 import { z } from 'zod';
 import { ToolDefinition, ToolResult } from '../../types';
 import { resolveFileFromInput, searchFiles } from '../../../../shared/utils/pathUtils';
+import { correctFilePathsToSinglePath } from '@shared/utils/zodUtils';
 
-// Esquema Zod con autocorrección MEJORADO
-export const getFileContentsParamsSchema = z.preprocess((input) => {
-  if (typeof input === 'object' && input !== null) {
-    const rawInput = input as any;
-    // Si el LLM envía 'filePaths' en lugar de 'filePath', lo corregimos.
-    if ('filePaths' in rawInput && !('filePath' in rawInput)) {
-      const filePaths = rawInput.filePaths;
-      if (Array.isArray(filePaths) && filePaths.length > 0) {
-        // 1. Creamos una copia del input para no mutar el original.
-        const correctedInput = { ...rawInput };
-        // 2. Añadimos la clave correcta ('filePath') con el primer valor del array.
-        correctedInput.filePath = filePaths[0];
-        // 3. ELIMINAMOS la clave incorrecta ('filePaths') del objeto.
-        delete correctedInput.filePaths;
-        // 4. Devolvemos el objeto corregido y limpio.
-        return correctedInput;
-      }
-    }
-  }
-  // Si no hay nada que corregir, devolvemos el input original.
-  return input;
-}, z.object({
+export const getFileContentsParamsSchema = z.preprocess(correctFilePathsToSinglePath('filePath'), z.object({
   filePath: z.string().min(1, { message: "File path cannot be empty." })
-}).strict()); // .strict() ahora recibirá un objeto limpio.
+}).strict());
 
 export const getFileContents: ToolDefinition<
   typeof getFileContentsParamsSchema,

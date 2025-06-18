@@ -1,19 +1,19 @@
 // src/core/langgraph/nodes/ExecutorNode.ts
 import { AIMessage } from "@langchain/core/messages";
-import { IExecutorService, IToolRegistry, IContextBuilderService } from "../services/interfaces/DependencyInterfaces"; // <-- MODIFICAR: Añadir IContextBuilderService
+import { IExecutorService, IToolRegistry, IContextBuilderService } from "../services/interfaces/DependencyInterfaces";
 import { GraphPhase, SimplifiedOptimizedGraphState } from "../state/GraphState";
 import { BaseNode } from "./BaseNode";
 
 export class ExecutorNode extends BaseNode {
     private executorService: IExecutorService;
     private toolRegistry: IToolRegistry;
-    private contextBuilder: IContextBuilderService; // <-- AÑADIR
+    private contextBuilder: IContextBuilderService;
 
     constructor(dependencies: any, observability: any) {
         super(GraphPhase.EXECUTOR, dependencies, observability);
         this.executorService = dependencies.get('IExecutorService');
         this.toolRegistry = dependencies.get('IToolRegistry');
-        this.contextBuilder = dependencies.get('IContextBuilderService'); // <-- AÑADIR: Inyectar el servicio
+        this.contextBuilder = dependencies.get('IContextBuilderService');
     }
 
     protected async executeCore(state: SimplifiedOptimizedGraphState): Promise<Partial<SimplifiedOptimizedGraphState>> {
@@ -23,7 +23,6 @@ export class ExecutorNode extends BaseNode {
             throw new Error("ExecutorNode no recibió ninguna tarea para ejecutar.");
         }
 
-        // MODIFICAR: Creamos el contexto y llamamos al servicio.
         const executorContext = this.contextBuilder.forExecutor(state);
         console.log('[ExecutorNode] Contexto construido para executor:', JSON.stringify(executorContext, null, 2));
         const executorResult = await this.executorService.generateToolCall(executorContext);
@@ -32,7 +31,6 @@ export class ExecutorNode extends BaseNode {
         const thoughtMessage = new AIMessage({ content: `Executor Thought: ${executorResult.thought}` });
 
         const toolCallInfo = {
-            // Log explícito del nombre de la tool y parámetros
             toolLog: executorResult.tool,
             paramsLog: executorResult.parameters,
             tool: executorResult.tool,

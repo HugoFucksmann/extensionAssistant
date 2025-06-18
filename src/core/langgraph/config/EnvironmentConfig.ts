@@ -13,7 +13,8 @@ export class EnvironmentConfig {
                     maxGraphIterations: 50,
                     maxNodeIterations: {
                         ...baseConfig.maxNodeIterations,
-                        [GraphPhase.EXECUTION]: 15,
+                        [GraphPhase.EXECUTOR]: 15,
+                        [GraphPhase.TOOL_RUNNER]: 5,
                     },
 
                 };
@@ -24,7 +25,8 @@ export class EnvironmentConfig {
                     maxGraphIterations: 15,
                     maxNodeIterations: {
                         ...baseConfig.maxNodeIterations,
-                        [GraphPhase.EXECUTION]: 5,
+                        [GraphPhase.EXECUTOR]: 5,
+                        [GraphPhase.TOOL_RUNNER]: 5,
                     },
                 };
 

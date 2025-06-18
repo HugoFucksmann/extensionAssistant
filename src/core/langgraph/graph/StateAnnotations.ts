@@ -27,7 +27,7 @@ export class StateAnnotations {
             currentPhase: {
 
                 reducer: (current: GraphPhase, update?: GraphPhase) => update ?? current,
-                default: () => GraphPhase.ANALYSIS,
+                default: () => GraphPhase.PLANNER,
             },
 
 
@@ -79,9 +79,9 @@ export class StateAnnotations {
                 reducer: (current: Record<GraphPhase, number>, update?: Partial<Record<GraphPhase, number>>) =>
                     ({ ...(current || {}), ...(update || {}) }),
                 default: () => ({
-                    [GraphPhase.ANALYSIS]: 0,
-                    [GraphPhase.EXECUTION]: 0,
-                    [GraphPhase.VALIDATION]: 0,
+                    [GraphPhase.PLANNER]: 0,
+                    [GraphPhase.EXECUTOR]: 0,
+                    [GraphPhase.TOOL_RUNNER]: 0,
                     [GraphPhase.RESPONSE]: 0,
                     [GraphPhase.ERROR_HANDLER]: 0,
                     [GraphPhase.COMPLETED]: 0,

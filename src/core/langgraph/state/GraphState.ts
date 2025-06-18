@@ -2,21 +2,13 @@
 import { BaseMessage } from "@langchain/core/messages";
 
 export enum GraphPhase {
-    // Fases del ciclo Planner/Executor
     PLANNER = 'PLANNER',
     EXECUTOR = 'EXECUTOR',
     TOOL_RUNNER = 'TOOL_RUNNER',
-
-    // Fases Comunes
     RESPONSE = 'RESPONSE',
     ERROR_HANDLER = 'ERROR_HANDLER',
     COMPLETED = 'COMPLETED',
     ERROR = 'ERROR',
-
-    // Fases Antiguas (pueden ser eliminadas si no se usan en ningún otro sitio)
-    ANALYSIS = 'ANALYSIS',
-    EXECUTION = 'EXECUTION',
-    VALIDATION = 'VALIDATION',
 }
 
 export interface ToolExecution {
@@ -38,17 +30,12 @@ export interface SimplifiedOptimizedGraphState {
     // Execution & Context
     currentPlan: string[];
     currentTask?: string | null;
-    // MODIFICACIÓN: Este campo es gestionado por el PlannerNode. Sigue siendo útil para
-    // que el Planner evite reintentar la misma tarea indefinidamente si el ErrorNode
-    // decide 'retry'. Lo mantenemos.
     currentTaskRetryCount: number;
-    toolsUsed: ToolExecution[]; // Este campo no parece ser usado activamente, pero puede ser útil para depuración. Lo mantenemos por ahora.
-    workingMemory: string; // Gestionado por HybridMemoryService, pero no integrado en el flujo. Lo dejamos por si se integra en el futuro.
-    retrievedMemory: string; // Ídem.
+    toolsUsed: ToolExecution[];
+    workingMemory: string;
+    retrievedMemory: string;
 
     // Control Flags
-    // MODIFICACIÓN: Este campo no se usa en la nueva arquitectura. Lo eliminamos.
-    // requiresValidation: boolean; 
     isCompleted: boolean;
     lastToolOutput?: any;
 
@@ -61,5 +48,15 @@ export interface SimplifiedOptimizedGraphState {
     // Metadata
     startTime: number;
     error?: string;
-    debugInfo?: Record<string, any>;
+    debugInfo?: DebugInfo;
+}
+
+
+export interface DebugInfo {
+    pendingToolCall?: {
+        tool: string;
+        parameters: any;
+    };
+    rawResponseFromFailedNode?: string;
+    [key: string]: any; // Permite extensibilidad
 }

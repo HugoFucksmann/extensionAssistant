@@ -1,29 +1,27 @@
+// src/CommandManager.ts
 import * as vscode from 'vscode';
 import { WebviewProvider } from './vscode/webView/core/WebviewProvider';
 
 export class CommandManager {
   private commands: vscode.Disposable[] = [];
 
-  constructor(private readonly webviewProvider: WebviewProvider) { }
-
-  public getCommands(): vscode.Disposable[] {
-    const newCommands = [
+  constructor(private readonly webviewProvider: WebviewProvider) {
+    this.commands = [
       this.createOpenChatCommand(),
       this.createHistoryCommand(),
       this.createNewChatCommand(),
       this.createSettingsCommand(),
     ];
-    this.commands = newCommands;
-    return newCommands;
   }
 
-  public dispose(): void {
-    this.commands.forEach(command => command.dispose());
-    this.commands = [];
+  public getCommands(): vscode.Disposable[] {
+    return this.commands;
   }
 
+  // --- CAMBIOS DE CONSISTENCIA EN LOS NOMBRES DE COMANDOS ---
   private createOpenChatCommand(): vscode.Disposable {
-    return vscode.commands.registerCommand('extensionAssistant.openChat', () => {
+    // El comando para enfocar la vista debe seguir el patrón de la vista.
+    return vscode.commands.registerCommand('extensionAssistant.chat.focus', () => {
       vscode.commands.executeCommand('aiChat.chatView.focus');
     });
   }
@@ -35,14 +33,18 @@ export class CommandManager {
   }
 
   private createNewChatCommand(): vscode.Disposable {
-    return vscode.commands.registerCommand('extensionAssistant.newChat', () => {
+    return vscode.commands.registerCommand('extensionAssistant.chat.new', () => {
       this.webviewProvider.startNewChat();
     });
   }
 
   private createSettingsCommand(): vscode.Disposable {
-    return vscode.commands.registerCommand('extensionAssistant.settings', () => {
+    return vscode.commands.registerCommand('extensionAssistant.settings.open', () => {
       vscode.commands.executeCommand('workbench.action.openSettings', 'extensionAssistant');
     });
+  }
+
+  public dispose(): void {
+    this.commands.forEach(command => command.dispose());
   }
 }

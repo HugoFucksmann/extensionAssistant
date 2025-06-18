@@ -75,6 +75,13 @@ export interface ActiveEditorInfoToolOutput extends BaseToolOutput<{
   } | null;
 }> { }
 
+// --- NUEVO TIPO DE SALIDA AÑADIDO ---
+export interface SearchWorkspaceFilesToolOutput extends BaseToolOutput<{
+  relativePath: string;
+  absolutePath: string;
+}> { }
+
+
 // Mapeo de herramientas a sus tipos de salida
 export type ToolOutputMap = {
   getProjectSummary: ProjectSummaryToolOutput;
@@ -83,6 +90,7 @@ export type ToolOutputMap = {
   deletePath: DeletePathToolOutput;
   getFileContents: FileContentsToolOutput;
   getActiveEditorInfo: ActiveEditorInfoToolOutput;
+  searchWorkspaceFiles: SearchWorkspaceFilesToolOutput;
 };
 
 export type ToolName = keyof ToolOutputMap;

@@ -18,7 +18,7 @@ export class StateFactory {
             messages: [new HumanMessage(userInput)],
             userInput,
             chatId,
-            currentPhase: GraphPhase.ANALYSIS,
+            currentPhase: GraphPhase.PLANNER,
             currentPlan: [],
             toolsUsed: [],
             workingMemory: '',
@@ -27,9 +27,6 @@ export class StateFactory {
             isCompleted: false,
             iteration: 0,
             nodeIterations: {
-                [GraphPhase.ANALYSIS]: 0,
-                [GraphPhase.EXECUTION]: 0,
-                [GraphPhase.VALIDATION]: 0,
                 [GraphPhase.RESPONSE]: 0,
                 [GraphPhase.ERROR_HANDLER]: 0,
                 [GraphPhase.COMPLETED]: 0,
@@ -58,7 +55,7 @@ export class StateFactory {
             maxNodeIterations: config.maxNodeIterations,
 
             userInput: newUserInput,
-            currentPhase: GraphPhase.ANALYSIS,
+            currentPhase: GraphPhase.PLANNER,
             currentPlan: [],
             currentTask: undefined,
             toolsUsed: [],
@@ -67,9 +64,6 @@ export class StateFactory {
             lastToolOutput: undefined,
             iteration: 0,
             nodeIterations: {
-                [GraphPhase.ANALYSIS]: 0,
-                [GraphPhase.EXECUTION]: 0,
-                [GraphPhase.VALIDATION]: 0,
                 [GraphPhase.RESPONSE]: 0,
                 [GraphPhase.ERROR_HANDLER]: 0,
                 [GraphPhase.COMPLETED]: 0,

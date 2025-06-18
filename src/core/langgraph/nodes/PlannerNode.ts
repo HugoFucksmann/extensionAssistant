@@ -1,6 +1,6 @@
 // src/core/langgraph/nodes/PlannerNode.ts
 import { AIMessage, BaseMessage, ToolMessage, isAIMessage, isHumanMessage, isToolMessage } from "@langchain/core/messages";
-import { IPlannerService, IContextBuilderService } from "../services/interfaces/DependencyInterfaces"; // <-- MODIFICAR: Añadir IContextBuilderService
+import { IPlannerService, IContextBuilderService } from "../services/interfaces/DependencyInterfaces";
 import { GraphPhase, SimplifiedOptimizedGraphState } from "../state/GraphState";
 import { BaseNode } from "./BaseNode";
 
@@ -8,12 +8,12 @@ const MAX_TASK_RETRIES = 3;
 
 export class PlannerNode extends BaseNode {
     private plannerService: IPlannerService;
-    private contextBuilder: IContextBuilderService; // <-- AÑADIR
+    private contextBuilder: IContextBuilderService;
 
     constructor(dependencies: any, observability: any) {
         super(GraphPhase.PLANNER, dependencies, observability);
         this.plannerService = dependencies.get('IPlannerService');
-        this.contextBuilder = dependencies.get('IContextBuilderService'); // <-- AÑADIR: Inyectar el servicio
+        this.contextBuilder = dependencies.get('IContextBuilderService');
     }
 
     protected async executeCore(state: SimplifiedOptimizedGraphState): Promise<Partial<SimplifiedOptimizedGraphState>> {
@@ -40,7 +40,6 @@ export class PlannerNode extends BaseNode {
             };
         }
 
-        // MODIFICAR: Delegamos la creación del contexto al nuevo servicio.
         const plannerContext = this.contextBuilder.forPlanner(state);
         console.log('[PlannerNode] Contexto construido para planner:', JSON.stringify(plannerContext, null, 2));
 
@@ -85,7 +84,6 @@ export class PlannerNode extends BaseNode {
             };
         }
 
-        // Solo sugerir la próxima tarea (nextTask)
         return {
             messages: [...state.messages, thoughtMessage],
             currentPlan: planResult.plan,
@@ -93,8 +91,4 @@ export class PlannerNode extends BaseNode {
             currentTaskRetryCount: 0,
         };
     }
-
-    // ELIMINAR: Estos métodos ya no son necesarios aquí.
-    // private formatChatHistory(messages: BaseMessage[]): string { ... }
-    // private formatExecutionHistory(messages: BaseMessage[]): string { ... }
 }

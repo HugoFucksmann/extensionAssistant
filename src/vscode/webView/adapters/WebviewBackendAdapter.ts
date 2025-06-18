@@ -88,7 +88,7 @@ export class WebviewBackendAdapter {
         }
     }
 
-    async switchModel(modelType: 'gemini' | 'ollama'): Promise<OperationResult> {
+    public async switchModel(modelType: 'gemini' | 'ollama'): Promise<OperationResult> {
         if (!modelType || !['gemini', 'ollama'].includes(modelType)) {
             return {
                 success: false,
