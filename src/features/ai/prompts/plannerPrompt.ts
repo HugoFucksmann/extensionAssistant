@@ -36,10 +36,13 @@ ESQUEMA JSON DE SALIDA:
 HISTORIAL DE LA CONVERSACIÓN (mensajes anteriores de usuario y asistente):
 {chatHistory}
 
+MEMORIA DE TRABAJO (resumen de lo que se ha aprendido hasta ahora):
+{workingMemory}
+
 PLAN ACTUAL (puede estar vacío):
 {currentPlan}
 
-HISTORIAL DE EJECUCIÓN (resultados de todas las herramientas ejecutadas en este turno):
+HISTORIAL DE EJECUCIÓN (resultados de herramientas en este turno):
 {executionHistory}
 `]
 ]);

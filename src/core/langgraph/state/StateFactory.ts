@@ -34,7 +34,8 @@ export class StateFactory {
             },
             maxGraphIterations: config.maxGraphIterations,
             maxNodeIterations: config.maxNodeIterations,
-            startTime: Date.now()
+            startTime: Date.now(),
+            turnScratchpad: '',
         };
     }
 
@@ -72,6 +73,7 @@ export class StateFactory {
             startTime: Date.now(),
             error: undefined,
             debugInfo: {},
+            turnScratchpad: '',
         };
     }
 }

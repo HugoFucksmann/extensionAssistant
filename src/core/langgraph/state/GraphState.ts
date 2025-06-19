@@ -49,6 +49,8 @@ export interface SimplifiedOptimizedGraphState {
     startTime: number;
     error?: string;
     debugInfo?: DebugInfo;
+
+    turnScratchpad: string;
 }
 
 

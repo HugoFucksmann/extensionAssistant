@@ -4,8 +4,8 @@ import { SimplifiedOptimizedGraphState } from "../state/GraphState";
 import { IToolRegistry } from "./interfaces/DependencyInterfaces";
 
 
-export type PlannerContext = { userQuery: string; currentPlan: string[]; chatHistory: string; executionHistory: string; };
-export type ExecutorContext = { userQuery: string; task: string; availableTools: string; };
+export type PlannerContext = { userQuery: string; currentPlan: string[]; chatHistory: string; executionHistory: string; workingMemory: string; };
+export type ExecutorContext = { userQuery: string; task: string; availableTools: string; currentPlan: string[]; workingMemory: string; };
 export type ResponderContext = {
     userQuery: string;
     chatHistory: string;
@@ -36,6 +36,7 @@ export class ContextBuilderService {
             currentPlan: state.currentPlan,
             chatHistory,
             executionHistory,
+            workingMemory: state.workingMemory || "La memoria de trabajo está vacía.",
         };
     }
 
@@ -53,13 +54,12 @@ export class ContextBuilderService {
             `Tool: ${tool.name}\nDescription: ${tool.description}\nParameters (Zod Schema): ${JSON.stringify(tool.parametersSchema.description || tool.parametersSchema._def, null, 2)}`
         ).join('\n\n---\n\n');
 
-
-        this.formatMessagesForHistory(state.messages, false, maxMessages, maxToolResults, previousSummary);
-
         return {
             userQuery: state.userInput,
             task: state.currentTask,
             availableTools,
+            currentPlan: state.currentPlan,
+            workingMemory: state.workingMemory || "La memoria de trabajo está vacía.",
         };
     }
 
@@ -109,9 +109,9 @@ export class ContextBuilderService {
         const recentMessages = messages.slice(-maxMessages);
 
         for (const msg of recentMessages) {
-            if (isHumanMessage(msg)) {
+            if (isHumanMessage(msg) && typeof msg.content === 'string') {
                 chatHistory.push(`User: ${msg.content}`);
-            } else if (isAIMessage(msg)) {
+            } else if (isAIMessage(msg) && typeof msg.content === 'string') {
                 // Opcionalmente incluir los "thoughts" del sistema para el prompt final.
                 if (includeSystemThoughts || !/^(Planner|Executor) Thought:/.test(msg.content as string)) {
                     chatHistory.push(`Assistant: ${msg.content}`);

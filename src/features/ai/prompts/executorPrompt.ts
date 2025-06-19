@@ -32,5 +32,14 @@ ESQUEMA JSON DE SALIDA:
 
 CONTEXTO GENERAL (Consulta original del usuario):
 {userQuery}
+
+CONTEXTO GENERAL (Consulta original del usuario):
+{userQuery}
+
+PLAN ACTUAL (para entender el contexto de la tarea):
+{currentPlan}
+
+MEMORIA DE TRABAJO (información útil ya recopilada):
+{workingMemory}
 `]
 ]);
