@@ -84,7 +84,6 @@ export interface SearchWorkspaceFilesToolOutput extends BaseToolOutput<{
 
 // Mapeo de herramientas a sus tipos de salida
 export type ToolOutputMap = {
-  getProjectSummary: ProjectSummaryToolOutput;
   runInTerminal: RunInTerminalToolOutput;
   createFileOrDirectory: CreateFileOrDirectoryToolOutput;
   deletePath: DeletePathToolOutput;

@@ -94,8 +94,6 @@ export interface RunInTerminalToolOutput extends BaseToolOutput<{
 
 
 export type ToolOutputMap = {
-  // Workspace
-  getProjectSummary: ProjectSummaryToolOutput;
 
   // Filesystem
   getFileContents: FileContentsToolOutput;

@@ -10,10 +10,3 @@ export const allToolDefinitions = [
   ...filesystemToolDefinitions,
   ...terminalToolDefinitions,
 ];
-
-export {
-  workspaceToolDefinitions,
-  editorToolDefinitions,
-  filesystemToolDefinitions,
-  terminalToolDefinitions,
-};

@@ -9,11 +9,4 @@ export const filesystemToolDefinitions = [
   createFileOrDirectory,
   deletePath,
   writeToFile,
-];
-
-export {
-  getFileContents,
-  createFileOrDirectory,
-  deletePath,
-  writeToFile,
-};
+];  

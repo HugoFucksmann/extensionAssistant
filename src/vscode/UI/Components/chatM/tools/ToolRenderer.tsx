@@ -31,7 +31,6 @@ const TOOL_COMPONENTS: Record<string, React.ComponentType<any>> = {
   console_command: ConsoleCommandTool,
   terminal: ConsoleCommandTool,
   getGitStatus: GitStatusTool,
-  getProjectSummary: ProjectSummaryTool,
 }
 
 export const ToolRenderer: React.FC<ToolRendererProps> = ({

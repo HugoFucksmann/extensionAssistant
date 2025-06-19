@@ -2,10 +2,5 @@
 import { runInTerminal } from './runInTerminal';
 
 export const terminalToolDefinitions = [
-
   runInTerminal,
 ];
-
-export {
-  runInTerminal,
-};

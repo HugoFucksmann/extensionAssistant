@@ -1,25 +1,30 @@
 // src/features/tools/definitions/filesystem/writeToFile.ts
 import * as vscode from 'vscode';
 import { z } from 'zod';
-import { ToolDefinition, ToolResult, } from '../../types';
-import { buildWorkspaceUri } from '@shared/utils/pathUtils';
-import { correctFilePathsToSinglePath } from '@shared/utils/zodUtils';
+import { ToolDefinition, ToolResult } from '../../types';
+import { buildWorkspaceUri } from '../../../../shared/utils/pathUtils';
+import { correctFilePathsToSinglePath } from '../../../../shared/utils/zodUtils';
 
-export const writeToFileParamsSchema = z.preprocess(correctFilePathsToSinglePath('path'), z.object({
-  path: z.string().min(1, { message: "File path cannot be empty." }),
-  content: z.string()
-}).strict());
+export const writeToFileParamsSchema = z.preprocess(
+  correctFilePathsToSinglePath('path'),
+  z.object({
+    path: z.string().min(1, { message: "File path cannot be empty." }),
+    content: z.string()
+  }).strict()
+);
 
-export const writeToFile: ToolDefinition<typeof writeToFileParamsSchema, { filePath: string }> = {
-  getUIDescription: (params) => `Escribir en archivo: ${params?.path?.split(/[\\/]/).pop() || 'archivo'}`,
-  uiFeedback: true,
+type WriteToFileResultData = {
+  filePath: string;
+};
+
+export const writeToFile: ToolDefinition<typeof writeToFileParamsSchema, WriteToFileResultData> = {
   name: 'writeToFile',
-  description: 'Writes or overwrites content to a specified file. The path must be provided in the "path" parameter. If multiple paths are sent, only the first one is processed. Creates parent directories if they do not exist. The path must be relative to the workspace root.',
+  description: 'Writes or overwrites content to a specified file. Creates parent directories if they do not exist. The path must be relative to the workspace root.',
   parametersSchema: writeToFileParamsSchema,
-  async execute(
-    params,
-    context
-  ): Promise<ToolResult<{ filePath: string }>> {
+  uiFeedback: true,
+  getUIDescription: (params) => `Escribir en archivo: ${params?.path?.split(/[\\/]/).pop() || 'archivo'}`,
+
+  async execute(params, context): Promise<ToolResult<WriteToFileResultData>> {
     const { path, content } = params;
     let targetUri: vscode.Uri | undefined;
 
