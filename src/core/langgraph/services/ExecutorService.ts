@@ -23,6 +23,8 @@ export class ExecutorService {
             task: context.task,
             userQuery: context.userQuery,
             availableTools: context.availableTools,
+            workingMemory: context.workingMemory,
+            currentPlan: context.currentPlan.join('\n') || 'N/A',
         });
     }
 }

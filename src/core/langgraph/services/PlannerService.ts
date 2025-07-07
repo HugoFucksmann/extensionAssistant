@@ -24,6 +24,7 @@ export class PlannerService {
             chatHistory: context.chatHistory,
             currentPlan: context.currentPlan.join('\n') || 'N/A',
             executionHistory: context.executionHistory,
+            workingMemory: context.workingMemory,
         });
     }
 }
