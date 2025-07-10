@@ -37,21 +37,30 @@ export class GraphBuilder {
         workflow.addNode(GraphPhase.RESPONSE, respondNode.execute.bind(respondNode));
         workflow.addNode(GraphPhase.ERROR_HANDLER, errorNode.execute.bind(errorNode));
 
-        workflow.addEdge(START, GraphPhase.PLANNER);
+        workflow.setEntryPoint(GraphPhase.PLANNER);
 
-        workflow.addConditionalEdges(GraphPhase.PLANNER, TransitionLogic.afterPlanner, {
+        workflow.addConditionalEdges(GraphPhase.PLANNER, TransitionLogic.route, {
             [GraphPhase.EXECUTOR]: GraphPhase.EXECUTOR,
             [GraphPhase.RESPONSE]: GraphPhase.RESPONSE,
             [GraphPhase.ERROR_HANDLER]: GraphPhase.ERROR_HANDLER,
         });
 
-        workflow.addEdge(GraphPhase.EXECUTOR, GraphPhase.TOOL_RUNNER);
-        workflow.addEdge(GraphPhase.TOOL_RUNNER, GraphPhase.PLANNER);
+        workflow.addConditionalEdges(GraphPhase.EXECUTOR, TransitionLogic.route, {
+            [GraphPhase.TOOL_RUNNER]: GraphPhase.TOOL_RUNNER,
+            [GraphPhase.RESPONSE]: GraphPhase.RESPONSE, // En caso de que no haya herramienta que llamar
+        });
 
-        // AÑADIR la nueva conexión de vuelta al Planner.
-        workflow.addEdge(GraphPhase.ERROR_HANDLER, GraphPhase.PLANNER);
+        workflow.addConditionalEdges(GraphPhase.TOOL_RUNNER, TransitionLogic.route, {
+            [GraphPhase.EXECUTOR]: GraphPhase.EXECUTOR, // Bucle para la siguiente tarea
+            [GraphPhase.RESPONSE]: GraphPhase.RESPONSE,   // Fin del plan
+            [GraphPhase.ERROR_HANDLER]: GraphPhase.ERROR_HANDLER,
+        });
+        
+        workflow.addConditionalEdges(GraphPhase.ERROR_HANDLER, TransitionLogic.route, {
+            [GraphPhase.PLANNER]: GraphPhase.PLANNER, // Re-planificar
+            [GraphPhase.RESPONSE]: GraphPhase.RESPONSE, // Error irrecuperable
+        });
 
-        // El único nodo que ahora termina el grafo es el de respuesta.
         workflow.addEdge(GraphPhase.RESPONSE, END);
 
         return workflow;

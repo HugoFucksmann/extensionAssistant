@@ -31,8 +31,19 @@ export class ContextBuilderService {
             maxToolResults,
             previousSummary
         );
+        let userQuery = '';
+        if (typeof state.userInput === 'string') {
+            userQuery = state.userInput;
+        } else if (typeof state.userInput === 'object' && state.userInput !== null) {
+            const input = state.userInput as { userInput?: string; attachedFile?: { fileName: string; content: string } };
+            userQuery = input.userInput || '';
+            if (input.attachedFile) {
+                userQuery += `\n\n--- Archivo Adjunto: ${input.attachedFile.fileName} ---\n${input.attachedFile.content}\n--- Fin del Archivo Adjunto ---`;
+            }
+        }
+
         return {
-            userQuery: state.userInput,
+            userQuery,
             currentPlan: state.currentPlan,
             chatHistory,
             executionHistory,

@@ -32,31 +32,36 @@ export class ErrorNode extends BaseNode {
 
         const updatedState: Partial<SimplifiedOptimizedGraphState> = {
             messages: [...state.messages, systemMessage],
-            error: undefined,
         };
 
         switch (decision.decision) {
             case 'modify_plan':
-
                 updatedState.currentPlan = decision.newPlan;
                 updatedState.currentTask = undefined;
+                updatedState.currentTaskIndex = 0; // Reset index for the new plan
                 console.log('[ErrorNode] Modifying plan. New plan:', decision.newPlan);
                 break;
 
             case 'retry':
-
+                // No state change needed, just clear the error and let it re-route to planner
                 console.log('[ErrorNode] Retrying task. The Planner will re-evaluate.');
                 break;
 
             case 'continue':
-
                 if (state.currentTask && state.currentPlan.includes(state.currentTask)) {
-                    updatedState.currentPlan = state.currentPlan.filter(task => task !== state.currentTask);
+                    const taskIndex = state.currentPlan.indexOf(state.currentTask);
+                    // If we are not at the end of the plan, increment the index
+                    if (taskIndex < state.currentPlan.length - 1) {
+                        updatedState.currentTaskIndex = taskIndex + 1;
+                    }
                 }
                 updatedState.currentTask = undefined;
                 console.log('[ErrorNode] Error deemed non-critical. Continuing with the next task.');
                 break;
         }
+
+        // ALWAYS clear the error after handling it.
+        updatedState.error = undefined;
 
         return updatedState;
     }

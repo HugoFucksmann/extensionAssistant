@@ -6,14 +6,14 @@ import { resolveFileFromInput } from '../../../../shared/utils/pathUtils';
 import { correctFilePathsToSinglePath } from '../../../../shared/utils/zodUtils';
 
 export const getFileContentsParamsSchema = z.preprocess(
-  correctFilePathsToSinglePath('filePath'),
+  correctFilePathsToSinglePath('path'),
   z.object({
-    filePath: z.string().min(1, { message: "File path cannot be empty." })
+    path: z.string().min(1, { message: "File path cannot be empty." })
   }).strict()
 );
 
 type FileContentsData = {
-  filePath: string;
+  path: string;
   content: string;
   fileSize: number;
   lastModified: string;
@@ -28,10 +28,10 @@ export const getFileContents: ToolDefinition<typeof getFileContentsParamsSchema,
   description: 'Gets the content of a single, specified file. The path can be absolute, relative to the workspace root, or just a filename.',
   parametersSchema: getFileContentsParamsSchema,
   uiFeedback: true,
-  getUIDescription: (params) => `Leer archivo: ${params?.filePath?.split(/[\\/]/).pop() || 'archivo'}`,
+  getUIDescription: (params) => `Leer archivo: ${params?.path?.split(/[\\/]/).pop() || 'archivo'}`,
 
   async execute(params, context): Promise<ToolResult<FileContentsData>> {
-    const { filePath: requestedPath } = params;
+    const { path: requestedPath } = params;
 
     try {
       const resolution = await resolveFileFromInput(context.vscodeAPI, requestedPath);
@@ -54,7 +54,7 @@ export const getFileContents: ToolDefinition<typeof getFileContentsParamsSchema,
       return {
         success: true,
         data: {
-          filePath: resolution.relativePath!,
+          path: resolution.relativePath!,
           content,
           fileSize: stat.size,
           lastModified: new Date(stat.mtime).toISOString(),

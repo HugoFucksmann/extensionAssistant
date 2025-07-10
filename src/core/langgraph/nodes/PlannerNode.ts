@@ -81,6 +81,7 @@ export class PlannerNode extends BaseNode {
                 currentTask: undefined,
                 isCompleted: true,
                 currentTaskRetryCount: 0,
+                currentTaskIndex: 0, // Reset index
             };
         }
 
@@ -89,6 +90,7 @@ export class PlannerNode extends BaseNode {
             currentPlan: planResult.plan,
             currentTask: planResult.nextTask ?? undefined,
             currentTaskRetryCount: 0,
+            currentTaskIndex: 0, // Start plan execution from the first task
         };
     }
 }

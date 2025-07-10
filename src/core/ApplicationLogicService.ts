@@ -51,6 +51,9 @@ export class ApplicationLogicService implements Disposable {
       engineConfig
     );
 
+    // Asignar la tarea actual explícitamente
+    stateForNewTurn.currentTask = fullInput;
+
     this.conversationManager.updateConversationState(chatId, stateForNewTurn);
 
     this.agentEngine.run(stateForNewTurn)

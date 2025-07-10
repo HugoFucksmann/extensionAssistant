@@ -18,9 +18,15 @@ export class ToolRunnerNode extends BaseNode {
     protected async executeCore(state: SimplifiedOptimizedGraphState): Promise<Partial<SimplifiedOptimizedGraphState>> {
         const toolCall = state.debugInfo?.pendingToolCall;
         if (!toolCall || !toolCall.tool) {
-            throw new Error("ToolRunnerNode no recibió ninguna herramienta para ejecutar desde el ExecutorNode.");
+            // Esto podría significar que no se necesita ninguna herramienta, así que pasamos al siguiente paso.
+            console.log("[ToolRunnerNode] No hay herramienta pendiente para ejecutar. Avanzando al siguiente paso.");
+            return {
+                currentTaskIndex: state.currentTaskIndex + 1,
+                currentTask: undefined,
+            };
         }
 
+        console.log(`[ToolRunnerNode] Ejecutando herramienta: ${toolCall.tool} con parámetros:`, toolCall.parameters);
         const toolResult = await this.toolRegistry.executeTool(toolCall.tool, toolCall.parameters, { chatId: state.chatId });
 
         const toolMessageContent = toolResult.success
@@ -41,9 +47,19 @@ export class ToolRunnerNode extends BaseNode {
             state.currentTask
         );
 
+        // Si la herramienta tuvo éxito, avanzamos al siguiente índice.
+        const nextTaskIndex = toolResult.success ? state.currentTaskIndex + 1 : state.currentTaskIndex;
+        
+        // Si hemos completado todas las tareas, marcamos como completado.
+        const isCompleted = nextTaskIndex >= state.currentPlan.length;
+
         return {
             messages: [...state.messages, toolMessage],
             debugInfo: { ...state.debugInfo, pendingToolCall: undefined },
+            currentTaskIndex: nextTaskIndex,
+            currentTask: undefined, // Limpiamos la tarea actual
+            isCompleted: isCompleted,
+            error: toolResult.success ? undefined : toolResult.error, // Propagamos el error si lo hubo
         };
     }
 }

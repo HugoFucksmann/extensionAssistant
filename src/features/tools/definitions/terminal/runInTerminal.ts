@@ -7,13 +7,13 @@ export const runInTerminalParamsSchema = z.object({
 });
 
 type RunInTerminalResultData = {
-  terminalName: string;
-  commandSent: boolean;
+  stdout: string;
+  stderr: string;
 };
 
 export const runInTerminal: ToolDefinition<typeof runInTerminalParamsSchema, RunInTerminalResultData> = {
   name: 'runInTerminal',
-  description: 'Executes a shell command in a new, visible VS Code terminal named "Extension Assistant". Use for installations (npm, pip), running scripts, git commands, etc. This command does not return the output, it only confirms execution.',
+  description: 'Executes a shell command and returns its standard output and error. Use for non-interactive commands like `ls`, `git status`, `cat file`, etc.',
   parametersSchema: runInTerminalParamsSchema,
   uiFeedback: true,
   getUIDescription: (params) => `Ejecutar en terminal: ${params.command}`,
@@ -29,32 +29,36 @@ export const runInTerminal: ToolDefinition<typeof runInTerminalParamsSchema, Run
       };
     }
 
+    const { exec } = await import('child_process');
+    const util = await import('util');
+    const execPromise = util.promisify(exec);
+
     try {
-      context.dispatcher.systemInfo(`Executing command in VS Code terminal: ${command}`, { command }, 'runInTerminal');
+      context.dispatcher.systemInfo(`Executing command: ${command}`, { command }, 'runInTerminal');
+      
+      const { stdout, stderr } = await execPromise(command, { cwd: workspaceFolder.uri.fsPath });
 
-      let terminal = context.vscodeAPI.window.terminals.find(t => t.name === 'Extension Assistant');
-      if (!terminal || terminal.exitStatus) { // Create new if not found or if it was closed
-        terminal = context.vscodeAPI.window.createTerminal({
-          name: 'Extension Assistant',
-          cwd: workspaceFolder.uri,
-        });
+      if (stderr) {
+        console.warn(`[runInTerminal] Command "${command}" produced stderr:`, stderr);
+        // We'll return stderr along with stdout, as some tools use stderr for progress info
       }
-
-      terminal.show();
-      terminal.sendText(command, true); // true to execute the command immediately
 
       return {
         success: true,
         data: {
-          terminalName: 'Extension Assistant',
-          commandSent: true,
+          stdout,
+          stderr,
         },
       };
     } catch (error: any) {
       console.error(`[runInTerminal] Failed to execute command "${command}":`, error);
       return {
         success: false,
-        error: `Failed to send command to terminal. Reason: ${error.message}`,
+        error: `Command execution failed: ${error.message}`,
+        data: {
+          stdout: error.stdout,
+          stderr: error.stderr,
+        }
       };
     }
   },

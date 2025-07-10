@@ -18,33 +18,37 @@ export class ExecutorNode extends BaseNode {
 
     protected async executeCore(state: SimplifiedOptimizedGraphState): Promise<Partial<SimplifiedOptimizedGraphState>> {
         console.log('--- [ExecutorNode] INICIO ---');
-        console.log('Estado recibido:', JSON.stringify(state, null, 2));
-        if (!state.currentTask) {
-            throw new Error("ExecutorNode no recibió ninguna tarea para ejecutar.");
+        
+        const { currentPlan, currentTaskIndex } = state;
+
+        if (!currentPlan || currentTaskIndex >= currentPlan.length) {
+            console.log('[ExecutorNode] No hay más tareas o plan. Completando.');
+            return { isCompleted: true };
         }
 
+        const task = currentPlan[currentTaskIndex];
+        console.log(`[ExecutorNode] Tarea actual (índice ${currentTaskIndex}): ${task}`);
+
+        // Asignar la tarea al estado ANTES de construir el contexto.
+        state.currentTask = task;
+
         const executorContext = this.contextBuilder.forExecutor(state);
-        console.log('[ExecutorNode] Contexto construido para executor:', JSON.stringify(executorContext, null, 2));
+        console.log('[ExecutorNode] Contexto construido para executor.');
+        
         const executorResult = await this.executorService.generateToolCall(executorContext);
         console.log('[ExecutorNode] Resultado de executorService:', JSON.stringify(executorResult, null, 2));
 
-        const thoughtMessage = new AIMessage({ content: `Executor Thought: ${executorResult.thought}` });
+        const thoughtMessage = new AIMessage({ content: executorResult.thought });
 
         const toolCallInfo = {
-            toolLog: executorResult.tool,
-            paramsLog: executorResult.parameters,
             tool: executorResult.tool,
             parameters: executorResult.parameters,
         };
 
-        console.log('[ExecutorNode] Estado resultante:', {
-            pendingToolCall: toolCallInfo,
-            currentTask: undefined
-        });
         return {
             messages: [...state.messages, thoughtMessage],
             debugInfo: { ...state.debugInfo, pendingToolCall: toolCallInfo },
-            currentTask: undefined,
+            currentTask: task, // Keep the current task for the ToolRunnerNode
         };
     }
 }

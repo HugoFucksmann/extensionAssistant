@@ -29,6 +29,7 @@ export interface SimplifiedOptimizedGraphState {
 
     // Execution & Context
     currentPlan: string[];
+    currentTaskIndex: number;
     currentTask?: string | null;
     currentTaskRetryCount: number;
     toolsUsed: ToolExecution[];

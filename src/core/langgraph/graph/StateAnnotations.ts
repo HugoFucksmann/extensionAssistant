@@ -47,6 +47,14 @@ export class StateAnnotations {
                     [...(current || []), ...(update || [])],
                 default: () => [],
             },
+            currentTaskIndex: {
+                reducer: (current: number, update?: number) => update ?? current,
+                default: () => 0,
+            },
+            currentTaskRetryCount: {
+                reducer: (current: number, update?: number) => update ?? current,
+                default: () => 0,
+            },
             workingMemory: {
 
                 reducer: (current: string, update?: string) => update ?? current,
